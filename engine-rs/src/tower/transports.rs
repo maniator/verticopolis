@@ -421,14 +421,9 @@ impl Tower {
             .schedule
             .as_ref()
             .and_then(|s| s.home_floors.clone());
-        let mut coerced = Schedule::coerce(Some(raw), cars, bottom, top);
-        if !self.mode.schedule_assist() {
-            // Auto is a Modern assist; a Classic schedule never carries it.
-            coerced = coerced.and_then(|mut sch| {
-                sch.auto_tune = false;
-                (!sch.is_empty()).then_some(sch)
-            });
-        }
+        let assist = self.mode.schedule_assist();
+        let coerced =
+            Schedule::coerce(Some(raw), cars, bottom, top).and_then(|s| s.kept_by_mode(assist));
         self.transports[i].schedule = coerced.map(|sch| {
             if sch.home_floors == previous_homes {
                 sch

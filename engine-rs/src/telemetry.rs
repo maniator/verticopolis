@@ -158,11 +158,27 @@ impl Simulation {
             let t = &self.tower.transports[ti];
             let cap = t.cars as f64 * t.kind.car_capacity();
             let load = self.elevators.riders_aboard(t, &self.crowd);
-            let frac = if cap > 0.0 {
-                (load / cap).min(1.0)
-            } else {
-                0.0
+            let share = |riders: f64| {
+                if cap > 0.0 {
+                    (riders / cap).min(1.0)
+                } else {
+                    0.0
+                }
             };
+            let frac = share(load);
+            // The ring also counts the Modern lines at the shaft's stops: a
+            // shaft cut to one car carries no more than one car holds, so
+            // the riders it leaves waiting are the demand Auto-tune must see
+            // to win its cars back (split-tower 29, 4.12.0). Classic counts
+            // no lines, so its ring is the riders aboard as before.
+            let line = |floor: i64| self.crowd.shaft_lines.get(&(t.id, floor));
+            let stops = self.tower.stops_of(t);
+            let waiting: f64 = stops
+                .iter()
+                .filter_map(|&f| line(f))
+                .map(|l| l.riders as f64)
+                .sum();
+            let demand = share(load + waiting);
             alive_hourly.push(t.id);
             let rings = tel.hourly.entry(t.id).or_insert_with(HourlyByDay::empty);
             let sized = |n: usize| n == 24;
@@ -180,9 +196,9 @@ impl Simulation {
             };
             // The first sample of an hour seeds it, a measured zero included.
             ring[hour] = if !sampled[hour] {
-                frac
+                demand
             } else {
-                0.3 * frac + 0.7 * ring[hour]
+                0.3 * demand + 0.7 * ring[hour]
             };
             sampled[hour] = true;
             let origins = tel.origins.entry(t.id).or_insert_with(OriginRings::empty);

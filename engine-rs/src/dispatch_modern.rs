@@ -63,6 +63,10 @@ pub struct DispatchRules {
     /// floors first (`dispatch_leaving.rs`). Both modes; the plain SCAN
     /// profile leaves it off.
     pub riders_go_their_way: bool,
+    /// An Auto schedule (a Modern assist) runs every car while a line backs
+    /// up at the shaft (`Schedule::cars_for_backlog`). Classic never does,
+    /// even for a schedule a crafted save marks Auto.
+    pub auto_backlog: bool,
     /// How many times the base speed a standard or service car moves.
     pub car_speed: f64,
     /// How many times the base speed an express car moves.
@@ -82,6 +86,7 @@ impl DispatchRules {
             parked_reach_gate: false,
             full_car_passes: mode.full_cars_pass_hall_calls(),
             riders_go_their_way: true,
+            auto_backlog: mode.schedule_assist(),
             car_speed: mode.car_speed_factor(),
             express_speed: mode.express_speed_factor(),
         }
@@ -104,6 +109,7 @@ impl DispatchRules {
             parked_reach_gate: true,
             full_car_passes: false,
             riders_go_their_way: false,
+            auto_backlog: false,
             car_speed: 1.0,
             express_speed: 1.0,
         }

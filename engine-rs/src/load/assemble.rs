@@ -260,7 +260,9 @@ pub(crate) fn assemble(
                     && t.get("preserveBasementStops").and_then(Value::as_bool) == Some(true),
                 classic_express_stops: kind == Kind::ElevatorExpress
                     && t.get("classicExpressStops").and_then(Value::as_bool) == Some(true),
-                schedule: Schedule::coerce(t.get("schedule"), cars, bottom, top),
+                // A Classic tower never keeps Auto on, whatever the file says.
+                schedule: Schedule::coerce(t.get("schedule"), cars, bottom, top)
+                    .and_then(|s| s.kept_by_mode(mode.schedule_assist())),
                 rides: 0,
             };
             mapped.push((tr, sane_id(t.get("id"))));
