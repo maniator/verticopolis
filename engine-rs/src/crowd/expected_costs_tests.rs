@@ -21,7 +21,7 @@ fn two_ways_up() -> (Simulation, i64, i64) {
     sim.crowd.begin_step();
     let lobby = sim.tower.seg_at(1, Some(30.0));
     let top = sim.tower.seg_at(15, Some(30.0));
-    fastest_path(&mut sim.crowd, &sim.tower, lobby, top).expect("a route");
+    fastest_path(&mut sim.crowd, &sim.tower, lobby, None, top).expect("a route");
     (sim, express, local)
 }
 

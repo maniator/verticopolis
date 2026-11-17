@@ -235,7 +235,7 @@ pub fn plan(
         // two like shafts' lines, and each rider joining one sends the next
         // to its twin. A coin toss could send a rider to the long line, or to
         // a shaft whose cars the schedule stood down.
-        let mut r = expected_time::fastest_path(crowd, tower, a, b)?;
+        let mut r = expected_time::fastest_path(crowd, tower, a, from_x, b)?;
         to_real_floors(&mut r);
         return Some((r, true));
     }

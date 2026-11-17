@@ -134,6 +134,8 @@ pub struct Router {
     /// The bound search's scratch, kept the same way.
     bound_scratch: BoundScratch,
     shafts: FastMap<i64, Shaft>,
+    /// Where each passenger shaft stands, for the walk to it (`walk`).
+    walks: walk::Walks,
     step: i64,
     /// Riders in line or on the way to one, and the longest wait in each
     /// line, by (shaft id, floor).
@@ -286,6 +288,7 @@ fn build(tower: &Tower) -> Router {
         heap: BinaryHeap::new(),
         bound_scratch: BoundScratch::default(),
         shafts,
+        walks: walk::Walks::new(tower),
         step: -1,
         waiting: FastMap::default(),
         spare: FastMap::default(),
@@ -351,9 +354,9 @@ fn stand_down(router: &mut Router, closed: &[(i64, i64)]) {
     }
 }
 
-/// The cheapest route from segment `from` to segment `to`. Ties go to the
-/// node reached first, in the graph's built order.
-fn cheapest(router: &mut Router, from: i64, to: i64) -> Option<Route> {
+/// The cheapest route from segment `from`, standing at `x` on it, to `to`,
+/// the walk to the first shaft included. Ties go to the first node reached.
+fn cheapest(router: &mut Router, from: i64, x: Option<f64>, to: i64) -> Option<Route> {
     if from == to {
         return Some(Route {
             floors: vec![from],
@@ -362,15 +365,16 @@ fn cheapest(router: &mut Router, from: i64, to: i64) -> Option<Route> {
     }
     let start = *router.place.get(&Node::Segment(from))?;
     let goal = *router.place.get(&Node::Segment(to))?;
-    if let Some(kept) = router.step_costs.route(start, goal) {
+    let key = walk::route_key(start, goal, x);
+    if let Some(kept) = router.step_costs.route(key) {
         return kept.clone();
     }
-    let found = search(router, start, goal);
+    let found = walk::search_from(router, start, x, goal);
     let route = found.then(|| walk_back(router, start, goal));
     for p in router.touched.drain(..) {
         router.best[p as usize] = i64::MAX;
     }
-    router.step_costs.keep_route(start, goal, &route);
+    router.step_costs.keep_route(key, &route);
     route
 }
 
@@ -461,9 +465,15 @@ fn walk_back(router: &Router, start: u32, goal: u32) -> Route {
     Route { floors, shafts }
 }
 
-/// The route with the shortest expected trip between two segments.
-pub fn fastest_path(crowd: &mut Crowd, tower: &Tower, from: i64, to: i64) -> Option<Route> {
-    cheapest(fresh(crowd, tower), from, to)
+/// The quickest expected route from segment `from`, standing at `x`, to `to`.
+pub fn fastest_path(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    from: i64,
+    x: Option<f64>,
+    to: i64,
+) -> Option<Route> {
+    cheapest(fresh(crowd, tower), from, x, to)
 }
 
 #[path = "expected_lines.rs"]
@@ -476,6 +486,8 @@ pub use lines::{join_line, keep_lines, spare_lines};
 mod bound;
 #[path = "expected_costs.rs"]
 mod costs;
+#[path = "expected_walk.rs"]
+mod walk;
 use bound::{bound_toward, carry_bounds, keep_bound, BoundScratch, Inbound, Toward, UNREACHABLE};
 use costs::{line_cost, number_lines, StepCosts, NO_LINE};
 

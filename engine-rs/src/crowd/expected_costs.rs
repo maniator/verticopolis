@@ -12,6 +12,9 @@ use super::super::fasthash::FastMap;
 use super::super::Route;
 use super::{tenths, Link, Move, Router};
 
+/// A kept route's start and goal places and where the rider stands
+/// (`walk::route_key`).
+type RouteKey = (u32, u32, u64);
 /// `Link::line` of a link that boards no car.
 pub(super) const NO_LINE: u32 = u32::MAX;
 /// The most routes kept at once: past it the kept ones go and are searched
@@ -30,8 +33,8 @@ pub(super) struct StepCosts {
     /// the last one is out of date. Starts at 1, so an entry never worked
     /// out (0) is out of date too.
     changes: u32,
-    /// The routes found since the lines last changed, by (start, goal).
-    routes: FastMap<(u32, u32), Option<Route>>,
+    /// The routes found since the lines last changed, by `RouteKey`.
+    routes: FastMap<RouteKey, Option<Route>>,
 }
 
 /// Numbers each line the graph's links board at, and keeps the number on
@@ -74,16 +77,16 @@ impl StepCosts {
         }
     }
 
-    /// The route from `start` to `goal` found since the lines last changed.
-    pub(super) fn route(&self, start: u32, goal: u32) -> Option<&Option<Route>> {
-        self.routes.get(&(start, goal))
+    /// The route between `key`'s ends found since the lines last changed.
+    pub(super) fn route(&self, key: RouteKey) -> Option<&Option<Route>> {
+        self.routes.get(&key)
     }
 
-    pub(super) fn keep_route(&mut self, start: u32, goal: u32, route: &Option<Route>) {
+    pub(super) fn keep_route(&mut self, key: RouteKey, route: &Option<Route>) {
         if self.routes.len() >= MOST_ROUTES {
             self.routes.clear();
         }
-        self.routes.insert((start, goal), route.clone());
+        self.routes.insert(key, route.clone());
     }
 }
 
