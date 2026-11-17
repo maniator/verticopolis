@@ -5,7 +5,7 @@
 
 use serde_json::{json, Value};
 
-use super::{fasthash, Crowd, Person, COMMUTE_STRESS_ALPHA};
+use super::{fasthash, Crowd, Person, COMMUTE_STRESS_ALPHA, COMMUTE_STRESS_PRIOR};
 use crate::clock::GameMode;
 
 /// The wait a finished tenant trip folds onto its floor: everything it
@@ -26,13 +26,16 @@ pub(super) fn finished_trip_wait(p: &Person, mode: GameMode) -> f64 {
 }
 
 impl Crowd {
+    /// Folds a finished trip's wait onto its tenant floor's average: an
+    /// exponential average by [`COMMUTE_STRESS_ALPHA`], starting from
+    /// [`COMMUTE_STRESS_PRIOR`] on a floor with no average yet.
     pub fn record_commute(&mut self, origin_floor: i64, wait_seconds: f64) {
         self.commute_revision = self.commute_revision.wrapping_add(1);
         let prev = self
             .commute_wait_by_floor
             .get(&origin_floor)
             .copied()
-            .unwrap_or(wait_seconds);
+            .unwrap_or(COMMUTE_STRESS_PRIOR);
         self.commute_wait_by_floor.insert(
             origin_floor,
             prev + (wait_seconds - prev) * COMMUTE_STRESS_ALPHA,

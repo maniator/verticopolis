@@ -55,6 +55,15 @@ pub const METRO_DWELL_MIN: i64 = 8;
 pub const METRO_DWELL_MAX: i64 = 24;
 pub const STRESS_WAIT: f64 = 25.0;
 pub const COMMUTE_STRESS_ALPHA: f64 = 0.15;
+/// The average a floor's first finished trip moves from: no wait, the value
+/// a floor no trip has named already reads as (#2435). Seeding the average
+/// with the first trip's own wait instead let one rider who gave up (twice
+/// the mode's limit, #2019) make a quiet floor read jammed for as long as
+/// the average lasts, which on a floor of shops alone is the whole hour
+/// (#2433). From no wait, one trip moves the average by
+/// [`COMMUTE_STRESS_ALPHA`] of its wait, so a floor needs several long waits
+/// in a row before it reads backed up.
+pub(crate) const COMMUTE_STRESS_PRIOR: f64 = 0.0;
 pub const GIVE_UP: f64 = 120.0;
 pub const STAFF_GIVE_UP: f64 = GIVE_UP * 3.0;
 /// `CROWD_SECONDS_PER_MINUTE / CAR_FLOORS_PER_MINUTE`.
