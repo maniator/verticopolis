@@ -1,10 +1,10 @@
 {
   "id": "fx-thief-uncaught",
-  "description": "A two-star tower with no security for sixty days. Thieves get away with the loot, which bumps the thief fx sequence with caught false (#879). The fx sequences and emergency counters sit outside the hashed views, so the compare reads them from the checkpoint detail.",
+  "description": "A two-star Modern tower with no security for sixty days (a Classic tower without Security sees no thief at all, #2364). Thieves get away with the loot, which bumps the thief fx sequence with caught false (#879). The fx sequences and emergency counters sit outside the hashed views, so the compare reads them from the checkpoint detail.",
   "start": {
     "newGame": {
       "seed": 17,
-      "mode": "classic",
+      "mode": "modern",
       "star": 2
     }
   },
