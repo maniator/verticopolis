@@ -4,7 +4,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::crowd::fasthash::FastMap;
 use crate::facilities::*;
 use crate::tower::{Tower, Transport, Unit};
 
@@ -289,58 +288,10 @@ impl Tower {
 
     /// `transportColumns`.
     pub fn transport_columns(&self, floor: i64) -> Vec<(i64, i64)> {
-        {
-            let memo = self.memo.borrow();
-            if let Some((rev, m)) = &memo.cols {
-                if *rev == self.revision {
-                    return m.get(&floor).cloned().unwrap_or_default();
-                }
-            }
-        }
-        let served = self.served_floors();
-        let mut m: FastMap<i64, Vec<(i64, i64)>> = FastMap::default();
-        for t in &self.transports {
-            if t.kind.is_staff_only_transport() {
-                continue;
-            }
-            for fl in t.stop_floors() {
-                if !served.contains(&fl) {
-                    continue;
-                }
-                let span = (t.x.max(0), (t.x + t.width).min(LOT_WIDTH));
-                m.get_or_insert_with(fl, Vec::new).push(span);
-            }
-        }
-        let out = m.get(&floor).cloned().unwrap_or_default();
-        self.memo.borrow_mut().cols = Some((self.revision, m));
-        out
-    }
-
-    /// `nearestTransportDistance`: `None` stands for `Infinity`.
-    pub fn nearest_transport_distance(&self, u: &Unit) -> Option<i64> {
-        let cols = self.transport_columns(u.floor);
-        if cols.is_empty() {
-            return None;
-        }
-        let left = u.x;
-        let right = u.x + u.width;
-        let mut best: Option<i64> = None;
-        for (x0, x1) in cols {
-            let gap = if x1 <= left {
-                left - x1
-            } else if x0 >= right {
-                x0 - right
-            } else {
-                0
-            };
-            if best.is_none_or(|b| gap < b) {
-                best = Some(gap);
-            }
-            if best == Some(0) {
-                break;
-            }
-        }
-        best
+        self.fill_columns();
+        let memo = self.memo.borrow();
+        let cols = memo.cols.as_ref().and_then(|(_, m)| m.get(&floor));
+        cols.cloned().unwrap_or_default()
     }
 
     // ---- segments (tower/segments.ts) --------------------------------------

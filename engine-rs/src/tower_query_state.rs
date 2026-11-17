@@ -8,7 +8,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::crowd::fasthash::{FastMap, FastSet};
 use crate::economy::visitors::census_follows_the_day;
-use crate::tower::{Unit, UnitState};
+use crate::facilities::LOT_WIDTH;
+use crate::tower::{Tower, Unit, UnitState};
 
 /// A floor's runs as the memo shares them (`Tower::segment_runs`).
 pub type Runs = std::sync::Arc<[(i64, i64)]>;
@@ -150,6 +151,74 @@ impl Unit {
     /// (`Kind::waits_for_staff`), once one of its staff is in.
     pub fn open_for_business(&self, hour: i64, mode: crate::clock::GameMode) -> bool {
         self.kind.is_open_at(hour) && (!self.kind.waits_for_staff(mode) || self.staff_in > 0)
+    }
+}
+
+/// Reads that answer from the memo in place, so the hourly satisfaction
+/// pass and the move-in gate, which ask them for every room, copy no list.
+impl Tower {
+    /// Builds the transport-column memo (each served floor's public
+    /// transport spans) when this revision has none.
+    pub(crate) fn fill_columns(&self) {
+        if matches!(&self.memo.borrow().cols, Some((rev, _)) if *rev == self.revision) {
+            return;
+        }
+        let served = self.served_floors();
+        let mut m: FastMap<i64, Vec<(i64, i64)>> = FastMap::default();
+        for t in &self.transports {
+            if t.kind.is_staff_only_transport() {
+                continue;
+            }
+            for fl in t.stop_floors() {
+                if !served.contains(&fl) {
+                    continue;
+                }
+                let span = (t.x.max(0), (t.x + t.width).min(LOT_WIDTH));
+                m.get_or_insert_with(fl, Vec::new).push(span);
+            }
+        }
+        self.memo.borrow_mut().cols = Some((self.revision, m));
+    }
+
+    /// `nearestTransportDistance`: `None` stands for `Infinity`.
+    pub fn nearest_transport_distance(&self, u: &Unit) -> Option<i64> {
+        self.fill_columns();
+        let memo = self.memo.borrow();
+        let cols = memo.cols.as_ref().and_then(|(_, m)| m.get(&u.floor))?;
+        let left = u.x;
+        let right = u.x + u.width;
+        let mut best: Option<i64> = None;
+        for &(x0, x1) in cols {
+            let gap = if x1 <= left {
+                left - x1
+            } else if x0 >= right {
+                x0 - right
+            } else {
+                0
+            };
+            if best.is_none_or(|b| gap < b) {
+                best = Some(gap);
+            }
+            if best == Some(0) {
+                break;
+            }
+        }
+        best
+    }
+
+    /// How many runs a floor has (`segment_runs(floor).len()`), read from
+    /// the memo without taking a share of the list.
+    pub(crate) fn segment_run_count(&self, floor: i64) -> usize {
+        {
+            let key = self.index_key();
+            let memo = self.memo.borrow();
+            if let Some((built, runs)) = &memo.segs {
+                if let Some(r) = runs.get(&floor).filter(|_| *built == key) {
+                    return r.len();
+                }
+            }
+        }
+        self.segment_runs(floor).len()
     }
 }
 

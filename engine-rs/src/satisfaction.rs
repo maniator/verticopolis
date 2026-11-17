@@ -6,7 +6,7 @@ use crate::clock::GameMode;
 use crate::demand::{compute_demand_map, origin_demand, unmet_coverage, DemandMap};
 use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
-use crate::rules::{HaloEffect, CLASSIC_HOUSEHOLD, NO_DRAIN};
+use crate::rules::{Drain, HaloEffect, CLASSIC_HOUSEHOLD, NO_DRAIN};
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
@@ -77,6 +77,20 @@ pub struct StepResult {
     pub unmet_cov: Option<f64>,
     /// The service shortfall holding this room down, if any.
     pub service_short: Option<ServiceShort>,
+}
+
+/// What a satisfaction step reads about a room's placement, which the hour
+/// does not change ([`Simulation::step_placement`]).
+#[derive(Clone, Copy)]
+struct Placement {
+    served: bool,
+    cong: f64,
+    far_walk: bool,
+    noisy: bool,
+    lobby_drain: Drain,
+    coverage: Option<f64>,
+    unmet_drain: Drain,
+    service_short: Option<ServiceShort>,
 }
 
 fn nearest_floor_dist(floors: &[i64], floor: i64) -> f64 {
@@ -164,7 +178,7 @@ impl Simulation {
         if !self.tower.is_floor_served(u.floor) {
             return false;
         }
-        if self.tower.segment_runs(u.floor).len() <= 1 {
+        if self.tower.segment_run_count(u.floor) <= 1 {
             return true;
         }
         self.crowd.segment_connected(&self.tower, u.floor, u.x)
@@ -177,6 +191,17 @@ impl Simulation {
         current: f64,
         ctx: &mut SatisfactionContext,
     ) -> StepResult {
+        let place = self.step_placement(u, ctx);
+        self.step_at_hour(u, current, place, ctx)
+    }
+
+    /// What a step reads about `u` that the hour does not change: whether it
+    /// is served, its congestion and each drain its placement puts on it.
+    /// The move-in gate steps one probe through two days of hours with the
+    /// tower and context unchanged, so it reads these once per probe;
+    /// only the halos follow the hour.
+    #[inline(always)]
+    fn step_placement(&mut self, u: &Unit, ctx: &mut SatisfactionContext) -> Placement {
         let served = ctx.served_set.contains(&u.floor) && self.reaches_lobby(u);
         // The map already carries the floor's real commute waits
         // (`spatial_congestion_by_floor`), so the views read this same value.
@@ -184,6 +209,75 @@ impl Simulation {
             Some(m) => m.get(&u.floor).copied().unwrap_or(0.0),
             None => ctx.global_cong,
         };
+        let far_walk = (u.kind == Kind::Office || u.kind == Kind::RentalApartment)
+            && served
+            && u.floor != 1
+            && self
+                .tower
+                .nearest_transport_distance(u)
+                .is_none_or(|d| d > TRANSPORT_FAR_TILES);
+        let noisy = (u.kind == Kind::Office
+            || u.kind.is_hotel()
+            || u.kind == Kind::Condo
+            || u.kind.is_rental())
+            && served
+            && self.noise_afflicted(u);
+        let lobby_drain = if served
+            && (u.kind == Kind::Office
+                || u.kind.is_hotel()
+                || u.kind == Kind::Condo
+                || u.kind == Kind::RentalApartment)
+        {
+            self.mode
+                .lobby_distance_drain(self.tower.nearest_lobby_floor_distance(u.floor))
+        } else {
+            NO_DRAIN
+        };
+        let coverage = if served && u.kind.is_unmet_demand_kind() {
+            if ctx.demand_map.is_none() {
+                ctx.demand_map = Some(compute_demand_map(self));
+            }
+            unmet_coverage(ctx.demand_map.as_ref().unwrap(), u)
+        } else {
+            None
+        };
+        let unmet_drain = match coverage {
+            None => NO_DRAIN,
+            Some(c) => self.mode.unmet_demand_drain(c),
+        };
+        let service_short = ctx.shortfalls.binding_for(u, served);
+        Placement {
+            served,
+            cong,
+            far_walk,
+            noisy,
+            lobby_drain,
+            coverage,
+            unmet_drain,
+            service_short,
+        }
+    }
+
+    /// One hour's step for `u` from `current`, given what its placement
+    /// reads ([`Self::step_placement`]).
+    #[inline(always)]
+    fn step_at_hour(
+        &self,
+        u: &Unit,
+        current: f64,
+        place: Placement,
+        ctx: &SatisfactionContext,
+    ) -> StepResult {
+        let Placement {
+            served,
+            cong,
+            far_walk,
+            noisy,
+            lobby_drain,
+            coverage,
+            unmet_drain,
+            service_short,
+        } = place;
         let churn = self.mode.churn_multiplier(u.residents);
         let mut s = current;
         if !served {
@@ -221,45 +315,8 @@ impl Simulation {
                 }
             }
         }
-        let far_walk = (u.kind == Kind::Office || u.kind == Kind::RentalApartment)
-            && served
-            && u.floor != 1
-            && self
-                .tower
-                .nearest_transport_distance(u)
-                .is_none_or(|d| d > TRANSPORT_FAR_TILES);
-        let noisy = (u.kind == Kind::Office
-            || u.kind.is_hotel()
-            || u.kind == Kind::Condo
-            || u.kind.is_rental())
-            && served
-            && self.noise_afflicted(u);
-        let lobby_drain = if served
-            && (u.kind == Kind::Office
-                || u.kind.is_hotel()
-                || u.kind == Kind::Condo
-                || u.kind == Kind::RentalApartment)
-        {
-            self.mode
-                .lobby_distance_drain(self.tower.nearest_lobby_floor_distance(u.floor))
-        } else {
-            NO_DRAIN
-        };
         let lobby_capped = lobby_drain.cap < 1.0;
-        let coverage = if served && u.kind.is_unmet_demand_kind() {
-            if ctx.demand_map.is_none() {
-                ctx.demand_map = Some(compute_demand_map(self));
-            }
-            unmet_coverage(ctx.demand_map.as_ref().unwrap(), u)
-        } else {
-            None
-        };
-        let unmet_drain = match coverage {
-            None => NO_DRAIN,
-            Some(c) => self.mode.unmet_demand_drain(c),
-        };
         let unmet_capped = unmet_drain.cap < 1.0;
-        let service_short = ctx.shortfalls.binding_for(u, served);
         let short_drain = service_short.map_or(NO_DRAIN, shortfall_drain);
         let short_capped = short_drain.cap < 1.0;
         if far_walk || noisy || lobby_capped || unmet_capped || short_capped {
@@ -305,6 +362,25 @@ impl Simulation {
 
     /// `wouldEvictFreshTenant`.
     pub fn would_evict_fresh_tenant(&mut self, u: &Unit, ctx: &mut SatisfactionContext) -> bool {
+        let probe = self.fresh_probe(u, ctx);
+        // The nightclub is felt only while it is open, so the gate walks its
+        // horizon hour by hour from now and opens the clubs in their hours:
+        // a night run would otherwise hold every spot near a club, and a day
+        // run would let a tenant in beside one that evicts them overnight.
+        // The newcomer adds to the trash and parking need it is judged by,
+        // only while the probe runs.
+        let hour_now = ctx.hour;
+        ctx.shortfalls.set_candidate(Some(fresh_tenant_need(u)));
+        let doomed = self.gate_horizon_dooms(&probe, ctx);
+        ctx.shortfalls.set_candidate(None);
+        ctx.hour = hour_now;
+        doomed
+    }
+
+    /// The newcomer the move-in gate judges for `u`: a fresh tenant who has
+    /// moved in, with a household where the room houses one, whose demand
+    /// the context's demand map counts.
+    fn fresh_probe(&mut self, u: &Unit, ctx: &mut SatisfactionContext) -> Unit {
         let mut probe = u.clone();
         probe.ever_occupied = true;
         probe.residents = if u.kind == Kind::Condo || u.kind == Kind::RentalApartment {
@@ -334,18 +410,7 @@ impl Simulation {
                 0.0
             };
         }
-        // The nightclub is felt only while it is open, so the gate walks its
-        // horizon hour by hour from now and opens the clubs in their hours:
-        // a night run would otherwise hold every spot near a club, and a day
-        // run would let a tenant in beside one that evicts them overnight.
-        // The newcomer adds to the trash and parking need it is judged by,
-        // only while the probe runs.
-        let hour_now = ctx.hour;
-        ctx.shortfalls.set_candidate(Some(fresh_tenant_need(u)));
-        let doomed = self.gate_horizon_dooms(&probe, ctx);
-        ctx.shortfalls.set_candidate(None);
-        ctx.hour = hour_now;
-        doomed
+        probe
     }
 
     /// Whether `probe`, starting content, falls under [`VACATE_RESCIND`]
@@ -353,10 +418,11 @@ impl Simulation {
     fn gate_horizon_dooms(&mut self, probe: &Unit, ctx: &mut SatisfactionContext) -> bool {
         let mut s = 1.0;
         let now = self.clock.hour();
+        let place = self.step_placement(probe, ctx);
         for h in 0..GATE_HORIZON_HOURS {
             ctx.hour = (now + h) % 24;
             let prev = s;
-            s = self.satisfaction_step(probe, s, ctx).next;
+            s = self.step_at_hour(probe, s, place, ctx).next;
             if s < VACATE_RESCIND {
                 return true;
             }
@@ -403,6 +469,10 @@ pub(crate) fn fresh_tenant_need(u: &Unit) -> (Kind, f64) {
     };
     (u.kind, heads)
 }
+
+#[cfg(test)]
+#[path = "satisfaction/probe_tests.rs"]
+mod probe_tests;
 
 #[cfg(test)]
 mod tests;
