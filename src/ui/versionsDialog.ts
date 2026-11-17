@@ -11,9 +11,10 @@ import { fileSizeText } from "./templates/fileDialog";
  * #2380): the earlier versions My Towers keeps of one tower
  * (`storage/fileVersions.ts`), newest first, from right-click > Previous
  * versions… in the Open and Save As windows. The window takes the place of
- * the one it was opened from, the way Windows' own Previous Versions does.
- * Open makes the picked version a new tower file beside the tower and opens
- * it; the tower itself is never changed.
+ * the one it was opened from, the way Windows' own Previous Versions does,
+ * and closing it (Cancel, the ✕, Esc or a click beside it) puts that window
+ * back as the player left it. Open makes the picked version a new tower file
+ * beside the tower and opens it; the tower itself is never changed.
  */
 export interface VersionsCtx {
   /** The tower's file name. */
@@ -22,6 +23,9 @@ export interface VersionsCtx {
   readonly versions: readonly TowerVersion[];
   /** Open version `v` as a new file. A note says why it couldn't. */
   open(v: TowerVersion): Promise<FileNote | null>;
+  /** Put back the window this one was opened from. Without it, closing
+   *  this window closes it. */
+  back?(): void;
 }
 
 /** When a version was written, the way Windows lists one: "Today, 3:04 PM". */
@@ -42,6 +46,26 @@ export function showVersionsDialog(ui: Pick<UI, "openModalTemplate" | "closeModa
   box.classList.add("pv-window");
   const host = box.querySelector<HTMLElement>(".pv-host")!;
   const picked = () => ctx.versions.find((v) => v.key === state.selected) ?? null;
+  // Every way out but Open goes back to the window this one came from. Not
+  // while a version is opening: that closes this window on its own.
+  const dismiss = (): void => {
+    if (state.busy) return;
+    if (ctx.back) ctx.back();
+    else ui.closeModal();
+  };
+  const dialog = box.closest("dialog");
+  if (dialog) {
+    // Esc and the ✕. A browser may refuse to keep the dialog open on an Esc
+    // with no click or key since the last one it kept; that Esc closes.
+    dialog.oncancel = (e) => {
+      if (!e.cancelable) return ui.closeModal();
+      e.preventDefault();
+      dismiss();
+    };
+    dialog.onclick = (e) => {
+      if (e.target === dialog) dismiss();
+    }; // a click beside the window
+  }
 
   async function open(v: TowerVersion | null): Promise<void> {
     if (!v || state.busy) return;
@@ -57,7 +81,7 @@ export function showVersionsDialog(ui: Pick<UI, "openModalTemplate" | "closeModa
 
   function draw(): void {
     if (!box.isConnected) return;
-    render(versionsTemplate(ctx, state, { select: (key) => ((state.selected = key), draw()), open, cancel: () => ui.closeModal(), picked }), host);
+    render(versionsTemplate(ctx, state, { select: (key) => ((state.selected = key), draw()), open, cancel: dismiss, picked }), host);
   }
   draw();
   host.querySelector<HTMLElement>(".pv-row.selected")?.focus();

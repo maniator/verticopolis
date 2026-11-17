@@ -36,6 +36,23 @@ describe("Previous versions… on a My Towers tower", () => {
     expect(m.track).toHaveBeenCalledExactlyOnceWith("file_versions", "list");
   });
 
+  it("hands the window a way back to the Open or Save As window, counted", async () => {
+    const a = await fileSpace.save("Sky", "tower", bytes(1), 0);
+    const back = vi.fn();
+    await showVersions(app() as never, a.id, vi.fn(), back);
+    const ctx = m.show.mock.calls[0][1] as VersionsCtx;
+    m.track.mockClear();
+    ctx.back!();
+    expect(back).toHaveBeenCalledOnce();
+    expect(m.track).toHaveBeenCalledExactlyOnceWith("file_versions", "back");
+  });
+
+  it("gives the window no way back when it was opened from nowhere", async () => {
+    const a = await fileSpace.save("Sky", "tower", bytes(1), 0);
+    await showVersions(app() as never, a.id, vi.fn());
+    expect((m.show.mock.calls[0][1] as VersionsCtx).back).toBeUndefined();
+  });
+
   it("shows an empty window for a tower with none yet, counted apart", async () => {
     const a = await fileSpace.save("Sky", "tower", bytes(1), 0);
     await showVersions(app() as never, a.id, vi.fn());

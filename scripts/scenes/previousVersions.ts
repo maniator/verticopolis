@@ -3,7 +3,10 @@
  * verdict item 3, #2380): every state the help page describes. A tower's
  * right-click menu with Previous versions…, the window listing versions the
  * game kept and the one saved by hand, the empty window of a tower with none
- * yet, and the window on a phone. Its own shard, `previous-versions`.
+ * yet, and the window on a phone. Closing it goes back to the Open or Save
+ * As window it came from, as the player left it (Naftali, 2026-11-17): that
+ * window is shot after a Cancel, on a computer and a phone. Its own shard,
+ * `previous-versions`.
  *
  * The versions are real: the shots write the tower's file the way the game
  * does (Save As, then autosaves, then File > Save), with the page's pinned
@@ -49,22 +52,32 @@ async function pgFileWithNone(): Promise<void> {
   await g.saveFile("Sky Hotel");
 }
 
-async function openWindow(page: Page): Promise<void> {
+/** File > Open… (`mb-import`) or File > Save As… (`mb-export`). */
+type FileItem = "mb-import" | "mb-export";
+
+async function openWindow(page: Page, item: FileItem = "mb-import"): Promise<void> {
   await page.evaluate(() => (window as unknown as { game: any }).game.ui.closeModal?.());
-  await page.evaluate(() => document.getElementById("mb-import")?.click());
+  await page.evaluate((id) => document.getElementById(id)?.click(), item);
   await page.waitForSelector("#modal .fd-row", { timeout: 4000 });
 }
 
-async function rowMenu(page: Page, name: string): Promise<void> {
-  await openWindow(page);
+async function rowMenu(page: Page, name: string, item: FileItem = "mb-import"): Promise<void> {
+  await openWindow(page, item);
   await page.locator("#modal .fd-row", { hasText: name }).first().click({ button: "right" });
   await page.waitForSelector("#modal .fd-menu", { timeout: 2000 });
 }
 
-async function versionsOf(page: Page, name: string): Promise<void> {
-  await rowMenu(page, name);
+async function versionsOf(page: Page, name: string, item: FileItem = "mb-import"): Promise<void> {
+  await rowMenu(page, name, item);
   await page.locator("#modal .fd-menu [role=menuitem]", { hasText: "Previous versions" }).click();
   await page.waitForSelector("#modal .pv-window .pv", { timeout: 4000 });
+}
+
+/** Previous versions… of `name`, then Cancel: back in the window it came from. */
+async function backFrom(page: Page, name: string, item: FileItem): Promise<void> {
+  await versionsOf(page, name, item);
+  await page.locator("#modal .pv-buttons .btn", { hasText: "Cancel" }).click();
+  await page.waitForSelector("#modal .fd-window .fd-row.selected", { timeout: 4000 });
 }
 
 const still = (shot: Shot, crop = true): Shot => ({
@@ -102,6 +115,16 @@ export const PREVIOUS_VERSIONS_SCENES: Scene[] = [
           await versionsOf(page, "Harbour Point");
         },
       }),
+      still({
+        // Cancel goes back to the Open window, Sky Hotel still picked.
+        name: "previous-versions-back",
+        setup: (page) => backFrom(page, "Sky Hotel", "mb-import"),
+      }),
+      still({
+        // And to the Save As window, from wherever it was opened.
+        name: "previous-versions-back-save-as",
+        setup: (page) => backFrom(page, "Harbour Point", "mb-export"),
+      }),
     ],
   },
   {
@@ -116,6 +139,14 @@ export const PREVIOUS_VERSIONS_SCENES: Scene[] = [
             await page.evaluate(pgMakeVersions);
             await versionsOf(page, "Sky Hotel");
           },
+        },
+        false,
+      ),
+      still(
+        {
+          // On a phone too: Cancel puts the Open window back.
+          name: "previous-versions-back-mobile",
+          setup: (page) => backFrom(page, "Sky Hotel", "mb-import"),
         },
         false,
       ),

@@ -16,7 +16,8 @@ import { failed } from "./fileKeep";
  *
  * Analytics (`docs/analytics-data-map.md`): `app_action` `file_versions`
  * with `list` (the window opened on a tower with versions), `none` (on one
- * with none yet) or `open` (a version opened as a new file).
+ * with none yet), `open` (a version opened as a new file) or `back` (the
+ * window closed without one, back to the Open or Save As window).
  */
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -45,8 +46,9 @@ export async function openVersion(app: Pick<GameApp, "ui">, name: string, v: Tow
   }
 }
 
-/** Show My Towers file `id`'s Previous Versions window. */
-export async function showVersions(app: Pick<GameApp, "ui">, id: string, openFile: (id: string) => Promise<unknown>): Promise<void> {
+/** Show My Towers file `id`'s Previous Versions window. `back` puts the
+ *  window it was opened from back when it closes without opening one. */
+export async function showVersions(app: Pick<GameApp, "ui">, id: string, openFile: (id: string) => Promise<unknown>, back?: () => void): Promise<void> {
   const f = fileSpace.get(id);
   if (!f) return;
   let versions: TowerVersion[] = [];
@@ -56,5 +58,17 @@ export async function showVersions(app: Pick<GameApp, "ui">, id: string, openFil
     // A list that can't be read shows as none.
   }
   trackAppAction("file_versions", versions.length === 0 ? "none" : "list");
-  showVersionsDialog(app.ui, { name: f.name, versions, open: (v) => openVersion(app, f.name, v, openFile) });
+  showVersionsDialog(app.ui, {
+    name: f.name,
+    versions,
+    open: (v) => openVersion(app, f.name, v, openFile),
+    ...(back
+      ? {
+          back: () => {
+            trackAppAction("file_versions", "back");
+            back();
+          },
+        }
+      : {}),
+  });
 }
