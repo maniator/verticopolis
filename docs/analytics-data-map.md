@@ -112,7 +112,8 @@ Outside the typed vocabulary:
   when a report is about to go out, with and without a file extension), and any
   tower, facility or imported file name from a rename or import in the same page
   life. A JSON error's quoted text, which is the start of the file being read,
-  is blanked the same way. Names under two characters are left alone. What the
+  is blanked the same way. Names under two characters, and the names the game
+  gives an unnamed tower or file (`Tower`, `Tower One`), are left alone. What the
   scrubber cannot know, such as a facility renamed on an earlier visit, is not
   quoted in any thrown message today. A grouped issue in PostHog Error Tracking
   therefore shows `<player text>` where a name was.

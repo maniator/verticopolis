@@ -36,6 +36,14 @@ describe("scrubPlayerText", () => {
     expect(scrubPlayerText("at blob:Spire.vctower:1:2", ["Spire"])).toBe(`at blob:${P}.vctower:1:2`);
   });
 
+  it("replaces back-to-back occurrences that share one separator", () => {
+    expect(scrubPlayerText("Spire Spire,spire", ["Spire"])).toBe(`${P} ${P},${P}`);
+  });
+
+  it("finds a second name after the first one changed the text", () => {
+    expect(scrubPlayerText("Old Mill then Harbor", ["Old Mill", "Harbor"])).toBe(`${P} then ${P}`);
+  });
+
   it("returns the text unchanged when no name is in it", () => {
     expect(scrubPlayerText("Cannot read properties of undefined (reading 'x')", ["Spire"])).toBe(
       "Cannot read properties of undefined (reading 'x')",
@@ -71,9 +79,9 @@ describe("scrubJsonEcho", () => {
 describe("the known player text", () => {
   it("reads every source at call time, longest first, without duplicates in any case", () => {
     let name = "Spire";
-    addPlayerTextSource(() => [name, "Tower One Annex"]);
-    addPlayerTextSource(() => ["spire", "Tower One", null, undefined]);
-    expect(knownPlayerText()).toEqual(["Tower One Annex", "Tower One", "Spire"]);
+    addPlayerTextSource(() => [name, "Harbor One Annex"]);
+    addPlayerTextSource(() => ["spire", "Harbor One", null, undefined]);
+    expect(knownPlayerText()).toEqual(["Harbor One Annex", "Harbor One", "Spire"]);
     name = "Lighthouse";
     expect(knownPlayerText()).toContain("Lighthouse");
   });
@@ -85,6 +93,11 @@ describe("the known player text", () => {
     });
     rememberPlayerText("B");
     expect(knownPlayerText()).toEqual(["Ok"]);
+  });
+
+  it("keeps the names the game gives an unnamed tower or file", () => {
+    addPlayerTextSource(() => ["Tower", "tower one", "Tower Two"]);
+    expect(knownPlayerText()).toEqual(["Tower Two"]);
   });
 
   it("stops reading a source once it is removed", () => {

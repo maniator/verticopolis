@@ -40,11 +40,17 @@ export type PlayerTextSource = () => Iterable<string | null | undefined> | null 
 const sources: PlayerTextSource[] = [];
 const remembered: string[] = [];
 
+/** The names the game gives a tower or file the player left unnamed (`UI.ts`,
+ *  `fileSpace.ts`, `towerDocument.ts`). They are the game's words, so a report
+ *  keeps them: blanking "Tower" would blank the word in every message. */
+const GAME_NAMES = new Set(["tower", "tower one"]);
+
 /** Trimmed text worth matching, or null. Never throws. */
 function usable(text: unknown): string | null {
   if (typeof text !== "string") return null;
   const t = text.trim();
-  return t.length >= MIN_PLAYER_TEXT && t.length <= MAX_PLAYER_TEXT ? t : null;
+  if (t.length < MIN_PLAYER_TEXT || t.length > MAX_PLAYER_TEXT) return null;
+  return GAME_NAMES.has(t.toLowerCase()) ? null : t;
 }
 
 /** Add a source the scrubber reads at report time. Returns a function that
@@ -81,7 +87,7 @@ export function rememberFileName(name: string | null | undefined): void {
 }
 
 /** Every known piece of player text, longest first so a name that contains
- *  another ("Tower One Annex", "Tower One") is replaced whole. A source that
+ *  another ("Harbor One Annex", "Harbor One") is replaced whole. A source that
  *  throws is skipped. */
 export function knownPlayerText(): string[] {
   const seen = new Map<string, string>();
@@ -108,15 +114,22 @@ function escapeRegExp(text: string): string {
 /**
  * `text` with every whole-word, any-case occurrence of each known piece of
  * player text replaced by {@link PLAYER_TEXT_PLACEHOLDER}. A plain lowercase
- * `includes` runs first, so a name that is not there builds no pattern.
+ * `includes` runs first, so a name that is not there builds no pattern. The
+ * left edge is a captured character rather than a lookbehind, which older
+ * Safari cannot compile.
  */
 export function scrubPlayerText(text: string, known: readonly string[]): string {
   if (!text) return text;
   let out = text;
+  let lower = out.toLowerCase();
   for (const name of known) {
-    if (!out.toLowerCase().includes(name.toLowerCase())) continue;
-    const word = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, "giu");
-    out = out.replace(word, PLAYER_TEXT_PLACEHOLDER);
+    if (!lower.includes(name.toLowerCase())) continue;
+    const word = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, "giu");
+    const next = out.replace(word, (_match, edge: string) => edge + PLAYER_TEXT_PLACEHOLDER);
+    if (next !== out) {
+      out = next;
+      lower = out.toLowerCase();
+    }
   }
   return out;
 }

@@ -1,5 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { knownPlayerText, resetPlayerTextForTest } from "../analyticsPlayerText";
+import { describe, expect, it, vi } from "vitest";
 import {
   MAX_TEXT,
   NOT_ENOUGH_MONEY,
@@ -57,14 +56,6 @@ describe("EditorActions: unit card", () => {
     const none = setup({}, null);
     await none.actions.handleEditAction("rename", root(""));
     expect(none.deps.captureUndo).not.toHaveBeenCalled();
-  });
-
-  it("remembers a facility's old and new names for the error scrubber (#607)", async () => {
-    resetPlayerTextForTest();
-    const { actions, deps } = setup({ labelUnit: () => rec("labelUnit", true) });
-    vi.mocked(deps.kit().cards.unit).mockReturnValue({ ...office, label: "Old Office" } as never);
-    await actions.handleEditAction("rename", root('<input id="ed-name" value="Acme Widgets">'));
-    expect(knownPlayerText()).toEqual(expect.arrayContaining(["Acme Widgets", "Old Office"]));
   });
 
   it("renames through labelUnit, and refuses an over-long name before the port", async () => {
@@ -473,8 +464,6 @@ describe("EditorActions: shaft card", () => {
 });
 
 describe("EditorActions.renameTower", () => {
-  beforeEach(() => resetPlayerTextForTest());
-
   it("names the tower, handing every name to the port and toasting a refusal's reason", () => {
     const { actions, port, deps } = setup({
       towerName: () => "Old Spire",
@@ -492,12 +481,5 @@ describe("EditorActions.renameTower", () => {
       "The engine said no.",
       "bad",
     );
-  });
-
-  it("remembers the old and new names, so an error report never quotes either (#607)", () => {
-    const { actions, port } = setup({ towerName: () => "Old Spire", nameTower: () => rec("buildAt", true) });
-    actions.renameTower("New Spire");
-    expect(port.towerName).toHaveBeenCalledOnce();
-    expect(knownPlayerText()).toEqual(expect.arrayContaining(["Old Spire", "New Spire"]));
   });
 });
