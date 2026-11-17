@@ -803,14 +803,16 @@ so the spec and the build cannot drift silently:
   drain files under yesterday's ring. Three specced surfaces land on it: red hotspot markers
   in the floors grid for the visible day's busiest hour, the Simulate trailing clause ("Most
   riders board on floors 5–7."), and Auto-tune's staging seed aiming the upper half at the
-  busiest boarding floor across the WHOLE day's rings (a single peak-hour slot is often the
+  busiest boarding floor above the base lobby across the WHOLE day's rings (a single peak-hour slot is often the
   lobby-dominated up-rush), preferring the visible day when warm. Presets keep the plain
   lobby split: they are intents, not measurements. Origins are gated on the day's warm demand
   curve, and both the markers and the aim are filtered to floors the shaft still serves, so
-  EMA'd history can never mark or stage a skipped floor. Known limits, tracked: attendance
-  venue riders (cinema, party hall) place real crowd calls and never enter the statistical
-  boarding tally, so their floors cannot become hotspots; the dialog's origin snapshot goes
-  stale across undo/adoptSim (#475).
+  EMA'd history can never mark or stage a skipped floor. Every crowd rider who boards an
+  elevator joins the tally beside the statistical estimate's riders (#477): visitors to
+  attendance venues (cinema, party hall), guests, residents, staff and commuters, so a
+  cinema's floor can become a hotspot. Staff on a service car are counted once, as they step
+  aboard, and the dispatch no longer tallies its staff callers on every arrival. The dialog
+  reads the live rings, so undo and adoptSim no longer leave its origin snapshot stale (#475).
 - **Day-split rings (#466, v1.59.0)**: the measured accumulator keeps one 24-slot ring per
   day type, keyed on `clock.isWeekend` at sample time. The ghost, the advice sentence, the
   Simulate peak, and Auto-tune are all day-scoped: an unmeasured weekend shows no ghost and

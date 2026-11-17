@@ -205,7 +205,7 @@ impl Reference {
                         if !staff_only {
                             self.waiting.insert(tf, (w - board).max(0.0));
                         }
-                        if call_set.contains(&tf) {
+                        if call_set.contains(&tf) && !staff_only {
                             let n = self
                                 .board_tally
                                 .entry(id)

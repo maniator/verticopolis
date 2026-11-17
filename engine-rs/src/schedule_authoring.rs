@@ -253,9 +253,14 @@ impl Simulation {
         let homes = match authored {
             Some(h) => h.clone(),
             None => {
+                // The up-tower half aims above the base lobby, where every
+                // crowd rider coming in boards (#477), so only floors above
+                // it compete for the aim.
+                let base = geo.base_lobby();
+                let above = &geo.served[geo.served.partition_point(|&f| f <= base)..];
                 let aim = aim_on_weekend(weekend_view, wd.warm, we.warm).and_then(|weekend| {
                     let origins = self.telemetry.origins.get(&id)?;
-                    origin_aim(origins, weekend, &geo.served)
+                    origin_aim(origins, weekend, above)
                 });
                 seeded_homes(&geo, aim)
             }
@@ -289,7 +294,8 @@ fn aim_on_weekend(weekend_view: bool, wd_warm: bool, we_warm: bool) -> Option<bo
     }
 }
 
-/// The staging aim: the busiest served boarding floor over the whole day's rings.
+/// The staging aim: the busiest boarding floor in `served` (ascending) over
+/// the whole day's rings.
 fn origin_aim(origins: &OriginRings, weekend: bool, served: &[i64]) -> Option<i64> {
     let ring = if weekend {
         &origins.weekend

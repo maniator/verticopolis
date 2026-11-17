@@ -308,9 +308,9 @@ pub struct Crowd {
     pub commuter_count: i64,
     /// The tower revision the desks were last squared with, `None` before the first (`commuters::reconcile`).
     pub desk_revision: Option<i64>,
-    /// Commuting workers who boarded an elevator this hour, by shaft and
-    /// floor, for the shaft's origin rings (`sample_elevator_util`). Not saved.
-    pub commuter_boardings: indexmap::IndexMap<i64, indexmap::IndexMap<i64, f64>>,
+    /// Everyone in the crowd who boarded an elevator this hour, by shaft and
+    /// floor, for the origin rings (`sample_elevator_util`, #477). Not saved.
+    pub elevator_boardings: fasthash::FastIndexMap<(i64, i64), f64>,
     /// The Modern router's transit graph and this step's lines. Never saved.
     pub router: Option<expected_time::Router>,
     /// Each shaft's line, keyed (shaft, floor), as the last motion slice counted it
@@ -365,7 +365,7 @@ impl Crowd {
             shifts: Vec::new(),
             commuter_count: 0,
             desk_revision: None,
-            commuter_boardings: Default::default(),
+            elevator_boardings: Default::default(),
             router: None,
             shaft_lines: fasthash::FastMap::default(),
             waits_seen: Default::default(),

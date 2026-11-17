@@ -59,8 +59,10 @@ pub struct ElevatorDispatch {
     /// Every read and write is by floor, and `retain` decays each entry on
     /// its own, so no result depends on the order.
     waiting: BTreeMap<i64, f64>,
-    /// The boarding tally since the last drain (#465): shaft id to origin
-    /// floor to boarded count. Counting only, never read back into behavior.
+    /// The estimate's boarding tally since the last drain (#465): shaft id
+    /// to origin floor to boarded count. The crowd counts its own riders
+    /// (`Crowd::elevator_boardings`). Counting only, never read back into
+    /// behavior.
     board_tally: HashMap<i64, IndexMap<i64, f64>>,
     /// Scratch for the waiting pass, one slot per served floor: that
     /// floor's running estimate this step, `None` until a room touches it.
@@ -483,3 +485,7 @@ mod tests;
 #[cfg(test)]
 #[path = "closed_cars_tests.rs"]
 mod closed_cars_tests;
+
+#[cfg(test)]
+#[path = "dispatch_staff_tally_tests.rs"]
+mod staff_tally_tests;

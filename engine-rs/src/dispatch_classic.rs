@@ -59,8 +59,11 @@ impl Boarding<'_> {
     /// Boards up to `room` of the `waiting` riders at `floor` onto a car of
     /// shaft `id` and returns how many got on. A passenger car takes them
     /// off the statistical estimate; a staff car leaves the crowd's calls
-    /// alone. A stop with a live call (`live_call`) adds the riders to the
-    /// shaft's origin tally (#465).
+    /// alone. A passenger stop with a live call (`live_call`) adds the
+    /// estimate's riders to the shaft's origin tally (#465). A staff car's
+    /// riders are the crowd's own callers, who count once each as they step
+    /// aboard (`Crowd::elevator_boardings`, #477): tallied here as well, a
+    /// car coming back to a call nobody answered would count them again.
     pub fn board(
         &mut self,
         id: i64,
@@ -77,7 +80,7 @@ impl Boarding<'_> {
         if !staff_only {
             self.waiting.insert(floor, (waiting - board).max(0.0));
         }
-        if live_call {
+        if live_call && !staff_only {
             let n = self
                 .tally
                 .entry(id)

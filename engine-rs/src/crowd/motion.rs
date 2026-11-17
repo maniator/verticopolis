@@ -210,12 +210,10 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             // The ride is noted once the shaft's read above ends.
             if let Some((shaft_id, ci, elevator)) = boarded {
                 tower.note_ride(shaft_id);
-                if crowd.people[i].commuter && elevator {
+                if elevator {
                     *crowd
-                        .commuter_boardings
-                        .entry(shaft_id)
-                        .or_default()
-                        .entry(floor)
+                        .elevator_boardings
+                        .entry((shaft_id, floor))
                         .or_insert(0.0) += 1.0;
                 }
                 super::line_count::waits_seen::note_boarding(crowd, tower, elevator, i);

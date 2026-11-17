@@ -333,6 +333,26 @@ fn the_up_tower_half_aims_at_the_busiest_served_boarding_floor() {
 }
 
 #[test]
+fn a_busier_lobby_leaves_the_aim_on_the_busiest_floor_above_it() {
+    // Every crowd rider coming in boards at the lobby (#477), so it often
+    // out-boards every floor; the up-tower half still aims above it.
+    let (mut sim, id) = tower(GameMode::Modern, 4);
+    let day: Vec<serde_json::Value> = (0..24)
+        .map(|h| {
+            if h == 9 {
+                json!([[1, 40.0], [6, 5.0]])
+            } else {
+                json!([])
+            }
+        })
+        .collect();
+    let origins = json!({ "weekday": day.clone(), "weekend": day });
+    seed(&mut sim, id, warm_ring(0.5), warm_ring(0.5), Some(origins));
+    let p = sim.auto_tune_proposal(id, None, false).proposal.unwrap();
+    assert_eq!(p.home_floors, vec![1, 1, 6, 6]);
+}
+
+#[test]
 fn asking_changes_nothing() {
     let (mut sim, id) = tower(GameMode::Modern, 4);
     seed(&mut sim, id, warm_ring(0.5), warm_ring(0.5), None);
