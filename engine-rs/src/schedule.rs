@@ -311,20 +311,31 @@ impl Schedule {
 
     /// The cars an Auto shaft runs while riders back up at its stops: every
     /// car once more people wait than the cars on shift could take in one
-    /// trip, else the row's `active`. The morning re-tune learns from the
-    /// riders the cars carry, and a shaft cut to one car carries no more than
-    /// one car holds, so its reading could never win the cars back while
-    /// crowds stood at its stops (split-tower 29, 4.12.0). A schedule the
-    /// player wrote, Auto off, keeps its row as written.
+    /// trip, and every car still while anyone waits and a car past the row
+    /// is out (moving, or away from its home), so the fleet stays out until
+    /// the line clears instead of standing down and coming back each step.
+    /// Else the row's `active`. The morning re-tune learns from the riders
+    /// the cars carry, and a shaft cut to one car carries no more than one
+    /// car holds, so its reading could never win the cars back while crowds
+    /// stood at its stops (split-tower 29, 4.12.0). A schedule the player
+    /// wrote, Auto off, keeps its row as written. `fleet` is the cars'
+    /// positions, ways and the shaft's span; `unset_home` is where a car
+    /// with no home idles.
     pub fn cars_for_backlog(
         s: Option<&Schedule>,
         active: usize,
-        cars: usize,
-        waiting: f64,
-        car_capacity: f64,
+        (waiting, car_capacity): (f64, f64),
+        (positions, ways, (bottom, top)): (&[f64], &[i64], (i64, i64)),
+        unset_home: impl Fn(usize) -> i64,
     ) -> usize {
-        let auto = s.is_some_and(|s| s.auto_tune);
-        if auto && active < cars && waiting > active as f64 * car_capacity {
+        let cars = positions.len().min(ways.len());
+        if !s.is_some_and(|s| s.auto_tune) || active >= cars || waiting <= 0.0 {
+            return active;
+        }
+        let home = |i| Self::home_floor_for(s, i, unset_home(i)).clamp(bottom, top) as f64;
+        let out = |i: usize| ways[i] != 0 || positions[i] != home(i);
+        let backed_up = waiting > active as f64 * car_capacity;
+        if backed_up || (active..cars).any(out) {
             cars
         } else {
             active

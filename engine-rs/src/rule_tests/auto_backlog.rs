@@ -22,9 +22,14 @@ const CARS: i64 = 8;
 const NOON: i64 = 12;
 
 /// A Modern shaft over floors 1 to `TOP` with `CARS` cars and a schedule
-/// that runs one car every hour, with Auto on or off.
+/// that runs one car every hour, with Auto on or off, idled until every
+/// car has parked at its home.
 fn one_car_shaft(auto_tune: bool) -> (Tower, i64) {
-    let mut sim = strip_tower(3, GameMode::Modern, 20, TOP);
+    one_car_shaft_in(GameMode::Modern, auto_tune)
+}
+
+fn one_car_shaft_in(mode: GameMode, auto_tune: bool) -> (Tower, i64) {
+    let mut sim = strip_tower(3, mode, 20, TOP);
     let id = shaft(&mut sim, Kind::ElevatorStandard, 4, 1, TOP);
     assert!(sim.tower.set_cars(id, CARS));
     let t = sim
@@ -39,6 +44,14 @@ fn one_car_shaft(auto_tune: bool) -> (Tower, i64) {
         auto_tune,
         ..Schedule::default()
     });
+    let mut d = ElevatorDispatch::new();
+    for _ in 0..300 {
+        d.move_cars(&mut sim.tower, 1.0, &ElevatorCalls::default(), NOON, false);
+    }
+    assert!(
+        sim.tower.transports[0].car_dir.iter().all(|&w| w == 0),
+        "parked"
+    );
     (sim.tower, id)
 }
 
@@ -90,23 +103,36 @@ fn a_schedule_the_player_wrote_keeps_its_row_whatever_waits() {
 }
 
 #[test]
+fn a_classic_shaft_marked_auto_keeps_its_row() {
+    // Auto is a Modern assist; a crafted Classic save may still mark it.
+    let (mut tower, id) = one_car_shaft_in(GameMode::Classic, true);
+    let a_crowd = car_capacity(&tower) * CARS as f64;
+    let closed = stood_down_after_a_step(&mut tower, id, a_crowd);
+    assert_eq!(closed, (CARS - 1) as usize);
+}
+
+#[test]
 fn the_fleet_follows_the_line_as_it_appears_clears_and_comes_back() {
     let (mut tower, id) = one_car_shaft(true);
     let (cap, mut d) = (car_capacity(&tower), ElevatorDispatch::new());
-    let mut stood_down = |tower: &mut Tower, callers: f64| {
-        d.move_cars(tower, 1.0, &lobby_crowd(id, callers), NOON, false);
+    let mut stood_down = |tower: &mut Tower, at: &[(i64, f64)]| {
+        let mut calls = ElevatorCalls::default();
+        let hall = at.iter().map(|&(floor, n)| (floor, n.into())).collect();
+        calls.hall.insert(id, hall);
+        d.move_cars(tower, 1.0, &calls, NOON, false);
         d.closed_cars().iter().filter(|&&(s, _)| s == id).count()
     };
     let tuned = (CARS - 1) as usize;
-    assert_eq!(stood_down(&mut tower, 0.0), tuned, "no line: the tuned row");
-    assert_eq!(stood_down(&mut tower, cap + 1.0), 0, "a line: every car");
+    assert_eq!(stood_down(&mut tower, &[(1, 1.0)]), tuned, "a few: the row");
+    // A line at the lobby and a crowd up the shaft: every car sets out.
+    let rush = [(1, cap + 1.0), (8, cap), (TOP, cap)];
+    assert_eq!(stood_down(&mut tower, &rush), 0, "a line: every car");
+    // Down to a few but not gone: the cars are out, so they stay out
+    // rather than stand down and come back as the line wavers.
+    assert_eq!(stood_down(&mut tower, &[(1, 1.0)]), 0, "the last few");
+    assert_eq!(stood_down(&mut tower, &[]), tuned, "cleared: the row");
     assert_eq!(
-        stood_down(&mut tower, cap),
-        tuned,
-        "cleared: back to the row"
-    );
-    assert_eq!(
-        stood_down(&mut tower, cap * 2.0),
+        stood_down(&mut tower, &rush),
         0,
         "the line again: every car"
     );
@@ -146,4 +172,101 @@ fn the_split_tower_line_at_the_auto_shaft_clears_within_the_hour() {
     // later; with every car back it is gone within the hour.
     let after = waiting_for(&sim, STARVED_SHAFT);
     assert!(after < 40, "{before} waiting fell only to {after}");
+}
+
+/// A Modern tower with one Auto shaft over floors 1 to `TOP` with `CARS`
+/// cars whose rows run `on_shift` cars every hour.
+fn auto_shaft_running(on_shift: i64) -> (Simulation, i64) {
+    let mut sim = strip_tower(5, GameMode::Modern, 20, TOP);
+    let id = shaft(&mut sim, Kind::ElevatorStandard, 4, 1, TOP);
+    assert!(sim.tower.set_cars(id, CARS));
+    let t = sim
+        .tower
+        .transports
+        .iter_mut()
+        .find(|t| t.id == id)
+        .unwrap();
+    t.schedule = Some(Schedule {
+        weekday: Some(vec![on_shift; SCHEDULE_HOURS]),
+        weekend: Some(vec![on_shift; SCHEDULE_HOURS]),
+        auto_tune: true,
+        ..Schedule::default()
+    });
+    (sim, id)
+}
+
+/// Samples a weekday's 24 hours with `riders` in line at the lobby and
+/// nobody aboard, then runs the next morning's re-tune. Returns the
+/// weekday row it writes.
+fn retuned_after_a_day_in_line(sim: &mut Simulation, id: i64, riders: i64) -> Vec<i64> {
+    let line = crate::crowd::line_count::Line {
+        riders,
+        oldest: 0.0,
+    };
+    sim.crowd.shaft_lines.insert((id, 1), line);
+    for hour in 0..SCHEDULE_HOURS {
+        sim.clock.minutes = hour as f64 * 60.0;
+        sim.sample_elevator_util();
+    }
+    sim.clock.minutes = (24 + crate::schedule_auto::AUTO_TUNE_HOUR) as f64 * 60.0;
+    sim.retune_auto_schedules();
+    let t = sim.tower.get_transport(id).unwrap();
+    t.schedule.as_ref().unwrap().weekday.clone().unwrap()
+}
+
+#[test]
+fn a_line_at_an_auto_shaft_is_demand_the_morning_re_tune_reads() {
+    let (mut sim, id) = auto_shaft_running(1);
+    let cap = Kind::ElevatorStandard.car_capacity();
+    // Three carloads waiting all day at a shaft cut to one car.
+    let row = retuned_after_a_day_in_line(&mut sim, id, 3 * cap as i64);
+    let ring = &sim.telemetry.hourly[&id].weekday;
+    assert!(ring.iter().all(|&r| r == 3.0 / CARS as f64), "{ring:?}");
+    assert!(
+        row.iter().all(|&n| n >= 4),
+        "three carloads need four cars with room: {row:?}"
+    );
+}
+
+#[test]
+fn a_re_tune_wins_back_cars_from_any_cut_while_a_line_waits() {
+    let cap = Kind::ElevatorStandard.car_capacity() as i64;
+    for on_shift in 1..CARS {
+        let (mut sim, id) = auto_shaft_running(on_shift);
+        // One carload more than the cars on shift take in a trip.
+        let row = retuned_after_a_day_in_line(&mut sim, id, (on_shift + 1) * cap);
+        assert!(
+            row.iter().all(|&n| n > on_shift),
+            "cut to {on_shift}: {row:?}"
+        );
+    }
+}
+
+#[test]
+fn a_quiet_auto_shaft_still_tunes_down() {
+    let (mut sim, id) = auto_shaft_running(CARS);
+    let row = retuned_after_a_day_in_line(&mut sim, id, 0);
+    assert!(
+        row.iter().all(|&n| n == 1),
+        "nobody rode or waited: {row:?}"
+    );
+}
+
+#[test]
+fn the_split_tower_auto_shaft_keeps_its_line_short_for_a_day() {
+    let mut sim = split_tower_29();
+    // The save's line clears in its first hour; then a full day, through
+    // the 5 AM re-tune and the next morning's rush.
+    for _ in 0..60 {
+        sim.tick(1.0);
+    }
+    let mut worst = 0;
+    for _ in 0..24 * 60 {
+        sim.tick(1.0);
+        worst = worst.max(waiting_for(&sim, STARVED_SHAFT));
+    }
+    // Cut to one car, the line stood near 200 all day; Auto now runs every
+    // car once more than a carload waits, so it never grows past a few.
+    let three_carloads = 3.0 * Kind::ElevatorStandard.car_capacity();
+    assert!((worst as f64) < three_carloads, "the line reached {worst}");
 }
