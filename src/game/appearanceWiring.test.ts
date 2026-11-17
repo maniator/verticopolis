@@ -7,9 +7,14 @@ vi.mock("../analytics", () => ({
   getCommonProps: vi.fn(() => ({ version: "x", display: "browser" })),
 }));
 vi.mock("../ui/appearance/appearanceDialog", () => ({ openAppearanceDialog: vi.fn() }));
+vi.mock("../ui/appearance/appearancePrefs", async (original) => ({
+  ...(await original<typeof import("../ui/appearance/appearancePrefs")>()),
+  shareScheme: vi.fn(),
+}));
 
 import { trackAppAction, setCommonProps } from "../analytics";
 import { openAppearanceDialog } from "../ui/appearance/appearanceDialog";
+import { shareScheme } from "../ui/appearance/appearancePrefs";
 import { APPEARANCE_ITEM_ID, applyKeptScheme, freshenHelpLink, wireAppearance } from "./appearanceWiring";
 
 /** The dialog's OK, as the mocked dialog hands it to the wiring. */
@@ -38,6 +43,13 @@ describe("the appearance wiring", () => {
     localStorage.setItem("vc.appearance", "skyline");
     expect(applyKeptScheme(root)).toBe("skyline");
     expect(root.getAttribute("data-scheme")).toBe("skyline");
+    // A kept scheme renews the cookie the manual's host reads.
+    expect(shareScheme).toHaveBeenCalledWith("skyline");
+  });
+
+  it("gives a Standard player no cookie at startup", () => {
+    expect(applyKeptScheme(root)).toBe("standard");
+    expect(shareScheme).not.toHaveBeenCalled();
   });
 
   it("opens the dialog from the menu item with the scheme the page wears", () => {
@@ -52,6 +64,7 @@ describe("the appearance wiring", () => {
     okWith("skyline");
     expect(root.getAttribute("data-scheme")).toBe("skyline");
     expect(localStorage.getItem("vc.appearance")).toBe("skyline");
+    expect(shareScheme).toHaveBeenCalledWith("skyline");
     expect(setCommonProps).toHaveBeenCalledWith({ version: "x", display: "browser", scheme: "skyline" });
     expect(trackAppAction).toHaveBeenCalledWith("appearance_set", "skyline");
     // The next open starts from the new scheme.
@@ -65,6 +78,7 @@ describe("the appearance wiring", () => {
     okWith("skyline");
     expect(trackAppAction).not.toHaveBeenCalled();
     expect(setCommonProps).not.toHaveBeenCalled();
+    expect(shareScheme).not.toHaveBeenCalled();
     expect(localStorage.getItem("vc.appearance")).toBeNull();
   });
 

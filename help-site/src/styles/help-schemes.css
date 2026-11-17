@@ -30,6 +30,26 @@ html[data-scheme="skyline"] [data-has-hero] .card {
   border-radius: 8px 8px 3px 3px;
   overflow: hidden;
 }
+/* The front page's title-screen buttons, as the game's phone title screen
+   draws them in Skyline: soft rounded plates, the main one on the title
+   gradient. */
+html[data-scheme="skyline"] .title-screen .ts-btn,
+html[data-scheme="skyline"] .title-screen .ts-btn:hover {
+  color: #241f4c;
+  background: var(--sky-btn);
+  border: 1px solid #2a2766;
+  border-radius: 8px;
+  box-shadow: 0 2px 0 rgba(20, 16, 50, 0.35);
+}
+html[data-scheme="skyline"] .title-screen .ts-btn.primary,
+html[data-scheme="skyline"] .title-screen .ts-btn.primary:hover {
+  color: #ffffff;
+  background: var(--sky-title);
+  text-shadow: 0 1px 0 #15123a;
+}
+html[data-scheme="skyline"] .title-screen .ts-btn:active {
+  box-shadow: inset 0 1px 2px rgba(20, 16, 50, 0.35);
+}
 
 /* ---- High Contrast ---------------------------------------------------- */
 
@@ -95,6 +115,24 @@ html[data-scheme="high_contrast"] .header site-search button[data-open-modal] kb
   background: #000000;
   color: #ffffff;
   box-shadow: none;
+}
+/* The front page's title-screen buttons, as the game's phone title screen
+   draws them in High Contrast: white on black with a white edge, the main
+   one black on yellow. */
+html[data-scheme="high_contrast"] .title-screen .ts-btn,
+html[data-scheme="high_contrast"] .title-screen .ts-btn:hover,
+html[data-scheme="high_contrast"] .title-screen .ts-btn:active {
+  color: #ffffff;
+  background: #000000;
+  border: 2px solid #ffffff;
+  box-shadow: none;
+  filter: none;
+}
+html[data-scheme="high_contrast"] .title-screen .ts-btn.primary,
+html[data-scheme="high_contrast"] .title-screen .ts-btn.primary:hover,
+html[data-scheme="high_contrast"] .title-screen .ts-btn.primary:active {
+  color: #000000;
+  background: #ffff00;
 }
 html[data-scheme="high_contrast"] .sl-markdown-content kbd {
   color: #ffffff;

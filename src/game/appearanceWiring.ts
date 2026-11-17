@@ -2,7 +2,7 @@ import type { GameApp } from "../main";
 import { getCommonProps, setCommonProps, trackAppAction } from "../analytics";
 import { openAppearanceDialog } from "../ui/appearance/appearanceDialog";
 import { withScheme, wornScheme } from "../ui/fromGame";
-import { applyScheme, loadScheme, saveScheme, type SchemeId } from "../ui/appearance/appearancePrefs";
+import { DEFAULT_SCHEME, applyScheme, loadScheme, saveScheme, shareScheme, type SchemeId } from "../ui/appearance/appearancePrefs";
 
 /**
  * The appearance scheme in the game (owner, 2026-11-17): Options >
@@ -28,11 +28,14 @@ export function noteScheme(id: SchemeId): void {
   setCommonProps({ ...getCommonProps(), scheme: id });
 }
 
-/** Read the kept scheme and dress the page in it. Returns it for the boot
- *  analytics. */
+/** Read the kept scheme and dress the page in it. A scheme other than
+ *  Standard is shared with the manual's host again, which renews the cookie
+ *  (and gives one to a player who picked before the cookie existed). Returns
+ *  it for the boot analytics. */
 export function applyKeptScheme(root: Element = document.documentElement): SchemeId {
   const id = loadScheme();
   applyScheme(id, root);
+  if (id !== DEFAULT_SCHEME) shareScheme(id);
   return id;
 }
 
@@ -57,6 +60,7 @@ export function wireAppearance(app: Pick<GameApp, "ui">, current: SchemeId, root
       scheme = picked;
       applyScheme(picked, root);
       saveScheme(picked);
+      shareScheme(picked);
       noteScheme(picked);
       trackAppAction("appearance_set", picked);
     }),
