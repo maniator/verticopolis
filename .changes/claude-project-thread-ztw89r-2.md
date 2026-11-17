@@ -5,7 +5,7 @@ readmes: unchanged
 ---
 ## Player
 - Modern: an elevator's measured demand, its schedule advice and the Auto-tune button now count the people left waiting in line at its stops, not only the people who rode. A shaft running too few cars could only ever read as full as its few cars, so its line never showed up as demand; now it does, and the 5 AM re-tune on an Auto shaft gives back the cars a busy shaft needs instead of cutting it again the next morning.
-- Modern: once an Auto shaft has put every car to work for a line, the cars already out stay out until fewer than half a trip of people wait, so the fleet no longer flips on and off at the edge of a full carload. A shaft whose hourly count drops lets its extra cars finish their trips without calling out the cars parked at their homes.
+- Modern: once an Auto shaft has put every car to work for a line, the cars already out stay out until fewer than half a trip of people wait, so the fleet no longer flips on and off at the edge of a full carload. A shaft whose hourly count drops lets its extra cars finish their trips, and the cars parked beyond the last one still out stay parked.
 - Classic: an elevator never keeps Auto on, even in a tower that came in with it ticked, so its hour counts are never locked.
 ## Engine
 - `sample_elevator_util` feeds the hourly demand ring with riders aboard plus the crowd's line at the shaft's stops (`crowd.shaft_lines`), so `retune_auto_schedules` sees a backlog the cars could not carry. Utilization still counts riders aboard only. Classic counts no lines, so its ring is unchanged.

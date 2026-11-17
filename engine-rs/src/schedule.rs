@@ -325,9 +325,9 @@ impl Schedule {
     /// car once more people wait than the cars on shift could take in one
     /// trip. While the line is still over half a trip, the cars already out
     /// (moving, or away from their homes) stay on, so the fleet does not
-    /// stand down and come back each step at the edge of a full trip; a
-    /// parked car is never woken for that, and at half a trip or less the
-    /// shaft falls back to its row's `active`. The morning re-tune once
+    /// stand down and come back each step at the edge of a full trip; a car
+    /// parked past the last one out stays stood down, and at half a trip or
+    /// less the shaft falls back to its row's `active`. The morning re-tune once
     /// learned only from the riders the cars carried, and a shaft cut to one
     /// car carries no more than one car holds, so its reading could never
     /// win the cars back while crowds stood at its stops (split-tower 29,
