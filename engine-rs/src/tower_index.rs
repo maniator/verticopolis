@@ -80,7 +80,7 @@ pub(crate) mod work_counts {
 /// Floor to the x of every structural tile on it, in unit order and with a
 /// unit's tiles left to right: the list `pickX` builds. A floor with no
 /// tiles has no entry.
-pub type FloorTiles = HashMap<i64, Arc<[i64]>>;
+pub type FloorTiles = crate::crowd::fasthash::FastMap<i64, Arc<[i64]>>;
 
 /// The room census: units of each kind, indexed by `Kind as usize`, and the
 /// floors that hold an office. Structural kinds count zero here; `count_kind`

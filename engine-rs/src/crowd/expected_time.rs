@@ -370,7 +370,7 @@ fn cheapest(router: &mut Router, from: i64, x: Option<f64>, to: i64) -> Option<R
         return kept.clone();
     }
     let found = walk::search_from(router, start, x, goal);
-    let route = found.then(|| walk_back(router, start, goal));
+    let route = found.then(|| walk::walk_back(router, start, goal));
     for p in router.touched.drain(..) {
         router.best[p as usize] = i64::MAX;
     }
@@ -428,39 +428,6 @@ fn search(router: &mut Router, start: u32, goal: u32) -> bool {
     keep_bound(router, goal, (bound, fresh));
     router.heap = heap;
     found
-}
-
-/// The segment id of the node at `place`. Only a segment's place is asked:
-/// a route starts and ends on one, and a rider boards and climbs from one.
-fn segment(router: &Router, place: u32) -> i64 {
-    match router.nodes[place as usize] {
-        Node::Segment(s) => s,
-        Node::Car(..) => unreachable!("a car node read as a segment"),
-    }
-}
-
-/// The route as segments and the shaft of each leg, from the search's trail.
-fn walk_back(router: &Router, start: u32, goal: u32) -> Route {
-    let seg = |p: u32| segment(router, p);
-    let mut floors = vec![seg(goal)];
-    let mut shafts = Vec::new();
-    let mut cur = goal;
-    while cur != start {
-        let (back, how) = router.prev[cur as usize];
-        match how {
-            Move::Flight { shaft } => {
-                shafts.push(shaft);
-                floors.push(seg(back));
-            }
-            Move::Alight { shaft } => shafts.push(shaft),
-            Move::Board { .. } => floors.push(seg(back)),
-            Move::Ride | Move::Street => {}
-        }
-        cur = back;
-    }
-    floors.reverse();
-    shafts.reverse();
-    Route { floors, shafts }
 }
 
 /// The quickest expected route from segment `from`, standing at `x`, to `to`.

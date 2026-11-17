@@ -14,7 +14,8 @@
 //! 7,000-person tower), and between legs the graph does not know which shaft
 //! a rider stepped off.
 
-use super::{search, tenths, Link, Move, Router};
+use super::super::Route;
+use super::{search, tenths, Link, Move, Node, Router};
 use crate::crowd::fasthash::FastMap;
 use crate::crowd::WALK_SPEED;
 use crate::tower::Tower;
@@ -117,4 +118,45 @@ fn lift(router: &mut Router) {
     for (from, i, walk) in router.walks.laid.drain(..) {
         router.links[from as usize][i as usize].tenths -= walk;
     }
+}
+
+/// The segment id of the node at `place`. Only a segment's place is asked:
+/// a route starts and ends on one, and a rider boards and climbs from one.
+pub(super) fn segment(router: &Router, place: u32) -> i64 {
+    match router.nodes[place as usize] {
+        Node::Segment(s) => s,
+        Node::Car(..) => unreachable!("a car node read as a segment"),
+    }
+}
+
+/// The route as segments and the shaft of each leg, from the search's trail.
+pub(super) fn walk_back(router: &Router, start: u32, goal: u32) -> Route {
+    let seg = |p: u32| segment(router, p);
+    // Counts the legs first, so each list is allocated once at its size.
+    let (mut legs, mut cur) = (0, goal);
+    while cur != start {
+        let (back, how) = router.prev[cur as usize];
+        legs += usize::from(matches!(how, Move::Flight { .. } | Move::Alight { .. }));
+        cur = back;
+    }
+    let mut floors = Vec::with_capacity(legs + 1);
+    floors.push(seg(goal));
+    let mut shafts = Vec::with_capacity(legs);
+    let mut cur = goal;
+    while cur != start {
+        let (back, how) = router.prev[cur as usize];
+        match how {
+            Move::Flight { shaft } => {
+                shafts.push(shaft);
+                floors.push(seg(back));
+            }
+            Move::Alight { shaft } => shafts.push(shaft),
+            Move::Board { .. } => floors.push(seg(back)),
+            Move::Ride | Move::Street => {}
+        }
+        cur = back;
+    }
+    floors.reverse();
+    shafts.reverse();
+    Route { floors, shafts }
 }
