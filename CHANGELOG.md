@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.11.2
+
+- Closing Previous versions… without opening a version now goes back to the Open or Save As window you came from, with the same tower picked and the list as you left it, instead of back to the game.
+- The Bulletin and the status bar no longer announce the breakfast, lunch and dinner rushes every day, so rent, maintenance and warnings stay in view (#2090).
+- Crash reports no longer include your tower names, file names or facility names: the game swaps each one for `<player text>` before a report is sent, and leaves out any part of a file it couldn't read. The Privacy page says so.
+
 ## 4.11.1
 
 - On an iPhone or iPad, touch and hold a tower in the Open or Save As window to open its menu, Previous versions… included. Before, Safari never opened it.
