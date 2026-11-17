@@ -185,8 +185,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Resolve Copilot/Codex PR review threads** once addressed. Actually mark
   each thread **Resolved** (`resolve_review_thread`); a reply alone does NOT
   clear it, and unresolved threads block merge under branch protection.
-- **Enable auto-merge only after the PR is signed off and CI is green, never
-  speculatively.** Signed off means Copilot has reviewed the PR and left no
+- **Arm auto-merge as soon as the PR is signed off, and let it wait for CI**
+  (owner, 2026-11-17). Signed off means Copilot has reviewed the PR and left no
   blocking finding unresolved (an approval, or a review whose comments are all
   addressed and marked resolved), and no other review is outstanding: when an
   independent review or a review-skill round has been requested or is running
@@ -198,13 +198,12 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   PR and a completed independent review of that commit, which the PR's author
   requests; the page's section 6 says when a record and a verdict carry to a
   later commit. A reviewer that is still running has not
-  signed off. CI green means every required check has passed, the screenshot
-  drift check included. Do not arm auto-merge before the PR is signed off and
-  CI is green, and do not arm it early so it fires the moment the checks pass.
-  Once both are true, auto-merge using a merge commit (never a squash-merge,
-  per the merge-commits-only rule above) may be armed without asking again.
-  If Copilot raises a finding or a required check fails, hold the PR and fix it
-  rather than let it merge.
+  signed off. Do not arm auto-merge before sign-off. Once the PR is signed off,
+  arm auto-merge with a merge commit (never a squash-merge, per the
+  merge-commits-only rule above) without asking again, even while checks are
+  still running: it merges only when every required check passes, the
+  screenshot drift check included. If a required check fails or a new finding
+  comes in, turn auto-merge off and fix it rather than let it merge.
 - **When the automated PR reviewers are down, loop the BMGD/BMAD review skill
   until the changes are clean.** Copilot/Codex being unavailable never lowers
   the bar or unblocks merge; it just removes the outside reviewer, so the deep

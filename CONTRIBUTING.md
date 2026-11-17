@@ -1083,10 +1083,11 @@ alone.
   opens and again right before it merges, fold fixups into the commits they
   fix, push with `--force-with-lease` and let CI run again. Fetch first: the
   branch may have been rebased in the GitHub UI.
-- **Merge with auto-merge once the PR is signed off.** When the review is
-  done and its findings are fixed, and every required check is green on a
-  branch rebased onto the latest `main`, arm auto-merge with the merge-commit
-  method. Never arm it early so it fires the moment checks pass. No merge
+- **Arm auto-merge as soon as the PR is signed off.** Once the review is
+  done and its findings are fixed on a branch rebased onto the latest `main`,
+  arm auto-merge with the merge-commit method and let it wait for CI: it
+  merges only when every required check passes. If a check fails or a new
+  finding comes in, turn auto-merge off and fix it first. No merge
   queue is in use today; `test.yml` and `engine-rs.yml` still answer the
   `merge_group` event so the queue can be turned back on without workflow
   changes.
