@@ -110,6 +110,17 @@ function describe(value: unknown): { type: string; message: string; stack: strin
   return { type: "UnhandledRejection", message: safeString(value), stack: "" };
 }
 
+/** Where `message` starts in a V8 stack (`Name: message` or the bare message
+ *  on its first line), or -1 when the stack does not open with it (Firefox and
+ *  Safari stacks hold frames only). Reads only as far as the message, so a
+ *  repeat costs no scan of the whole stack. */
+function messageStart(stack: string, type: string, message: string): number {
+  if (!message) return -1;
+  const named = `${type}: `;
+  if (stack.startsWith(named) && stack.startsWith(message, named.length)) return named.length;
+  return stack.startsWith(message) ? 0 : -1;
+}
+
 /**
  * One text field as it is sent: scrubbed, then bounded to `max`. Only the
  * first `max` + {@link MAX_PLAYER_TEXT} characters are read, so a pathological
@@ -195,19 +206,32 @@ function report(
     // report that will go out pays for the scrub, and the fingerprint it sends is
     // rebuilt from the scrubbed parts.
     const key = (t: string, m: string, f: string) => `${clamp(t, MAX_TYPE_LEN)}|${clamp(m, 180)}|${clamp(f, 100)}`;
-    const firstFrame = fullStack.split("\n", 2)[1]?.trim() ?? "";
+    // The frame is the line after the message, not after the stack's first
+    // line: a message with a line break in it (a JSON echo of a save) would
+    // otherwise hand its second line over as the frame.
+    const messageAt = messageStart(fullStack, type, message);
+    const afterMessage = messageAt >= 0 ? fullStack.slice(messageAt + message.length) : fullStack;
+    const firstFrame = afterMessage.split("\n", 2)[1]?.trim() ?? "";
     if (!throttle.allow(opts.fingerprint ?? key(type, message, firstFrame))) return;
 
     // Replace every piece of player text the game knows about in every field
     // that carries text. A JSON error's echoed input is blanked first, in the
     // message and where V8's stack repeats the message on its first line.
     const known = playerTextMatcher(knownPlayerText());
-    const messageHead = message.slice(0, MAX_MESSAGE_LEN + MAX_PLAYER_TEXT);
-    const aboutJson = mentionsJson(messageHead);
-    const jsonMessage = aboutJson ? scrubJsonEcho(messageHead) : messageHead;
+    // Judged on the whole message, so a long wrapper before the JSON error
+    // cannot push "JSON" past a field's read window and skip the blanking.
+    const aboutJson = mentionsJson(message);
     const sentType = sentField(type, MAX_TYPE_LEN, known);
     const sentMessage = sentField(message, MAX_MESSAGE_LEN, known, aboutJson ? scrubJsonEcho : undefined);
-    const echo = aboutJson && messageHead ? (head: string) => head.split(messageHead).join(jsonMessage) : undefined;
+    // The stack's copy of the message is blanked over its whole length (as
+    // much of it as the read window holds), however long the message is.
+    const echo =
+      aboutJson && messageAt >= 0
+        ? (head: string) => {
+            const end = Math.min(messageAt + message.length, head.length);
+            return messageAt >= end ? head : head.slice(0, messageAt) + scrubJsonEcho(head.slice(messageAt, end)) + head.slice(end);
+          }
+        : undefined;
     const sentStack = sentField(stack, MAX_STACK_LEN, known, echo);
     const fingerprint = opts.fingerprint ?? key(sentType, sentMessage, scrubPlayerText(synthetic ? "" : firstFrame, known));
 

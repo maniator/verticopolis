@@ -77,6 +77,22 @@ describe("$exception scrubs player text (#607)", () => {
     expect(sent().$exception_stack_trace_raw).toBe(`SyntaxError: ${value()}\n    at JSON.parse (<anonymous>)\n    at load (app.js:1:1)`);
   });
 
+  it("takes the fingerprint's frame from after a JSON echo that spans lines", () => {
+    const err = new SyntaxError(`Unexpected token 'T', "\nTOP_SECRET\n" is not valid JSON`);
+    err.stack = `SyntaxError: ${err.message}\n    at JSON.parse (<anonymous>)\n    at load (app.js:1:1)`;
+    fireError({ error: err });
+    expect(sentText()).not.toContain("TOP_SECRET");
+    expect(String(sent().$exception_fingerprint).endsWith("|at JSON.parse (<anonymous>)")).toBe(true);
+  });
+
+  it("blanks the stack's whole copy of a JSON echo longer than the message's read window", () => {
+    const err = new SyntaxError(`${"w".repeat(1_200)} Unexpected token 'S', "{"a": Secret Spire}" is not valid JSON`);
+    err.stack = `SyntaxError: ${err.message}\n    at JSON.parse (<anonymous>)`;
+    fireError({ error: err });
+    expect(sentText()).not.toMatch(/Secret|"a"/);
+    expect(sent().$exception_stack_trace_raw).toBe(`SyntaxError: ${"w".repeat(1_200)} Unexpected token "${P}" is not valid JSON\n    at JSON.parse (<anonymous>)`);
+  });
+
   it("keeps the quotes of an error that is not about JSON, even in a stack through JSON.parse", () => {
     const err = new TypeError("Cannot read properties of undefined (reading 'floors')");
     err.stack = `TypeError: ${err.message}\n    at reviver (app.js:1:1)\n    at JSON.parse (<anonymous>)`;
