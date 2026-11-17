@@ -1,11 +1,22 @@
 //! Fresh commute waits (#2021): a floor's average commute wait (#1971) is
 //! the waits of the people who live or work there, so it goes when they do.
+//!
+//! Only offices, homes and hotel rooms hold a floor's average between hours.
+//! A shop's or venue's staff never add a wait to their floor
+//! (`Errand::on_the_job`), and its customers only add theirs while they come,
+//! so a floor of shops alone keeps its average for the hour its customers
+//! made it. Otherwise an old average outlives every trip that could replace
+//! it: a jam remembered from long ago drains the floor's shops, a drained
+//! shop draws no customers, and with no customer trip the average never
+//! moves again (a save whose basement read "Backed up" all day with no trip there).
 
-use crate::facilities::MIN_FLOOR;
+use crate::crowd::trip::ErrandPlace;
+use crate::facilities::{Kind, MIN_FLOOR};
 use crate::sim::Simulation;
 use crate::tower::{Unit, UnitState};
 
-/// The floors where someone settled lives, works or stays, gathered by the
+/// The floors where someone settled lives, works in an office or stays,
+/// gathered by the
 /// hourly satisfaction pass's own room loop so no second walk over the
 /// rooms is needed. One flag per floor of the lot, from `MIN_FLOOR` up, so
 /// noting a story is an array write. Gathers nothing while no floor has an
@@ -18,15 +29,24 @@ fn slot(floor: i64) -> Option<usize> {
 }
 
 impl SettledFloors {
-    /// Whether someone settled lives, works or stays in this room: a tenant,
-    /// a working business or a hotel guest, asleep or about to leave. A room
+    /// Whether someone settled lives, works or stays in this room: an office
+    /// tenant, a household or a hotel guest, asleep or about to leave. A room
     /// a TDT import left moving in is not one: its newcomers should not
-    /// inherit the waits of the people before them.
+    /// inherit the waits of the people before them. Nor is a shop or venue,
+    /// whose own people add no wait to the floor.
     fn holds_settled_occupant(u: &Unit) -> bool {
-        matches!(
-            u.state,
-            UnitState::Occupied | UnitState::Asleep | UnitState::Vacating
-        )
+        Self::keeps_floor_average(u.kind)
+            && matches!(
+                u.state,
+                UnitState::Occupied | UnitState::Asleep | UnitState::Vacating
+            )
+    }
+
+    /// Whether a room of `kind` is one whose people's trips the floor's
+    /// average is made of from hour to hour: an office, a home or a hotel
+    /// room, the places a tenant's commute starts from or comes back to.
+    fn keeps_floor_average(kind: Kind) -> bool {
+        ErrandPlace::Office.fits(kind) || ErrandPlace::Home.fits(kind)
     }
 
     /// Notes every story of the room `i` as settled when its occupant is,

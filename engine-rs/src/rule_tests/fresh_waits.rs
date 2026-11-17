@@ -88,3 +88,55 @@ fn a_saved_tower_keeps_the_averages_and_forgets_the_same_floors() {
         sim.crowd.commute_stress_json()
     );
 }
+
+const SHOP_FLOOR: i64 = 4;
+
+/// [`tower_with_jams`] with an open fast food on its own floor and a jammed
+/// average there too.
+fn tower_with_a_shop_floor_jam() -> (Simulation, i64) {
+    let (mut sim, _) = tower_with_jams(UnitState::Occupied);
+    let id = sim
+        .tower
+        .place(Kind::FastFood, SHOP_FLOOR, C)
+        .unit_id
+        .unwrap();
+    sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
+    sim.crowd.commute_wait_by_floor.insert(SHOP_FLOOR, JAM);
+    (sim, id)
+}
+
+#[test]
+fn a_floor_of_shops_keeps_its_waits_only_for_the_hour_they_were_made() {
+    let (mut sim, id) = tower_with_a_shop_floor_jam();
+    let before = sim.tower.get_unit(id).unwrap().satisfaction;
+    sim.update_satisfaction();
+    assert!(
+        sim.tower.get_unit(id).unwrap().satisfaction < before,
+        "this hour's jam still drains the shop"
+    );
+    assert_eq!(average(&sim, SHOP_FLOOR), None, "and is gone after it");
+    assert_eq!(
+        average(&sim, OFFICE_FLOOR),
+        Some(JAM),
+        "the office keeps its own"
+    );
+    let after = sim.tower.get_unit(id).unwrap().satisfaction;
+    sim.update_satisfaction();
+    assert!(
+        sim.tower.get_unit(id).unwrap().satisfaction >= after,
+        "with no new trip the shop stops draining"
+    );
+}
+
+#[test]
+fn a_shop_beside_an_office_leaves_the_office_floor_its_waits() {
+    let (mut sim, _) = tower_with_jams(UnitState::Occupied);
+    let shop = sim
+        .tower
+        .place(Kind::FastFood, OFFICE_FLOOR, C + 9)
+        .unit_id
+        .unwrap();
+    sim.tower.get_unit_mut(shop).unwrap().state = UnitState::Occupied;
+    sim.update_satisfaction();
+    assert_eq!(average(&sim, OFFICE_FLOOR), Some(JAM));
+}
