@@ -34,16 +34,21 @@ import type { EntranceKind } from "./sprites/structure/lobby";
  *  floor-1 lobby columns, sorted ascending with no repeats. `buildings` is
  *  null for one building on the lot, or the floor-1 columns every ground-floor
  *  unit covers (lobby and rooms, any order, repeats allowed) to stamp each
- *  contiguous run of them as its own building. */
+ *  contiguous run of them as its own building. `towers` (cleared first)
+ *  receives each stamped building's first and last column, left to right, as
+ *  flat pairs; one building on the lot spans every column. */
 export function stampGroundEntrances(
   out: Map<number, EntranceKind>,
   lobbyTiles: readonly number[],
   buildings: number[] | null,
+  towers: number[],
 ): void {
   out.clear();
+  towers.length = 0;
   if (lobbyTiles.length === 0) return;
   if (buildings === null) {
     stampBuilding(out, lobbyTiles, 0, lobbyTiles.length);
+    towers.push(-Infinity, Infinity);
     return;
   }
   buildings.sort((a, b) => a - b);
@@ -58,6 +63,7 @@ export function stampGroundEntrances(
     const end = buildings[j]; // inclusive
     let hi = lo;
     while (hi < lobbyTiles.length && lobbyTiles[hi] <= end) hi++;
+    if (hi > lo) towers.push(buildings[i], end);
     stampBuilding(out, lobbyTiles, lo, hi);
     lo = hi;
     i = j + 1;
@@ -86,4 +92,24 @@ function stampBuilding(out: Map<number, EntranceKind>, tiles: readonly number[],
   const sameRunAsFirst = lastRunStart <= firstRunEnd;
   const roomPastGrand = sameRunAsFirst ? firstWidth > grandSpan : true;
   if (roomPastGrand && !out.has(lastRightX)) out.set(lastRightX, "service");
+}
+
+/** The tower (an index into the pairs {@link stampGroundEntrances} wrote to
+ *  `towers`) that a unit on columns `x` to `x + width - 1` belongs to: the
+ *  first whose ground floor it overlaps, else the nearest, so a floor that
+ *  overhangs its lobby still counts for its own tower. -1 when the lot has
+ *  no tower. A lot holds a handful of towers, so this walks them. */
+export function towerOfSpan(towers: readonly number[], x: number, width: number): number {
+  const last = x + width - 1;
+  let best = -1;
+  let bestGap = Infinity;
+  for (let t = 0; t < towers.length; t += 2) {
+    const gap = Math.max(towers[t] - last, x - towers[t + 1], 0);
+    if (gap === 0) return t / 2;
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = t / 2;
+    }
+  }
+  return best;
 }

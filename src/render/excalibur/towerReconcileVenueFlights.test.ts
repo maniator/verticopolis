@@ -86,6 +86,8 @@ function fakeEngine(units: UnitView[]): FakeEngine {
     d: {},
     litState: false,
     floor1EntranceMap: new Map(),
+    groundTowers: [],
+    towerStaffed: [],
     structTiles: new Set(),
     structPass: emptyStructPass(),
     animatedRooms: new Map(),

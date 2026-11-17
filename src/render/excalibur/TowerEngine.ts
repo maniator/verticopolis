@@ -257,26 +257,32 @@ export class TowerEngine {
   /** Lobby tile variants, baked per [lit][ground][variant] so the concourse
    *  pattern (columns, chandeliers/planters) repeats and lights up at night. */
   lobbyGfx!: ex.Canvas[][][];
-  /** The two slices of the wide grand entrance storefront, baked per [lit]. Left
-   *  is the display window (chandelier through the glass); right carries the
-   *  doors and swaying doorman. Both `cache: false` because the right doorman
-   *  reads `d.anim`, and one path for both beats mixing cache-true/false. */
+  /** The two slices of the wide grand entrance storefront, staffed, baked per
+   *  [lit]. Left carries the reception attendant; right the doors and swaying
+   *  doorman. Both `cache: false` because the right doorman reads `d.anim`, and
+   *  one path for both beats mixing cache-true/false. */
   entranceGrandLeftGfx!: ex.Canvas[];
   entranceGrandRightGfx!: ex.Canvas[];
   /** The compact grand entrance, for a lobby too narrow for the storefront (`cache: false`: doorman). */
   entranceGrandSoloGfx!: ex.Canvas[];
+  /** Grand entrance slices for an empty tower (no doorman or attendant), per kind and [lit]; static. */
+  entranceEmptyGfx!: Record<"grand-left" | "grand-right" | "grand-solo", ex.Canvas[]>;
   /** The floor-1 service entrance tile, baked per [lit]. Static (`cache: true`)
    *  because it has no motion of its own. */
   entranceServiceGfx!: ex.Canvas[];
   /** One story of a tall lobby's slice (#308), baked on first use and kept:
    *  by lighting, ground or sky style, height, story (0 = the lobby's floor)
    *  and pattern slot or entrance kind. */
-  tallLobbyGfx!: (lit: boolean, ground: boolean, height: number, story: number, slot: number | EntranceKind) => ex.Canvas;
+  tallLobbyGfx!: (lit: boolean, ground: boolean, height: number, story: number, slot: number | EntranceKind, staffed: boolean) => ex.Canvas;
   /** Per-tile entrance kind for the floor-1 lobby, refreshed at the top of every
    *  {@link reconcile.syncScene} sweep. Keyed by grid x; absent x takes the
    *  normal 4-variant cycle. Recomputed by walking the lobby's CONTIGUOUS runs so
    *  a mid-lobby gap can't orphan a grand-left half-facade from its right half. */
   floor1EntranceMap: Map<number, "grand-left" | "grand-right" | "grand-solo" | "service"> = new Map();
+  /** Each tower's first and last ground-floor column as flat pairs, from `stampGroundEntrances`. */
+  groundTowers: number[] = [];
+  /** Whether each of {@link groundTowers} has anyone in it, so its entrance shows its staff (#2384). */
+  towerStaffed: boolean[] = [];
   /** Fire-escape segments, baked per [side][floor parity] (shared by all floors). */
   escGfx!: { left: ex.Canvas[]; right: ex.Canvas[] };
   /** Ground-floor entrance awnings, baked per side. They stand in for the fire

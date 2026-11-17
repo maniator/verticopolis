@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stampGroundEntrances } from "./groundEntrances";
+import { stampGroundEntrances, towerOfSpan } from "./groundEntrances";
 import type { EntranceKind } from "./sprites/structure/lobby";
 
 const range = (from: number, to: number): number[] => Array.from({ length: to - from }, (_, i) => from + i);
@@ -7,7 +7,7 @@ const range = (from: number, to: number): number[] => Array.from({ length: to - 
 /** The stamped map as sorted `[x, kind]` pairs. */
 function stamp(lobby: number[], buildings: number[] | null): [number, EntranceKind][] {
   const out = new Map<number, EntranceKind>([[999, "service"]]);
-  stampGroundEntrances(out, lobby, buildings);
+  stampGroundEntrances(out, lobby, buildings, []);
   return [...out].sort((a, b) => a[0] - b[0]);
 }
 
@@ -85,5 +85,37 @@ describe("a front door for each tower (Modern)", () => {
       [21, "grand-right"],
       [23, "service"],
     ]);
+  });
+});
+
+describe("the towers the entrances stand in", () => {
+  /** The towers stamped, as [first, last] column pairs. */
+  function towers(lobby: number[], buildings: number[] | null): number[] {
+    const out: number[] = [99, 99];
+    stampGroundEntrances(new Map(), lobby, buildings, out);
+    return out;
+  }
+
+  it("spans the whole lot for one building", () => {
+    expect(towers(range(4, 10), null)).toEqual([-Infinity, Infinity]);
+    expect(towers([], null)).toEqual([]);
+  });
+
+  it("lists each tower with a lobby by its ground floor's first and last column", () => {
+    const lobby = [...range(4, 8), ...range(20, 26)];
+    // A room on 8..9 widens the left tower; a building with no lobby is no tower.
+    expect(towers(lobby, [...lobby, 8, 9, 40, 41])).toEqual([4, 9, 20, 25]);
+  });
+
+  it("finds the tower a unit stands over, else the nearest one", () => {
+    const t = [4, 9, 20, 25];
+    expect(towerOfSpan(t, 6, 2)).toBe(0);
+    expect(towerOfSpan(t, 9, 4)).toBe(0); // its first column is the tower's last
+    expect(towerOfSpan(t, 18, 3)).toBe(1); // overhangs the right tower's left end
+    expect(towerOfSpan(t, 11, 2)).toBe(0); // open ground, nearer the left tower
+    expect(towerOfSpan(t, 17, 1)).toBe(1); // open ground, nearer the right tower
+    expect(towerOfSpan(t, 30, 9)).toBe(1);
+    expect(towerOfSpan([-Infinity, Infinity], 300, 9)).toBe(0);
+    expect(towerOfSpan([], 6, 2)).toBe(-1);
   });
 });

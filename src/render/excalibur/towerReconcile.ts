@@ -27,7 +27,8 @@ import { isDeadParking, roomSignature } from "./roomSignature";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
 import { awaitsInitialBake } from "./sceneBake";
-import { syncStructureTiles } from "./towerStructTiles";
+import { repaintEntrances, syncStructureTiles } from "./towerStructTiles";
+import { towerOfSpan } from "../groundEntrances";
 import { syncScenery } from "./towerScenery";
 import type { TowerEngine } from "./TowerEngine";
 
@@ -95,7 +96,12 @@ export function syncScene(engine: TowerEngine): void {
   // `everOccupied`) would keep staff in a tower everyone has left. Revisit if
   // the daily flip reads badly on a real hotel tower.
   // Set here rather than in the per-frame tick because it needs every room.
-  let staffed = false;
+  // Each tower on the lot is staffed by its own rooms (#2384): a room counts
+  // for the tower whose ground floor it stands over (`towerOfSpan`), and once
+  // every tower is staffed the walk stops asking.
+  const towers = engine.groundTowers;
+  const staffed: boolean[] = new Array<boolean>(towers.length / 2).fill(false);
+  let unstaffed = staffed.length;
   const seenR = new Set<number>();
   // The flights' look (span, cars, stops, and whether they wind beside a
   // venue, `venueFlights.ts`) moves only with the structure or the mode, so
@@ -115,7 +121,13 @@ export function syncScene(engine: TowerEngine): void {
   // draw closures read it live at raster time (dead spaces get the red X).
   const deadNow = new Set<number>();
   for (const u of rooms) {
-    if (!staffed && isPresent(u)) staffed = true;
+    if (unstaffed > 0 && isPresent(u)) {
+      const t = towerOfSpan(towers, u.x, u.width);
+      if (t >= 0 && !staffed[t]) {
+        staffed[t] = true;
+        unstaffed--;
+      }
+    }
     if (venues !== null && isVenue(u.kind)) venues.push(venueBox(u, catalogFacility(catalog, u.kind).floors));
     seenR.add(u.id);
     const unchained = !parkingOK.has(u.id);
@@ -156,7 +168,8 @@ export function syncScene(engine: TowerEngine): void {
     }
     engine.roomSig.set(u.id, sig);
   }
-  engine.d.staffed = staffed;
+  engine.towerStaffed = staffed;
+  repaintEntrances(engine);
   engine.deadParking = deadNow;
   reap(engine.animatedRooms, seenR, (a, id) => {
     a.kill();
