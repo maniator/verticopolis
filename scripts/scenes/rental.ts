@@ -82,6 +82,14 @@ export const RENTAL_SCENES: Scene[] = [
         clock: 19,
         wait: 500,
       },
+      {
+        // 2 AM: the residents are asleep, so the leased Studios and Apartments
+        // take the condo's dark asleep scrim (#1025) while the vacant LEASE
+        // shell stays as it is.
+        name: "rental-living-night",
+        clock: 2,
+        wait: 500,
+      },
     ],
   },
   {
