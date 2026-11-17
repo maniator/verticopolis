@@ -1157,6 +1157,7 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
       expect(typeof save.appVersion).toBe("string");
       savedMoney.push(save.money);
       if (savedMoney.length === 1) await new Promise<void>((resolve) => (releaseFirst = resolve));
+      return null;
     });
     try {
       sim.money = 100;

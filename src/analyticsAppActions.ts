@@ -23,6 +23,9 @@ export type AppActionName =
   | "files_copied" | "files_waited" | "file_ask"
   // The tower left behind by a swap, kept in My Towers (owner, 2026-11-16).
   | "tower_kept"
+  // A tower given its own file, or its file caught up at boot (#2380), and
+  // the Previous versions… window and its opens.
+  | "tower_file" | "file_versions"
   // File > Open Recent found the file it named gone at its pick
   // (2026-11-16): `towers` (My Towers) or `folder` (the linked folder).
   | "recent_missing"

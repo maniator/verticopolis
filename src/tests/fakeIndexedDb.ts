@@ -9,7 +9,9 @@
  * Switches stand in for the failures a browser can give: `failOpen` (a
  * private window that refuses the database), `openDelayMs` (an open that
  * answers late), `failWrites` (a full quota: the
- * transaction aborts and nothing in it lands) and `dropWrites` (a write that
+ * transaction aborts and nothing in it lands), `failPutsOf` (the same, only
+ * for a transaction that puts a key it matches: a device with room for some
+ * writes and not others) and `dropWrites` (a write that
  * commits but does not read back, which the migration must catch).
  */
 
@@ -36,12 +38,13 @@ class FakeStore {
   put(value: unknown, key: IDBValidKey): FakeRequest<IDBValidKey> {
     if (this.tx.mode !== "readwrite") throw new Error("put in a read-only transaction");
     const copy = value instanceof Uint8Array ? value.slice() : value;
+    const full = this.tx.factory.failPutsOf?.(String(key)) ?? false;
     return this.tx.queue(() => {
       this.tx.write(() => {
         if (!this.tx.factory.dropWrites) this.rows.set(String(key), copy);
       });
       return key;
-    }, true);
+    }, true, full);
   }
 
   delete(key: IDBValidKey): FakeRequest<undefined> {
@@ -76,11 +79,11 @@ class FakeTransaction {
   }
 
   /** Queue a request; a write fails the whole transaction under `failWrites`. */
-  queue<T>(answer: () => T, isWrite = false): FakeRequest<T> {
+  queue<T>(answer: () => T, isWrite = false, full = false): FakeRequest<T> {
     const req = new FakeRequest<T>();
     this.ops.push(() => {
       if (this.error) return;
-      if (isWrite && this.factory.failWrites) {
+      if (isWrite && (this.factory.failWrites || full)) {
         this.error = req.error = new DOMException("The quota has been exceeded.", "QuotaExceededError");
         req.onerror?.();
         return;
@@ -147,6 +150,8 @@ export class FakeIndexedDb {
   /** The connection the last open handed out. */
   lastDb: FakeDatabase | null = null;
   failWrites = false;
+  /** Fails the transaction of any put whose key it matches, as a full quota. */
+  failPutsOf: ((key: string) => boolean) | null = null;
   dropWrites = false;
   /** Read-write transactions that committed, to tell when the store wrote. */
   commits = 0;

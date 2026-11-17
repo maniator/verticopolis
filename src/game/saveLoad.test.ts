@@ -100,7 +100,7 @@ type CrashInfo = Parameters<SaveLoadDeps["showCrashScreen"]>[0];
 beforeEach(() => {
   sessionStorage.clear();
   vi.mocked(trackAppAction).mockClear();
-  vi.spyOn(SaveGame, "save").mockImplementation(() => {});
+  vi.spyOn(SaveGame, "save").mockReturnValue({ savedAt: 1, appVersion: "t" });
   vi.spyOn(SaveGame, "hasSave").mockReturnValue(false);
 });
 afterEach(() => {

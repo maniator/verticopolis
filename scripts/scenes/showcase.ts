@@ -99,8 +99,8 @@ export const SHOWCASE_SCENES: Scene[] = [
         name: "02c-open",
         keepDialogs: true,
         setup: async (page) => {
-          // Quick-save first so the window shows the Auto-save row above the
-          // My Towers files.
+          // Quick-save first so the tower being played has its own file in
+          // the window, beside the other My Towers files.
           await page.evaluate(() => document.getElementById("btn-save-top")?.click());
           // The Settings shot before this one leaves its window open.
           await pgShowOpenWindow(page, true);

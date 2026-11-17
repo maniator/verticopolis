@@ -1,4 +1,5 @@
 import { saveCurrentFile } from "./fileSpaceCommands";
+import { claimTower } from "./towerDocument";
 import { keepOpenedFile } from "./fileKeep";
 import type { BulldozeDragPicker, LobbyHeightPicker } from "../ui/templates/toolInfo";
 import { trackAppAction } from "../analytics";
@@ -102,7 +103,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onSave: () => {
       trackAppAction("quick_save");
       app.saveLoad.save();
-      // The tower's My Towers file too, when it was opened from or saved to one.
+      // And the tower's own file, kept as its version saved by hand.
       void saveCurrentFile();
     },
     onLoad: () => app.saveLoad.load(),
@@ -113,8 +114,10 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onImport: (data, from) => {
       trackAppAction("import_save");
       const before = app.enginePort.generation();
-      void app.saveLoad.importGame(data).then(() => {
-        if (from && app.enginePort.generation() !== before) void keepOpenedFile(from.name, from.bytes, "tower");
+      // The picked file kept in My Towers is the tower's own file (#2380).
+      void claimTower(async () => {
+        await app.saveLoad.importGame(data);
+        if (from && app.enginePort.generation() !== before) await keepOpenedFile(from.name, from.bytes, "tower");
       });
     },
     onImportLegacy: (buffer, filename) => {

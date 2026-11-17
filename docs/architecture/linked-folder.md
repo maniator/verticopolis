@@ -19,7 +19,7 @@ Towers once (Safari 11.1+, Firefox 50+, iOS 18.4+).
 
 ## How it behaves
 
-- My Towers stays the default and always holds the Auto-save. The linked
+- My Towers stays the default. The linked
   folder is a second place in the Look in / Save in box; one folder at a time.
 - The game lists `.vctower` and `.TDT` files at the folder's top level, opens
   them through the same importers as My Towers, and writes `.vctower` files
@@ -32,49 +32,61 @@ Towers once (Safari 11.1+, Firefox 50+, iOS 18.4+).
   one: Chromium makes a new file empty before the bytes go in, so a save under
   a new name that fails can leave an empty `.vctower` behind (#2337). The game
   does not delete it. Instead an empty file is a free name: Save As and the
-  Auto-save copy write over a file that is empty on disk at that moment
+  tower copy write over a file that is empty on disk at that moment
   without asking (nothing in it can be lost), and opening one says plainly
   that it holds no tower. A file that has bytes again is asked about as usual.
-  Saves that pick a name (Save As and the Auto-save copy) hold one Web Lock
+  Saves that pick a name (Save As and the tower copy) hold one Web Lock
   shared by every tab (`verticopolis-linked-folder-save`), so a second tab
   can't take a file the first is still writing, which is empty until its
   write closes, for a free one.
-- A tower opened from the folder, or saved there, is the live tower's file:
-  File > Save writes it back over that very file by its name on disk, and Save
-  As starts in the folder. Linking a different folder forgets it, so Save
-  never writes over a file of the same name in the new folder.
+- A tower opened from the folder, or saved there, is the live tower's file
+  (a tower is a document, #2380): File > Save writes it back over that very
+  file by its name on disk, and Save As starts in the folder. The autosave
+  writes it too, once a minute, while the folder is open this visit with the
+  browser's OK (`writeLinkedTower` in `autosaveMirror.ts`, with the bytes
+  the autosave already packed); leaving the tower for another writes it
+  there as well (`keepOutgoing.ts`). The browser's crash copy (the old
+  Auto-save key) is written as always, and remembers which folder file it
+  belongs to by the link's id, so a reload writes back only into the same
+  folder. Linking a different folder forgets it, so neither Save nor the
+  autosave writes over a file of the same name in the new folder.
 - A file that can't be read while the folder is listed (removed meanwhile, or
   held by another program such as a cloud drive syncing it) is left out of the
   list; the rest of the folder still works, and the link is kept.
 
-## The Auto-save copy
+## The tower copy
 
-The player may keep a copy of the Auto-save in the folder too (owner,
-2026-11-15, the follow-up to #2335): **Keep the Auto-save here too**, a check
-item in the Look in box while a folder is linked. It is off by default and
-kept in localStorage (`verticopolis-autosave-mirror`).
+The player may keep a copy of each My Towers tower they play in the folder
+too (owner, 2026-11-15, the follow-up to #2335; one copy per tower under its
+name since #2380): **Keep a copy of my towers here too**, a check item in the
+Look in box while a folder is linked. It is off by default and kept in
+localStorage (`verticopolis-autosave-mirror`).
 
-- The Auto-save in the browser stays the one the game loads. The copy is only
+- The tower's My Towers file stays the one the game loads. The copy is only
   written, never read back on its own; the player opens it from the folder
-  like any tower.
-- After a timer autosave (`startAutosave`'s `afterTick`), the game writes the
-  live tower as a binary `.vctower` (`VCTOWER2`, a newline, then the raw
-  DEFLATE of the stamped save), at most once a minute. It costs nothing while
-  the copy is off. While on, it asks the engine for the same stamped bytes the
-  autosave stores (`saveBytes`, about 2 ms on the split-tower-4 fixture) and
-  packs them in the save packer's worker, so no compression runs on the frame.
-  The engine's own file export compresses on the main thread (median 19 ms on
-  split-tower-4, 10 ms on the large fixture), which is why the copy does not
-  use it.
+  like any tower. A tower with no My Towers file (one from the folder itself)
+  gets no copy.
+- After an autosave writes the tower's file, the game writes the same bytes,
+  a binary `.vctower` (`VCTOWER2`, a newline, then the raw DEFLATE of the
+  stamped save), at most once a minute. It costs nothing while the copy is
+  off, and nothing more than the folder write while on: the autosave's
+  worker already packed the bytes, so no compression runs on the frame. (A
+  forced copy, when the player turns it on, asks the engine for its stamped
+  bytes, about 2 ms on split-tower-4, and packs them in the worker. The
+  engine's own file export compresses on the main thread, median 19 ms on
+  split-tower-4, which is why neither path uses it.)
 - It writes only while the folder is open this visit with the browser's OK.
   It never asks the browser and never reads the handle back on its own (see
   Permission below), so after a restart it starts again once Open or Save As
   shows the folder.
-- Its first write in a folder takes `Auto-save.vctower`, or `Auto-save (2)`
-  and up when the list or the disk has that name (`linkedFolder.saveNew`), so
-  it never replaces a file it didn't write. It then writes that same file
+- A tower's first write in a folder takes its file name, or "Name (2)" and
+  up when the list or the disk has that name (`linkedFolder.saveNew`), so it
+  never replaces a file it didn't write. It then writes that same file
   (`saveOver`), remembered beside the setting by the link's id
-  (`linkedFolder.linkId`, made new by every link and held per page). Each
+  (`linkedFolder.linkId`, made new by every link and held per page) and the
+  tower's My Towers file id (64 towers a link at most). The single
+  `Auto-save.vctower` an earlier version remembered is forgotten and left
+  in the folder as it was. Each
   link keeps its own file, so two tabs on two folders each write theirs, and
   a file remembered for another link is never written over, even when the new
   folder has a file of that name. The files of the last eight links are kept;
@@ -82,8 +94,8 @@ kept in localStorage (`verticopolis-autosave-mirror`).
   unlinked or linked again while it packed is dropped. Unlinking also turns
   the copy off. Turning it
   off leaves the file in the folder.
-- A failed write says nothing on screen (the in-browser Auto-save worked or
-  told the player itself) and tries again a minute later; it is counted once a
+- A failed write says nothing on screen (the tower's own file was written,
+  or told the player itself) and tries again a minute later; it is counted once a
   page life.
 
 ## Permission
@@ -104,5 +116,6 @@ its mark in localStorage.
 ## Analytics
 
 `app_action` `folder_link`, `folder_allow`, `folder_unlink`, `folder_open`,
-`folder_save`, `folder_copy`, `folder_failed`, `folder_mirror`, and `file_add` `folder` for
-From a folder…. See `docs/analytics-data-map.md`.
+`folder_save`, `folder_copy`, `folder_failed` (with `autosave` for the
+autosave's write of a folder tower), `folder_mirror`, `tower_kept` `folder`,
+and `file_add` `folder` for From a folder…. See `docs/analytics-data-map.md`.

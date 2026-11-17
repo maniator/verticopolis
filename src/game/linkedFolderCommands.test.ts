@@ -204,9 +204,11 @@ describe("the linked folder in the Open and Save As windows", () => {
   });
 });
 
-describe("the Auto-save copy in the linked folder", () => {
+describe("the copy of each tower in the linked folder", () => {
+  beforeEach(() => setCurrentFile("T1"));
+
   it("turns on, writes the copy now, and says how often it is written", async () => {
-    expect(await place().setMirror(true)).toEqual({ text: `The Auto-save is copied to "Towers" every minute while you play.`, kind: "info" });
+    expect(await place().setMirror(true)).toEqual({ text: `The tower you play is copied to "Towers" every minute, under its own name.`, kind: "info" });
     expect(m.mirror.set).toHaveBeenCalledExactlyOnceWith(true);
     expect(m.mirror.copy).toHaveBeenCalledExactlyOnceWith(app, expect.any(Number), true);
     expect(m.track).toHaveBeenCalledWith("folder_mirror", "on");
@@ -220,7 +222,7 @@ describe("the Auto-save copy in the linked folder", () => {
   it("waits to write while the folder needs the browser's OK or the tower can't be saved", async () => {
     m.folder.state.mockImplementation(() => ({ name: "Towers", access: "prompt" }));
     expect(await place().setMirror(true)).toEqual({
-      text: `The Auto-save will be copied to "Towers" once your browser allows the folder.`,
+      text: `Your towers will be copied to "Towers" once your browser allows the folder.`,
       kind: "info",
     });
     m.folder.state.mockImplementation(() => ({ name: "Towers", access: "granted" }));
@@ -229,8 +231,14 @@ describe("the Auto-save copy in the linked folder", () => {
     expect(m.mirror.copy).not.toHaveBeenCalled();
   });
 
+  it("writes no copy now for a tower without a My Towers file yet", async () => {
+    setCurrentFile(null);
+    expect((await place().setMirror(true))?.kind).toBe("info");
+    expect(m.mirror.copy).not.toHaveBeenCalled();
+  });
+
   it("turns off and says the copy stays", async () => {
-    expect(await place().setMirror(false)).toEqual({ text: `The Auto-save is no longer copied to "Towers". The copy there stays.`, kind: "info" });
+    expect(await place().setMirror(false)).toEqual({ text: `Your towers are no longer copied to "Towers". The copies there stay.`, kind: "info" });
     expect(m.mirror.set).toHaveBeenCalledExactlyOnceWith(false);
     expect(m.mirror.copy).not.toHaveBeenCalled();
     expect(m.track).toHaveBeenCalledWith("folder_mirror", "off");

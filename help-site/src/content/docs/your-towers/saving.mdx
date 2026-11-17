@@ -1,25 +1,29 @@
 ---
 title: Saving and loading
-description: How Verticopolis saves your towers, the Auto-save, the My Towers folder with its Open and Save As windows, a linked folder on your computer, saving a tower to a file, and bringing in a 1994 SimTower save.
+description: How Verticopolis saves your towers, each tower's own file and its earlier versions, the My Towers folder with its Open and Save As windows, a linked folder on your computer, saving a tower to a file, and bringing in a 1994 SimTower save.
 ---
 
 Your towers live in your own browser, on your own device. The game keeps them in the browser's database for the site. Nothing is uploaded, and there is no account to sign into.
 
-## The Auto-save
+## Your tower's file
 
-The game saves the tower you're playing every 30 seconds, on its own, into the **Auto-save**. When you come back, **Continue** on the opening screen picks up where you left off. **File > Save** (Ctrl+S, or the 💾 button) saves into the Auto-save right away.
+Every tower is a file, the way a letter is a document in a word processor. A new tower gets its file in My Towers as soon as you found it, under the tower's name ("Name (2)" if that name is taken). The game saves the tower you're playing into its file every 30 seconds, on its own, and **File > Save** (Ctrl+S, or the 💾 button) saves it right away. There's no "Save changes?" box: your tower is always saved.
 
-**File > Close** saves the tower you're playing into the Auto-save and goes back to the opening screen, the way a program closes a document. **Continue** brings the tower back, paused. If the game can't save it (say, the browser's storage is full), the tower stays open and the game tells you, so nothing is lost.
+When you come back, **Continue** on the opening screen opens the last tower you played. **File > Close** saves the tower and goes back to the opening screen, the way a program closes a document. **Continue** brings the tower back, paused. If the game can't save it (say, the browser's storage is full), the tower stays open and the game tells you, so nothing is lost.
+
+Behind the scenes the game also keeps a spare copy of the tower you're playing, so a crash or a closed tab loses nothing. You never need to look after it.
+
+Playing the same tower in two windows at once? Each window keeps its own game. When one window saves the tower after the other opened it, the other window saves its game to a new file, "Name (2)", and tells you, so neither window saves over the other.
 
 ## My Towers
 
-**My Towers** is a folder of tower files the game keeps for you, as many as your device has room for. Each file is a whole tower, saved the moment you saved it, and it stays put while the Auto-save moves on with the tower you're playing. Keep a copy before you try something risky, or keep several towers going at once.
+**My Towers** is a folder of tower files the game keeps for you, as many as your device has room for. Each file is a whole tower. The file of the tower you're playing moves on with it, and every other file stays as you left it. Keep a copy with **Save As…** before you try something risky, or keep several towers going at once.
 
-**File > Save As…** (Ctrl+Shift+S) opens the **Save As** window. Type a name in **File name** and click **Save**, or pick a tower in the list to save over it. If a tower already has that name, the game asks first, the way Windows does: **Save as "Name (2)"** keeps both towers (the next free number is picked for you), **Replace** saves over the old one, and **Cancel** goes back. The tower you saved becomes this tower's file, and from then on **File > Save** saves into that file as well as the Auto-save.
+**File > Save As…** (Ctrl+Shift+S) opens the **Save As** window. Type a name in **File name** and click **Save**, or pick a tower in the list to save over it. If a tower already has that name, the game asks first, the way Windows does: **Save as "Name (2)"** keeps both towers (the next free number is picked for you), **Replace** saves over the old one, and **Cancel** goes back. The tower you saved becomes this tower's file, and from then on **File > Save** and the game's own saving write into that file.
 
 ![The Save As window asking whether to save as Riverside Plaza (2), replace the old tower, or cancel](../../../../../docs/screenshots/features/linked-folder-replace.png)
 
-**File > Open…** (Ctrl+O) opens the **Open** window. Double-click a tower, or pick it and click **Open**. The **Auto-save** sits at the top of the list. **Open Tower…** on the opening screen opens the same window.
+**File > Open…** (Ctrl+O) opens the **Open** window. Double-click a tower, or pick it and click **Open**. The tower you're playing is in the list too, under its own name; opening it just tells you you're in it. **Open Tower…** on the opening screen opens the same window.
 
 ### Opening another tower
 
@@ -27,13 +31,13 @@ Opening a tower never costs you the one you were playing. Before the next tower 
 
 - A tower that has a file in My Towers is saved into that file, as **File > Save** would.
 - A tower with no file yet gets one under its own name. If that name is taken, it becomes "Name (2)", the same way **Save As…** numbers a name.
-- A tower from a folder on your computer is kept in My Towers. The game never writes your own files without being asked.
+- A tower from your linked folder is saved into its own file there, while the browser lets the game into the folder. If it doesn't, the tower is kept in My Towers instead.
 
 The game says where it went. The same goes for the tower waiting behind the opening screen: open a different one and the tower **Continue** would have brought back is kept first. If My Towers can't take it (the device is full, or a private window), a message box offers it as a `.vctower` file to download. If it couldn't be kept at all, the game says so, and **File > Save As…** keeps the tower you're in.
 
 ### Open Recent
 
-**File > Open Recent** is the quick way back to a tower you were just playing. It lists the last five towers you opened or saved, newest first, numbered **1** to **5**: the towers in My Towers by their names, and a tower in your linked folder by its file name. Pick one, or press its number while the list is open, and it opens just as it would from the Open window. It works from the opening screen too. The Auto-save isn't listed, since **Continue** and the top of the Open window already bring it back.
+**File > Open Recent** is the quick way back to a tower you were just playing. It lists the last five towers you opened or saved, newest first, numbered **1** to **5**: the towers in My Towers by their names, and a tower in your linked folder by its file name. Pick one, or press its number while the list is open, and it opens just as it would from the Open window. It works from the opening screen too.
 
 ![File > Open Recent listing five towers, numbered 1 to 5](../../../../../docs/screenshots/features/open-recent.png)
 
@@ -41,7 +45,7 @@ If a tower on the list has been deleted from My Towers, it simply drops off. If 
 
 The list is kept by your browser on this device, like your other settings, and never leaves it.
 
-Both windows list each tower's **Name**, **Type** (Tower, or SimTower 1994 for a `.TDT` file), **Size** and when it was **Modified**. Click a column's heading to sort by it, and click again to turn the order around. **Files of type** shows only one kind of file. The line beside **Look in** says how many towers the window lists and how much room they take, the Auto-save included in the Open window.
+Both windows list each tower's **Name**, **Type** (Tower, or SimTower 1994 for a `.TDT` file), **Size** and when it was **Modified**. Click a column's heading to sort by it, and click again to turn the order around. **Files of type** shows only one kind of file. The line beside **Look in** says how many towers the window lists and how much room they take.
 
 ## Looking after your towers
 
@@ -52,15 +56,22 @@ Pick a tower in either window, then:
 | Rename it | **Rename**, or F2. Type the new name and press Enter (Esc keeps the old one). |
 | Make a copy | **Duplicate**, or Ctrl+C then Ctrl+V. The copy is called "Copy of" and the tower's name. |
 | Delete it | **Delete**, or the Delete key. The game asks first, and a deleted tower can't be brought back. |
+| Go back to an earlier version | Right-click it and choose **Previous versions…** (below). |
 | See every choice | Right-click it, or press the context menu key (Shift+F10). |
 
-The Auto-save has no Rename, Duplicate or Delete: it's the game's own.
+The tower you're playing can't be deleted while you're in it, nor can the tower **Continue** opens from the opening screen. Open or start another tower first.
+
+### Previous versions
+
+My Towers keeps earlier versions of each tower, so a bad week at the tower is never the end of it. While you play, it keeps one every 10 minutes, the last five of them, and it also keeps the last one you saved yourself with **File > Save**. It keeps the tower as it was before the game first saved over it, too, marked **Original**: a tower from an earlier version, or one you brought in, can always be had back just as it was. Right-click a tower in the Open or Save As window and choose **Previous versions…** to see them, newest first, each with when it was saved and whether you saved it or the game did. Pick one and click **Open**: it comes in as a new tower file, named after the tower and the version's time, such as "Sky Hotel (Nov 17 at 3.04 PM)". The tower and its versions stay as they were.
+
+A tower's versions are kept in the browser only, and go with the tower when you delete it. If your device is nearly full, the game saves your tower first and skips the version. Towers in your linked folder have none, since the folder is yours; back it up as you would any folder.
 
 To add a tower file from your computer, drag it onto the Open or Save As window. Drop a tower file anywhere else on the game and it opens, the same as **From a file on your computer…**.
 
 If your device runs out of room, the game says so and saves nothing. Delete some towers you no longer need, or save a tower to a file on your computer (below), and try again.
 
-Coming from an earlier version? Your three save slots are copied into My Towers the first time you open this version, each under its slot's name or its tower's.
+Coming from an earlier version? Your three save slots are copied into My Towers the first time you open this version, each under its slot's name or its tower's. The tower you were playing (the old Auto-save) becomes a file of its own under its name, and **Continue** opens it as before.
 
 ## A folder on your computer
 
@@ -70,7 +81,7 @@ In Chrome, Edge and other Chromium browsers on a computer, and in Chrome on Andr
 
 ![The Save As window showing a linked folder called Verticopolis Towers, with three towers and a 1994 file in it](../../../../../docs/screenshots/features/linked-folder-save-as.png)
 
-Towers you save into your folder are ordinary `.vctower` files, so you can back them up, sync them with a cloud drive, or copy them to another machine like any other file. `.TDT` files from 1994 in the folder are listed too, and open the same way. Once a tower comes from your folder, **File > Save** writes it back to the same file.
+Towers you save into your folder are ordinary `.vctower` files, so you can back them up, sync them with a cloud drive, or copy them to another machine like any other file. `.TDT` files from 1994 in the folder are listed too, and open the same way. Once a tower comes from your folder, it lives there: **File > Save** writes it back to the same file, and while you play the game saves it there every minute, as long as the browser lets the game into the folder. The game keeps its spare copy in the browser either way.
 
 | In your folder you can | You can't |
 | --- | --- |
@@ -82,15 +93,15 @@ The game only reads and writes files in the folder you picked, and never deletes
 
 ![The Open window asking for your OK again, with an Allow access button](../../../../../docs/screenshots/features/linked-folder-allow.png)
 
-### A copy of the Auto-save in your folder
+### A copy of your towers in your folder
 
-Choose **Keep the Auto-save here too** in the **Look in** box to keep a copy of the Auto-save in your folder as well, so a backup or a cloud drive picks it up. A check mark shows it's on. While you play, the game copies the tower there every minute, into a file called **Auto-save**. If your folder already has a file of that name that the game didn't write, the copy goes into **Auto-save (2)** instead, so nothing of yours is replaced.
+Choose **Keep a copy of my towers here too** in the **Look in** box to keep a copy of each My Towers tower you play in your folder as well, so a backup or a cloud drive picks it up. A check mark shows it's on. While you play, the game copies the tower there every minute, into a file under the tower's name. If your folder already has a file of that name that the game didn't write, the copy goes into "Name (2)" instead, so nothing of yours is replaced. A copy called **Auto-save** that an earlier version wrote stays as it was.
 
-The Auto-save in the browser is still the one the game opens when you come back. The copy in your folder is a tower file like any other: open it from the folder whenever you want it. The game never asks the browser for its OK just to copy the Auto-save, so after a restart the copying starts again once you've opened the folder in the Open or Save As window. Choose the item again to stop copying. The copy already in the folder stays there.
+The tower's file in My Towers is still the one the game opens when you come back. The copy in your folder is a tower file like any other: open it from the folder whenever you want it. The game never asks the browser for its OK just to copy a tower, so after a restart the copying starts again once you've opened the folder in the Open or Save As window. Choose the item again to stop copying. The copies already in the folder stay there.
 
-To stop using the folder, choose **Unlink** in the **Look in** box. Its files stay where they are, and the Auto-save stops being copied. Linking a folder doesn't change My Towers or the Auto-save.
+To stop using the folder, choose **Unlink** in the **Look in** box. Its files stay where they are, and your towers stop being copied. Linking a folder doesn't change My Towers.
 
-![The Look in box open with a folder linked: My Towers, the folder, Link a different folder, Keep the Auto-save here too, and Unlink](../../../../../docs/screenshots/features/linked-folder-look-in-menu.png)
+![The Look in box open with a folder linked: My Towers, the folder, Link a different folder, Keep a copy of my towers here too, and Unlink](../../../../../docs/screenshots/features/linked-folder-look-in-menu.png)
 
 On a phone the box says **on this device**, and each tower takes two lines.
 

@@ -10,7 +10,6 @@ import { KeyboardPlay } from "./keyboardPlay";
 import { catalogOf, isUnlocked } from "./portAccess";
 import { attemptContextRecovery } from "./contextRecovery";
 import { autosaveIfLive, startAutosave } from "./autosaveSchedule";
-import { mirrorAutosave } from "./autosaveMirror";
 import { showCrashScreen } from "../ui/crashScreen";
 import { showGraphicsRecovery } from "../ui/graphicsRecovery";
 import { OnboardingController, isOnboarded } from "../ui/Onboarding";
@@ -54,7 +53,8 @@ import { wireTitlePicks } from "./titlePicks";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { placeSkyBridge } from "./skyBridgeGestures";
 import { createPersonCard } from "./personCardWiring";
-import { captureOutgoing, dropOutgoing, keepOutgoing } from "./keepOutgoing";
+import { captureOutgoing, dropOutgoing, keepOutgoing, type SwapKind } from "./keepOutgoing";
+import { bootTowerDocument, crashCopyLoaded, crashCopyWritten } from "./towerDocument";
 export { APP_VERSION };
 
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
@@ -145,6 +145,8 @@ export function wireControllers(app: GameApp): void {
     announce: (msg) => app.announce(msg),
     openSchedule: (id) => app.editor.openSchedule(id),
   });
+  /** The swap SaveLoad is making, from `beforeSwap` to `towerSwapped`. */
+  let swapKind: SwapKind | null = null;
   app.saveLoad = new SaveLoad({
     getView: () => app.engine.viewState(),
     enginePort: () => app.enginePort,
@@ -156,11 +158,19 @@ export function wireControllers(app: GameApp): void {
     // drives (found, load, import). See SPEC-modal-precedence-reports CAP-5.
     // The tower being left is kept in My Towers once the next is in, since the
     // autosave below writes over it (owner, 2026-11-16; `keepOutgoing.ts`).
-    beforeSwap: (kind) => captureOutgoing(app, kind),
+    beforeSwap: (kind) => {
+      swapKind = kind;
+      captureOutgoing(app, kind);
+    },
     swapRefused: dropOutgoing,
+    // Every write of the crash copy; an autosave's also writes the tower's file.
+    crashCopy: (generation, savedAt, packed) => crashCopyWritten(generation, savedAt, packed),
     towerSwapped: () => {
       app.ui.precedence.towerSwapped();
       app.followSwap();
+      // The Auto-save loaded is the tower its file names (`towerDocument.ts`).
+      if (swapKind === "load") crashCopyLoaded(app);
+      swapKind = null;
       void keepOutgoing(app);
       // Autosave the tower the player just loaded, imported or founded at
       // once, so a Rust crash in the next half minute reloads it rather than
@@ -282,7 +292,9 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
   wireDesk(); // on a computer, every part of the game in its own window (option C)
   wireTitlePicks(); // each title-screen button press, as app_action title_pick
-  void openFileSpace(app); // My Towers, and the one-time copy of the save slots
+  // My Towers and the one-time copy of the save slots; then the loaded tower's
+  // own file is found, or made (`towerDocument.ts`).
+  void bootTowerDocument(app, savedAtBoot, openFileSpace(app));
   wireTowerDrop(app); // a tower file dropped on the game opens
   wireScreenSaver(app); // Options > Screen Saver… and its idle and return triggers
   // A help page the game opened asks whether the game is still running before
@@ -438,9 +450,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
 
   // Autosave periodically, but never while the first-run splash is up, so an
   // idle first visit can't persist the throwaway boot sim (which would flip
-  // hasSave() true for a tower the player never started). A player who asked
-  // for it also gets a copy in their linked folder (autosaveMirror.ts).
-  startAutosave(app.saveLoad, () => void mirrorAutosave(app));
+  // hasSave() true for a tower the player never started). Each autosave also
+  // writes the tower's own file, and any copy in the linked folder
+  // (`towerDocument.ts`).
+  startAutosave(app.saveLoad);
 }
 
 /** What the player is told when a stored save could not be read. The corrupt

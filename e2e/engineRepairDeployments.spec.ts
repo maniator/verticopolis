@@ -59,10 +59,9 @@ test("a repair leaves a save that was made online, and the repaired engine loads
       const ok = g.sim.build("lobby", 1, 160).ok;
       (window as any).game.syncSim();
       const id = (await g.saveFile("Repair test")) as string;
-      // The page now saves its tower when it goes to the background, which a
-      // reload does. This test is about the My Towers file, so keep the page's
-      // own tower out of the autosave and let the reload start a new one.
-      g.saveLoad.save = () => {};
+      // This test is about the My Towers file: another tower comes in, so the
+      // reload resumes that one and "Repair test" is a file to open.
+      g.saveLoad.newGame("classic");
       return { ok, id };
     });
     expect(built.ok, "the lobby was built before the save").toBe(true);

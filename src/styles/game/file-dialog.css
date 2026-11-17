@@ -413,3 +413,47 @@
 .fd-kept .btn {
   margin-left: 6px;
 }
+
+/* Previous Versions (src/ui/versionsDialog.ts): one tower's earlier versions
+   in the same sunken list, newest first, with Open and Cancel under it. */
+#modal:has(> .pv-window) {
+  max-width: min(480px, 96vw);
+}
+.pv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  width: min(440px, 88vw);
+}
+.pv-intro {
+  margin: 0;
+}
+.pv-rows {
+  height: min(10em, 40vh);
+}
+.pv-row {
+  grid-template-columns: 16px minmax(0, 1fr) 8.5em 5em;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.pv-row.selected {
+  background: var(--r-title);
+  color: var(--r-title-fg);
+}
+.pv-row:focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: -2px;
+}
+.pv-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.pv-buttons .btn {
+  min-width: 6.5em;
+}

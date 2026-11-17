@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
-import { cleanFileName, fileSpace, type TowerFileEntry, type TowerFileKind } from "../storage/fileSpace";
+import { cleanFileName, FileConflictError, FileGoneError, fileSpace, type TowerFileEntry, type TowerFileKind } from "../storage/fileSpace";
 import { copySlotsOnce } from "../storage/fileSpaceMigrate";
 import { SaveGame } from "../storage/SaveGame";
 import { TOWER_FILE_MAGIC } from "../storage/saveCompression";
@@ -9,15 +9,17 @@ import { looksLikeLegacyTower } from "../storage/tdtImportHelpers";
 import { showFileDialog, type FileNote } from "../ui/fileDialog";
 import type { FileRow } from "../ui/templates/fileDialog";
 import { decodeTowerText, isBinaryTowerFile, openImport, readPickedFile } from "../ui/uiImport";
-import { isDialogOpen, isEngineStopped } from "./interactionState";
+import { isDialogOpen, isEngineStopped, isSplashUp } from "./interactionState";
 import { linkedFolder } from "../storage/linkedFolder";
 import { noteTowersFile } from "../storage/recentTowers";
 import { currentFileId, currentLinkedFile, setCurrentFile } from "./currentFile";
 import { linkedPlace, saveCurrentLinked } from "./linkedFolderCommands";
 import { baseName, failed } from "./fileKeep";
-import { loadSave } from "./loadMenu";
+import { openLive } from "./loadMenu";
 import { exportFile } from "./portLifecycle";
 import { keptSettled, openingFile } from "./keepOutgoing";
+import { claimTower, liveFileId } from "./towerDocument";
+import { showVersions } from "./versionCommands";
 
 /**
  * What File > Open…, Save As… and Save do with My Towers (owner,
@@ -29,13 +31,16 @@ import { keptSettled, openingFile } from "./keepOutgoing";
  *
  * A tower picked from the device (Open's "From a file on your computer…", or
  * a file dropped on the game) is copied into My Towers once it opens, so it
- * is there next time. The live tower's file is the one it came from or was
- * saved as; any other tower arriving (a new one, a load, an import) forgets
- * it (`towerFollow.ts`), and Save then writes the Auto-save alone.
+ * is there next time. The live tower's file is the one it came from, was
+ * saved as, or was given at its founding (`towerDocument.ts`); File > Save
+ * and the autosave write it. The Auto-save is the game's crash copy and is
+ * not listed: Continue brings it back (#2380). Opening the live tower's own
+ * file again goes back to it, and its file can't be deleted while it is
+ * live.
  *
  * Analytics (`docs/analytics-data-map.md`): `app_action` `files_open`
- * (`open`, `open_key`, `open_title` or `save_as`: see `OPEN_DETAIL`), `file_open` (`tower`, `tdt` or `auto`), `file_save`
- * (`new`, `replace` or `current`), `file_add` (`picked`, `drop` or
+ * (`open`, `open_key`, `open_title` or `save_as`: see `OPEN_DETAIL`), `file_open` (`tower`, `tdt` or `live`), `file_save`
+ * (`new`, `replace`, `current` or `created`), `file_add` (`picked`, `drop` or
  * `folder`),
  * `file_rename`, `file_copy`, `file_delete`, and `file_failed` (`full` or
  * `error`), plus `files_copied` once with the number of slots copied in.
@@ -87,23 +92,25 @@ export function currentFile(): TowerFileEntry | null {
 
 /** Open My Towers file `id`'s .vctower bytes; once the tower is in, the file
  *  is the live tower's. */
-async function openTowerBytes(app: GameApp, id: string, bytes: Uint8Array): Promise<void> {
-  const before = app.enginePort.generation();
-  openingFile(id);
-  await app.saveLoad.importGame(isBinaryTowerFile(bytes) ? bytes : decodeTowerText(bytes));
-  if (app.enginePort.generation() === before) return;
-  setCurrentFile(id);
-  const f = fileSpace.get(id);
-  if (f) noteTowersFile(f);
+function openTowerBytes(app: GameApp, id: string, bytes: Uint8Array): Promise<void> {
+  return claimTower(async () => {
+    const before = app.enginePort.generation();
+    openingFile(id);
+    await app.saveLoad.importGame(isBinaryTowerFile(bytes) ? bytes : decodeTowerText(bytes));
+    if (app.enginePort.generation() === before) return;
+    setCurrentFile(id);
+    const f = fileSpace.get(id);
+    if (f) noteTowersFile(f);
+  });
 }
 
 /** Open a row of the Open window. */
 async function openRow(app: GameApp, row: FileRow): Promise<void> {
-  trackAppAction("file_open", row.type);
-  if (row.type === "auto") {
-    loadSave(app, "auto");
+  if (row.id === liveFileId()) {
+    openLive(app, row.name);
     return;
   }
+  trackAppAction("file_open", row.type);
   // A keep still being written may be this very file: read what it wrote.
   await keptSettled();
   const bytes = await fileSpace.read(row.id);
@@ -136,20 +143,6 @@ export async function openTowersFile(app: GameApp, id: string): Promise<TowersFi
 /** Open My Towers file `id`; nothing happens when there is none. */
 export async function openFile(app: GameApp, id: string): Promise<void> {
   await openTowersFile(app, id);
-}
-
-/** The Auto-save's row, whenever one is stored. One that did not read now
- *  (the population check can fail on a phone short of memory) still shows,
- *  under its plain name; opening it says why if it won't load. */
-function autoRow(): FileRow | null {
-  try {
-    const auto = SaveGame.listSlots().find((s) => s.slot === "auto");
-    if (!auto?.exists && !auto?.present) return null;
-    const name = auto.exists ? `Auto-save (${auto.towerName || "Tower"})` : "Auto-save";
-    return { id: "auto", name, type: "auto", size: auto.size, modified: auto.savedAt };
-  } catch {
-    return null;
-  }
 }
 
 /** Whether `bytes` named `name` are a tower file, and which kind. */
@@ -222,9 +215,15 @@ function folderCommands() {
       }
     },
     remove: async (id: string) => {
+      // The live tower is its file: the autosave would only make it again.
+      if (liveFileId() === id) {
+        const name = fileSpace.get(id)?.name ?? "That tower";
+        return isSplashUp()
+          ? { text: `"${name}" is the tower Continue opens, so it can't be deleted. Open or start another tower first.`, kind: "bad" as const }
+          : { text: `You're playing "${name}", so it can't be deleted. Open or start another tower first.`, kind: "bad" as const };
+      }
       try {
         await fileSpace.remove(id);
-        if (currentFileId() === id) setCurrentFile(null);
         trackAppAction("file_delete");
         return null;
       } catch (err) {
@@ -283,12 +282,14 @@ export function showOpenDialog(app: GameApp, from: OpenFrom): void {
   showFileDialog(app.ui, {
     mode: "open",
     initialName: "",
-    auto: autoRow,
+    // The Auto-save is the crash copy, not a file: Continue brings it back.
+    auto: () => null,
     open: (row) => void openRow(app, row),
     save: async () => null,
     fromComputer: () => openImport(app.ui),
     downloadKept: keptDownload(app),
     ...folderCommands(),
+    versions: (id) => void showVersions(app, id, (file) => openTowersFile(app, file)),
     ...places(app),
   });
 }
@@ -296,6 +297,13 @@ export function showOpenDialog(app: GameApp, from: OpenFrom): void {
 /** Write the live tower into My Towers as `name`, replacing a file of that
  *  name, and make it the live tower's file. */
 async function saveTowerAs(app: GameApp, name: string, why: "new" | "replace" | "current"): Promise<TowerFileEntry> {
+  // The crash copy first, as File > Save does: a reload resumes the crash
+  // copy, so it must never be older than the file it names.
+  try {
+    app.saveLoad.save(true);
+  } catch {
+    /* the crash copy follows on the next autosave */
+  }
   const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
   // A "new" save never replaces: a file of that name another tab just made
   // refuses the write, and the window asks again.
@@ -354,23 +362,45 @@ export function showSaveAsDialog(app: GameApp): void {
     fromComputer: () => app.ui.promptExport(),
     downloadKept: null,
     ...folderCommands(),
+    versions: (id) => void showVersions(app, id, (file) => openTowersFile(app, file)),
     ...places(app),
     // A tower opened from the linked folder saves there by default.
     ...(currentLinkedFile() !== null ? { startIn: "linked" as const } : {}),
   });
 }
 
-/** File > Save also writes the live tower's file, in My Towers or in the
- *  linked folder, when it has one
- *  (the quick save to the Auto-save runs first, as before). Never rejects. */
+/** File > Save writes the live tower's file, in My Towers or in the linked
+ *  folder, and keeps it as the tower's version saved by hand
+ *  (`fileVersions.ts`). A tower with no file yet (My Towers was full or
+ *  closed when it was founded) gets one under its name. The quick save to
+ *  the Auto-save, the crash copy, runs first. Never rejects. */
 export async function saveCurrentFile(): Promise<void> {
   const app = live;
-  if (app && (await saveCurrentLinked(app))) return;
+  if (!app || (await saveCurrentLinked(app))) return;
+  await ready;
+  if (!fileSpace.isOpen()) return;
+  const generation = app.enginePort.generation();
   const file = currentFile();
-  if (!app || !file || file.kind !== "tower") return;
   try {
-    await saveTowerAs(app, file.name, "current");
-    app.ui.toast(`Saved "${file.name}" in My Towers.`, "good");
+    const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
+    const add = () => fileSpace.add(cleanFileName(app.enginePort.towerName() ?? "") || "Tower", "tower", bytes);
+    let entry: TowerFileEntry;
+    let why: "current" | "created" | "forked" = "created";
+    if (!file || file.kind !== "tower") entry = await add();
+    else
+      try {
+        entry = await fileSpace.overwrite(file.id, bytes, Date.now(), true);
+        why = "current";
+      } catch (err) {
+        // Deleted in another window, or saved there since: a file of its own.
+        if (!(err instanceof FileGoneError || err instanceof FileConflictError)) throw err;
+        entry = await add();
+        if (err instanceof FileConflictError) why = "forked";
+      }
+    if (app.enginePort.generation() === generation) setCurrentFile(entry.id);
+    noteTowersFile(entry);
+    trackAppAction("file_save", why);
+    app.ui.toast(why === "forked" ? `Another window saved "${file!.name}" too, so this tower is saved as "${entry.name}".` : `Saved "${entry.name}" in My Towers.`, "good");
   } catch (err) {
     app.ui.sayVisibly(failed(err).text);
   }

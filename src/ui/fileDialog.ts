@@ -59,6 +59,8 @@ export interface FileDialogCtx {
   rename(id: string, name: string): Promise<FileNote | null>;
   duplicate(id: string): Promise<FileNote | null>;
   remove(id: string): Promise<FileNote | null>;
+  /** Show a My Towers tower's Previous Versions window (#2380). */
+  versions?(id: string): void;
   /** Files dropped on the window (`drop`), or the towers of a folder the
    *  player picked with From a folder… (`folder`), added to My Towers. */
   add(files: readonly File[], how?: "drop" | "folder"): Promise<FileNote | null>;
@@ -166,6 +168,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
       usage: here ? linked!.usage() : withAuto(ctx.usage(), auto),
       loading: !here && ctx.loading(),
       canPaste: copied !== null,
+      canVersions: !!ctx.versions,
       kept: ctx.downloadKept !== null,
       place: here ? ("linked" as const) : ("local" as const),
       linked: folder ? { name: folder.name, allowed: folder.access === "granted", mirror: linked!.mirror() } : null,
@@ -324,6 +327,11 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     if (target && !state.busy) void run(() => (inLinked() ? linked!.duplicate(target.id) : ctx.duplicate(target.id)));
   }
 
+  function versions(): void {
+    const target = fileOf(state.selected);
+    if (target?.type === "tower" && !inLinked()) ctx.versions?.(target.id);
+  }
+
   function focusList(): void {
     host.querySelector<HTMLElement>(".fd-rows")?.focus();
   }
@@ -402,6 +410,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     paste,
     duplicate,
     remove,
+    versions,
     answer,
     openMenu,
     closeMenu: () => {

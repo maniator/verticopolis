@@ -67,7 +67,7 @@ describe("a failed save reports autosave_failed", () => {
   });
 
   it("reports nothing when the save works", () => {
-    vi.spyOn(SaveGame, "save").mockImplementation(() => {});
+    vi.spyOn(SaveGame, "save").mockReturnValue({ savedAt: 1, appVersion: "t" });
     const { load } = makeLoad();
     load.save();
     expect(trackAppActionOnce).not.toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe("a failed save reports autosave_failed", () => {
     expect(saveWarning.show).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/private or incognito window/));
     expect(ui.toast).not.toHaveBeenCalled();
 
-    save.mockResolvedValue(undefined);
+    save.mockResolvedValue(null);
     await load.autosave();
     expect(saveWarning.clear).toHaveBeenCalledTimes(1);
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Saving works again.", "good");
@@ -128,7 +128,7 @@ describe("a failed save reports autosave_failed", () => {
     expect(ui.toast).toHaveBeenNthCalledWith(2, expect.stringMatching(/^Save failed: storage is full or blocked/), "bad");
     expect(saveWarning.show).toHaveBeenCalledTimes(1);
 
-    save.mockImplementation(() => {});
+    save.mockReturnValue({ savedAt: 1, appVersion: "t" });
     load.save();
     expect(saveWarning.clear).toHaveBeenCalledTimes(1);
     expect(ui.toast).toHaveBeenNthCalledWith(3, "Saving works again.", "good");
@@ -136,7 +136,7 @@ describe("a failed save reports autosave_failed", () => {
   });
 
   it("says nothing about saving working again to a player who was never told it failed", async () => {
-    vi.spyOn(SaveGame, "saveAsync").mockResolvedValue(undefined);
+    vi.spyOn(SaveGame, "saveAsync").mockResolvedValue(null);
     const { load, ui, saveWarning } = makeLoad();
     await load.autosave();
     expect(saveWarning.clear).not.toHaveBeenCalled();
@@ -153,7 +153,7 @@ describe("a failed save reports autosave_failed", () => {
   });
 
   it("reports nothing when a periodic autosave works", async () => {
-    vi.spyOn(SaveGame, "saveAsync").mockResolvedValue(undefined);
+    vi.spyOn(SaveGame, "saveAsync").mockResolvedValue(null);
     const { load } = makeLoad();
     await load.autosave();
     expect(trackAppActionOnce).not.toHaveBeenCalled();
