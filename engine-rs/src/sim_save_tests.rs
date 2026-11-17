@@ -32,10 +32,11 @@ fn reference(sim: &Simulation) -> Value {
     let tall_lobbies = sim.tower.tall_lobbies();
     m.insert(
         "version".into(),
-        json!(stamped_save_version(
-            !tall_lobbies.is_empty(),
-            sim.tower.holds_an_hour_back()
-        )),
+        json!(if sim.tower.runs_an_auto_schedule() {
+            crate::schedule_auto::AUTO_TUNE_SAVE_VERSION
+        } else {
+            stamped_save_version(!tall_lobbies.is_empty(), sim.tower.holds_an_hour_back())
+        }),
     );
     m.insert("seed".into(), json!(sim.rng.seed()));
     m.insert("initialSeed".into(), json!(sim.rng.initial_seed));
@@ -102,6 +103,9 @@ fn reference(sim: &Simulation) -> Value {
     }
     if let Some(move_ins) = sim.move_ins_today.save_json() {
         m.insert("moveIns".into(), move_ins);
+    }
+    if let Some(load) = sim.elevator_load_json() {
+        m.insert("elevatorLoad".into(), load);
     }
     if let Some(v) = &sim.view {
         m.insert("view".into(), v.clone());
@@ -356,7 +360,8 @@ fn the_save_without_units_and_its_units_are_the_trees_save() {
         let units: Vec<Value> = units.collect();
         assert_eq!(Value::Array(units), sim.serialize_unfolded()["units"]);
         // The `.TDT` export reads neither the people, the cars' timers nor
-        // the housekeeping tallies, the day's move-ins or the period marks.
+        // the housekeeping tallies, the day's move-ins, the period marks or
+        // the elevators' load.
         let left_out = [
             "units",
             "crowd",
@@ -364,6 +369,7 @@ fn the_save_without_units_and_its_units_are_the_trees_save() {
             "housekeeping",
             "moveIns",
             "periodMarks",
+            "elevatorLoad",
         ];
         assert!(left_out.iter().all(|k| rest.get(k).is_none()));
         for key in left_out {

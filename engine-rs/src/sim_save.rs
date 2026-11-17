@@ -22,6 +22,7 @@ use crate::dispatch::ElevatorDispatch;
 use crate::events::{EventSystem, PendingChoice};
 use crate::ledger::{totals_json, Ledger};
 use crate::save_floor_runs::{SavedUnits, FLOOR_RUN_SAVE_VERSION};
+use crate::schedule_auto::AUTO_TUNE_SAVE_VERSION;
 use crate::sim::{stamped_save_version, LogEntry, Simulation, LOG_SAVE_CAP};
 use crate::tower::{SavedUnit, Transport, Unit};
 
@@ -186,6 +187,8 @@ impl Simulation {
         let tall_lobbies = self.tower.tall_lobby_runs();
         let version = if fold {
             self.written_save_version()
+        } else if self.tower.runs_an_auto_schedule() {
+            AUTO_TUNE_SAVE_VERSION
         } else {
             stamped_save_version(!tall_lobbies.is_empty(), self.tower.holds_an_hour_back())
         };
@@ -267,6 +270,11 @@ impl Simulation {
         if let Some(move_ins) = self.move_ins_today.save_json() {
             m.push(own("moveIns", move_ins));
         }
+        // The elevators' measured load, which the daily Auto-tune reads, so
+        // a reload re-tunes as the game that saved would.
+        if let Some(load) = self.elevator_load_json() {
+            m.push(own(crate::telemetry_save::ELEVATOR_LOAD_KEY, load));
+        }
         if let Some(v) = &self.view {
             m.push(("view", Field::Borrowed(v)));
         }
@@ -307,7 +315,9 @@ impl Simulation {
     /// tiles into runs is stamped with the version that reads them, so an
     /// older build refuses it rather than load a run as its first tile alone.
     pub(crate) fn written_save_version(&self) -> i64 {
-        if self.tower.lists_a_floor_run() {
+        if self.tower.runs_an_auto_schedule() {
+            AUTO_TUNE_SAVE_VERSION
+        } else if self.tower.lists_a_floor_run() {
             FLOOR_RUN_SAVE_VERSION
         } else {
             stamped_save_version(
@@ -352,7 +362,8 @@ impl Simulation {
     #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     pub(crate) fn save_without_units(&self) -> (Value, impl Iterator<Item = Value> + '_) {
         // The `.TDT` format has no place for the crowd, the cars' timers,
-        // the housekeeping tallies, the day's move-ins or the period marks.
+        // the housekeeping tallies, the day's move-ins, the period marks or
+        // the elevators' load.
         (
             self.serialize_without(&[
                 "units",
@@ -361,6 +372,7 @@ impl Simulation {
                 "housekeeping",
                 "moveIns",
                 "periodMarks",
+                crate::telemetry_save::ELEVATOR_LOAD_KEY,
             ]),
             self.tower.units.iter().map(Unit::serialize),
         )

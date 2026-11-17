@@ -115,6 +115,10 @@ export const SHARDS: Record<string, string[]> = {
   // Cancel, and on a phone; DOM stills over the default new tower, its own
   // shard as new features get.
   "previous-versions": ["previous-versions", "previous-versions-mobile"],
+  // The elevator schedule's Auto box (owner, 2026-11-17): ticked on a
+  // measured shaft, waiting on a new one, and on a phone; DOM stills over
+  // the small frozen schedule tower, its own shard as new features get.
+  "elevator-auto": ["schedule-dialog-auto", "schedule-dialog-auto-phone"],
   // The 1994 desk and the sunrise startup screen (owner, 2026-11-15: their own
   // shard, every design and option): one canon tower on the desk, the
   // README's day and night pair on a second one, the title window, and the

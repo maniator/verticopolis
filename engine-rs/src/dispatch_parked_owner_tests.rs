@@ -47,6 +47,7 @@ fn parked_shaft(
         standard_floor_departure: None,
         home_floors: homes,
         held_back: None,
+        auto_tune: false,
     });
     let mut d = ElevatorDispatch::new();
     for _ in 0..200 {

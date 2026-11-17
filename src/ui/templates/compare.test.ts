@@ -26,7 +26,7 @@ describe("the Classic and Modern summary", () => {
   const CATALOG_RULE_TO_HELP: Record<keyof CatalogRules, string | null> = {
     variantHouseholds: "Households of two to five",
     previewNamesRefusal: "Hovering a refused spot says why first",
-    scheduleAssist: "Adds presets, auto-tune and advice", // #305
+    scheduleAssist: "Adds presets, auto-tune, a daily Auto re-tune and advice", // #305, Auto 2026-11-17
     buildsWhilePaused: "Building while paused", // #1936
     exportsTo1994: "Export a .TDT for the original game",
     quotesLobbyDistance: null, // a wording detail of the tenant card's lobby warning

@@ -54,6 +54,7 @@ pub(super) fn schedule(response: Option<f64>) -> Schedule {
         standard_floor_departure: None,
         home_floors: Some(vec![1, 1]),
         held_back: None,
+        auto_tune: false,
     }
 }
 

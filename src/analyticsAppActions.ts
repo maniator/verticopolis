@@ -101,6 +101,9 @@ export type AppActionName =
   // The Sky Bridge tool laid a bridge (Modern, 2026-11-16): detail `new`, or
   // `finish` for the rest of a half bridge from a save made before the tool.
   | "sky_bridge"
+  // A shaft's Auto checkbox saved changed (Modern daily re-tune,
+  // 2026-11-17): detail `on` or `off`. New Modern elevators start on.
+  | "elevator_auto_tune"
   // The star-up message box opened, detail the mode and the rating it
   // announces, such as `modern-3`.
   | "star_notice"

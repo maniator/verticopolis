@@ -68,6 +68,7 @@ describe("opening the dialog", () => {
       homeFloors: [1, 1, 1, 1],
       waitingCarResponse: 0,
       standardFloorDeparture: 48,
+      autoTune: false,
     });
     expect(ctx.preset).not.toHaveBeenCalled();
     expect(dialog().open).toBe(true);
@@ -241,7 +242,7 @@ describe("presets", () => {
     expect(homesShown()).toEqual(["4:1", "4:2", "4:3", "4:4"]);
     expect(q(".modal-warn")?.textContent).toBe("You have unsaved changes.");
     ok();
-    expect(saved(apply)).toEqual({ activeCars: { weekday: row(2), weekend: row(3) }, homeFloors: [4, 4, 4, 4], waitingCarResponse: 0, standardFloorDeparture: 48 });
+    expect(saved(apply)).toEqual({ activeCars: { weekday: row(2), weekend: row(3) }, homeFloors: [4, 4, 4, 4], waitingCarResponse: 0, standardFloorDeparture: 48, autoTune: false });
   });
 
   it("fills a day the preset leaves out with the whole fleet", () => {

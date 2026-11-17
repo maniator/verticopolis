@@ -1,8 +1,10 @@
 //! Port of `sampleElevatorUtil` (`src/engine/sim/congestion.ts`) and the
 //! origin-ring fold (`src/engine/scheduleOrigins.ts`): the hourly elevator
 //! telemetry the schedule dialog, the stats screen and the facility
-//! diagnostics read. Sampling only: no rng, nothing read back into behavior,
-//! and never saved (a load starts every ring empty, as on the TypeScript side).
+//! diagnostics read. Sampling only: no rng. The one gameplay reader is the
+//! daily Auto-tune (`schedule_auto.rs`), so a save with a shaft on Auto
+//! carries the hourly rings (`telemetry_save.rs`); any other load starts
+//! every ring empty.
 
 use std::collections::HashMap;
 
@@ -262,7 +264,8 @@ impl Simulation {
 impl Simulation {
     /// Replace the telemetry with the `telemetry_json` shape. Tooling only:
     /// the gallery's engine leg carries a scene's authored curve across the
-    /// load that hands the tower to the engine (the save never carries it).
+    /// load that hands the tower to the engine (a save carries the rings only
+    /// with a shaft on Auto, `telemetry_save.rs`).
     /// A malformed document leaves the telemetry as it was.
     pub fn seed_telemetry(&mut self, doc: &Value) -> Result<(), String> {
         fn id_of(v: &Value) -> Result<i64, String> {

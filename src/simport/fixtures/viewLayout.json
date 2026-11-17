@@ -1,5 +1,5 @@
 {
-  "version": 31,
+  "version": 32,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -802,7 +802,7 @@
     "bad",
     "money"
   ],
-  "scheduleSlots": 61,
+  "scheduleSlots": 62,
   "heatModes": [
     "congestion",
     "occupancy",

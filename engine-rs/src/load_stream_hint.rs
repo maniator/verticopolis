@@ -131,3 +131,7 @@ pub(crate) fn skip_space(text: &[u8], mut i: usize) -> usize {
     }
     i
 }
+
+#[cfg(test)]
+#[path = "load_stream_hint_tests.rs"]
+mod tests;

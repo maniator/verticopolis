@@ -103,6 +103,7 @@ pub(crate) fn draft(
         standard_floor_departure: None,
         home_floors: homes,
         held_back: None,
+        auto_tune: false,
     }
 }
 
@@ -191,7 +192,15 @@ fn each_hour_follows_its_load_with_a_one_car_floor_and_the_installed_cap() {
     assert_eq!(wd[10], 8);
     assert_eq!(wd[11], 1);
     assert_eq!(wd[12], 8);
-    assert_eq!(wd[3], 1, "an unsampled hour still keeps one car");
+    // An hour nobody measured is not an idle hour: it keeps the draft's
+    // count, every car with no draft (2026-11-17, daily Auto-tune).
+    assert_eq!(wd[3], 8, "an unsampled hour keeps every car");
+    let kept = sim.auto_tune_proposal(id, Some(&draft(Some(vec![2; 24]), None, None)), false);
+    assert_eq!(
+        kept.proposal.unwrap().weekday.unwrap()[3],
+        2,
+        "the draft's count"
+    );
     assert_eq!(
         p.weekend.unwrap()[8],
         3,
@@ -371,7 +380,8 @@ fn asking_changes_nothing() {
     assert_eq!(sim.telemetry, telemetry);
     assert_eq!(format!("{:?}", sim.rng), format!("{rng:?}"));
     assert_eq!(sim.money, money);
-    assert!(sim.tower.get_transport(id).unwrap().schedule.is_none());
+    let schedule = sim.tower.get_transport(id).unwrap().schedule.as_ref();
+    assert!(schedule.is_none_or(|s| s.weekday.is_none() && s.weekend.is_none()));
 }
 
 #[test]

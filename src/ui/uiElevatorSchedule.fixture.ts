@@ -145,6 +145,7 @@ export const saved = (apply: { mock: { calls: unknown[][] } }) =>
     homeFloors: number[];
     waitingCarResponse: number;
     standardFloorDeparture: number;
+    autoTune: boolean;
   };
 
 /** The last string the dialog announced. */

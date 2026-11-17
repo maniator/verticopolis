@@ -458,6 +458,9 @@ pub(crate) fn assemble(
     if let Some(move_ins) = data.get("moveIns") {
         sim.move_ins_today = crate::sim::MoveIns::from_save(move_ins);
     }
+    if let Some(load) = data.get(crate::telemetry_save::ELEVATOR_LOAD_KEY) {
+        sim.restore_elevator_load(load);
+    }
     // The saved office head counts are the workers at their desks, and an
     // edit the game had not squared yet (`desksStale`) is squared at the
     // first step. Both readers come through here, so they square the desks

@@ -207,7 +207,8 @@ The crate has no default features.
   before 10:00 carries `morningVenueDay`, the day the shops' and fast
   food's day last closed, since theirs ends at 10:00 (a save without it
   counts today's as closed). The elevator
-  panels' hourly figures start over on a load. A save from before the crowd
+  panels' hourly figures start over on a load, unless a shaft is on Auto
+  (`elevatorLoad`, below). A save from before the crowd
   was saved loads with nobody in the building, and the tower fills again
   from the lobby; one from before `waitsSeen` starts with no waits
   remembered. The `.TDT` format carries none of the four.
@@ -230,8 +231,16 @@ The crate has no default features.
   the next id, and nothing on it but `id`, `kind`, `floor` and `x`) into
   the first tile's entry with a `run` count (`FLOOR_RUN_KEY`,
   `save_floor_runs`); the loaders unfold it in place, so the unit list
-  comes back as a version 10 writer listed it. A save takes the oldest of
-  these versions that reads it whole. All five load here.
+  comes back as a version 10 writer listed it. A save is version 12 when
+  an elevator schedule has Auto on (`autoTune`, `Schedule::auto_tune`,
+  which every Modern elevator starts with): at 5 AM each game day
+  (`schedule_auto::AUTO_TUNE_HOUR`) the engine sets that shaft's car counts
+  from its measured traffic, the hours it has measured only, and leaves the
+  staging and timings alone. Such a save carries `elevatorLoad`, the
+  elevators' hourly load rings, so a reload re-tunes as the game that saved
+  would; an older engine would drop the flag, so it refuses the save. A
+  save takes the oldest of these versions that reads it whole. All six load
+  here.
 
 ## Proving conformance
 

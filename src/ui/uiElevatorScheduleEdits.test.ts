@@ -273,7 +273,7 @@ describe("live stop edits", () => {
   it("renders endpoints as fixed stops and the middle floors as toggles", () => {
     open();
     expect(dialog().querySelectorAll(".es-always")).toHaveLength(2);
-    expect(Array.from(dialog().querySelectorAll("input[type=checkbox]")).map((i) => i.getAttribute("aria-label"))).toEqual([
+    expect(Array.from(dialog().querySelectorAll(".es-grid input[type=checkbox]")).map((i) => i.getAttribute("aria-label"))).toEqual([
       "Serve floor 3",
       "Serve floor 2",
     ]);
@@ -349,7 +349,7 @@ describe("live stop edits", () => {
   it("shows an express shaft's stops above ground as a fact, with no toggles", () => {
     open({ isExpress: true });
     expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain("Serves all lobbies and sky lobbies");
-    expect(q("input[type=checkbox]")).toBeNull();
+    expect(q(".es-grid input[type=checkbox]")).toBeNull();
     // Its endpoints and lobbies show the fixed check instead.
     expect(q(".es-always")).not.toBeNull();
     expect(Array.from(dialog().querySelectorAll("button")).some((b) => b.textContent === "Express (lobbies)")).toBe(false);
@@ -381,7 +381,7 @@ describe("OK and Cancel", () => {
     ok();
     ok();
     expect(apply).toHaveBeenCalledTimes(1);
-    expect(saved(apply)).toEqual({ activeCars: { weekday: row(CARS), weekend: row(CARS) }, homeFloors: [1, 1, 1, 1], waitingCarResponse: 0, standardFloorDeparture: 48 });
+    expect(saved(apply)).toEqual({ activeCars: { weekday: row(CARS), weekend: row(CARS) }, homeFloors: [1, 1, 1, 1], waitingCarResponse: 0, standardFloorDeparture: 48, autoTune: false });
     await flush();
     expect(dialog().open).toBe(false);
     expect(q(".es-body")).toBeNull();

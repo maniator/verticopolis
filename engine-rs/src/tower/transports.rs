@@ -163,7 +163,8 @@ impl Tower {
             preserve_basement_stops: kind == Kind::ElevatorExpress,
             classic_express_stops: kind == Kind::ElevatorExpress
                 && self.mode.express_stops_on_15th_floors(),
-            schedule: None,
+            // A Modern elevator starts with Auto on (owner, 2026-11-17).
+            schedule: (kind.is_elevator() && self.mode.schedule_assist()).then(Schedule::auto_only),
             rides: 0,
         };
         self.transport_by_id.insert(id, self.transports.len());
@@ -419,7 +420,14 @@ impl Tower {
             .schedule
             .as_ref()
             .and_then(|s| s.home_floors.clone());
-        let coerced = Schedule::coerce(Some(raw), cars, bottom, top);
+        let mut coerced = Schedule::coerce(Some(raw), cars, bottom, top);
+        if !self.mode.schedule_assist() {
+            // Auto is a Modern assist; a Classic schedule never carries it.
+            coerced = coerced.and_then(|mut sch| {
+                sch.auto_tune = false;
+                (!sch.is_empty()).then_some(sch)
+            });
+        }
         self.transports[i].schedule = coerced.map(|sch| {
             if sch.home_floors == previous_homes {
                 sch
@@ -429,6 +437,13 @@ impl Tower {
             }
         });
         true
+    }
+
+    /// Whether a shaft's schedule has Auto on, which a save carries as
+    /// version 12.
+    pub fn runs_an_auto_schedule(&self) -> bool {
+        let auto = |t: &Transport| t.schedule.as_ref().is_some_and(|s| s.auto_tune);
+        self.transports.iter().any(auto)
     }
 
     /// Whether a shaft's schedule holds an hour back (#1546), which a save

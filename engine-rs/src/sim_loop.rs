@@ -176,6 +176,7 @@ impl Simulation {
             self.morning_venue_day = today;
             self.roll_over_morning_venues();
         }
+        self.retune_auto_schedules();
         let shift = self.mode.housekeeping_shift();
         // Crews come in two hours early, and none sets out during a bomb
         // search, when everyone but the guards stands still.

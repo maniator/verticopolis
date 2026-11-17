@@ -28,9 +28,14 @@ const SCHEDULE_HOMES: usize = 8;
 const ALL_CARS: f64 = 8.0;
 
 /// `scheduleShaft`'s slots: whether a weekday row is set, its 24 hours,
-/// the same for the weekend, the two timings (NaN when unset), then the
-/// home-floor count and up to [`SCHEDULE_HOMES`] floors.
-pub(crate) const SCHEDULE_LEN: usize = 2 * (1 + SCHEDULE_HOURS) + 2 + 1 + SCHEDULE_HOMES;
+/// the same for the weekend, the two timings (NaN when unset), the
+/// home-floor count and up to [`SCHEDULE_HOMES`] floors, then the Auto flag
+/// at [`SCHEDULE_AUTO_SLOT`].
+pub(crate) const SCHEDULE_LEN: usize = SCHEDULE_AUTO_SLOT + 1;
+
+/// Where the Auto flag sits in the slots: 1 when the engine re-tunes the
+/// rows every morning, 0 when it does not.
+const SCHEDULE_AUTO_SLOT: usize = 2 * (1 + SCHEDULE_HOURS) + 2 + 1 + SCHEDULE_HOMES;
 
 fn log_kind(code: f64) -> Option<LogKind> {
     match whole(code)? {
@@ -59,7 +64,8 @@ fn table<'a>(code: f64, names: &[&'a str]) -> Option<&'a str> {
 /// they break the input classes (contract section 3): exactly
 /// [`SCHEDULE_LEN`] slots, each row flag 0 or 1, a set row's hours and the
 /// home floors safe integers, the home-floor count a safe integer up to
-/// [`SCHEDULE_HOMES`], and each timing finite or NaN for unset. The ranges
+/// [`SCHEDULE_HOMES`], each timing finite or NaN for unset, and the Auto
+/// flag 0 or 1. The ranges
 /// stay with `Schedule::coerce`, which clamps them as it does for the legacy
 /// setter and a save.
 fn schedule_json(slots: &[f64]) -> Option<serde_json::Value> {
@@ -98,6 +104,11 @@ fn schedule_json(slots: &[f64]) -> Option<serde_json::Value> {
     if n > 0 {
         v["homeFloors"] = serde_json::json!(ints(&slots[homes + 1..homes + 1 + n])?);
     }
+    match whole(slots[SCHEDULE_AUTO_SLOT])? {
+        0 => {}
+        1 => v["autoTune"] = serde_json::json!(true),
+        _ => return None,
+    }
     Some(v)
 }
 
@@ -122,7 +133,8 @@ fn schedule_slots(s: &Schedule) -> Vec<f64> {
     let homes = &homes[..homes.len().min(SCHEDULE_HOMES)];
     out.push(homes.len() as f64);
     out.extend(homes.iter().map(|&f| f as f64));
-    out.resize(SCHEDULE_LEN, 0.0);
+    out.resize(SCHEDULE_AUTO_SLOT, 0.0);
+    out.push(f64::from(u8::from(s.auto_tune)));
     out
 }
 

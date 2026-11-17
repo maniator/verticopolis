@@ -30,6 +30,8 @@
 /* Presets row (Modern): the recommended preset carries the primary ring. */
 .es-presets .btn.es-rec { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out); font-weight: 700; }
 .es-presets .btn.es-rec:active { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-in); }
+/* The Auto checkbox sits at the row's end with a full touch target. */
+.es-auto { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin-left: auto; cursor: pointer; }
 /* The floors grid (#464): one row per span floor descending, in a pressed well.
    Columns: floor label, the Serve stop toggle, then the car chips. The canon
    floors-by-cars shape: floors down the left, one chip per car. */

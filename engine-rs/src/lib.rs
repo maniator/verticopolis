@@ -119,6 +119,7 @@ pub mod facilities;
 #[doc(hidden)]
 pub mod fflate;
 pub mod fixed_step;
+mod floor_bits;
 pub mod frame;
 pub mod gameplay;
 #[doc(hidden)]
@@ -187,6 +188,8 @@ pub mod schedule;
 #[doc(hidden)]
 pub mod schedule_authoring;
 #[doc(hidden)]
+pub mod schedule_auto;
+#[doc(hidden)]
 pub mod schedule_facts;
 mod schedule_geometry;
 #[doc(hidden)]
@@ -217,6 +220,7 @@ mod sim_undo_check;
 mod sim_undo_ground;
 #[doc(hidden)]
 pub mod telemetry;
+mod telemetry_save;
 #[doc(hidden)]
 pub mod tower;
 mod tower_index;

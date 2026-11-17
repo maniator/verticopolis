@@ -99,6 +99,8 @@ describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal through the bind
       const before = rust.serialize();
       const signature = rust.undoSignature();
       const hourlyBefore = rust.elevatorTelemetry();
+      // A new Modern shaft runs Auto with no rows of its own (owner, 2026-11-17).
+      const scheduleBefore = rust.shaftSchedule(f.standard);
       const first = rust.autoTuneProposal(f.standard, new Float64Array(0), false);
       const second = rust.autoTuneProposal(f.standard, new Float64Array(0), false);
       expect(first.status).toBe("available");
@@ -106,7 +108,7 @@ describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal through the bind
       expect(rust.serialize()).toBe(before);
       expect(rust.undoSignature()).toEqual(signature);
       expect(rust.elevatorTelemetry()).toBe(hourlyBefore);
-      expect(rust.shaftSchedule(f.standard)).toHaveLength(0);
+      expect(rust.shaftSchedule(f.standard)).toEqual(scheduleBefore);
       // Accepting it is the ordinary schedule command, and it reads back.
       const proposal = first.proposal!;
       const slots = scheduleSlots({

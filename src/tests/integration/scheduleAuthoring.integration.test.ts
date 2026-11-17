@@ -88,13 +88,15 @@ describe.skipIf(!hasWasmPackage())("the Rust schedule facts and presets through 
     try {
       const before = rust.serialize();
       const signature = rust.undoSignature();
+      // A new Modern shaft runs Auto with no rows of its own (owner, 2026-11-17).
+      const scheduleBefore = rust.shaftSchedule(f.standard);
       const first = rust.schedulePreset(f.standard, "rush");
       expect(first.status).toBe("available");
       expect(rust.schedulePreset(f.standard, "rush")).toEqual(first);
       rust.scheduleFacts(f.standard, new Float64Array(0), false);
       expect(rust.serialize()).toBe(before);
       expect(rust.undoSignature()).toEqual(signature);
-      expect(rust.shaftSchedule(f.standard)).toHaveLength(0);
+      expect(rust.shaftSchedule(f.standard)).toEqual(scheduleBefore);
       // Accepting it is the ordinary schedule command, and the facts then read
       // the saved schedule back through the same draft slots.
       const slots = scheduleSlots({

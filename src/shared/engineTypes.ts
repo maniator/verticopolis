@@ -30,6 +30,10 @@ export interface ElevatorSchedule {
   /** Per-car home/waiting floor; index `i` is car `i`. An absent or short entry
    *  falls back to the derived lowest-lobby idle floor. */
   homeFloors?: number[];
+  /** Auto (Modern): the engine re-tunes `activeCars` every game morning from
+   *  the shaft's measured traffic. Staging, door time and waiting response
+   *  stay as set. Absent means off; a new Modern elevator starts on. */
+  autoTune?: boolean;
 }
 
 /**
@@ -37,8 +41,9 @@ export interface ElevatorSchedule {
  * per day of EMA'd load fractions (0..1), so weekend samples never blend into
  * the weekday curve. A slot of 0 means "no positive sample yet": a genuinely
  * zero-load hour also reads 0, so consumers cannot tell the two apart (the
- * conflation is tracked as #474). Transient (never serialized): a fresh load
- * reads empty, never a fabricated curve.
+ * conflation is tracked as #474). A save carries it only while a shaft is on
+ * Auto (`elevatorLoad`); otherwise a fresh load reads empty, never a
+ * fabricated curve.
  */
 export interface HourlyByDay {
   weekday: number[];
