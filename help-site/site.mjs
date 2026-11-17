@@ -143,6 +143,26 @@ export function oldAnchorRedirects(helpIds) {
   return `(function(){var p=location.pathname.replace(/\\/+$/,"");if(p!==${JSON.stringify(HELP_BASE)})return;var id=location.hash.slice(1);var to=Object.prototype.hasOwnProperty.call(${map},id)?${map}[id]:null;if(to)location.replace(${JSON.stringify(HELP_BASE + "/")}+to+"/"+location.search);})();`;
 }
 
+/** The appearance schemes the game offers besides Standard
+ *  (src/ui/appearance/appearancePrefs.ts), and where the manual keeps the one
+ *  it wears on its own host. */
+export const HELP_SCHEMES = ["skyline", "high_contrast"];
+export const HELP_SCHEME_KEY = "vc.appearance";
+
+/**
+ * The manual wears the game's appearance scheme (owner, 2026-11-17). An inline
+ * head script, so the page is dressed before it paints: a page the game opened
+ * (`?from=game`) wears the `scheme` the link names, Standard when it names
+ * none, and keeps that on this host; any other visit wears the kept one. It
+ * sets `data-scheme` on `<html>`, which the game's retro-tokens.css and
+ * src/styles/help-schemes.css key on. Blocked storage only loses the memory.
+ */
+export function schemeBootScript() {
+  const known = JSON.stringify(HELP_SCHEMES);
+  const key = JSON.stringify(HELP_SCHEME_KEY);
+  return `(function(){try{var k=${key},ok=${known},q=new URLSearchParams(location.search),s=null;if(q.get("from")==="game"){s=q.get("scheme");if(ok.indexOf(s)<0)s=null;try{localStorage.setItem(k,s||"standard")}catch(e){}}else{try{s=localStorage.getItem(k)}catch(e){}if(ok.indexOf(s)<0)s=null}if(s)document.documentElement.setAttribute("data-scheme",s)}catch(e){}})();`;
+}
+
 /**
  * Whether a link points at the Sponsors page, so the help site's click
  * listener can count it as a `sponsor_click` app action (detail "help"). It

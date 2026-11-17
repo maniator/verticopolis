@@ -1,0 +1,106 @@
+/* The manual in the game's appearance schemes (owner, 2026-11-17): a page the
+   game opened wears the scheme the game wears (site.mjs schemeBootScript sets
+   html[data-scheme]). The game's retro-tokens.css already swaps the palette;
+   these rules give the manual's own chrome the scheme's shapes. Standard sets
+   no attribute, so none of this matches it. Style only, no images. */
+
+/* ---- Skyline ---------------------------------------------------------- */
+
+html[data-scheme="skyline"] .header {
+  background: var(--sky-title);
+  text-shadow: 0 1px 0 #15123a;
+}
+html[data-scheme="skyline"] .sidebar-content a[aria-current="page"],
+html[data-scheme="skyline"] .sidebar-content a[aria-current="page"]:hover {
+  background: var(--sky-violet);
+  border-radius: 4px;
+}
+html[data-scheme="skyline"] .vc-bar-game,
+html[data-scheme="skyline"] .vc-help-bar-btn,
+html[data-scheme="skyline"] .sl-menu-button,
+html[data-scheme="skyline"] .pagination-links a {
+  background: var(--sky-btn);
+  border-radius: 4px;
+}
+html[data-scheme="skyline"] .header site-search button[data-open-modal] {
+  border-radius: 4px;
+}
+html[data-scheme="skyline"] .vc-infobox,
+html[data-scheme="skyline"] [data-has-hero] .card {
+  border-radius: 8px 8px 3px 3px;
+  overflow: hidden;
+}
+
+/* ---- High Contrast ---------------------------------------------------- */
+
+/* White on black in both of Starlight's themes; links and the current page
+   in yellow. */
+html[data-scheme="high_contrast"],
+html[data-scheme="high_contrast"][data-theme] {
+  --sl-color-bg: #000000;
+  --sl-color-bg-sidebar: #000000;
+  --sl-color-bg-nav: #000000;
+  --sl-color-bg-inline-code: #000000;
+  --sl-color-black: #000000;
+  --sl-color-white: #ffffff;
+  --sl-color-text: #ffffff;
+  --sl-color-gray-1: #ffffff;
+  --sl-color-gray-2: #ffffff;
+  --sl-color-gray-3: #ffffff;
+  --sl-color-gray-4: #ffffff;
+  --sl-color-gray-5: #ffffff;
+  --sl-color-gray-6: #000000;
+  --sl-color-hairline: #ffffff;
+  --sl-color-hairline-light: #ffffff;
+  --sl-color-hairline-shade: #ffffff;
+  --sl-color-accent-low: #000000;
+  --sl-color-accent: #ffff00;
+  --sl-color-accent-high: #ffff00;
+  --sl-color-text-accent: #ffff00;
+  --sl-color-text-invert: #000000;
+}
+html[data-scheme="high_contrast"] .header {
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #ffffff;
+  --sl-color-gray-2: #ffffff;
+  --sl-color-gray-3: #ffffff;
+  --sl-color-text-accent: #ffff00;
+  background: #000000;
+  border-bottom: 2px solid #ffffff;
+}
+html[data-scheme="high_contrast"] .vc-bar-title,
+html[data-scheme="high_contrast"] .vc-bar-title:hover,
+html[data-scheme="high_contrast"] .vc-bar-github,
+html[data-scheme="high_contrast"] .vc-bar-github:hover,
+html[data-scheme="high_contrast"] mobile-starlight-toc .display-current {
+  color: #ffffff;
+}
+html[data-scheme="high_contrast"] .sidebar-content a[aria-current="page"],
+html[data-scheme="high_contrast"] .sidebar-content a[aria-current="page"]:hover {
+  background: #ffff00;
+  color: #000000;
+}
+html[data-scheme="high_contrast"] .sidebar-content .group-label .large {
+  color: #ffffff;
+}
+html[data-scheme="high_contrast"] .vc-bar-game,
+html[data-scheme="high_contrast"] .vc-bar-game:hover,
+html[data-scheme="high_contrast"] .vc-help-bar-btn,
+html[data-scheme="high_contrast"] .header site-search button[data-open-modal] {
+  background: #000000;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 2px #ffffff;
+}
+html[data-scheme="high_contrast"] .header site-search button[data-open-modal] kbd {
+  background: #000000;
+  color: #ffffff;
+  box-shadow: none;
+}
+html[data-scheme="high_contrast"] .sl-markdown-content kbd {
+  color: #ffffff;
+  background: #000000;
+  border-color: #ffffff;
+}
+html[data-scheme="high_contrast"] :focus-visible {
+  outline: 2px solid #ffff00;
+}

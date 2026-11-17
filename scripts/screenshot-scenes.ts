@@ -55,6 +55,7 @@ import { LINKED_FOLDER_SCENES } from "./scenes/linkedFolder.ts";
 import { OPEN_RECENT_SCENES } from "./scenes/openRecent.ts";
 import { PREVIOUS_VERSIONS_SCENES } from "./scenes/previousVersions.ts";
 import { DESK_SCENES } from "./scenes/desk.ts";
+import { APPEARANCE_SCENES } from "./scenes/appearance.ts";
 import { STAR_UP_SCENES } from "./scenes/starUp.ts";
 
 export const SCENES: Scene[] = [
@@ -82,6 +83,7 @@ export const SCENES: Scene[] = [
   ...OPEN_RECENT_SCENES,
   ...PREVIOUS_VERSIONS_SCENES,
   ...DESK_SCENES,
+  ...APPEARANCE_SCENES,
   ...STAR_UP_SCENES,
   ...FRONT_DOOR_SCENES,
 ];

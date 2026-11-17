@@ -144,6 +144,8 @@ export function bootCommonProps(input: {
   tenureDay: number | undefined;
   savedAt: number | undefined;
   standalone: boolean;
+  /** The appearance scheme the page wears (Options > Appearance…). */
+  scheme: string;
   now: number;
 }): EventProps {
   // A real save time is a positive epoch-ms stamp. A non-positive savedAt is a
@@ -168,5 +170,9 @@ export function bootCommonProps(input: {
     tenure: tenureBucket(input.tenureDay),
     recency: recencyBucket(msSinceSave),
     display: displayModeBucket(input.standalone),
+    // The player's appearance scheme (`standard`, `skyline` or
+    // `high_contrast`), so any event splits by look. Updated in place when the
+    // Appearance dialog changes it (`game/appearanceWiring.ts`).
+    scheme: input.scheme,
   };
 }

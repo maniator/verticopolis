@@ -124,6 +124,18 @@ export const SHARDS: Record<string, string[]> = {
   // README's day and night pair on a second one, the title window, and the
   // startup screen on a computer and a phone.
   desk: ["desk", "desk-hero", "desk-title", "startup-sunrise", "startup-sunrise-phone"],
+  // The appearance schemes (owner, 2026-11-17): the dialog, the canon tower's
+  // desk in Skyline and High Contrast, a phone in Skyline and the phone title
+  // screen in both; its own shard,
+  // as new features get.
+  appearance: [
+    "appearance",
+    "appearance-skyline",
+    "appearance-high-contrast",
+    "appearance-skyline-phone",
+    "appearance-skyline-phone-title",
+    "appearance-high-contrast-phone-title",
+  ],
   // The star-up message box (r/SimTower feedback, 2026-11-16): every rating's
   // box in both modes and one on a phone, each over a small frozen tower.
   "star-up": ["star-up", "star-up-mobile"],

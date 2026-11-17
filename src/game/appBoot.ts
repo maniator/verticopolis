@@ -25,6 +25,7 @@ import { bootCommonProps, distributionChannelLabel, platformLabel } from "../ana
 import { isStandalone } from "../pwaInstall";
 import { wireMenus } from "./menuWiring";
 import { wireScreenSaver } from "./screenSaverWiring";
+import { applyKeptScheme, wireAppearance } from "./appearanceWiring";
 import { answerGamePresence } from "../ui/fromGame";
 import { initInstallAffordance } from "./installAffordance";
 import { showTitleScreen, welcomeFounder } from "./titleScreen";
@@ -283,6 +284,8 @@ export function flightCount(transports: ReadonlyArray<{ readonly kind: string }>
  *  is the loaded tower's write time (from `SaveGame.loadResult`), passed in for
  *  the S4 return-recency bucket; undefined with no readable save. */
 export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
+  // The kept appearance scheme, while the boot cover still hides the page.
+  const scheme = applyKeptScheme();
   // Wire the install affordance early: the browser can fire beforeinstallprompt
   // during initial load, so its capture must be in place before then. The chip
   // stays hidden until the play-gate trips (see tickInstallAffordance).
@@ -299,6 +302,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   void bootTowerDocument(app, savedAtBoot, openFileSpace(app));
   wireTowerDrop(app); // a tower file dropped on the game opens
   wireScreenSaver(app); // Options > Screen Saver… and its idle and return triggers
+  wireAppearance(app, scheme); // Options > Appearance…
   // A help page the game opened asks whether the game is still running before
   // its Back to game closes its window (src/ui/fromGame.ts).
   answerGamePresence();
@@ -377,6 +381,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
         tenureDay: app.reader ? clockOf(app.reader.header).day : undefined,
         savedAt: savedAtBoot,
         standalone: isStandalone(),
+        scheme,
         now: Date.now(),
       }),
     );

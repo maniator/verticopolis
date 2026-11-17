@@ -138,6 +138,7 @@ describe("bootCommonProps", () => {
         tenureDay: undefined,
         savedAt: undefined,
         standalone: false,
+        scheme: "standard",
         now: 0,
       }).version,
     ).toBe(APP_VERSION);
@@ -157,6 +158,7 @@ describe("bootCommonProps", () => {
         tenureDay: 12,
         savedAt: now - 3 * DAY,
         standalone: false,
+        scheme: "skyline",
         now,
       }),
     ).toEqual({
@@ -167,6 +169,7 @@ describe("bootCommonProps", () => {
       tenure: "d7-29",
       recency: "7d",
       display: "browser",
+      scheme: "skyline",
     });
   });
 
@@ -180,6 +183,7 @@ describe("bootCommonProps", () => {
         tenureDay: undefined,
         savedAt: undefined,
         standalone: true,
+        scheme: "standard",
         now: DAY,
       }),
     ).toEqual({
@@ -190,6 +194,7 @@ describe("bootCommonProps", () => {
       tenure: "unknown",
       recency: "unknown",
       display: "standalone",
+      scheme: "standard",
     });
   });
 
@@ -204,6 +209,7 @@ describe("bootCommonProps", () => {
       onboarded: false,
       tenureDay: 3,
       standalone: false,
+      scheme: "standard",
       now,
     } as const;
     expect(bootCommonProps({ ...base, savedAt: -5 }).recency).toBe("unknown");
@@ -222,6 +228,7 @@ describe("bootCommonProps", () => {
         tenureDay: 0,
         savedAt: now - 10 * DAY,
         standalone: false,
+        scheme: "high_contrast",
         now,
       }),
     ).toEqual({
@@ -232,6 +239,7 @@ describe("bootCommonProps", () => {
       tenure: "d0",
       recency: "30d",
       display: "browser",
+      scheme: "high_contrast",
     });
   });
 });

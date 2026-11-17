@@ -66,3 +66,57 @@
   --splash-tagline: #ffd9a8;
   --splash-premise: #e7ddf5;
 }
+
+/* The appearance schemes' palettes (Options > Appearance…, src/ui/appearance/).
+   Each is scoped to its html[data-scheme] value, which the game sets and the
+   manual copies from the game's links (help-site/site.mjs), so Standard
+   (above) is the palette everywhere else. Component rules: styles/schemes/
+   and the manual's help-schemes.css. */
+html[data-scheme="skyline"] {
+  --r-face: #ebe7dc;
+  --r-light: #f7f5ef;
+  --r-hi: #ffffff;
+  --r-shadow: #a59fb4;
+  --r-dark: #4a4560;
+  --r-title: #33378f;
+  --r-desktop: #3b3c7a;
+  --panel-light: #f4f2ec;
+  --line: #8b8698;
+  /* Text on the warm face, each 4.5:1 or better on #ebe7dc. */
+  --muted: #3c3850;
+  --money: #0b5a1f;
+  --sky-line: #8b8698;
+  /* White title text clears 4.5:1 on each title gradient's lightest stop,
+     and the white title-button glyphs clear 3:1 on theirs. */
+  --sky-title: linear-gradient(180deg, #5a63c8 0%, #3d429e 42%, #2a2766 100%);
+  --sky-title-off: linear-gradient(180deg, #77739a 0%, #66618a 45%, #555075 100%);
+  --sky-btn: linear-gradient(#ffffff, #e4e0d5);
+  --sky-btn-down: linear-gradient(#d8d3c6, #efece4);
+  --sky-violet: linear-gradient(#7880dc, #4a50b0);
+  --sky-rose: linear-gradient(#d06a7c, #9c3048);
+  --bevel-out: inset 0 0 0 1px var(--sky-line);
+  --bevel-in: inset 0 0 0 1px var(--sky-line), inset 1px 1px 0 1px rgba(74, 69, 96, 0.18);
+  --win-shadow: 2px 3px 0 rgba(20, 16, 50, 0.32);
+}
+html[data-scheme="high_contrast"] {
+  --r-face: #000000;
+  --r-light: #000000;
+  --r-hi: #ffffff;
+  --r-shadow: #ffffff;
+  --r-dark: #ffffff;
+  --r-title: #ffff00;
+  --r-title-fg: #000000;
+  --r-ink: #ffffff;
+  --r-desktop: #000000;
+  --panel-light: #000000;
+  --ink: #ffffff;
+  --muted: #ffffff;
+  --line: #ffffff;
+  --good: #7dff7d;
+  --bad: #ff8a8a;
+  --bad-ink: #ff8a8a;
+  --money: #7dff7d;
+  --bevel-out: inset 0 0 0 2px #ffffff;
+  --bevel-in: inset 0 0 0 2px #ffff00;
+  --win-shadow: 0 0 0 1px #ffffff;
+}

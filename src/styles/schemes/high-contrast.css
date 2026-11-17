@@ -1,0 +1,138 @@
+/* High Contrast (Options > Appearance…, Wren's ask, party 2026-11-17):
+   white on black, yellow title bars and selection (text 9:1 or better,
+   greyed-out text #8a8a8a 6.6:1, non-text lines 3:1 or better),
+   solid lines instead of bevels. Scoped to html[data-scheme="high_contrast"];
+   style only. The system's forced-colors mode still wins. */
+html[data-scheme="high_contrast"] body {
+  color: #ffffff;
+}
+html[data-scheme="high_contrast"] .win {
+  box-shadow: 0 0 0 2px #ffffff;
+}
+html[data-scheme="high_contrast"] .win-title,
+html[data-scheme="high_contrast"] .desk-title-bar,
+html[data-scheme="high_contrast"] body.desk .desk-win:not(.desk-active) > .win-title {
+  color: #000000;
+}
+/* An inactive desk window's title: black on white, set apart from the
+   active window's yellow. */
+html[data-scheme="high_contrast"] body.desk .desk-win:not(.desk-active) > .win-title {
+  background: #ffffff;
+}
+html[data-scheme="high_contrast"] .win-title > .btn,
+html[data-scheme="high_contrast"] body.desk .desk-win > .win-title > .desk-btn {
+  background: #000000;
+  color: #ffffff;
+}
+/* The tray's speaker and monitor are black drawings: they sit on a white
+   tile here so they stay visible on the black taskbar. */
+html[data-scheme="high_contrast"] .desk-tray-sound,
+html[data-scheme="high_contrast"] .desk-tray-display {
+  background-color: #ffffff;
+}
+html[data-scheme="high_contrast"] .btn,
+html[data-scheme="high_contrast"] .desk-task,
+html[data-scheme="high_contrast"] body.desk-title .splash-btn {
+  background: #000000;
+  color: #ffffff;
+}
+html[data-scheme="high_contrast"] .btn.danger {
+  color: var(--bad-ink);
+}
+html[data-scheme="high_contrast"] .btn:active,
+html[data-scheme="high_contrast"] .btn.active,
+html[data-scheme="high_contrast"] .desk-task.on {
+  background: #ffff00;
+  color: #000000;
+}
+html[data-scheme="high_contrast"] .menubar,
+html[data-scheme="high_contrast"] .mb-pop,
+html[data-scheme="high_contrast"] .desk-taskbar,
+html[data-scheme="high_contrast"] .desk-tray {
+  background: #000000;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px #ffffff;
+}
+html[data-scheme="high_contrast"] .mb-title[aria-expanded="true"],
+html[data-scheme="high_contrast"] .mb-item:not([aria-disabled="true"], :disabled):hover,
+html[data-scheme="high_contrast"] .mb-item:focus-visible {
+  background: #ffff00;
+  color: #000000;
+}
+html[data-scheme="high_contrast"] .pal-item:hover {
+  background: #000000;
+  outline: 1px solid #ffffff;
+}
+html[data-scheme="high_contrast"] .pal-item.active,
+html[data-scheme="high_contrast"] .pal-item.active .pal-name,
+html[data-scheme="high_contrast"] .pal-item.active .pal-cost {
+  background: #ffff00;
+  color: #000000;
+}
+html[data-scheme="high_contrast"] .pal-cost,
+html[data-scheme="high_contrast"] .pal-group-title,
+html[data-scheme="high_contrast"] .stat .label,
+html[data-scheme="high_contrast"] .stars {
+  color: #ffffff;
+}
+html[data-scheme="high_contrast"] #traffic-glyph {
+  --bar-off: #5a5a5a;
+}
+html[data-scheme="high_contrast"] select,
+html[data-scheme="high_contrast"] input,
+html[data-scheme="high_contrast"] textarea {
+  background: #000000;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+}
+html[data-scheme="high_contrast"] :focus-visible {
+  outline: 2px solid #ffff00;
+  outline-offset: 1px;
+}
+html[data-scheme="high_contrast"] body.desk #app,
+html[data-scheme="high_contrast"] body.desk-title::before {
+  background: #000000;
+}
+/* The title screen's buttons away from the desk (phones, tablets). */
+html[data-scheme="high_contrast"] body:not(.desk-title) .splash-btn:not(.ghost) {
+  color: #ffffff;
+  background: #000000;
+  border: 2px solid #ffffff;
+  box-shadow: none;
+}
+html[data-scheme="high_contrast"] body:not(.desk-title) .splash-btn.primary {
+  color: #000000;
+  background: #ffff00;
+}
+/* Anything greyed out (Call Fire Rescue with no fire, Undo with nothing to
+   undo, a locked field): gray text that never lights up, so it reads as off
+   next to the white. Buttons also get a dashed edge. */
+html[data-scheme="high_contrast"] .mb-item[aria-disabled="true"],
+html[data-scheme="high_contrast"] .mb-item:disabled,
+html[data-scheme="high_contrast"] .btn:disabled,
+html[data-scheme="high_contrast"] .btn[aria-disabled="true"],
+html[data-scheme="high_contrast"] select:disabled,
+html[data-scheme="high_contrast"] input:disabled,
+html[data-scheme="high_contrast"] textarea:disabled,
+html[data-scheme="high_contrast"] .es-skipped .es-cell-floor {
+  color: #8a8a8a;
+  background: #000000;
+  text-shadow: none;
+}
+html[data-scheme="high_contrast"] .btn:disabled,
+html[data-scheme="high_contrast"] .btn[aria-disabled="true"] {
+  box-shadow: none;
+  outline: 2px dashed #8a8a8a;
+  outline-offset: -2px;
+}
+/* The phone title screen's corner chips, and the menu bar's logo badge. */
+html[data-scheme="high_contrast"] .splash-sponsor,
+html[data-scheme="high_contrast"] .splash-install,
+html[data-scheme="high_contrast"] .splash-mute {
+  color: #ffffff;
+  background: #000000;
+  border: 2px solid #ffffff;
+}
+html[data-scheme="high_contrast"] .menubar-brand {
+  color: #000000;
+}

@@ -17,6 +17,7 @@ import {
   helpVisitSource,
   openedFromGame,
   takeFromGameFlag,
+  withScheme,
   type BackToGameDeps,
   type PresenceChannel,
 } from "./fromGame";
@@ -34,6 +35,28 @@ describe("fromGameHref and openedFromGame", () => {
     expect(fromGameHref("/help", "game_menu")).toBe("/help?from=game&via=game_menu");
     expect(fromGameHref("/help#classic-vs-modern", "compare")).toBe("/help?from=game&via=compare#classic-vs-modern");
     expect(fromGameHref("https://help.verticopolis.com/changelog?x=1", "update_prompt")).toBe("https://help.verticopolis.com/changelog?x=1&from=game&via=update_prompt");
+  });
+
+  it("names the appearance scheme the game wears, and nothing for Standard", () => {
+    expect(fromGameHref("/help#a", "about", "skyline")).toBe("/help?from=game&via=about&scheme=skyline#a");
+    expect(fromGameHref("/help", "about", null)).toBe("/help?from=game&via=about");
+    document.documentElement.setAttribute("data-scheme", "high_contrast");
+    try {
+      expect(fromGameHref("/help", "title")).toBe("/help?from=game&via=title&scheme=high_contrast");
+    } finally {
+      document.documentElement.removeAttribute("data-scheme");
+    }
+  });
+
+  it("re-marks a game link with the scheme worn now, and leaves other links alone", () => {
+    expect(withScheme("/help/rooms?from=game&via=stats#x", "skyline")).toBe("/help/rooms?from=game&via=stats&scheme=skyline#x");
+    expect(withScheme("https://help.verticopolis.com/?from=game&via=about&scheme=skyline", null)).toBe("https://help.verticopolis.com/?from=game&via=about");
+    expect(withScheme("https://help.verticopolis.com/?from=game&via=about&scheme=skyline", "high_contrast")).toBe(
+      "https://help.verticopolis.com/?from=game&via=about&scheme=high_contrast",
+    );
+    const unchanged = "/help?from=game&via=about&scheme=skyline";
+    expect(withScheme(unchanged, "skyline")).toBe(unchanged);
+    expect(withScheme("https://example.test/page?x=1", "skyline")).toBe("https://example.test/page?x=1");
   });
 
   it("reads back what it writes", () => {
@@ -204,6 +227,12 @@ describe("takeFromGameFlag", () => {
     const hist = { replaceState: vi.fn() };
     takeFromGameFlag({ pathname: "/help/", search: "?from=game&via=stats&ref=x", hash: "" }, hist, memoryStorage);
     expect(hist.replaceState).toHaveBeenCalledWith(null, "", "/help/?ref=x");
+  });
+
+  it("takes the appearance scheme out with it", () => {
+    const hist = { replaceState: vi.fn() };
+    takeFromGameFlag({ pathname: "/help/", search: "?from=game&via=stats&scheme=skyline", hash: "" }, hist, memoryStorage);
+    expect(hist.replaceState).toHaveBeenCalledWith(null, "", "/help/");
   });
 
   it("leaves no bare question mark when from=game was the only param", () => {

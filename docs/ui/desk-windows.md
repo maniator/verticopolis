@@ -68,7 +68,7 @@ ordinary layout. The code is `src/ui/desk/`; the numbers below live in
   `btn-about`, `mb-close`); `desk_tray` is the tray's `display` or `sound`;
   `desk_win_menu_open` is a window menu opening from the `taskbar` or a
   `title_bar`, and `desk_win_menu` its pick, `<window>_<command>`;
-  `desk_control` is a Control Panel icon, detail `display`, `sounds` or
-  `settings`. The Window menu's picks are `menu_pick` events with `menu`
+  `desk_control` is a Control Panel icon, detail `display`, `appearance`,
+  `sounds` or `settings`. The Window menu's picks are `menu_pick` events with `menu`
   `window` and `window_*` item codes. The title screen's own buttons are
   `title_pick` (`src/game/titlePicks.ts`).

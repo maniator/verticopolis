@@ -458,6 +458,7 @@ describe("the platform and distribution-channel dimensions ride every event", ()
         tenureDay: 3,
         savedAt: undefined,
         standalone: false,
+        scheme: "standard",
         now: 1_000,
       }),
     );
