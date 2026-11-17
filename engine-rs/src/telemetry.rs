@@ -135,10 +135,11 @@ impl Simulation {
         let hour = self.clock.hour().rem_euclid(24) as usize;
         let weekend = self.clock.is_weekend();
         let mut boardings = self.elevators.drain_boardings();
-        // Office workers ride as people, outside the dispatch's estimate
-        // (`crowd::commuters`), so their boardings and the seats they fill
-        // join the estimate's here: a shaft full of commuters reads full.
-        for (shaft, floors) in std::mem::take(&mut self.crowd.commuter_boardings) {
+        // The crowd's riders are outside the dispatch's estimate, so their
+        // boardings join the estimate's here (#477): a cinema's evening
+        // crowd marks its own floor. Office workers (`crowd::commuters`) also
+        // add the seats they fill: a shaft full of commuters reads full.
+        for (shaft, floors) in std::mem::take(&mut self.crowd.elevator_boardings) {
             let tally = boardings.entry(shaft).or_default();
             for (floor, n) in floors {
                 *tally.entry(floor).or_insert(0.0) += n;

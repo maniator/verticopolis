@@ -807,10 +807,12 @@ so the spec and the build cannot drift silently:
   lobby-dominated up-rush), preferring the visible day when warm. Presets keep the plain
   lobby split: they are intents, not measurements. Origins are gated on the day's warm demand
   curve, and both the markers and the aim are filtered to floors the shaft still serves, so
-  EMA'd history can never mark or stage a skipped floor. Known limits, tracked: attendance
-  venue riders (cinema, party hall) place real crowd calls and never enter the statistical
-  boarding tally, so their floors cannot become hotspots; the dialog's origin snapshot goes
-  stale across undo/adoptSim (#475).
+  EMA'd history can never mark or stage a skipped floor. Every crowd rider who boards an
+  elevator joins the tally beside the statistical estimate's riders (#477): visitors to
+  attendance venues (cinema, party hall), guests, residents, staff and commuters, so a
+  cinema's floor can become a hotspot. Staff on a service car are counted once, as they step
+  aboard, and the dispatch no longer tallies its staff callers on every arrival. Known
+  limit, tracked: the dialog's origin snapshot goes stale across undo/adoptSim (#475).
 - **Day-split rings (#466, v1.59.0)**: the measured accumulator keeps one 24-slot ring per
   day type, keyed on `clock.isWeekend` at sample time. The ghost, the advice sentence, the
   Simulate peak, and Auto-tune are all day-scoped: an unmeasured weekend shows no ghost and

@@ -21,6 +21,7 @@ mod condo_relocation;
 mod condos;
 mod congestion_gripe_copy;
 mod crowd;
+mod crowd_origins;
 mod demand_pools;
 mod demographic_routines;
 mod departure_cause;

@@ -210,9 +210,9 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
             // The ride is noted once the shaft's read above ends.
             if let Some((shaft_id, ci, elevator)) = boarded {
                 tower.note_ride(shaft_id);
-                if crowd.people[i].commuter && elevator {
+                if elevator {
                     *crowd
-                        .commuter_boardings
+                        .elevator_boardings
                         .entry(shaft_id)
                         .or_default()
                         .entry(floor)
