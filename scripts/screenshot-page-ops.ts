@@ -210,7 +210,13 @@ export function pgStep(frames: number): boolean {
   if (!clock || typeof clock.step !== "function") return false;
   const n = Math.floor(frames);
   if (!Number.isFinite(n) || n <= 0) return false;
-  for (let i = 0; i < n; i++) clock.step(1000 / 60);
+  for (let i = 0; i < n - 1; i++) clock.step(1000 / 60);
+  // A meal-overlay change waits up to MEAL_SYNC_MS for its scene sync in play
+  // (#1747); a shot shows the settled tower, so the final frame takes any
+  // change still waiting, as pgStepNoDraw does.
+  const tower = w.game?.engine;
+  if (tower && typeof tower.lastSceneSyncAt === "number") tower.lastSceneSyncAt = -Infinity;
+  clock.step(1000 / 60);
   return true;
 }
 
@@ -269,6 +275,11 @@ export function pgStepNoDraw(frames: number): boolean {
   } catch {
     /* Excalibur internals moved: the final draw still runs, degrading to prior behavior. */
   }
+  // A meal-overlay change waits up to MEAL_SYNC_MS for its scene sync in play
+  // (#1747); a shot shows the settled tower, so the final frame takes any
+  // change still waiting.
+  const tower = w.game?.engine;
+  if (tower && typeof tower.lastSceneSyncAt === "number") tower.lastSceneSyncAt = -Infinity;
   clock.step(1000 / 60);
   return true;
 }
