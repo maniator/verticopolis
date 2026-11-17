@@ -9,3 +9,4 @@ whole: each test names its file.
 | --- | --- | --- |
 | `split-tower-26.vctower` | The owner, binary `.vctower` (Modern, 9 AM) | Riders above the lobby waiting over an hour at the evening rush while full cars stopped at every waiting floor (`rule_tests::full_car_passes`) |
 | `split-tower-26-remembered.vctower` | The engine, from `split-tower-26.vctower` after 30 one-minute steps, binary `.vctower` | A save that carries the remembered elevator waits (`waitsSeen`), loaded and replayed by `rule_tests::remembered_waits` |
+| `split-tower-29.vctower` | The owner, binary `.vctower` (Modern, 11:44 AM) | An Auto elevator re-tuned to one car every hour while about 190 people waited at its floor 1 and floor 15 stops, the 4.12.0 stall (`rule_tests::auto_backlog`) |

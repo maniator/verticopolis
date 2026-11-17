@@ -148,7 +148,8 @@ impl ElevatorDispatch {
             let t = &mut tower.transports[ti];
             // Dispatch only reads the schedule, so it borrows it.
             let sched = t.schedule.as_ref();
-            let active_count = Schedule::active_car_count(sched, is_weekend, hour, t.cars) as usize;
+            let mut active_count =
+                Schedule::active_car_count(sched, is_weekend, hour, t.cars) as usize;
             let shaft_dwell = Schedule::dwell_minutes_for(sched, DWELL_MINUTES);
             let response = Schedule::waiting_response_for(sched);
             let span = (t.top - t.bottom) as f64;
@@ -193,12 +194,14 @@ impl ElevatorDispatch {
             self.no_calls.resize(words, 0);
             self.ways
                 .reset(if rules.riders_go_their_way { words } else { 0 });
+            let mut waiting = 0.0;
             for (k, &fl) in stops.iter().enumerate() {
                 // A crowd call already raises the stop, so the estimate is
                 // only looked up when it would decide (or, with riders
                 // bound their way, whether the stop is the crowd's alone).
                 let call = call_at(fl);
                 let callers = call.callers;
+                waiting += callers;
                 let estimate =
                     || !staff_only && self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0;
                 if callers >= 1.0 && ways_known {
@@ -208,6 +211,7 @@ impl ElevatorDispatch {
                     set_bit(call_bits, k);
                 }
             }
+            active_count = Schedule::cars_for_backlog(sched, active_count, cars, waiting, cap);
             let stop_index = |floor: i64| stops.binary_search(&floor).ok();
             if rules.best_car {
                 // The on-shift cars as they begin the step; each called
