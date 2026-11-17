@@ -118,16 +118,22 @@ impl Simulation {
         }
     }
 
-    /// `spatialCongestionByFloor`: floor -> ratio, in the map's insertion order.
+    /// `spatialCongestionByFloor`: floor -> ratio, in the map's insertion
+    /// order. The ratio is the congestion a floor's tenants feel, the one the
+    /// hourly satisfaction pass drains them by (`fold_commute_waits`), so the
+    /// overlay, the hotspot, the HUD and the 9 AM warning name the floor
+    /// that is losing tenants (#2020).
     pub fn spatial_congestion_by_floor(&self) -> IndexMap<i64, f64> {
-        self.build_spatial_congestion(false).0
+        let (mut ratios, _) = self.build_spatial_congestion(false);
+        self.fold_commute_waits(&mut ratios, None);
+        ratios
     }
 
     /// `spatialCongestionAttributionByFloor`: the per-class maxes (elevator,
     /// stairs, escalator) a floor's reading was folded from, for the
     /// congestion copy (`bindingTransportClassAt`).
     pub fn spatial_congestion_attribution_by_floor(&self) -> IndexMap<i64, CongestionAttribution> {
-        self.build_spatial_congestion(true).1
+        self.spatial_congestion_with_attribution().1
     }
 
     /// Both maps from one pass, for a reader that needs a floor's ratio and
@@ -136,7 +142,64 @@ impl Simulation {
     pub(crate) fn spatial_congestion_with_attribution(
         &self,
     ) -> (IndexMap<i64, f64>, IndexMap<i64, CongestionAttribution>) {
-        self.build_spatial_congestion(true)
+        let (mut ratios, mut attribution) = self.build_spatial_congestion(true);
+        self.fold_commute_waits(&mut ratios, Some(&mut attribution));
+        (ratios, attribution)
+    }
+
+    /// Raises each floor's transport estimate to the floor's real average
+    /// commute wait over the mode's limit where that is higher
+    /// (`commute_wait_congestion`, #1971). A floor the estimate has no
+    /// reading for joins the map after the estimate's floors, lowest first,
+    /// when its tenants' trips have waited at all. Commute waits are waits
+    /// for a car (stairs and escalators keep nobody waiting), so where the
+    /// real wait wins, the floor's `attribution` binds on the elevators.
+    ///
+    /// The estimate's floors are raised by lookup. The averages are walked
+    /// in floor order only when some recorded floor is missing from the
+    /// estimate, which on a grown tower is the usual case: basement trips
+    /// record floors the estimate does not list.
+    fn fold_commute_waits(
+        &self,
+        ratios: &mut IndexMap<i64, f64>,
+        mut attribution: Option<&mut IndexMap<i64, CongestionAttribution>>,
+    ) {
+        let waits = &self.crowd.commute_wait_by_floor;
+        if waits.is_empty() {
+            return;
+        }
+        let raise =
+            |floor: i64, real: f64, att: &mut Option<&mut IndexMap<i64, CongestionAttribution>>| {
+                if let Some(att) = att.as_deref_mut() {
+                    let a = att.entry(floor).or_default();
+                    a.elevator = a.elevator.max(real);
+                }
+            };
+        let mut matched = 0;
+        for (&floor, estimate) in ratios.iter_mut() {
+            if !waits.contains_key(&floor) {
+                continue;
+            }
+            matched += 1;
+            let real = self.commute_wait_congestion(floor);
+            if real > *estimate {
+                *estimate = real;
+                raise(floor, real, &mut attribution);
+            }
+        }
+        if matched == waits.len() {
+            return;
+        }
+        for (&floor, _) in waits.sorted() {
+            if ratios.contains_key(&floor) {
+                continue;
+            }
+            let real = self.commute_wait_congestion(floor);
+            if real > 0.0 {
+                ratios.insert(floor, real);
+                raise(floor, real, &mut attribution);
+            }
+        }
     }
 
     /// `buildSpatialCongestion` (sim/congestion.ts): the ratio map and, when
