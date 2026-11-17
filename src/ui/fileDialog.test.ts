@@ -316,7 +316,7 @@ describe("the Open window", () => {
     const items = [...box!.querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")];
     expect(items.map((b) => b.textContent)).toContain("Previous versions…");
     items.find((b) => b.textContent === "Previous versions…")!.click();
-    expect(versions).toHaveBeenCalledExactlyOnceWith("a");
+    expect(versions).toHaveBeenCalledExactlyOnceWith("a", expect.any(Function));
   });
 
   it("leaves a hold or a right-click in the rename box to the text, with no row menu", () => {

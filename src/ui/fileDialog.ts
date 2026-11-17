@@ -4,6 +4,7 @@ import { cleanFileName, freeName, type TowerFileEntry } from "../storage/fileSpa
 import type { FilePlace } from "./templates/fileDialogPlaces";
 import { rowPress } from "./fileDialogPress";
 import { lastPlace, pickFolderFiles, placeHandlers, rememberPlace, whereWords, type LinkedPlaceCtx } from "./fileDialogPlaces";
+import { fileRows, withAuto } from "./fileDialogRows";
 import {
   fileDialogTemplate,
   rowDomId,
@@ -60,8 +61,9 @@ export interface FileDialogCtx {
   rename(id: string, name: string): Promise<FileNote | null>;
   duplicate(id: string): Promise<FileNote | null>;
   remove(id: string): Promise<FileNote | null>;
-  /** Show a My Towers tower's Previous Versions window (#2380). */
-  versions?(id: string): void;
+  /** Show a My Towers tower's Previous Versions window (#2380). Its Cancel
+   *  calls `back`, which puts this window back as the player left it. */
+  versions?(id: string, back: () => void): void;
   /** Files dropped on the window (`drop`), or the towers of a folder the
    *  player picked with From a folder… (`folder`), added to My Towers. */
   add(files: readonly File[], how?: "drop" | "folder"): Promise<FileNote | null>;
@@ -83,6 +85,8 @@ export interface FileDialogCtx {
   downloadKept: (() => void) | null;
 }
 
+export { fileRows, withAuto } from "./fileDialogRows";
+
 /** The tower Copy put on the clipboard, by id. Kept between openings, as a
  *  desktop's clipboard is. */
 let copied: string | null = null;
@@ -92,47 +96,34 @@ export function clearFileClipboardForTests(): void {
   copied = null;
 }
 
-const TYPE_ORDER: Readonly<Record<FileRow["type"], number>> = { auto: 0, tower: 1, tdt: 2 };
-
-/** The window's tower count and size, with the Auto-save when it is listed,
- *  so the header counts every tower the window shows. */
-export function withAuto(usage: { count: number; bytes: number }, auto: FileRow | null): { count: number; bytes: number } {
-  return auto ? { count: usage.count + 1, bytes: usage.bytes + (auto.size ?? 0) } : usage;
-}
-
-/** The rows a window shows: the Auto-save first, then the files that pass
- *  the filter, in the chosen order. */
-export function fileRows(auto: FileRow | null, files: readonly TowerFileEntry[], filter: FileFilter, sort: FileDialogView["sort"]): FileRow[] {
-  const rows: FileRow[] = files
-    .filter((f) => filter === "all" || f.kind === filter)
-    .map((f) => ({ id: f.id, name: f.name, type: f.kind, size: f.size, modified: f.modified }));
-  const by: Record<FileSortKey, (a: FileRow, b: FileRow) => number> = {
-    name: (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }),
-    type: (a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type],
-    size: (a, b) => (a.size ?? 0) - (b.size ?? 0),
-    modified: (a, b) => (a.modified ?? 0) - (b.modified ?? 0),
-  };
-  rows.sort((a, b) => (sort.down ? -1 : 1) * by[sort.key](a, b) || by.name(a, b));
-  return auto && filter === "all" ? [auto, ...rows] : rows;
+/** Where the player left a window that opened a child window (Previous
+ *  versions…), so closing the child puts it back as it was, as in Windows. */
+export interface FileDialogResume {
+  readonly selected: string | null;
+  readonly name: string;
+  readonly filter: FileFilter;
+  readonly sort: FileDialogView["sort"];
+  readonly place: FilePlace;
+  readonly scroll: number; // how far the list was scrolled
 }
 
 /** Whether a drag carries files from the device. */
 const carriesFiles = (e: DragEvent): boolean => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
 
-export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">, ctx: FileDialogCtx): void {
+export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">, ctx: FileDialogCtx, resume?: FileDialogResume): void {
   const opening = ctx.mode === "open";
   const state = {
-    selected: null as string | null,
-    name: ctx.initialName,
-    filter: "all" as FileFilter,
-    sort: { key: "modified" as FileSortKey, down: true },
+    selected: resume?.selected ?? null,
+    name: resume?.name ?? ctx.initialName,
+    filter: resume?.filter ?? ("all" as FileFilter),
+    sort: resume?.sort ?? { key: "modified" as FileSortKey, down: true },
     line: null as FileNote | null,
     ask: null as FileAsk | null,
     renaming: null as string | null,
     menu: null as FileDialogView["menu"],
     busy: false,
     dropping: false,
-    place: (ctx.startIn ?? lastPlace()) as FilePlace,
+    place: (resume?.place ?? ctx.startIn ?? lastPlace()) as FilePlace,
     look: false,
   };
   const linked = ctx.linked ?? null;
@@ -330,7 +321,10 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
 
   function versions(): void {
     const target = fileOf(state.selected);
-    if (target?.type === "tower" && !inLinked()) ctx.versions?.(target.id);
+    if (target?.type !== "tower" || inLinked() || !ctx.versions) return;
+    const { selected, name, filter, sort, place } = state;
+    const scroll = host.querySelector(".fd-rows")?.scrollTop ?? 0;
+    ctx.versions(target.id, () => showFileDialog(ui, ctx, { selected, name, filter, sort, place, scroll }));
   }
 
   function focusList(): void {
@@ -491,7 +485,12 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
   // The folder is read back only when a window shows it, and its files may
   // have changed on disk since it was last read.
   if (inLinked()) void linked!.refresh().catch(() => {});
-  if (opening) focusList();
+  if (resume) {
+    // Back from a child window: the list where it was, the row in focus.
+    const list = host.querySelector<HTMLElement>(".fd-rows");
+    if (list) list.scrollTop = resume.scroll;
+    focusList();
+  } else if (opening) focusList();
   else {
     const input = host.querySelector<HTMLInputElement>("#fd-name");
     input?.focus();

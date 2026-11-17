@@ -289,7 +289,7 @@ export function showOpenDialog(app: GameApp, from: OpenFrom): void {
     fromComputer: () => openImport(app.ui),
     downloadKept: keptDownload(app),
     ...folderCommands(),
-    versions: (id) => void showVersions(app, id, (file) => openTowersFile(app, file)),
+    versions: (id, back) => void showVersions(app, id, (file) => openTowersFile(app, file), back),
     ...places(app),
   });
 }
@@ -362,7 +362,7 @@ export function showSaveAsDialog(app: GameApp): void {
     fromComputer: () => app.ui.promptExport(),
     downloadKept: null,
     ...folderCommands(),
-    versions: (id) => void showVersions(app, id, (file) => openTowersFile(app, file)),
+    versions: (id, back) => void showVersions(app, id, (file) => openTowersFile(app, file), back),
     ...places(app),
     // A tower opened from the linked folder saves there by default.
     ...(currentLinkedFile() !== null ? { startIn: "linked" as const } : {}),
