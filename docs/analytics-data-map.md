@@ -153,6 +153,16 @@ towers' sky lobbies in one click, at 3 stars and up (party, 2026-11-16). One
 | --- | --- | --- |
 | `sky_bridge` | `new` or `finish` | The tool laid a bridge. `finish` means it completed a half bridge from a save made before the tool (a bridge tile already stood beside the gap), `new` any other bridge |
 
+## Drags that stop
+
+A drag keeps its refusals quiet while it moves and says the last one when it is
+let go (#1847, #2046). One `app_action` code counts those releases, to show how
+often a drag runs into a rule. It carries no floor, place or reason text.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `drag_stopped` | `extend` or `bulldoze` | The release of an elevator's extend arrow (`extend`) or of a bulldoze drag (`bulldoze`) said why the drag stopped. For `extend` that is any stop: a floor the shaft can't serve (an unbuilt lobby, another shaft), too little money, the kind's longest span or the edge of the lot. A refusal the press already said is not said again and not counted |
+
 ## The star-up message box
 
 `app_action` with `action` `star_notice` reports that the star-up message box

@@ -46,7 +46,7 @@ function makeApp(tool: Record<string, unknown>) {
     enginePort,
     reader,
     canvas: document.createElement("canvas"),
-    audio: { start: vi.fn() },
+    audio: { start: vi.fn(), sfx: vi.fn() },
     keyboard: { pointerDrew: vi.fn(), followTower: vi.fn() },
     tool,
     bulldozeDrag: new BulldozeDragChoice(),
@@ -264,7 +264,58 @@ describe("a bulldoze drag removes only the kind it first touched (#644)", () => 
     hooks.onActionDown!(5, 2, false, FLOOR_TILE(5));
     hooks.onActionUp!();
     hooks.onActionDown!(6, 2, false, SHAFT);
-    expect(app.build.bulldozePicked).toHaveBeenLastCalledWith(SHAFT);
+    expect(vi.mocked(app.build.bulldozePicked).mock.lastCall?.[0]).toEqual(SHAFT);
+  });
+});
+
+describe("a bulldoze drag says once on release why it stopped (#2046)", () => {
+  const TILE = (x: number) => ({ type: "unit", id: 0, kind: "floor", cell: { floor: 2, x } });
+  const FLOOR_RULE = "In Classic, only the tile at either end of a floor can be removed, so a floor never has a gap in the middle.";
+  type Sink = ((reason: string) => void) | undefined;
+  /** The engine keeps every tile from `kept` on, with the floor rule's reason. */
+  const keepFrom = (app: ReturnType<typeof makeApp>["app"], kept: number) =>
+    vi.mocked(app.build.bulldozePicked).mockImplementation((p, held?: Sink) => {
+      if ((p as ReturnType<typeof TILE>).cell.x < kept) return true;
+      held?.(FLOOR_RULE);
+      return false;
+    });
+
+  it("keeps the refusals quiet while it moves and says the reason once on release", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    keepFrom(app, 7);
+    hooks.onActionDown!(5, 2, false, TILE(5));
+    hooks.onActionMove!(6, 2, TILE(6));
+    hooks.onActionMove!(7, 2, TILE(7));
+    hooks.onActionMove!(8, 2, TILE(8));
+    expect(app.ui.toast).not.toHaveBeenCalled();
+    expect(app.audio.sfx).not.toHaveBeenCalled();
+    hooks.onActionUp!();
+    expect(app.ui.toast).toHaveBeenCalledExactlyOnceWith(FLOOR_RULE, "bad");
+    expect(app.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
+    hooks.onActionDown!(1, 2, false, TILE(1));
+    hooks.onActionUp!();
+    expect(app.ui.toast, "the next drag starts with nothing held").toHaveBeenCalledOnce();
+  });
+
+  it("does not repeat what the press already said", () => {
+    const { app, hooks } = makeApp({ type: "bulldoze" });
+    keepFrom(app, 0);
+    hooks.onActionDown!(5, 2, false, TILE(5));
+    expect(app.ui.toast).toHaveBeenCalledExactlyOnceWith(FLOOR_RULE, "bad");
+    hooks.onActionMove!(6, 2, TILE(6));
+    hooks.onActionUp!();
+    expect(app.ui.toast).toHaveBeenCalledOnce();
+    expect(app.audio.sfx).toHaveBeenCalledOnce();
+  });
+
+  it("says nothing on release once an undo closed its gesture", () => {
+    const { app, undo, hooks } = makeApp({ type: "bulldoze" });
+    keepFrom(app, 6);
+    hooks.onActionDown!(5, 2, false, TILE(5));
+    hooks.onActionMove!(6, 2, TILE(6));
+    undo.gesture = NO_GESTURE;
+    hooks.onActionUp!();
+    expect(app.ui.toast).not.toHaveBeenCalled();
   });
 });
 

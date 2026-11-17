@@ -147,7 +147,7 @@ with the count in its slot.
 | `demolishTile` | floor, x, bulldoze | none | per command: the floor or lobby tile in that cell, which the view gives no id (#1417); any other cell is refused |
 | `changeCars` | id, add | cars | per command |
 | `startExtend` / `stopExtend` | id / none | none | per drag |
-| `extendShaft` | id, up, targetFloor | bottom, top, added | per drag step |
+| `extendShaft` | id, up, targetFloor | bottom, top, added | per drag step: a floor the shaft cannot serve stops it just short; that step is done and leaves the floor's reason in `lastReason()` (#1847) |
 | `markStop` | id, floor, stop | none | per command |
 | `expressStops` / `dropStops` | id | none | per command |
 | `scheduleShaft` | id, slots `Float64Array` of layout `scheduleSlots` length: a weekday flag and its 24 hours, the same for the weekend, the two timings (NaN unset), then the home-floor count and up to 8 floors | none | per command |

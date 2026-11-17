@@ -375,9 +375,11 @@ describe.skipIf(noEngine)("BuildActions (paint runs, bulldoze gauntlet, transpor
     expect(cleared).toBe(1);
   });
 
-  it("bulldozePicked on a burning unit refuses: loud toasts, the quiet drag path doesn't", async () => {
+  it("bulldozePicked on a burning unit refuses: loud toasts, the drag path holds the reason", async () => {
     office.state = "fire";
-    expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true)).toBe(false); // drag step
+    const held: string[] = [];
+    expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, (why) => held.push(why))).toBe(false); // drag step
+    expect(held).toEqual(["You can't bulldoze a burning unit. Call fire rescue or let it burn out."]);
     expect(f.toasts).toEqual([]);
     expect(f.sfx).toEqual([]);
     expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" })).toBe(false); // deliberate click

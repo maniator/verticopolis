@@ -345,7 +345,7 @@ describe("BuildActions paint gestures", () => {
 });
 
 describe("BuildActions removals", () => {
-  it("removes a unit through demolish, a bulldoze flagged as one, and a refusal speaks unless quiet", () => {
+  it("removes a unit through demolish, a bulldoze flagged as one, and a refusal speaks unless a drag holds it", () => {
     const ok = setup({ demolish: () => rec("demolish", true) });
     expect(ok.build.tryRemoveUnit({ id: 4 }, "bulldoze")).toBe(true);
     expect(ok.port.demolish).toHaveBeenCalledExactlyOnceWith(4, true);
@@ -356,8 +356,11 @@ describe("BuildActions removals", () => {
       "The engine said no.",
       "bad",
     );
-    expect(refused.build.tryRemoveUnit({ id: 4 }, "sell", true)).toBe(false);
+    const held = vi.fn();
+    expect(refused.build.tryRemoveUnit({ id: 4 }, "sell", held)).toBe(false);
+    expect(held).toHaveBeenCalledExactlyOnceWith("The engine said no.");
     expect(refused.deps.ui.toast).toHaveBeenCalledOnce();
+    expect(refused.deps.audio.sfx).toHaveBeenCalledOnce();
   });
 
   it("removes a shaft through demolish and answers whether the engine did", () => {
@@ -393,13 +396,16 @@ describe("BuildActions.bulldozePicked", () => {
     expect(port.demolishTile).toHaveBeenCalledExactlyOnceWith(3, 12, true);
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("sell");
     const refused = setup({ demolishTile: () => rec("demolish", false) });
+    const held = vi.fn();
     expect(
       refused.build.bulldozePicked(
         { type: "unit", id: 0, kind: "lobby", cell: { floor: 1, x: 2 } },
-        true,
+        held,
       ),
     ).toBe(false);
+    expect(held).toHaveBeenCalledExactlyOnceWith("The engine said no.");
     expect(refused.deps.audio.sfx).not.toHaveBeenCalled();
+    expect(refused.deps.ui.toast).not.toHaveBeenCalled();
   });
 
   it("removes a picked unit and drops the selection when it was selected", () => {
@@ -439,7 +445,7 @@ describe("BuildActions.bulldozePicked", () => {
     const unit = setup({ demolish: () => rec("demolish", false) });
     unit.tower.getUnit.mockReturnValue({ id: 6 });
     expect(
-      unit.build.bulldozePicked({ type: "unit", id: 6, kind: WIDE }, true),
+      unit.build.bulldozePicked({ type: "unit", id: 6, kind: WIDE }, vi.fn()),
     ).toBe(false);
     const shaft = setup({ demolish: () => rec("demolish", false) });
     shaft.tower.getTransport.mockReturnValue({ id: 8 });

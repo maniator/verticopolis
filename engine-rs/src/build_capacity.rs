@@ -60,9 +60,23 @@ impl Simulation {
     /// `tower.resizeTransport(id, bottom, top)` with its `capacity_changed`,
     /// when the span actually moved.
     pub fn resize_transport(&mut self, id: i64, bottom: i64, top: i64) -> ResizeResult {
+        self.resize_transport_noting(id, bottom, top, &mut None)
+    }
+
+    /// [`resize_transport`](Simulation::resize_transport), also noting the
+    /// newly served floor that refused it (see the tower's own).
+    pub(crate) fn resize_transport_noting(
+        &mut self,
+        id: i64,
+        bottom: i64,
+        top: i64,
+        refused_at: &mut Option<i64>,
+    ) -> ResizeResult {
         let span = |sim: &Simulation| sim.tower.get_transport(id).map(|t| (t.bottom, t.top));
         let before = span(self);
-        let r = self.tower.resize_transport(id, bottom, top);
+        let r = self
+            .tower
+            .resize_transport_noting(id, bottom, top, refused_at);
         if r.ok && span(self) != before {
             self.note_capacity(id);
         }

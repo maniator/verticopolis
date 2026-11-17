@@ -75,7 +75,7 @@ function wired(t: Tower) {
     enginePort: t.port,
     reader: t.reader,
     canvas: document.createElement("canvas"),
-    audio: { start: () => {} },
+    audio: { start: () => {}, sfx: () => {} },
     keyboard: { pointerDrew: () => {}, followTower: () => {} },
     tool: { type: "bulldoze" },
     bulldozeDrag: new BulldozeDragChoice(),

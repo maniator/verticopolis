@@ -165,4 +165,7 @@ export type AppActionName =
   // The manual's Play and Back to game links (help-site Header.astro):
   // `detail` `<where>_<what>`, where `bar` (the title bar) or `front` (the
   // front page), what `play` or `back`.
-  | "help_game_link";
+  | "help_game_link"
+  // A drag's release said why it stopped (src/game/dragRefusal.ts, #1847,
+  // #2046): `detail` `extend` (an elevator's arrow) or `bulldoze`.
+  | "drag_stopped";

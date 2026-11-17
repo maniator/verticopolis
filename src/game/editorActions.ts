@@ -14,6 +14,7 @@ import { scheduleSlots } from "../simport/scheduleSlots";
 import type { ViewReader } from "../simport/viewReader";
 import { groupDigits } from "../ui/format";
 import { NOT_ENOUGH_MONEY } from "../simport/request";
+import { sayHeldRefusal, type HeldRefusal } from "./dragRefusal";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 
 
@@ -69,8 +70,10 @@ export class EditorActions {
    *  tower swapped in mid-drag (a load, an undo, a redo) or another gesture
    *  opened over this one (keyboard play) ends the drag, as it ends a build
    *  drag: it extends nothing more until the arrow is let go. The ends follow
-   *  each step's record, so a pointer move asks the port for no card. */
-  private extendDrag: { id: number; generation: number; gesture: number; bottom: number; top: number } | null = null;
+   *  each step's record, so a pointer move asks the port for no card. A
+   *  step the engine stopped short or refused holds its reason, which the
+   *  release says once (#1847). */
+  private extendDrag: ({ id: number; generation: number; gesture: number; bottom: number; top: number } & HeldRefusal) | null = null;
 
   constructor(private readonly deps: EditorActionsDeps) {}
 
@@ -84,7 +87,9 @@ export class EditorActions {
     this.extendDrag = null;
     const engine = this.deps.engine();
     engine.stopExtend();
-    return held.generation === engine.generation() && held.gesture === this.deps.undoGesture();
+    const live = held.generation === engine.generation() && held.gesture === this.deps.undoGesture();
+    if (live) sayHeldRefusal(this.deps, held, "extend");
+    return live;
   }
 
   /** Open the per-shaft elevator Schedule dialog for the selected elevator
@@ -207,8 +212,12 @@ export class EditorActions {
     const bottom = this.deps.codes().slot(rec, "extendShaft", "bottom");
     const top = this.deps.codes().slot(rec, "extendShaft", "top");
     // A blocked or broke step (cap reached, no structure, another shaft in the
-    // way, no money left) is silent so a drag doesn't spam toasts; the shaft
-    // simply stops growing.
+    // way, an unbuilt lobby, no money left) is quiet so a drag doesn't spam
+    // toasts: the shaft stops growing, and the release says why once. A step
+    // the engine stopped short of a refusing floor is done and leaves that
+    // floor's reason in lastReason (#1847); a step that went where it was
+    // aimed leaves none, so the drag holds only why it stopped last.
+    drag.stoppedBy = res.ok ? engine.lastReason() : res.reason;
     if (!res.ok || (bottom === drag.bottom && top === drag.top)) return;
     drag.bottom = bottom;
     drag.top = top;
