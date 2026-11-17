@@ -330,6 +330,7 @@ fn a_gutted_theater_drops_its_blockbuster() {
         message: String::new(),
     });
     sim.resolve_choice(true);
+    sim.land_helicopter();
     let u = sim.tower.get_unit(cinema).unwrap();
     assert_eq!(u.state, UnitState::Gutted);
     assert!(!u.extras().film_blockbuster);

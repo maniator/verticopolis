@@ -72,4 +72,19 @@ impl GameMode {
     pub fn thief_needs_security(self) -> bool {
         self == GameMode::Classic
     }
+
+    /// Whether a Security office that opens while a fire burns sends its
+    /// guards to it, as late offices join a bomb search. Classic's guards are
+    /// the ones on duty when the fire starts (#1889).
+    pub fn security_joins_fire(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// The Fire Rescue helicopter's fixed price, or `None` where it scales
+    /// with the tower's stars. Classic charges the $500,000 the PC fan guides
+    /// agree on (MentalMan, kiwizoid, furdude2; the combined Mac and Windows
+    /// manual shows $300,000), #1889. Modern keeps its star-scaled price.
+    pub fn fire_rescue_fixed_price(self) -> Option<f64> {
+        (self == GameMode::Classic).then_some(500_000.0)
+    }
 }

@@ -291,6 +291,7 @@ impl Simulation {
             }
         }
         self.advance_bomb_search();
+        self.advance_fire_response();
         self.finish_construction();
     }
 
@@ -349,6 +350,7 @@ impl Simulation {
                 self.emit(&msg, LogKind::Good);
                 if kind == Kind::Security {
                     self.join_bomb_search(floor, x);
+                    self.join_fire_response(floor, x);
                 }
                 crew_wanted |= kind.waits_for_staff(mode);
                 // A theater opens with its mode's first film free: a Classic

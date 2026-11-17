@@ -7,7 +7,7 @@ use serde_json::{json, Map, Value};
 
 /// The version of the view's layout. It goes up when a slot moves, a width
 /// changes, or a slot or code changes meaning.
-pub const VIEW_LAYOUT_VERSION: u32 = 30;
+pub const VIEW_LAYOUT_VERSION: u32 = 31;
 
 /// The dynamic frame's header slots, one name each. `UNLOCKED` holds the
 /// unlocked kinds as a bitmask by kind code in one double, with more than 32
@@ -23,6 +23,9 @@ pub const VIEW_LAYOUT_VERSION: u32 = 30;
 /// every change to it, so a host rereads the search only when it moved.
 /// `THIEF_FX_X` is a tile of the stretch of floor the last thief prowled,
 /// so a host runs him along that tower's rooms on a lot with several.
+/// `FIRE_RESPONSE_SEQ` is 0 while nobody answers a fire and otherwise moves
+/// with every change to the guards or the helicopter answering it, so a host
+/// rereads that answer only when it moved.
 // Each slot is named for the value it holds.
 #[allow(missing_docs)]
 pub mod header {
@@ -67,10 +70,11 @@ pub mod header {
     pub const WEEKEND_DAYS: usize = 38;
     pub const BOMB_SEARCH_SEQ: usize = 39;
     pub const THIEF_FX_X: usize = 40;
+    pub const FIRE_RESPONSE_SEQ: usize = 41;
 }
 
 /// Slots of the dynamic frame's header.
-pub const HEADER: usize = header::THIEF_FX_X + 1;
+pub const HEADER: usize = header::FIRE_RESPONSE_SEQ + 1;
 
 /// The slots of a drawn person's record.
 // Each slot is named for the value it holds.
@@ -260,6 +264,7 @@ pub(crate) const TABLES: &[Table] = &[
             ("weekendDays", header::WEEKEND_DAYS),
             ("bombSearchSeq", header::BOMB_SEARCH_SEQ),
             ("thiefFxX", header::THIEF_FX_X),
+            ("fireResponseSeq", header::FIRE_RESPONSE_SEQ),
         ],
         width_name: "headerWidth",
         width: HEADER,

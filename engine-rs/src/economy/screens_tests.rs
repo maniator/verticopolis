@@ -410,6 +410,7 @@ fn a_gutted_theater_reopens_with_a_new_film_on_each_screen_and_keeps_their_choic
         message: String::new(),
     });
     sim.resolve_choice(true);
+    sim.land_helicopter();
     assert_eq!(sim.tower.get_unit(cinema).unwrap().state, UnitState::Gutted);
     let [first, second] = both(&sim, cinema);
     assert_eq!(
@@ -436,6 +437,7 @@ fn a_theater_gutted_before_the_nights_count_loads_with_a_new_film() {
         message: String::new(),
     });
     sim.resolve_choice(true);
+    sim.land_helicopter();
     assert!(
         sim.blockbusters.contains(&(cinema as f64)),
         "until the count"

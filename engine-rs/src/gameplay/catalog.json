@@ -46,6 +46,7 @@
     "emergencyKind": ["fireRescue", "bombThreat"],
     "emergencyDecision": ["accept", "decline"],
     "emergencySource": ["player", "timeout"],
+    "fireOutcome": ["security", "rescue", "burnedOut"],
     "milestoneId": [
       "pop-500",
       "pop-2500",
@@ -181,6 +182,16 @@
       "semantics": "Security found the bomb of a declined ransom before the search deadline and defused it. With emergency_resolved's accept (the ransom paid) and bomb_detonated, it closes every bomb threat one way.",
       "payload": {},
       "history": "New with the timed bomb search (#349)."
+    },
+    {
+      "name": "fire_out",
+      "version": 1,
+      "cardinality": "per_occurrence",
+      "semantics": "The last room of a fire stopped burning. by is what put it out: rescue when the paid helicopter landed on it, security when Security's guards had reached it by the emergency stairs, and burnedOut when nobody reached it. With fire_started it brackets every fire.",
+      "payload": {
+        "by": { "type": "enum", "enum": "fireOutcome" }
+      },
+      "history": "New with guards answering fires and the rescue helicopter (#1889)."
     }
   ]
 }

@@ -16,6 +16,8 @@ pub enum FireRescueRefusal {
     None,
     /// An emergency choice is already waiting for the player's answer.
     Pending,
+    /// The rescue helicopter is already on its way or at the fire.
+    Coming,
 }
 
 impl FireRescueRefusal {
@@ -24,6 +26,7 @@ impl FireRescueRefusal {
         match self {
             FireRescueRefusal::None => "none",
             FireRescueRefusal::Pending => "pending",
+            FireRescueRefusal::Coming => "coming",
         }
     }
 }
@@ -47,13 +50,20 @@ impl Simulation {
             self.floor_label(floor)
         );
         self.emit(&msg, LogKind::Bad);
+        let now = self.clock.minutes;
+        self.dispatch_fire_guards(i, now);
     }
 
     /// `offerFireRescue`: the paid-rescue choice a new outbreak raises, with
-    /// the free-defense tip for a tower that has no Security office.
+    /// the free-defense tip for a tower that has no Security office. None
+    /// while a helicopter paid for an earlier fire is still on its way: it
+    /// lands on this one.
     pub(super) fn offer_fire_rescue(&mut self) {
+        if self.helicopter_flying() {
+            return;
+        }
         let cost = self.fire_rescue_cost();
-        let message = format!("🚒 Fire rescue available for ${}. Pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.", with_thousands(cost));
+        let message = format!("🚒 Fire Rescue can fly a helicopter in for ${}. It puts the fire out when it arrives, though the rooms already ablaze burn down to gutted shells you'll rebuild. Decline and Security fights it from the emergency stairs; you can still call the helicopter from the Tower menu while the fire burns.", with_thousands(cost));
         self.events.pending = Some(PendingChoice {
             kind: "fireRescue",
             cost,
@@ -72,13 +82,17 @@ impl Simulation {
     /// offer can still call the rescue for as long as a fire burns. This puts
     /// the same offer up again, at today's price, and returns that price;
     /// [`Simulation::resolve_choice`] answers it as it answers the first one.
-    /// It takes no money and draws nothing from the random stream.
+    /// It takes no money and draws nothing from the random stream. Refused
+    /// while the helicopter is already on its way.
     pub fn call_fire_rescue(&mut self) -> Result<f64, FireRescueRefusal> {
         if self.events.pending.is_some() {
             return Err(FireRescueRefusal::Pending);
         }
         if self.events.active.is_empty() {
             return Err(FireRescueRefusal::None);
+        }
+        if self.helicopter_flying() {
+            return Err(FireRescueRefusal::Coming);
         }
         self.offer_fire_rescue();
         Ok(self.fire_rescue_cost())

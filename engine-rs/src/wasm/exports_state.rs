@@ -281,6 +281,17 @@ impl Engine {
         self.sim.bomb_search_view().map(|v| v.to_string())
     }
 
+    /// Security's guards and the rescue helicopter answering a fire, as JSON
+    /// `{ floor, x, width, guards, helicopter, out, seq }` (`guards` in the
+    /// bomb search's guard shape, `right` the tile each fights from;
+    /// `helicopter` `{ called, arrive, sprayEnd, leave }` or null), or null
+    /// while nobody answers one. A host reads it when the frame's
+    /// `fireResponseSeq` moves.
+    #[wasm_bindgen(js_name = fireResponse)]
+    pub fn fire_response(&self) -> Option<String> {
+        self.sim.fire_response_view().map(|v| v.to_string())
+    }
+
     /// `resolveChoice(accept ? "accept" : "decline")`.
     #[wasm_bindgen(js_name = resolveChoice)]
     pub fn resolve_choice(&mut self, accept: bool) {
