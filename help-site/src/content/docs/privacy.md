@@ -7,6 +7,6 @@ Verticopolis keeps a small, anonymous read on how the game is going: whether new
 
 To see whether the game engine runs reliably, the game reports which engine started, whether you started playing, and a short code if the engine stopped. None of it identifies you.
 
-Crash reports are the one place your own words can travel. They carry the technical details of the error and the same kind of anonymous totals, and an error message can occasionally quote a bit of game text, such as a tower's name.
+Crash reports carry the technical details of the error and the same kind of anonymous totals. Before one is sent, the game takes out any name of yours it can find in it, such as a tower's name, a file's name or a facility's name, and puts `<player text>` in its place. If an error quotes part of a file the game couldn't read, that part is taken out too.
 
 There are no accounts and no ads: the game never asks for your name or email, keeps no profile, and nothing recognizes you from one day to the next. There is no consent banner, because nothing that identifies you is kept. Saves live in your own storage and leave your device only when you export them. The counts help decide what to improve; they are never sold or shared.

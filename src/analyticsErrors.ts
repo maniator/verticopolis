@@ -3,6 +3,7 @@ import { sendException } from "./analyticsRelay";
 import { getCommonProps } from "./analytics";
 import { createEventThrottle } from "./analyticsThrottle";
 import { isBrowserExtensionError } from "./analyticsErrorOrigin";
+import { MAX_PLAYER_TEXT, knownPlayerText, mentionsJson, scrubJsonEcho, scrubPlayerText } from "./analyticsPlayerText";
 
 /**
  * Cookieless JavaScript error tracking (spec CAP-2 posture, the S5 follow-up
@@ -38,15 +39,14 @@ import { isBrowserExtensionError } from "./analyticsErrorOrigin";
  * Relay-only, off the adapter seam: `$exception` is a PostHog-only event shape,
  * so it is sent straight through `sendException`.
  *
- * Privacy note: an exception `value` is the thrown message, which the game builds
- * from its own strings and could occasionally interpolate a player-authored tower
- * name. The 500/2000-char bounds cap payload SIZE, not sensitivity: a tower name
- * within the bound is forwarded verbatim. It stays acceptable because there is no
- * IP (the relay disables GeoIP and forwards none), no persistent id, and no
- * cross-session linkage, so a leaked free-text string is not bound to any stable
- * identity and does not de-anonymize. Redacting known player-authored fields from
- * the outgoing message is a tracked follow-up (backlog), alongside the frame
- * parsing below.
+ * Player text (#607): a thrown message can quote a tower, file or facility name,
+ * or a bit of a save that a browser's JSON error echoes. Before a report is sent,
+ * its type, message, stack, source and fingerprint go through the scrubber in
+ * `analyticsPlayerText.ts`, which replaces every piece of player text the game
+ * knows about and blanks a JSON error's quoted input. The 500/2000-char bounds
+ * cap payload SIZE; the scrubber covers what the text says. The scrub runs only
+ * for a report that passed the cap and dedup, so an error repeating every frame
+ * costs nothing more than before.
  * Structured stack FRAMES are deliberately not parsed in this first version: with
  * no source maps uploaded they would point at minified positions, so the bounded
  * raw stack string carries the same debugging value at far less code. Frame
@@ -86,22 +86,32 @@ function clamp(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
+/** The part of a field that is scrubbed before it is clamped to `max`: the
+ *  clamp plus room for the longest player text, so a name that straddles the
+ *  cut is replaced whole rather than sent half. Bounded, so a pathological
+ *  message never makes the scrub expensive. */
+function scrubWindow(text: string, max: number): string {
+  return text.slice(0, max + MAX_PLAYER_TEXT);
+}
+
 /** Normalize an arbitrary thrown value into `{ type, message, stack }`. A real
  *  `Error` gives its name, message, and stack; anything else (a string, a
- *  rejected non-Error) degrades to a stringified value with no stack. */
+ *  rejected non-Error) degrades to a stringified value with no stack. Each of
+ *  the three is cut to its scrub window here and clamped in `report` after the
+ *  scrub. */
 function describe(value: unknown): { type: string; message: string; stack: string; rawStack: string } {
   try {
     if (value instanceof Error) {
       const rawStack = typeof value.stack === "string" ? value.stack : "";
       return {
-        // `type` is clamped like every other field: `error.name` is the one lever
+        // `type` is bounded like every other field: `error.name` is the one lever
         // an adversarial Error could use to push the body past the relay's size
         // cap. Reading name/message/stack is wrapped because a hostile subclass can
         // throw from those getters; on a throw we fall through to the generic shape,
         // so `report` still counts a cap/dedup slot rather than looping every frame.
-        type: clamp(value.name || "Error", MAX_TYPE_LEN),
-        message: clamp(value.message || "", MAX_MESSAGE_LEN),
-        stack: clamp(rawStack, MAX_STACK_LEN),
+        type: scrubWindow(value.name || "Error", MAX_TYPE_LEN),
+        message: scrubWindow(value.message || "", MAX_MESSAGE_LEN),
+        stack: scrubWindow(rawStack, MAX_STACK_LEN),
         // Unbounded, for the browser-extension check only: a game frame past the
         // clamp must still keep the report. Never sent.
         rawStack,
@@ -110,7 +120,7 @@ function describe(value: unknown): { type: string; message: string; stack: strin
   } catch {
     /* an Error whose name/message/stack getter throws: use the generic shape */
   }
-  return { type: "UnhandledRejection", message: clamp(safeString(value), MAX_MESSAGE_LEN), stack: "", rawStack: "" };
+  return { type: "UnhandledRejection", message: scrubWindow(safeString(value), MAX_MESSAGE_LEN), stack: "", rawStack: "" };
 }
 
 /** Stringify an arbitrary rejection reason without ever throwing (a value with a
@@ -174,9 +184,24 @@ function report(
     // survives: clamping the join could cut the frame off for a long message and
     // merge two genuinely distinct crashes that share that message. A synthetic
     // incident overrides this with a stable key (it has no throw site to pin).
+    //
+    // Dedup and the cap key on the RAW parts, which stay in this module's memory
+    // and are never sent, so a repeat is dropped before any scrubbing. Only a
+    // report that will go out pays for the scrub, and the fingerprint it sends is
+    // rebuilt from the scrubbed parts.
     const firstFrame = stack.split("\n", 2)[1]?.trim() ?? "";
-    const fingerprint = opts.fingerprint ?? `${type}|${clamp(message, 180)}|${clamp(firstFrame, 100)}`;
-    if (!throttle.allow(fingerprint)) return;
+    const key = (t: string, m: string, f: string) => `${t}|${clamp(m, 180)}|${clamp(f, 100)}`;
+    if (!throttle.allow(opts.fingerprint ?? key(type, message, firstFrame))) return;
+
+    // Replace every piece of player text the game knows about, and a JSON
+    // error's echoed input, in every field that carries text.
+    const known = knownPlayerText();
+    const aboutJson = mentionsJson(message);
+    const scrub = (text: string) => scrubPlayerText(scrubJsonEcho(text, aboutJson), known);
+    const sentType = clamp(scrub(type), MAX_TYPE_LEN);
+    const sentMessage = clamp(scrub(message), MAX_MESSAGE_LEN);
+    const sentStack = clamp(scrub(rawStack), MAX_STACK_LEN);
+    const fingerprint = opts.fingerprint ?? key(sentType, sentMessage, scrub(firstFrame));
 
     const properties: Record<string, unknown> = {
       ...getCommonProps(), // version / platform / distribution_channel / returning / tenure / recency / display
@@ -184,23 +209,23 @@ function report(
       // first version (no source maps); the raw stack below carries the trace.
       $exception_list: [
         {
-          type,
-          value: message,
+          type: sentType,
+          value: sentMessage,
           mechanism: { handled, synthetic },
           stacktrace: { type: "raw", frames: [] },
         },
       ],
       // Also a top-level copy so a dashboard trend can break errors down by type
       // without reaching into the nested `$exception_list`.
-      $exception_type: type,
+      $exception_type: sentType,
       $exception_fingerprint: fingerprint,
-      $exception_stack_trace_raw: rawStack,
+      $exception_stack_trace_raw: sentStack,
       handled,
       ...opts.extraProps,
     };
     // Location from the ErrorEvent, when the browser supplied it. Omitted for a
     // rejection (no location) and for a cross-origin "Script error." with none.
-    if (extra?.source) properties.source = clamp(extra.source, MAX_MESSAGE_LEN);
+    if (extra?.source) properties.source = clamp(scrub(scrubWindow(extra.source, MAX_MESSAGE_LEN)), MAX_MESSAGE_LEN);
     if (Number.isFinite(extra?.lineno)) properties.lineno = extra?.lineno;
     if (Number.isFinite(extra?.colno)) properties.colno = extra?.colno;
 

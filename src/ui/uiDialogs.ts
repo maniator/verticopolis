@@ -15,6 +15,7 @@ import type { ExportReport } from "../storage/tdtExportReport";
 import type { UpdateInfo } from "../pwa";
 import { isInstalledStandalone } from "./standalone";
 import { trackAppAction } from "../analytics";
+import { rememberPlayerText } from "../analyticsPlayerText";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -197,6 +198,8 @@ export interface ImportReportCallbacks {
  * adopted. See {@link ImportReportCallbacks} for when each callback fires.
  */
 export function showImportReport(ui: UI, report: ImportReport, cb: ImportReportCallbacks): void {
+  // The 1994 tower's name is the player's text before it is the open tower's (#607).
+  rememberPlayerText(report.towerName);
   // Not "is a dialog open" but "would replacing it destroy something": one that
   // owns nothing is displaced, one that owns a decision is waited for. The old
   // guard refused on "open at all" and said so with a toast, which a <dialog>

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ImportReport } from "../storage/tdtImportReport";
 import { precedenceUi } from "./precedenceUi.fixture";
 import { showImportReport } from "./uiDialogs";
+import { knownPlayerText, resetPlayerTextForTest } from "../analyticsPlayerText";
 
 /**
  * The import report's `onShown`: it fires once, when the report is actually on
@@ -88,5 +89,14 @@ describe("showImportReport onShown", () => {
     const { ui, spies } = precedenceUi();
     expect(() => showImportReport(ui, report(), { onOpen: vi.fn() })).not.toThrow();
     expect(spies.openModalTemplate).toHaveBeenCalledOnce();
+  });
+});
+
+describe("showImportReport and the error scrubber (#607)", () => {
+  it("remembers the 1994 tower's name, which is the player's text before it is the open tower's", () => {
+    resetPlayerTextForTest();
+    const { ui } = precedenceUi();
+    showImportReport(ui, report("HARBOR POINT"), { onOpen: vi.fn(), onShown: vi.fn() });
+    expect(knownPlayerText()).toContain("HARBOR POINT");
   });
 });

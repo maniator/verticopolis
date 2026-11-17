@@ -52,6 +52,7 @@ import { wireDesk } from "../ui/desk/deskController";
 import { wireTitlePicks } from "./titlePicks";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { placeSkyBridge } from "./skyBridgeGestures";
+import { wirePlayerTextSources } from "./playerTextSources";
 import { createPersonCard } from "./personCardWiring";
 import { captureOutgoing, dropOutgoing, keepOutgoing, type SwapKind } from "./keepOutgoing";
 import { bootTowerDocument, crashCopyLoaded, crashCopyWritten } from "./towerDocument";
@@ -83,6 +84,7 @@ export function bootReason(flags: {
  *  the same reason: `app.ui` is assigned just after this returns. Every module
  *  re-asks the app per call, so a tower swap is picked up automatically. */
 export function wireControllers(app: GameApp): void {
+  wirePlayerTextSources(app); // names an error report must not quote (#607)
   app.build = new BuildActions({
     enginePort: () => app.enginePort,
     portCodes: () => app.portCodes,
