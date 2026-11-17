@@ -3,6 +3,7 @@ import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 import { FILE_NAME_MAX } from "../../storage/fileSpace";
 import { fileIcon, warningIcon } from "../fileIcons";
+import type { RowPress } from "../fileDialogPress";
 import { allowNote, placesTemplate, type FilePlace, type LinkedView, type PlacesHandlers } from "./fileDialogPlaces";
 
 /**
@@ -92,6 +93,8 @@ export interface FileDialogHandlers {
   answer(choice: FileAnswer): void;
   openMenu(id: string, x: number, y: number): void;
   closeMenu(): void;
+  /** A finger held on a row opens its menu too (`../fileDialogPress.ts`). */
+  press: RowPress;
   listKey(e: KeyboardEvent): void;
   fromComputer(): void;
   fromFolder(): void;
@@ -156,7 +159,8 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
   const selectedRow = v.rows.find((r) => r.id === v.selected) ?? null;
   const fileSelected = !!selectedRow && selectedRow.type !== "auto";
   return html`
-    <div class=${classMap({ fd: true, "fd-dropping": v.dropping })}>
+    <div class=${classMap({ fd: true, "fd-dropping": v.dropping })} @pointerdown=${h.press.watch} @pointermove=${h.press.watch}
+      @pointerup=${h.press.watch} @pointercancel=${h.press.watch} @click=${h.press.watch}>
       ${placesTemplate({ ...v, usage: usageLine(v) }, h.places)}
       <div class="fd-list well" @click=${h.closeMenu}>
         <div class="fd-head" role="presentation">
@@ -239,10 +243,8 @@ function row(r: FileRow, v: FileDialogView, h: FileDialogHandlers): TemplateResu
     class=${classMap({ "fd-row": true, [`fd-row-${r.type}`]: true, selected })}
     draggable="false"
     @click=${() => h.select(r.id)} @dblclick=${() => h.activate(r.id)}
-    @contextmenu=${(e: MouseEvent) => {
-      e.preventDefault();
-      h.openMenu(r.id, e.clientX, e.clientY);
-    }}>
+    @pointerdown=${(e: PointerEvent) => h.press.down(r.id, e)}
+    @contextmenu=${(e: MouseEvent) => h.press.contextMenu(r.id, e)}>
     ${fileIcon(r.type)}
     ${v.renaming === r.id ? renameBox(r, h) : html`<span class="fd-cell fd-name-cell">${r.name}</span>`}
     <span class="fd-cell fd-type-cell">${FILE_TYPE_LABEL[r.type]}</span>

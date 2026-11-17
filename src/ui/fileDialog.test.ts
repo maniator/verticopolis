@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, type TemplateResult } from "lit-html";
+
+const m = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("../analytics", () => ({ trackAppAction: m.track }));
+
 import type { TowerFileEntry } from "../storage/fileSpace";
 import { clearFileClipboardForTests, fileRows, showFileDialog, type FileDialogCtx, type FileNote } from "./fileDialog";
+import { ROW_HOLD_MS } from "./fileDialogPress";
 import type { FileRow } from "./templates/fileDialog";
 
 const entry = (id: string, name: string, modified: number, kind: TowerFileEntry["kind"] = "tower", size = 100): TowerFileEntry => ({ id, name, kind, size, modified });
@@ -65,6 +70,7 @@ beforeEach(() => {
 
 afterEach(() => {
   box?.remove();
+  vi.useRealTimers();
 });
 
 describe("the rows a window lists", () => {
@@ -292,11 +298,47 @@ describe("the Open window", () => {
     expect(box!.isConnected).toBe(true);
   });
 
+  it("opens a row's menu on a held finger, once, and keeps it open through the finger's lift", () => {
+    vi.useFakeTimers();
+    const versions = vi.fn();
+    show("open", { versions });
+    m.track.mockClear();
+    const touch = (type: string) => new PointerEvent(type, { pointerType: "touch", pointerId: 3, isPrimary: true, clientX: 30, clientY: 40, bubbles: true, cancelable: true });
+    q("#fd-row-a").dispatchEvent(touch("pointerdown"));
+    vi.advanceTimersByTime(ROW_HOLD_MS);
+    expect(q<HTMLInputElement>("#fd-name").value).toBe("Alpha");
+    // Android's own hold arrives too; the menu is not opened again.
+    q("#fd-row-a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }));
+    q("#fd-row-a").dispatchEvent(touch("pointerup"));
+    q(".fd-menu .mb-item").dispatchEvent(new MouseEvent("click", { detail: 1, bubbles: true, cancelable: true }));
+    expect(ctx.open, "the lift's click pressed nothing").not.toHaveBeenCalled();
+    expect(m.track).toHaveBeenCalledExactlyOnceWith("file_menu", "hold");
+    const items = [...box!.querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")];
+    expect(items.map((b) => b.textContent)).toContain("Previous versions…");
+    items.find((b) => b.textContent === "Previous versions…")!.click();
+    expect(versions).toHaveBeenCalledExactlyOnceWith("a");
+  });
+
+  it("leaves a hold or a right-click in the rename box to the text, with no row menu", () => {
+    vi.useFakeTimers();
+    show("open");
+    q("#fd-row-a").click();
+    key(q(".fd-rows"), "F2");
+    const field = q(".fd-rename");
+    field.dispatchEvent(new PointerEvent("pointerdown", { pointerType: "touch", pointerId: 4, isPrimary: true, bubbles: true, cancelable: true }));
+    vi.advanceTimersByTime(ROW_HOLD_MS * 2);
+    const native = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    field.dispatchEvent(native);
+    expect(box!.querySelector(".fd-menu")).toBeNull();
+    expect(native.defaultPrevented, "the browser's own text menu still shows").toBe(false);
+  });
+
   it("offers only Open and Paste on the Auto-save's menu, opened with Shift+F10", () => {
     show("open");
     q("#fd-row-auto").click();
     key(q(".fd-rows"), "F10", { shiftKey: true });
     expect([...box!.querySelectorAll(".fd-menu .mb-item")].map((b) => b.textContent)).toEqual(["Open", "Paste"]);
+    expect(m.track).toHaveBeenLastCalledWith("file_menu", "key");
     q(".fd-menu .mb-item").click();
     expect(ctx.open).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: "auto" }));
   });

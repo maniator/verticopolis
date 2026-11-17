@@ -26,6 +26,9 @@ export type AppActionName =
   // A tower given its own file, or its file caught up at boot (#2380), and
   // the Previous versions… window and its opens.
   | "tower_file" | "file_versions"
+  // The Open and Save As windows' right-click menu opened: a right-click
+  // (`pointer`), a finger held on a row (`hold`), or a key (`key`).
+  | "file_menu"
   // File > Open Recent found the file it named gone at its pick
   // (2026-11-16): `towers` (My Towers) or `folder` (the linked folder).
   | "recent_missing"
