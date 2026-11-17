@@ -70,7 +70,10 @@ fn a_new_modern_elevator_starts_on_auto_and_nothing_else_does() {
     let (mut sim, _) = tower(GameMode::Modern, 8);
     assert!(sim.build_transport(Kind::Stairs, 10, 1, 2).ok);
     let stairs = sim.tower.transports.iter().find(|t| t.kind == Kind::Stairs);
-    assert!(stairs.unwrap().schedule.is_none(), "stairs keep no schedule");
+    assert!(
+        stairs.unwrap().schedule.is_none(),
+        "stairs keep no schedule"
+    );
 }
 
 #[test]
@@ -142,7 +145,11 @@ fn a_shaft_off_auto_and_a_classic_tower_are_left_alone() {
     assert!(classic.tower.set_schedule(cid, &raw));
     assert!(!schedule(&classic, cid).auto_tune, "Classic drops the flag");
     // A hand-edited save could still carry it; the pass ignores Classic.
-    classic.tower.transports[0].schedule.as_mut().unwrap().auto_tune = true;
+    classic.tower.transports[0]
+        .schedule
+        .as_mut()
+        .unwrap()
+        .auto_tune = true;
     seed(&mut classic, cid, Some(0.5), Some(0.5));
     at_hour(&mut classic, AUTO_TUNE_HOUR);
     classic.retune_auto_schedules();
@@ -272,7 +279,10 @@ fn a_steady_tower_settles() {
                 row.as_ref().map(|r| r[h])
             };
             let changes = last.windows(2).filter(|w| at(&w[0]) != at(&w[1])).count();
-            assert!(changes <= 1, "hour {h} weekend {weekend}: {changes} changes");
+            assert!(
+                changes <= 1,
+                "hour {h} weekend {weekend}: {changes} changes"
+            );
         }
     }
     assert!(rows[20].weekday.is_some(), "the pass tuned the weekday row");

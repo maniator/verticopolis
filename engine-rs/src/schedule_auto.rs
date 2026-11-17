@@ -6,7 +6,8 @@
 //!
 //! The pass owns the weekday and weekend rows and nothing else: staging
 //! homes, the door time and the waiting-car response stay the player's. A day
-//! type with too little measured traffic keeps its row. The pass draws no
+//! type with too little measured traffic keeps its row, and so does every
+//! hour the shaft has not measured (the proposal keeps the draft's count). The pass draws no
 //! rng, logs nothing and opens no undo journal; an older undo step on the
 //! shaft still applies, since `Transport::config_eq` leaves the rows Auto
 //! owns out of its comparison (`Schedule::same_but_auto_rows`).
@@ -42,19 +43,15 @@ impl Simulation {
             };
             // The current schedule is the draft, so a cold day keeps its row;
             // the proposal's staging is left unread.
-            let Some(rows) = self.auto_tune_proposal(t.id, Some(current), weekend).proposal else {
+            let Some(rows) = self
+                .auto_tune_proposal(t.id, Some(current), weekend)
+                .proposal
+            else {
                 continue;
             };
-            let rings = self.telemetry.hourly.get(&t.id);
-            let keep = |tuned: Option<Vec<i64>>, weekend: bool| {
-                let sampled = rings.map(|r| r.day(weekend).1);
-                let row = if weekend { &current.weekend } else { &current.weekday };
-                keep_unmeasured_hours(tuned, row.as_deref(), sampled, t.cars)
-            };
-            let (weekday, weekend_row) = (keep(rows.weekday, false), keep(rows.weekend, true));
-            let moved = weekday != current.weekday || weekend_row != current.weekend;
+            let moved = rows.weekday != current.weekday || rows.weekend != current.weekend;
             if moved || current.held_back.is_some() {
-                retunes.push((i, weekday, weekend_row));
+                retunes.push((i, rows.weekday, rows.weekend));
             }
         }
         if retunes.is_empty() {
@@ -71,26 +68,6 @@ impl Simulation {
         }
         self.tower.revision += 1;
     }
-}
-
-/// A tuned row with every hour the shaft has not measured kept at the count
-/// it runs now (every car, when the row is unset). A warm day can still
-/// hold hours nobody has sampled, such as the hours before a reload or a
-/// new shaft's first night, and a tune would read them as idle and cut them
-/// to one car, the morning rush included.
-fn keep_unmeasured_hours(
-    tuned: Option<Vec<i64>>,
-    current: Option<&[i64]>,
-    sampled: Option<&[bool]>,
-    cars: i64,
-) -> Option<Vec<i64>> {
-    let mut row = tuned?;
-    for (h, n) in row.iter_mut().enumerate() {
-        if !sampled.is_some_and(|s| s.get(h) == Some(&true)) {
-            *n = current.and_then(|c| c.get(h)).copied().unwrap_or(cars).clamp(0, cars);
-        }
-    }
-    Some(row)
 }
 
 #[cfg(test)]

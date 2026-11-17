@@ -87,7 +87,10 @@ impl Simulation {
             let Some(id) = id.as_i64() else {
                 continue;
             };
-            let elevator = self.tower.get_transport(id).is_some_and(|t| t.kind.is_elevator());
+            let elevator = self
+                .tower
+                .get_transport(id)
+                .is_some_and(|t| t.kind.is_elevator());
             if let (true, Some(rings)) = (elevator, rings_of(rings)) {
                 self.telemetry.hourly.insert(id, rings);
             }

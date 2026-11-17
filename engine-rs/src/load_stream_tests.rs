@@ -181,9 +181,13 @@ fn is_current(save: &Value) -> bool {
         Some(u) => at(k).is_some_and(|i| i < u),
     };
     let version = m.get("version").and_then(Value::as_f64);
-    [STREAMED_VERSION, FLOOR_RUN_STREAMED_VERSION, PLAIN_STREAMED_VERSION]
-        .map(Some)
-        .contains(&version)
+    [
+        STREAMED_VERSION,
+        FLOOR_RUN_STREAMED_VERSION,
+        PLAIN_STREAMED_VERSION,
+    ]
+    .map(Some)
+    .contains(&version)
         && matches!(
             m.get("mode").and_then(Value::as_str),
             Some("classic" | "modern")

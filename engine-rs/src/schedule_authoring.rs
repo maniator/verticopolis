@@ -143,6 +143,22 @@ fn cars_for(load: f64, cars: i64) -> i64 {
     n
 }
 
+/// A tuned row with every hour the ring has not sampled set back to the
+/// draft's count (every car where the draft has no row).
+fn keep_unmeasured_hours(
+    mut row: Vec<i64>,
+    draft: Option<&[i64]>,
+    sampled: &[bool],
+    cars: i64,
+) -> Vec<i64> {
+    for (h, n) in row.iter_mut().enumerate() {
+        if sampled.get(h) != Some(&true) {
+            *n = draft.and_then(|d| d.get(h)).copied().unwrap_or(cars);
+        }
+    }
+    row
+}
+
 /// The origin floors summed over the day's 24 slots, in first-seen order.
 fn day_origin_totals(ring: &[IndexMap<i64, f64>]) -> IndexMap<i64, f64> {
     let mut totals: IndexMap<i64, f64> = IndexMap::new();
@@ -250,13 +266,21 @@ impl Simulation {
             });
             row.map(|r| r.iter().map(|&n| n.clamp(0, cars)).collect::<Vec<i64>>())
         };
+        // A warm day still keeps the hours its ring has not measured (the
+        // hours before a reload, a new shaft's first night) at the draft's
+        // count: read as idle, they would drop to one car, a rush included.
+        let tuned = |weekend: bool| {
+            let (ring, sampled) = rings.day(weekend);
+            let row = tuned_row(&self.twin_load(t, ring, weekend), cars);
+            keep_unmeasured_hours(row, draft_row(weekend).as_deref(), sampled, cars)
+        };
         let weekday = if wd.warm {
-            Some(tuned_row(&self.twin_load(t, &rings.weekday, false), cars))
+            Some(tuned(false))
         } else {
             draft_row(false)
         };
         let weekend = if we.warm {
-            Some(tuned_row(&self.twin_load(t, &rings.weekend, true), cars))
+            Some(tuned(true))
         } else {
             draft_row(true)
         };

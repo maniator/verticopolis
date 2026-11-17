@@ -164,8 +164,7 @@ impl Tower {
             classic_express_stops: kind == Kind::ElevatorExpress
                 && self.mode.express_stops_on_15th_floors(),
             // A Modern elevator starts with Auto on (owner, 2026-11-17).
-            schedule: (kind.is_elevator() && self.mode.schedule_assist())
-                .then(Schedule::auto_only),
+            schedule: (kind.is_elevator() && self.mode.schedule_assist()).then(Schedule::auto_only),
             rides: 0,
         };
         self.transport_by_id.insert(id, self.transports.len());

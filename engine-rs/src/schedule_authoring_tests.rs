@@ -192,7 +192,15 @@ fn each_hour_follows_its_load_with_a_one_car_floor_and_the_installed_cap() {
     assert_eq!(wd[10], 8);
     assert_eq!(wd[11], 1);
     assert_eq!(wd[12], 8);
-    assert_eq!(wd[3], 1, "an unsampled hour still keeps one car");
+    // An hour nobody measured is not an idle hour: it keeps the draft's
+    // count, every car with no draft (2026-11-17, daily Auto-tune).
+    assert_eq!(wd[3], 8, "an unsampled hour keeps every car");
+    let kept = sim.auto_tune_proposal(id, Some(&draft(Some(vec![2; 24]), None, None)), false);
+    assert_eq!(
+        kept.proposal.unwrap().weekday.unwrap()[3],
+        2,
+        "the draft's count"
+    );
     assert_eq!(
         p.weekend.unwrap()[8],
         3,
