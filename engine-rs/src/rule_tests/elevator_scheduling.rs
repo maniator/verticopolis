@@ -36,6 +36,7 @@ fn blank() -> Schedule {
         standard_floor_departure: None,
         home_floors: None,
         held_back: None,
+        auto_tune: false,
     }
 }
 
@@ -337,6 +338,7 @@ fn a_scheduled_tower_runs_the_same_every_time() {
             weekend: flat(1),
             home_floors: Some(vec![12, 12, 3]),
             held_back: None,
+            auto_tune: false,
             waiting_car_response: Some(4.0),
             standard_floor_departure: Some(20.0),
         };

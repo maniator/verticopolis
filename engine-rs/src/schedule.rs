@@ -17,6 +17,11 @@ pub struct Schedule {
     /// The hours the player cut back that a car sold since left at the whole
     /// fleet's size (#1546). Saved as `heldBack`; `None` when there are none.
     pub held_back: Option<HeldBack>,
+    /// Whether the engine re-tunes the active-car rows every morning from
+    /// the shaft's measured traffic (Modern, `schedule_auto.rs`). Saved as
+    /// `autoTune`, written only when on, so a save from before it loads
+    /// with Auto off.
+    pub auto_tune: bool,
 }
 
 /// The hours of each day type, `0..24` in ascending order, that run fewer
@@ -87,6 +92,33 @@ fn coerce_row(raw: &Value, cars: i64) -> Vec<i64> {
 }
 
 impl Schedule {
+    /// A schedule that only turns Auto on: every car runs every hour until
+    /// the first morning re-tune writes the rows. A Modern elevator is built
+    /// with it (owner, 2026-11-17).
+    pub fn auto_only() -> Schedule {
+        Schedule {
+            weekday: None,
+            weekend: None,
+            waiting_car_response: None,
+            standard_floor_departure: None,
+            home_floors: None,
+            held_back: None,
+            auto_tune: true,
+        }
+    }
+
+    /// Whether `self` and `other` hold the same schedule, leaving out the
+    /// rows the morning re-tune owns when both have Auto on, so the re-tune
+    /// does not make an older undo step on the shaft refuse.
+    pub fn same_but_auto_rows(&self, other: &Schedule) -> bool {
+        if !(self.auto_tune && other.auto_tune) {
+            return self == other;
+        }
+        self.waiting_car_response == other.waiting_car_response
+            && self.standard_floor_departure == other.standard_floor_departure
+            && self.home_floors == other.home_floors
+    }
+
     pub fn is_empty(&self) -> bool {
         let no_rows = self.weekday.as_ref().is_none_or(|w| w.is_empty())
             && self.weekend.as_ref().is_none_or(|w| w.is_empty());
@@ -94,6 +126,7 @@ impl Schedule {
             && self.waiting_car_response.is_none()
             && self.standard_floor_departure.is_none()
             && self.home_floors.as_ref().is_none_or(|h| h.is_empty())
+            && !self.auto_tune
     }
 
     /// `coerceSchedule(raw, cars, bottom, top)`.
@@ -109,6 +142,7 @@ impl Schedule {
             standard_floor_departure: None,
             home_floors: None,
             held_back: None,
+            auto_tune: r.get("autoTune").and_then(Value::as_bool) == Some(true),
         };
         if let Some(a) = r.get("activeCars").and_then(Value::as_object) {
             if let Some(w) = a.get("weekday").and_then(Value::as_array) {
@@ -253,6 +287,9 @@ impl Schedule {
         }
         if let Some(h) = &self.held_back {
             m.insert("heldBack".into(), h.to_json());
+        }
+        if self.auto_tune {
+            m.insert("autoTune".into(), json!(true));
         }
         Value::Object(m)
     }

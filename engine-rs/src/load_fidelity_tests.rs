@@ -11,6 +11,7 @@ use crate::load::{
 };
 use crate::load_stream::{load_save_text, read_save};
 use crate::rng::Rng;
+use crate::save_floor_runs::FLOOR_RUN_SAVE_VERSION;
 use crate::sim::{Simulation, PLAIN_SAVE_VERSION, SAVE_VERSION};
 use serde_json::{json, Value};
 
@@ -60,7 +61,9 @@ fn is_current(save: &Value) -> bool {
     let units = at("units").unwrap_or(usize::MAX);
     let before_units = |key: &str| at(key).is_some_and(|i| i < units);
     let version = save["version"].as_f64();
-    (version == Some(SAVE_VERSION as f64) || version == Some(PLAIN_SAVE_VERSION as f64))
+    (version == Some(SAVE_VERSION as f64)
+        || version == Some(FLOOR_RUN_SAVE_VERSION as f64)
+        || version == Some(PLAIN_SAVE_VERSION as f64))
         && matches!(save["mode"].as_str(), Some("classic" | "modern"))
         && before_units("version")
         && before_units("mode")

@@ -181,7 +181,9 @@ fn is_current(save: &Value) -> bool {
         Some(u) => at(k).is_some_and(|i| i < u),
     };
     let version = m.get("version").and_then(Value::as_f64);
-    (version == Some(STREAMED_VERSION) || version == Some(PLAIN_STREAMED_VERSION))
+    [STREAMED_VERSION, FLOOR_RUN_STREAMED_VERSION, PLAIN_STREAMED_VERSION]
+        .map(Some)
+        .contains(&version)
         && matches!(
             m.get("mode").and_then(Value::as_str),
             Some("classic" | "modern")
@@ -250,8 +252,13 @@ fn fixture_towers_load_the_same() {
     for p in paths {
         let save = decode_vctower(&std::fs::read_to_string(&p).unwrap()).unwrap();
         let text = save.to_string();
-        let current = save["version"] == json!(STREAMED_VERSION as i64)
-            || save["version"] == json!(PLAIN_STREAMED_VERSION as i64);
+        let current = [
+            STREAMED_VERSION,
+            FLOOR_RUN_STREAMED_VERSION,
+            PLAIN_STREAMED_VERSION,
+        ]
+        .iter()
+        .any(|&v| save["version"] == json!(v as i64));
         let took = check(&text, 0);
         assert_eq!(took.is_some(), current, "{}", p.display());
         let written = match took {
@@ -322,7 +329,9 @@ fn order_version_and_mode() {
     assert!(same(&text.replacen("\"version\":7", "\"version\":10", 1)));
     // 11 too: floor runs, which both readers unfold (`load::floor_runs`).
     assert!(same(&text.replacen("\"version\":7", "\"version\":11", 1)));
-    for version in ["6", "12", "\"7\"", "7.5", "null"] {
+    // 12 too: a schedule's `autoTune` flag, which a save without reads as off.
+    assert!(same(&text.replacen("\"version\":7", "\"version\":12", 1)));
+    for version in ["6", "13", "\"7\"", "7.5", "null"] {
         assert!(!same(&patched(&save, |m| {
             m["version"] = serde_json::from_str(version).unwrap();
         })));
@@ -379,7 +388,10 @@ fn units_and_transports_shapes() {
         a.push(json!({ "kind": "condo", "id": -1, "completeAt": "soon", "state": "construction" }));
     })));
     // A narrow shaft from before version 7, which the version step widens.
+    // The Modern save is stamped 12 (its elevator is on Auto), so it is
+    // marked 7 here.
     let narrow = patched(&save, |m| {
+        m["version"] = json!(7);
         m["transports"][0]["width"] = json!(2);
         m["transports"][0]["x"] = json!(140);
     });

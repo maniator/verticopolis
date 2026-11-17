@@ -45,15 +45,14 @@ pub struct MoveIns {
 /// The newest save format version this engine writes. It loads every older
 /// version back to the oldest one [`crate::identity::identity`] names.
 ///
-/// Version 8 adds one key, `lobbyHeights` (#308), and version 9 lists it
-/// per hall (#2068), so a save is stamped with the oldest version that reads
-/// it whole ([`save_version`]): 9 when it holds a tall lobby, which a build
-/// from before tall lobbies refuses rather than drop, and
-/// [`PLAIN_SAVE_VERSION`] otherwise, which every build from version 7 on
-/// still loads. Version 10 adds an elevator schedule's `heldBack` hours
-/// (#1546), held when a sold car left a cut-back hour at the fleet's size.
-/// Version 11 folds floor tiles into runs (`save_floor_runs`).
-pub const SAVE_VERSION: i64 = 11;
+/// Version 8 adds `lobbyHeights` (#308), version 9 lists it per hall
+/// (#2068); a save is stamped with the oldest version that reads it whole
+/// ([`save_version`]): 9 with a tall lobby, which an older build refuses
+/// rather than drop, else [`PLAIN_SAVE_VERSION`], which every build from 7
+/// on loads. Version 10 adds a schedule's `heldBack` hours (#1546), 11 folds
+/// floor tiles into runs (`save_floor_runs`), and 12 a schedule's `autoTune`
+/// ([`crate::schedule_auto::AUTO_TUNE_SAVE_VERSION`]).
+pub const SAVE_VERSION: i64 = 12;
 /// The version a save with a held hour and no floor run is written at.
 pub const HELD_HOURS_SAVE_VERSION: i64 = 10;
 /// The version a save with a tall lobby and no held hour is written at.

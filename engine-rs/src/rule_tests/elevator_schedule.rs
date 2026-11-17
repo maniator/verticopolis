@@ -73,7 +73,10 @@ fn homes(sim: &Simulation) -> Vec<i64> {
 #[test]
 fn a_save_is_stamped_with_the_current_version() {
     assert_eq!(PLAIN_SAVE_VERSION, 7);
-    assert_eq!(tower_with_elevator().serialize_unfolded()["version"], 7);
+    let classic = tower_with_elevator_in(GameMode::Classic);
+    assert_eq!(classic.serialize_unfolded()["version"], 7);
+    // A Modern elevator starts on Auto, which an older build would drop.
+    assert_eq!(tower_with_elevator().serialize_unfolded()["version"], 12);
 }
 
 #[test]
@@ -137,7 +140,8 @@ fn homes_snap_on_the_express_lock_and_a_tie_goes_to_the_lower_floor() {
 
 #[test]
 fn a_shaft_without_a_schedule_writes_and_loads_none() {
-    let sim = tower_with_elevator();
+    // Classic, since a Modern elevator starts with an Auto schedule.
+    let sim = tower_with_elevator_in(GameMode::Classic);
     assert!(shaft(&sim).schedule.is_none());
     let save = sim.serialize();
     assert!(save["transports"][0].get("schedule").is_none());

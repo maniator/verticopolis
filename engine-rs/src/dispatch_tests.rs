@@ -98,6 +98,7 @@ fn scenario() -> Tower {
         standard_floor_departure: None,
         home_floors: Some(vec![15, 18, 21]),
         held_back: None,
+        auto_tune: false,
     });
     for t in &mut tower.transports {
         t.cars = 8;

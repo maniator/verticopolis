@@ -169,3 +169,22 @@ hashes still. On would change what a fresh Modern game plays like.
     recommended off. **Naftali chose on (2026-11-17, 14:58Z):** every Modern
     elevator built from this version on starts with Auto on; old saves load
     with it off. Modern conformance hashes move in this PR as a result.
+
+## Amendment during the build (2026-11-17)
+
+🗂️ **Vera** and ⏱️ **Tess** caught it on the first determinism test: the
+hourly load rings were never saved ("the save never carries it",
+`telemetry.rs`), because nothing the game played read them. With Auto,
+gameplay reads them, so a reload would re-tune differently than the game that
+saved. And a ring warm by its day's count can still hold hours nobody
+measured (the hours before a reload, a new shaft's first night), which a tune
+reads as idle and cuts to one car, morning rush included.
+
+12. **Save the rings with Auto:** a save with a shaft on Auto carries
+    `elevatorLoad`, the hourly rings of every measured elevator (twins
+    included), each day's 24 loads and its measured hours. Left out of the
+    state view (the hash shows it through what it decides) and the `.TDT`
+    path. A save with no shaft on Auto is unchanged.
+13. **Unmeasured hours keep their count:** the pass writes the proposal only
+    for hours the shaft's own ring has measured; any other hour keeps the
+    count it runs now.

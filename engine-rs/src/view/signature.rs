@@ -133,6 +133,7 @@ fn fingerprint(tower: &Tower) -> u64 {
             h.opt(s.waiting_car_response, Fingerprint::num);
             h.opt(s.standard_floor_departure, Fingerprint::num);
             h.list(s.home_floors.as_deref(), Fingerprint::int);
+            h.word(u64::from(s.auto_tune));
         });
     }
     h.0

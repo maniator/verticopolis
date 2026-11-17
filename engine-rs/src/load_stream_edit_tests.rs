@@ -43,8 +43,11 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// shops' day last closed (`morningVenueDay`, #1500), the base saves being
 /// first-day games at 07:00, for that reason again. 144 became 153 when
 /// Modern venue staff started commuting (#2238): the base saves gained
-/// their desks and marks, and the edits shift again.
-const STREAMED: usize = 153;
+/// their desks and marks, and the edits shift again. 153 became 140 when
+/// a Modern elevator started on Auto (2026-11-17): the Modern base save
+/// gained a schedule and version 12, so the edits shift once more. No reader
+/// disagreement came with it.
+const STREAMED: usize = 140;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

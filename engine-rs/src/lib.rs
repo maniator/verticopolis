@@ -187,6 +187,8 @@ pub mod schedule;
 #[doc(hidden)]
 pub mod schedule_authoring;
 #[doc(hidden)]
+pub mod schedule_auto;
+#[doc(hidden)]
 pub mod schedule_facts;
 mod schedule_geometry;
 #[doc(hidden)]
@@ -217,6 +219,7 @@ mod sim_undo_check;
 mod sim_undo_ground;
 #[doc(hidden)]
 pub mod telemetry;
+mod telemetry_save;
 #[doc(hidden)]
 pub mod tower;
 mod tower_index;

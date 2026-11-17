@@ -103,6 +103,7 @@ pub(crate) fn draft(
         standard_floor_departure: None,
         home_floors: homes,
         held_back: None,
+        auto_tune: false,
     }
 }
 
@@ -371,7 +372,8 @@ fn asking_changes_nothing() {
     assert_eq!(sim.telemetry, telemetry);
     assert_eq!(format!("{:?}", sim.rng), format!("{rng:?}"));
     assert_eq!(sim.money, money);
-    assert!(sim.tower.get_transport(id).unwrap().schedule.is_none());
+    let schedule = sim.tower.get_transport(id).unwrap().schedule.as_ref();
+    assert!(schedule.is_none_or(|s| s.weekday.is_none() && s.weekend.is_none()));
 }
 
 #[test]

@@ -47,8 +47,11 @@ use crate::tower::{unit_list_headroom, Unit};
 /// version 9 lists them per hall (#2068), and version 10 adds an elevator
 /// schedule's `heldBack` hours (#1546); `assemble` reads every shape, so all
 /// four take the same step. Version 11 folds floor tiles into runs, which
-/// `Units` unfolds (`load::floor_runs`), and takes the same step too.
-const STREAMED_VERSION: f64 = 11.0;
+/// `Units` unfolds (`load::floor_runs`), and takes the same step too, as
+/// does version 12, which adds a schedule's `autoTune` flag.
+const STREAMED_VERSION: f64 = 12.0;
+/// Version 11, still read here: floor runs, and no shaft on Auto.
+const FLOOR_RUN_STREAMED_VERSION: f64 = 11.0;
 /// Version 10, still read here: a schedule's held hours, and no floor run.
 const HELD_HOURS_STREAMED_VERSION: f64 = 10.0;
 /// Version 9, still read here: a tall lobby per hall, and no held hour.
@@ -246,6 +249,7 @@ fn current_mode(rest: &Map<String, Value>, forced: Option<bool>) -> Option<bool>
     let version = rest.get("version").and_then(Value::as_f64);
     let taken = [
         STREAMED_VERSION,
+        FLOOR_RUN_STREAMED_VERSION,
         HELD_HOURS_STREAMED_VERSION,
         TALL_LOBBY_STREAMED_VERSION,
         FLOOR_HEIGHTS_STREAMED_VERSION,

@@ -75,10 +75,11 @@ pub fn migrate_save_owned(data: Value) -> Value {
     // (`Tower::adopt_lobby_heights`), which is the migration, and a save
     // without `heldBack` holds no hour back.
     // Version 11 folds floor tiles into runs, which the unit readers unfold
-    // (`floor_runs`), so it takes the same step.
+    // (`floor_runs`), so it takes the same step, and so does version 12,
+    // whose `autoTune` flag a save without it reads as off.
     if matches!(
         v(&migrated),
-        Some(7.0) | Some(8.0) | Some(9.0) | Some(10.0) | Some(11.0)
+        Some(7.0) | Some(8.0) | Some(9.0) | Some(10.0) | Some(11.0) | Some(12.0)
     ) {
         widen_shafts_in_place(&mut migrated);
     }

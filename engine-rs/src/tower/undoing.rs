@@ -108,7 +108,10 @@ impl Transport {
             && self.top == other.top
             && self.cars == other.cars
             && self.skip_floors == other.skip_floors
-            && self.schedule == other.schedule
+            && match (&self.schedule, &other.schedule) {
+                (Some(a), Some(b)) => a.same_but_auto_rows(b),
+                (a, b) => a == b,
+            }
     }
 
     /// Put the facts an edit owns back from `other`. The cars on the shaft

@@ -37,6 +37,7 @@ fn a_bought_car_inherits_the_authored_pattern_and_keeps_it_through_a_save() {
         standard_floor_departure: None,
         home_floors: None,
         held_back: None,
+        auto_tune: false,
     });
     assert!(sim.add_car(lift).ok);
     assert!(sim.add_car(lift).ok);
@@ -71,6 +72,7 @@ fn four_car_shaft() -> (Simulation, i64, Vec<i64>, Vec<i64>) {
         standard_floor_departure: None,
         home_floors: Some(vec![1, 2, 1, 2]),
         held_back: None,
+        auto_tune: false,
     });
     (sim, lift, weekday, weekend)
 }
@@ -256,6 +258,7 @@ fn a_refit_that_holds_nothing_leaves_no_held_list_and_the_old_save_version() {
         standard_floor_departure: None,
         home_floors: None,
         held_back: None,
+        auto_tune: false,
     };
     whole.refit(4, 3);
     assert_eq!(

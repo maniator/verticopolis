@@ -256,7 +256,8 @@ builds them, for the web game's own tests and tooling.
   before 10:00 carries `morningVenueDay`, the day the shops' and fast
   food's day last closed, since theirs ends at 10:00 (a save without it
   counts today's as closed). The elevator
-  panels' hourly figures start over on a load. A save from before the crowd
+  panels' hourly figures start over on a load, unless a shaft is on Auto
+  (`elevatorLoad`, below). A save from before the crowd
   was saved loads with nobody in the building, and the tower fills again
   from the lobby; one from before `waitsSeen` starts with no waits
   remembered. The `.TDT` format carries none of the four.
@@ -276,7 +277,12 @@ builds them, for the web game's own tests and tooling.
   stands for 60 tiles at x 167 to 226 with ids 43 to 102. Most built towers
   have such a row, and folding them about halves a large save. Read a save's
   units through the engine; a tool that reads the JSON itself unfolds each
-  `run` in place.
+  `run` in place. A save is version 12 when an elevator schedule has Auto on
+  (`schedule.autoTune`, which every Modern elevator starts with): the engine
+  re-tunes that shaft's car counts at 5 AM each game day from its measured
+  traffic, and the save then carries `elevatorLoad`, the elevators' hourly
+  load rings, so a reload re-tunes the same way. An older engine would drop
+  the flag, so it refuses the save.
 
 ## Versioning
 

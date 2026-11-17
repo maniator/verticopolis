@@ -66,6 +66,7 @@ fn scheduled_shaft(t: &mut Tower, cars: i64, weekday: Vec<i64>, weekend: Vec<i64
         standard_floor_departure: None,
         home_floors: Some(vec![1, 2]),
         held_back: None,
+        auto_tune: false,
     });
     id
 }
@@ -137,6 +138,7 @@ fn a_shift_recovery_preserves_unchanged_legacy_home_floors() {
         standard_floor_departure: None,
         home_floors: Some(vec![2, 2]),
         held_back: None,
+        auto_tune: false,
     };
     // Simulate loading an older schedule with staging on a non-stop floor.
     let index = tower.transport_index(id).unwrap();
