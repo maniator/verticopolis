@@ -45,4 +45,21 @@ describe("EmergencyReads", () => {
     r.read({ pendingChoice }, false, 0);
     expect(r.choice).toBeNull();
   });
+
+  it("reads the answer to a fire only when its sequence moves, and forgets it on reset", () => {
+    const answer = { floor: 6, x: 170, width: 9, guards: [], helicopter: null, out: false, seq: 2 };
+    const fireResponse = vi.fn(() => JSON.stringify(answer));
+    const port = { pendingChoice: () => undefined, fireResponse };
+    const r = new EmergencyReads();
+    r.read(port, false, 0, 0);
+    expect(fireResponse).not.toHaveBeenCalled();
+    r.read(port, false, 0, 2);
+    r.read(port, false, 0, 2);
+    expect(r.fire).toEqual(answer);
+    expect(fireResponse).toHaveBeenCalledTimes(1);
+    r.reset();
+    expect(r.fire).toBeNull();
+    r.read(port, false, 0, 0);
+    expect(r.fire).toBeNull();
+  });
 });

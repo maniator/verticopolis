@@ -348,13 +348,12 @@ export class ViewReader implements SimView {
     const l = this.l;
     const h = l.header;
     const fx = {
-      santaSeq: f[h.santaFxSeq],
-      vipSeq: f[h.vipFxSeq],
+      santaSeq: f[h.santaFxSeq], vipSeq: f[h.vipFxSeq],
       explosion: { floor: f[h.explosionFxFloor], x: f[h.explosionFxX], seq: f[h.explosionFxSeq] },
       thief: { caught: f[h.thiefFxCaught] === 1, floor: f[h.thiefFxFloor], x: f[h.thiefFxX], seq: f[h.thiefFxSeq] },
       treasure: { floor: f[h.treasureFxFloor], x: f[h.treasureFxX], seq: f[h.treasureFxSeq] },
     };
-    this.emergency.read(this.port, f[h.pendingChoice] === 1, f[h.bombSearchSeq]);
+    this.emergency.read(this.port, f[h.pendingChoice] === 1, f[h.bombSearchSeq], f[h.fireResponseSeq]);
     this.unlockedKinds = f[h.unlocked];
     const minutes = f[h.minutes];
     this.header = {
@@ -365,6 +364,7 @@ export class ViewReader implements SimView {
       logSeq: f[h.logSeq],
       pendingChoice: this.emergency.choice,
       bombSearch: this.emergency.bomb,
+      fireResponse: this.emergency.fire,
       minutes,
       minuteOfDay: ((minutes % 1440) + 1440) % 1440,
       day: f[h.day],

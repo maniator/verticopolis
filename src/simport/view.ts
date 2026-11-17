@@ -68,6 +68,8 @@ export interface HeaderView {
   readonly pendingChoice: PendingChoiceView | null;
   /** Classic's bomb search while one runs, else null. */
   readonly bombSearch: BombSearchView | null;
+  /** The guards and the helicopter answering a fire, else null. */
+  readonly fireResponse: FireResponseView | null;
   /** The game clock in minutes since the start. */
   readonly minutes: number;
   readonly minuteOfDay: number;
@@ -158,6 +160,25 @@ export interface BombSearchView {
   /** Whether guards are still out searching, so the engine holds every
    *  person and car still (`Simulation::bomb_lockdown`). */
   readonly lockdown: boolean;
+}
+
+/** Who answers a fire (#1889): Security's guards walking the emergency
+ *  stairs to it, and the paid rescue helicopter. Each guard has the bomb
+ *  search's guard shape: it climbs by `route` until `arrive`, then walks from
+ *  the stairs tile `left` to `right`, the tile in the burning room it fights
+ *  from, by `done`, and stays there. The guards are empty once the fire is
+ *  out; the helicopter may still be spraying or flying off. */
+export interface FireResponseView {
+  /** The room the fire started in: its floor, left tile and width. */
+  readonly floor: number;
+  readonly x: number;
+  readonly width: number;
+  readonly guards: readonly BombSearchGuard[];
+  /** The minutes the helicopter was called, lands (and puts the fire out),
+   *  stops spraying, and is gone. */
+  readonly helicopter: { readonly called: number; readonly arrive: number; readonly sprayEnd: number; readonly leave: number } | null;
+  readonly out: boolean;
+  readonly seq: number;
 }
 
 /** An emergency waiting on the player's answer. */

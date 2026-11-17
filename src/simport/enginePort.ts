@@ -306,13 +306,13 @@ export interface EnginePortView {
   logText(seq: number): string | undefined;
   /** The saved camera as JSON, read once per tower. */
   view(): string | undefined;
-  /** The emergency waiting on the player as JSON `{ kind, cost, message }`,
-   *  read when the frame's `pendingChoice` flag rises. */
+  /** The waiting emergency as JSON `{ kind, cost, message }`, read when `pendingChoice` rises. */
   pendingChoice(): string | undefined;
   /** The bomb search as JSON `{ deadline, sweeping, searched, seq, lockdown }`,
-   *  read when the frame's `bombSearchSeq` moves; undefined when none runs.
-   *  Rust only (#349): the TypeScript reference answers a ransom at once. */
+   *  read when the frame's `bombSearchSeq` moves; undefined when none runs. */
   bombSearch?(): string | undefined;
+  /** The answer to a fire as JSON (`FireResponseView`), read when `fireResponseSeq` moves. */
+  fireResponse?(): string | undefined;
 }
 
 /** The commands; each answers a result record (contract section 2). */

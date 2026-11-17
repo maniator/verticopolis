@@ -5,6 +5,7 @@ import { outcome } from "../simport/portCodes";
 export const FIRE_RESCUE_REFUSED = {
   none: "No fire is burning, so there is nothing for the rescue crews to put out.",
   pending: "Answer the emergency that is already waiting first.",
+  coming: "The Fire Rescue helicopter is already on its way.",
 } as const;
 
 /**
@@ -22,5 +23,6 @@ export function callFireRescue(app: GameApp): void {
     app.reader.update();
     return;
   }
-  app.ui.toast(res.reason === "pending" ? FIRE_RESCUE_REFUSED.pending : FIRE_RESCUE_REFUSED.none, "info");
+  const why = res.reason === "pending" || res.reason === "coming" ? res.reason : "none";
+  app.ui.toast(FIRE_RESCUE_REFUSED[why], "info");
 }

@@ -4,7 +4,8 @@ import { FLOOR } from "../scale";
 import { VIEW_ZOOM_MIN } from "../../shared/viewZoom";
 import { drawSearchGuard, drawThief, FIGURE_HEIGHT } from "../sprites/events";
 import { STAFF_LOOK } from "../pixelSprites/people";
-import { drawOverlay, floorFigureScale, floorRoomSpan, guardPosition } from "./towerOverlay";
+import { drawOverlay, floorFigureScale, floorRoomSpan } from "./towerOverlay";
+import { guardPosition } from "./guardPosition";
 
 /**
  * The bomb search's guards and the thief walk a floor, so each must fit

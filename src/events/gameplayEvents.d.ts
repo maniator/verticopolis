@@ -72,6 +72,11 @@ export type GameplayEmergencySource =
   | "player"
   | "timeout";
 
+export type GameplayFireOutcome =
+  | "security"
+  | "rescue"
+  | "burnedOut";
+
 export type GameplayMilestoneId =
   | "pop-500"
   | "pop-2500"
@@ -242,6 +247,16 @@ export interface GameplayEventPayloads {
    * occurrence. New with the timed bomb search (#349).
    */
   bomb_found: Record<string, never>;
+  /**
+   * The last room of a fire stopped burning. by is what put it out: rescue when
+   * the paid helicopter landed on it, security when Security's guards had
+   * reached it by the emergency stairs, and burnedOut when nobody reached it.
+   * With fire_started it brackets every fire. Version 1, per occurrence. New
+   * with guards answering fires and the rescue helicopter (#1889).
+   */
+  fire_out: {
+    by: GameplayFireOutcome;
+  };
 }
 
 /** Each event's schema version, by name. */
@@ -258,6 +273,7 @@ export interface GameplayEventVersions {
   emergency_resolved: 1;
   milestone_reached: 1;
   bomb_found: 1;
+  fire_out: 1;
 }
 
 export type GameplayEventName = keyof GameplayEventPayloads;

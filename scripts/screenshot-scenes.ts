@@ -19,6 +19,7 @@
  *   - scenes/boot-fallback.ts: the no-WebGL boot screen (staged boot failure).
  *   - scenes/notFound.ts: the "page not found" page, for the game and the manual.
  *   - scenes/security.ts: Security guards during a bomb search and on a quiet day.
+ *   - scenes/fireResponse.ts: Security guards at a fire and the Fire Rescue helicopter.
  *   - scenes/tallLobbies.ts: tall lobbies (#308) for the Help site.
  *   - scenes/venueFlights.ts: spiral stairs and switchback escalators beside venues.
  *   - scenes/paletteFit.ts: the desktop Tools window fitting every tool.
@@ -43,6 +44,7 @@ import { INSTALL_SCENES } from "./scenes/install.ts";
 import { RENTAL_SCENES } from "./scenes/rental.ts";
 import { FOUNDER_SCENES } from "./scenes/founder.ts";
 import { SECURITY_SCENES } from "./scenes/security.ts";
+import { FIRE_RESPONSE_SCENES } from "./scenes/fireResponse.ts";
 import { TALL_LOBBY_SCENES } from "./scenes/tallLobbies.ts";
 import { VENUE_FLIGHT_SCENES } from "./scenes/venueFlights.ts";
 import { PALETTE_FIT_SCENES } from "./scenes/paletteFit.ts";
@@ -70,6 +72,7 @@ export const SCENES: Scene[] = [
   ...RENTAL_SCENES,
   ...FOUNDER_SCENES,
   ...SECURITY_SCENES,
+  ...FIRE_RESPONSE_SCENES,
   ...TALL_LOBBY_SCENES,
   ...VENUE_FLIGHT_SCENES,
   ...PALETTE_FIT_SCENES,

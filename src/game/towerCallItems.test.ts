@@ -13,10 +13,11 @@ const SHEET = Float64Array.of(9);
 /** A stand-in app: the port answers the strip and the sheet with canned
  *  records, the codes read the fire count off the strip, and the reader's
  *  header says whether a choice waits. */
-function fakeApp(o: { fires?: number; choice?: boolean } = {}) {
+function fakeApp(o: { fires?: number; choice?: boolean; flying?: boolean } = {}) {
   const port = { statsStrip: vi.fn(() => STRIP), statsSheet: vi.fn(() => SHEET) };
   const codes = { slot: vi.fn(() => o.fires ?? 0) };
-  const reader = { header: { pendingChoice: o.choice ? { kind: "fireRescue" } : null } };
+  const helicopter = o.flying ? { called: 0, arrive: 30, sprayEnd: 50, leave: 65 } : null;
+  const reader = { header: { pendingChoice: o.choice ? { kind: "fireRescue" } : null, fireResponse: { helicopter } } };
   return { port, codes, app: { enginePort: port, portCodes: codes, reader } as unknown as Parameters<typeof towerCalls>[0] };
 }
 
@@ -44,6 +45,11 @@ describe("towerCalls: Classic", () => {
   it("grays Fire Rescue with no fire, and while a choice already waits", () => {
     expect(towerCalls(fakeApp({ fires: 0 }).app).fireRescue).toBe(false);
     expect(towerCalls(fakeApp({ fires: 1, choice: true }).app).fireRescue).toBe(false);
+  });
+
+  it("grays Fire Rescue while the helicopter is already on its way", () => {
+    expect(towerCalls(fakeApp({ fires: 1, flying: true }).app).fireRescue).toBe(false);
+    expect(towerCalls(fakeApp({ fires: 1, flying: false }).app).fireRescue).toBe(true);
   });
 });
 

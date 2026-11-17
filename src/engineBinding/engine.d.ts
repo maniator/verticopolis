@@ -195,6 +195,15 @@ export class Engine {
      */
     extendTransport(id: number, end: "up" | "down", target_floor: number): string;
     /**
+     * Security's guards and the rescue helicopter answering a fire, as JSON
+     * `{ floor, x, width, guards, helicopter, out, seq }` (`guards` in the
+     * bomb search's guard shape, `right` the tile each fights from;
+     * `helicopter` `{ called, arrive, sprayEnd, leave }` or null), or null
+     * while nobody answers one. A host reads it when the frame's
+     * `fireResponseSeq` moves.
+     */
+    fireResponse(): string | undefined;
+    /**
      * The number of units on fire.
      */
     fires(): number;

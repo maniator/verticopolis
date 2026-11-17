@@ -2,6 +2,7 @@ import {
   trackEvent,
   type AppActionName,
   type BombOutcome,
+  type FireOutcome,
   type EconomyActionName,
   type EmergencyKind,
   type EmergencyDecision,
@@ -76,6 +77,12 @@ export function trackEmergencyChoice(kind: EmergencyKind, decision: EmergencyDec
  *  analytics bridge. Host-gated and never-throw. */
 export function trackBombOutcome(outcome: BombOutcome): void {
   trackEvent("bomb_outcome", { outcome });
+}
+
+/** Report how a fire ended (see `fire_outcome`). Called only by the
+ *  analytics bridge. Host-gated and never-throw. */
+export function trackFireOutcome(outcome: FireOutcome): void {
+  trackEvent("fire_outcome", { outcome });
 }
 
 /** Clear the once-per-session action latches, so the next call to each `*Once`

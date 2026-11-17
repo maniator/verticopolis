@@ -12,8 +12,8 @@ import {
   MAX_TREASURES,
   bombCountdownText,
   bombPulseAlpha,
-  guardPosition,
 } from "./towerOverlay";
+import { guardPosition } from "./guardPosition";
 
 /**
  * The 2D overlay/sky-event painters and the decorative-fx bookkeeping, driven

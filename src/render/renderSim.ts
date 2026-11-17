@@ -1,7 +1,7 @@
 import type { ElevatorQueueView } from "../shared/engineTypes";
 import type { HeatCell, HeatmapMode } from "../shared/engineTypes";
 import type { GameMode, SerializedView, WeatherKind } from "../shared/types";
-import type { BombSearchView, CrowdView, TowerView } from "../simport/view";
+import type { BombSearchView, CrowdView, FireResponseView, TowerView } from "../simport/view";
 import type { LobbyHalls } from "./lobbyHalls";
 
 /**
@@ -60,6 +60,8 @@ export interface RenderSim {
   readonly treasureFx: { readonly floor: number; readonly x: number; readonly seq: number };
   /** Classic's bomb search while one runs, else null. View: `header.bombSearch`. */
   readonly bombSearch?: BombSearchView | null;
+  /** The guards and the helicopter answering a fire, else null. View: `header.fireResponse`. */
+  readonly fireResponse?: FireResponseView | null;
 
   /** Frame slices (3b): answered by the live engine today. */
   congestion(): number;

@@ -3,7 +3,7 @@ import { GAMEPLAY_EVENT_RULES } from "./events/gameplayEventRules";
 import type { GameplayEvent } from "./events/gameplayEvents";
 import { RateLimiter } from "./analyticsRateLimit";
 import { gameplaySession } from "./analyticsSession";
-import { trackBombOutcome, trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice } from "./analyticsActions";
+import { trackBombOutcome, trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice, trackFireOutcome } from "./analyticsActions";
 
 /**
  * The analytics engine bridge (#873 phase 2): the one place the game's gameplay
@@ -150,6 +150,9 @@ function fold(event: GameplayEvent, now: number): void {
       return;
     case "bomb_found":
       if (allowSend("bomb_outcome", now)) trackBombOutcome("found");
+      return;
+    case "fire_out":
+      if (allowSend("fire_outcome", now)) trackFireOutcome(event.payload.by);
       return;
     case "emergency_resolved":
       // A timed-out auto-decline is the absence of a choice, and reports nothing.

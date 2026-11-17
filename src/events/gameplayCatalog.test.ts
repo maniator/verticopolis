@@ -50,6 +50,7 @@ describe("gameplay event catalog", () => {
       "emergency_resolved",
       "milestone_reached",
       "bomb_found",
+      "fire_out",
     ]);
     expect([sameKinds, sameModes]).toEqual([true, true]);
   });
@@ -141,7 +142,7 @@ describe("gameplay event catalog", () => {
   // which dashboards it moves, and this digest is updated in the same commit.
   it("is frozen: the parsed catalog matches its pinned digest", () => {
     const digest = createHash("sha256").update(JSON.stringify(raw())).digest("hex");
-    expect(digest).toBe("f096241b5a4d986061363a2698ef811cc7088ae755eb3ce98aa0c4c6d5d0ae34");
+    expect(digest).toBe("63ce50044c94832d8cc7d86c5df6aeb07802000ff134e8a47671c3104781308e");
   });
 });
 
