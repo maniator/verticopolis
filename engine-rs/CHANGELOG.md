@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.47.1 (2026-11-17)
+
+- Each open car carries the way it leaves (`Leaving`: up, down or either), and a waiting rider boards only a car leaving their way; the crowd's hall calls carry their way, so a car passes a stop whose callers are all bound the other way unless it turns there, and Modern's best-car choice counts a car that will pass them as coming the long way round. The conformance lock, the frame-day and port-edit goldens moved, and the Classic ransom scenario now runs 592 hours to its threat.
+
 ## 1.47.0 (2026-11-16)
 
 - `Simulation::quote_skybridge` and `build_skybridge` (the binding's `quoteSkyBridge` and `buildSkyBridge` port records) quote and lay a whole sky bridge in one command; a lobby tile over open air is now refused.
