@@ -7,6 +7,7 @@ import { wheelZoomDelta } from "../../shared/inputEvents";
 import { clampCameraY, fitZoom } from "../cameraBounds";
 import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
+import { crowdCullNext } from "./crowdCull";
 import { armLongPress, cancelLongPressOnMove, finishLongPress } from "./longPress";
 import { cancelPress, endPress, isFirstContact, isUnusedMouseButton, movesWithButtonUp } from "./pressLifecycle";
 import type { TowerEngine } from "./TowerEngine";
@@ -435,7 +436,8 @@ function censusCrowd(engine: TowerEngine, dominant: ViewFocus["dominant"], bound
     }
   }
   if (cap > 0) return { crowd: Math.min(1, Math.max(0, occ / cap)), seen };
-  if (engine.crowdCulled) return { crowd: seen, seen };
+  // Judged as the frame's people window is (`frameWindow`), from this frame's zoom.
+  if (crowdCullNext(engine.cam.zoom, engine.crowdCulled)) return { crowd: seen, seen };
   let visible = 0;
   for (const p of engine.sim.crowd.people) {
     if (p.floor < bounds.f0 || p.floor > bounds.f1) continue;

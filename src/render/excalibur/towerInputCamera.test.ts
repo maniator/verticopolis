@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { CROWD_CULL_ZOOM } from "./crowdCull";
 import * as ex from "excalibur";
 import { catalogFor } from "../../tests/catalogFixture";
 import { FLOOR, TILE } from "../scale";
@@ -271,14 +272,18 @@ describe("focus counts the crowd a lobby shows", () => {
     setCamera(e, 120, 15, 1);
     now.mockReturnValue(10_000);
     expect(focus(e).crowd).toBe(0.5);
-    // Culled: the view carries nobody, and the count holds.
-    e.crowdCulled = true;
+    // Zoomed past the cull: the view already carries nobody on the frame
+    // the latch has not moved yet, and the count holds then and after.
     e.sim.crowd.people = [];
+    e.cam.zoom = CROWD_CULL_ZOOM / 2;
     now.mockReturnValue(12_000);
     expect(focus(e).crowd).toBe(0.5);
-    // Drawn again: the count follows the people the view carries.
-    e.crowdCulled = false;
+    e.crowdCulled = true;
     now.mockReturnValue(14_000);
+    expect(focus(e).crowd).toBe(0.5);
+    // Drawn again: the count follows the people the view carries.
+    e.cam.zoom = 1;
+    now.mockReturnValue(16_000);
     expect(focus(e).crowd).toBe(0);
     now.mockRestore();
   });
