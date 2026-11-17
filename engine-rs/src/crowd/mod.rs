@@ -9,6 +9,7 @@ pub(crate) mod commuters_save;
 pub mod doors;
 pub mod expected_time;
 pub(crate) mod fasthash;
+pub(crate) mod floor_index;
 pub mod graph;
 mod hall_call;
 pub mod landing;
@@ -278,18 +279,16 @@ pub struct Crowd {
     /// Housekeepers in the building, by the housekeeping room they work at.
     pub crew_roster: HashMap<i64, i64>,
     pub step: i64,
-    /// The cars the schedule has stood down, as (shaft id, car index),
-    /// ascending: nobody boards one, even one still finishing its riders.
-    /// Swapped in from the dispatch each step; saved as `closedCars`.
+    /// The cars the schedule stood down, (shaft id, car index) ascending: nobody boards one, even
+    /// one finishing its riders. Swapped in from the dispatch each step; saved as `closedCars`.
     pub closed_cars: Vec<(i64, i64)>,
     /// The cars standing open at a stop (`dispatch::OpenCar`), ascending: the only
     /// cars a person boards or leaves. Swapped in from the dispatch each step; never saved.
     pub open_cars: Vec<crate::dispatch::OpenCar>,
     /// The queue projection and its (step, tower revision). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
-    /// The clock hour of the step, so nobody stays in or walks into a venue
-    /// after it closes. `None` (a crowd stepped on its own) leaves every
-    /// venue open. Set by the step, and saved as the last step left it.
+    /// The clock hour of the step, so nobody stays in or walks into a venue after it closes. `None`
+    /// (a crowd stepped on its own) leaves every venue open. Set by the step, and saved as it left it.
     pub hour: Option<i64>,
     /// The game minute the step reached, for the train (`metro_train`). Not saved.
     pub minute: Option<f64>,
@@ -299,17 +298,15 @@ pub struct Crowd {
     pub walk_ins: Vec<walk_ins::WalkIn>,
     /// The walk-ins in the crowd, on their way or inside.
     pub walk_in_count: i64,
-    /// Each office's workers (inside, on the way in, booked to leave) by
-    /// office id (`commuters`). Saved (`commuters_save.rs`); a save without
-    /// them takes the head counts as the workers inside.
+    /// Each office's workers (inside, on the way in, booked to leave) by office id (`commuters`).
+    /// Saved (`commuters_save.rs`); a save without them takes the head counts as the workers inside.
     pub desks: std::collections::BTreeMap<i64, commuters::Desk>,
     /// The office arrivals and departures booked this hour, latest first. Saved.
     pub shifts: Vec<commuters::Shift>,
     /// The commuting workers in the crowd, on their way in or out. Counted
     /// again from the people on load.
     pub commuter_count: i64,
-    /// The tower revision the desks were last squared with, or `None`
-    /// before the first time (`commuters::reconcile`).
+    /// The tower revision the desks were last squared with, `None` before the first (`commuters::reconcile`).
     pub desk_revision: Option<i64>,
     /// Commuting workers who boarded an elevator this hour, by shaft and
     /// floor, for the shaft's origin rings (`sample_elevator_util`). Not saved.
@@ -323,6 +320,8 @@ pub struct Crowd {
     pub waits_seen: line_count::waits_seen::WaitsSeen,
     /// The route search's seen set, kept between searches. Never saved.
     pub(crate) route_seen: seg_set::SegSet,
+    /// The people by floor band, for a view's people window. Never saved.
+    pub(crate) by_floor: floor_index::FloorIndex,
 }
 
 impl Crowd {
@@ -371,6 +370,7 @@ impl Crowd {
             shaft_lines: fasthash::FastMap::default(),
             waits_seen: Default::default(),
             route_seen: Default::default(),
+            by_floor: Default::default(),
         }
     }
 

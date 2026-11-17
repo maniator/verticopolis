@@ -478,6 +478,8 @@ impl Crowd {
                 }
             }
         }
+        // The view's floor index, so the first frame after a load reads it.
+        self.by_floor.rebuild(&self.people);
         // The next person gets an id above everyone's in the tower.
         let past_ids = self.people.last().map_or(1, |p| p.id + 1);
         let saved = num("nextId").and_then(whole).unwrap_or(1);

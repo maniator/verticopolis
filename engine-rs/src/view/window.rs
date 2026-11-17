@@ -6,6 +6,7 @@
 //! the game: it is not saved and not hashed, and the simulation steps every
 //! person whatever it is.
 
+use crate::crowd::floor_index::{band, FloorIndex};
 use crate::crowd::Person;
 use crate::tower::Transport;
 
@@ -70,6 +71,49 @@ impl PeopleWindow {
     pub fn holds(&self, p: &Person) -> bool {
         (self.floor_lo..=self.floor_hi).contains(&p.fy) && (self.x_lo..=self.x_hi).contains(&p.x)
     }
+
+    /// Marks in `marks`, one bit per crowd index, everyone the crowd's
+    /// floor index `index` (which must fit a crowd of `people`) holds in the
+    /// bands this window spans (pads already added), and every newcomer it
+    /// has not banded yet, and returns how many; the window's people are
+    /// among them, and a reader tests each in crowd order with
+    /// [`PeopleWindow::holds`] (`marked`). Bits instead of a list keep crowd
+    /// order with no sort, at one word per 64 people to clear. `None`, with
+    /// nothing marked, when those people are a third of the crowd or more:
+    /// a test of every person in turn then costs no more (#2151 measured
+    /// the lobby screen, where the crowd gathers).
+    pub(crate) fn mark(
+        &self,
+        index: &FloorIndex,
+        people: usize,
+        marks: &mut Vec<u64>,
+    ) -> Option<usize> {
+        let banded = index.in_bands(band(self.floor_lo), band(self.floor_hi));
+        let found = banded.len() + index.newcomers().len();
+        if found * 3 >= people {
+            return None;
+        }
+        marks.clear();
+        marks.resize(people.div_ceil(64), 0);
+        for i in banded.iter().map(|&i| i as usize).chain(index.newcomers()) {
+            marks[i / 64] |= 1u64 << (i % 64);
+        }
+        Some(found)
+    }
+}
+
+/// The crowd indices `marks` holds (`PeopleWindow::mark`), ascending.
+pub(crate) fn marked(marks: &[u64]) -> impl Iterator<Item = usize> + '_ {
+    marks.iter().enumerate().flat_map(|(w, &word)| {
+        let mut bits = word;
+        std::iter::from_fn(move || {
+            (bits != 0).then(|| {
+                let i = w * 64 + bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                i
+            })
+        })
+    })
 }
 
 /// The widest transport's width in tiles, 0 with none: the width

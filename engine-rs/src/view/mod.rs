@@ -126,6 +126,9 @@ mod meta_tests;
 #[path = "oracle_tests.rs"]
 mod oracle_tests;
 #[cfg(test)]
+#[path = "people_index_tests.rs"]
+mod people_index_tests;
+#[cfg(test)]
 #[path = "session_tests.rs"]
 mod session_tests;
 #[cfg(test)]
