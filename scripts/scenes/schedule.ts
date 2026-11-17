@@ -93,6 +93,28 @@ async function openScheduleDialog(page: import("playwright").Page, kind: string,
   await page.waitForSelector("#modal .es-body", { timeout: 4000 });
 }
 
+/** Tick the open dialog's Auto box when `tick`, then check the state the shot
+ *  is about: the box ticked, the presets locked, and `hint` under them. */
+async function checkAuto(page: import("playwright").Page, tick: boolean, hint: string): Promise<void> {
+  await page.evaluate(
+    ({ tick, hint }) => {
+      const box = document.querySelector("#modal .es-auto input") as HTMLInputElement | null;
+      if (!box) throw new Error("the Modern schedule dialog rendered no Auto box");
+      if (tick) box.click();
+      if (!box.checked) throw new Error("the Auto box is not ticked");
+      const presets = [...document.querySelectorAll<HTMLButtonElement>("#modal .es-presets .btn")];
+      if (!presets.length || presets.some((b) => !b.disabled)) throw new Error("the presets are not locked under Auto");
+      if (document.querySelector("#modal .es-autotune")) throw new Error("the one-time Auto-tune button shows under Auto");
+      const hints = [...document.querySelectorAll("#modal .es-hint")].map((p) => p.textContent);
+      if (!hints.includes(hint)) throw new Error(`the Auto hint is missing: ${hint}`);
+    },
+    { tick, hint },
+  );
+}
+
+const AUTO_ON_HINT = "Auto re-tunes the car counts every morning from measured traffic. Uncheck Auto to set them by hand.";
+const AUTO_WAITING_HINT = "Auto starts once this shaft has measured a day of traffic.";
+
 export const SCHEDULE_SCENES: Scene[] = [
   {
     // The showcase hero: Modern, standard shaft, staging-first surface with a
@@ -109,9 +131,12 @@ export const SCHEDULE_SCENES: Scene[] = [
           await openScheduleDialog(page, "elevatorStandard");
           // The hero's whole subject is the assisted Modern surface; fail the
           // shot if the advice line did not render rather than commit a
-          // picture of the wrong thing.
+          // picture of the wrong thing. Its hand-set schedule shows Auto off.
           await page.evaluate(() => {
             if (!document.querySelector("#modal .es-advice")) throw new Error("the Modern advice line did not render");
+            if ((document.querySelector("#modal .es-auto input") as HTMLInputElement | null)?.checked !== false) {
+              throw new Error("the hand-set hero shaft must show Auto unticked");
+            }
           });
         },
         wait: 300,
@@ -208,13 +233,69 @@ export const SCHEDULE_SCENES: Scene[] = [
         keepDialogs: true,
         setup: async (page) => {
           await openScheduleDialog(page, "elevatorExpress");
-          // The express shot's subject is the recommended Feeder preset.
+          // The express shot's subject is the recommended Feeder preset. A
+          // new Modern elevator starts on Auto (owner, 2026-11-17), so the
+          // presets show locked under the ticked box, as a player sees them.
           await page.evaluate(() => {
             const rec = document.querySelector("#modal .es-presets .es-rec");
             if (!rec || rec.textContent !== "Feeder") throw new Error("express dialog did not recommend Feeder");
           });
         },
         wait: 300,
+      },
+    ],
+  },
+  {
+    // The Auto box (Modern daily re-tune, owner 2026-11-17), its own scene
+    // and shard: ticked on a measured shaft (the counts filled from the
+    // engine's proposal and locked), and on by default on a new shaft that
+    // has measured nothing yet. Unticked is the hero above; Classic has no
+    // box (checked in the Classic scene).
+    id: "schedule-dialog-auto",
+    outDir: "features",
+    build: buildScheduleTowerModern,
+    assertUnits: 60,
+    shots: [
+      {
+        name: "schedule-auto-on",
+        crop: "#modal .modal-box",
+        keepDialogs: true,
+        setup: async (page) => {
+          await openScheduleDialog(page, "elevatorStandard");
+          await checkAuto(page, true, AUTO_ON_HINT);
+        },
+        wait: 300,
+      },
+      {
+        name: "schedule-auto-waiting",
+        crop: "#modal .modal-box",
+        keepDialogs: true,
+        setup: async (page) => {
+          await openScheduleDialog(page, "elevatorExpress");
+          await checkAuto(page, false, AUTO_WAITING_HINT);
+        },
+        wait: 300,
+      },
+    ],
+  },
+  {
+    // The Auto box at phone width with a coarse pointer (the scene viewport
+    // sets the touch layout): the box keeps its 44px target in the row.
+    id: "schedule-dialog-auto-phone",
+    outDir: "features",
+    viewport: PHONE,
+    build: buildScheduleTowerModern,
+    assertUnits: 60,
+    shots: [
+      {
+        name: "schedule-auto-on-mobile",
+        crop: "#modal .modal-box",
+        keepDialogs: true,
+        setup: async (page) => {
+          await openScheduleDialog(page, "elevatorStandard");
+          await checkAuto(page, true, AUTO_ON_HINT);
+        },
+        wait: 400,
       },
     ],
   },
@@ -236,6 +317,7 @@ export const SCHEDULE_SCENES: Scene[] = [
           await page.evaluate(() => {
             if (!document.querySelector("#modal .es-strip")) throw new Error("the Classic raw strip did not render");
             if (document.querySelector("#modal .es-presets")) throw new Error("Classic must not show presets");
+            if (document.querySelector("#modal .es-auto")) throw new Error("Classic must not show the Auto box");
           });
         },
         wait: 300,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { scheduleSlots } from "../simport/scheduleSlots";
+import { trackAppAction } from "../analytics";
 import {
   lift,
   rec,
@@ -7,6 +8,11 @@ import {
   setup,
   type Answers,
 } from "./editorActions.fixture";
+
+vi.mock("../analytics", async (importActual) => ({
+  ...(await importActual<typeof import("../analytics")>()),
+  trackAppAction: vi.fn(),
+}));
 
 vi.mock("../simport/headerClock", () => ({
   clockOf: () => ({ hour: 9, isWeekend: true }),
@@ -162,6 +168,29 @@ describe("EditorActions: schedule dialog", () => {
       "Elevator schedule saved.",
     );
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
+  });
+
+  it("OK counts a changed Auto box, and only a changed one the engine took", async () => {
+    vi.mocked(trackAppAction).mockClear();
+    const off = opened();
+    await off.cb.apply({ cars: [] });
+    expect(trackAppAction, "Auto left off").not.toHaveBeenCalled();
+    await off.cb.apply({ cars: [], autoTune: true });
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("elevator_auto_tune", "on");
+    vi.mocked(trackAppAction).mockClear();
+    const on = opened();
+    vi.mocked(on.kit.currentSchedule).mockReturnValue({ cars: [], autoTune: true } as never);
+    on.deps.ui.showElevatorScheduleDialog.mockClear();
+    on.actions.openSchedule(lift.id);
+    const [, cb] = on.deps.ui.showElevatorScheduleDialog.mock.calls[0] as unknown as [Ctx, Cb];
+    await cb.apply({ cars: [], autoTune: true });
+    expect(trackAppAction, "Auto left on").not.toHaveBeenCalled();
+    await cb.apply({ cars: [], autoTune: false });
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("elevator_auto_tune", "off");
+    vi.mocked(trackAppAction).mockClear();
+    const refused = opened({ scheduleShaft: () => rec("buildAt", false) });
+    await refused.cb.apply({ cars: [], autoTune: true });
+    expect(trackAppAction, "a refused schedule").not.toHaveBeenCalled();
   });
 
   it("OK on a refused schedule says why; on a shaft that is gone it writes nothing", async () => {

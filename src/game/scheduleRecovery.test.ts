@@ -71,6 +71,12 @@ describe("shortFleets keeps detection conservative", () => {
     ).toEqual([]);
     expect(shortFleets([shaft(4)], () => undefined)).toEqual([]);
   });
+
+  it("leaves a shaft on Auto alone, since the morning re-tune owns its counts", () => {
+    const tuned = { activeCars: { weekday: flat(3), weekend: flat(3) } };
+    expect(shortFleets([shaft(8)], () => ({ ...tuned, autoTune: true }))).toEqual([]);
+    expect(shortFleets([shaft(8)], () => ({ ...tuned, autoTune: false }))[0]?.flatAt).toBe(3);
+  });
 });
 
 describe("recoveredSchedule", () => {

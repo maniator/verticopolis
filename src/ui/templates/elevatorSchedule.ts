@@ -95,7 +95,9 @@ export interface SchedState {
   base: number;
   /** The live working copy (fully populated: both day rows length 24, homeFloors
    *  length cars, both tunables set). */
-  schedule: Required<Pick<ElevatorSchedule, "activeCars" | "homeFloors" | "waitingCarResponse" | "standardFloorDeparture">>;
+  schedule: Required<
+    Pick<ElevatorSchedule, "activeCars" | "homeFloors" | "waitingCarResponse" | "standardFloorDeparture" | "autoTune">
+  >;
   /** Derived, computed by the controller: the advice sentence ("" when none) and the
    *  Simulate staging readout. */
   adviceMsg: string;
@@ -125,6 +127,9 @@ export interface SchedHandlers {
   /** Run the whole fleet every hour of both day types (the bulk fix for editing one slot at a time). */
   onAllCars: () => void;
   onAutoTune: () => void;
+  /** The Auto checkbox (Modern): the engine re-tunes the car counts every
+   *  morning while it is on, so the count controls lock. */
+  onAutoToggle: () => void;
   onToggleAdvanced: () => void;
   onOk: () => void;
   onCancel: () => void;
@@ -136,6 +141,9 @@ const PRESET_LABEL: Record<AssistedPreset, string> = { rush: "Rush", balanced: "
 function row(state: SchedState): number[] {
   return (state.day === "weekend" ? state.schedule.activeCars.weekend : state.schedule.activeCars.weekday) ?? [];
 }
+
+/** Whether Auto owns the car counts, so the controls that set them lock. */
+const countsLocked = (state: SchedState): boolean => state.schedule.autoTune;
 
 /** The ascending inclusive [start, end] hour span of the selection. */
 function span(state: SchedState): [number, number] {
@@ -219,6 +227,7 @@ function stripTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Temp
   const [a, b] = span(state);
   const n = r[state.selectedHour] ?? ctx.cars;
   const spanLabel = a === b ? `Hour ${hh(a)}` : `Hours ${hh(a)}–${hh(b)}`;
+  const locked = countsLocked(state);
   const demandAt = (hr: number): number | undefined =>
     ctx.hourly ? Math.max(0, Math.min(1, ctx.hourly[hr] ?? 0)) : undefined;
   return html`
@@ -239,8 +248,10 @@ function stripTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Temp
                 aria-label="${state.day} ${hh(hr)}, ${v} of ${ctx.cars} cars"
                 aria-valuemin="0" aria-valuemax=${ctx.cars} aria-valuenow=${v}
                 @click=${(e: MouseEvent) => h.onSelectHour(hr, !!e.shiftKey)}
+                aria-readonly=${locked ? "true" : nothing}
                 @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                  const adjusts = e.key === "ArrowUp" || e.key === "ArrowDown";
+                  if ((adjusts && !locked) || e.key === "ArrowLeft" || e.key === "ArrowRight") {
                     e.preventDefault();
                     h.onBarKey(hr, e.key);
                   }
@@ -267,7 +278,7 @@ function stripTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Temp
       <p class="es-hint es-touch-hint">Tap an hour, then set its cars with − and +. A second tap spans hours.</p>
       <div class="es-row es-strip-step">
         <span>${spanLabel}</span>
-        ${stepper(html`${n} car${n === 1 ? "" : "s"}`, n > 0, n < ctx.cars, h.onHourStep, ["fewer cars", "more cars"])}
+        ${stepper(html`${n} car${n === 1 ? "" : "s"}`, !locked && n > 0, !locked && n < ctx.cars, h.onHourStep, ["fewer cars", "more cars"])}
       </div>
     </div>`;
 }
@@ -373,21 +384,41 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
     </div>`;
 }
 
+/** The hint under the presets row: what Auto is doing while it is on,
+ *  otherwise why the one-time Auto-tune is or is not offered. */
+function tuneHint(ctx: SchedCtx, state: SchedState): string {
+  if (!ctx.ux.autoTune) return "";
+  if (ctx.tuneStatus === "no-cars") return "This shaft has no cars to tune.";
+  if (countsLocked(state)) {
+    return ctx.canTune
+      ? "Auto re-tunes the car counts every morning from measured traffic. Uncheck Auto to set them by hand."
+      : "Auto starts once this shaft has measured a day of traffic.";
+  }
+  if (ctx.tuneStatus === "insufficient-data") return "Auto-tune needs a day or two of measured traffic first.";
+  if (ctx.canTune && !ctx.hasMeasured) return `No measured ${state.day} traffic yet; Auto-tune adjusts only measured days.`;
+  return "";
+}
+
+/** Modern's presets row: the presets, the one-time Auto-tune button, and the
+ *  Auto checkbox. While Auto is on the presets lock and the button hides,
+ *  since the engine sets the counts each morning. */
 function presetsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
+  const locked = countsLocked(state);
+  const hint = tuneHint(ctx, state);
   return html`
     <div class="es-row es-presets">
       ${(["rush", "balanced", "feeder"] as AssistedPreset[]).map((p) => html`
-        <button type="button" class="btn${p === ctx.recommended ? " es-rec" : ""}" @click=${() => h.onPreset(p)}
+        <button type="button" class="btn${p === ctx.recommended ? " es-rec" : ""}" ?disabled=${locked} @click=${() => h.onPreset(p)}
           title=${p === ctx.recommended ? "Recommended for this shaft" : ""}>${PRESET_LABEL[p]}</button>`)}
-      ${ctx.ux.autoTune
+      ${ctx.ux.autoTune && !locked
         ? html`<button type="button" class="btn es-autotune" ?disabled=${!ctx.canTune} @click=${h.onAutoTune}>Auto-tune</button>`
         : nothing}
+      ${ctx.ux.autoTune
+        ? html`<label class="es-auto" title="Re-tune the car counts every morning from measured traffic"><input type="checkbox"
+            .checked=${live(state.schedule.autoTune)} @change=${h.onAutoToggle} /> Auto</label>`
+        : nothing}
     </div>
-    ${ctx.ux.autoTune && ctx.tuneStatus === "insufficient-data" ? html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>` : nothing}
-    ${ctx.ux.autoTune && ctx.tuneStatus === "no-cars" ? html`<p class="es-hint">This shaft has no cars to tune.</p>` : nothing}
-    ${ctx.ux.autoTune && ctx.canTune && !ctx.hasMeasured
-      ? html`<p class="es-hint">No measured ${state.day} traffic yet; Auto-tune adjusts only measured days.</p>`
-      : nothing}`;
+    ${hint ? html`<p class="es-hint">${hint}</p>` : nothing}`;
 }
 
 export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
@@ -402,7 +433,7 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
             <button type="button" class="btn${state.day === "weekday" ? " es-on" : ""}" aria-pressed=${state.day === "weekday"} @click=${() => h.onDay("weekday")}>Weekday</button>
             <button type="button" class="btn${state.day === "weekend" ? " es-on" : ""}" aria-pressed=${state.day === "weekend"} @click=${() => h.onDay("weekend")}>Weekend</button>
           </span>
-          <button type="button" class="btn es-allcars" @click=${h.onAllCars}
+          <button type="button" class="btn es-allcars" ?disabled=${countsLocked(state)} @click=${h.onAllCars}
             aria-label="All ${ctx.cars} car${ctx.cars === 1 ? "" : "s"}, all hours, both day types"
             title="Sets every hour of both Weekday and Weekend to the full fleet">All ${ctx.cars} car${ctx.cars === 1 ? "" : "s"}, all hours</button>
         </div>

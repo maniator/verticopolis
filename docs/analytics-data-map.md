@@ -156,6 +156,18 @@ back on. Each carries the new state only.
 | `found_bridged` | `on` or `off` | A Modern tower is founded from the New Tower window: whether its box was ticked. A Classic founding sends nothing, since Classic always bridges |
 | `auto_bridge` | `on` or `off` | The Settings switch was flipped in a Modern tower, with the state the engine answered |
 
+## Elevator Auto (Modern)
+
+From the release after 4.10, an elevator's Schedule window has an **Auto** box
+(Modern): while it is ticked, the engine re-tunes that shaft's car counts every
+game morning from its measured traffic. New Modern elevators start with it on
+(owner, 2026-11-17), so one `app_action` code says how often players change it.
+It carries the new state only, never the shaft or its schedule.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `elevator_auto_tune` | `on` or `off` | The player pressed OK in the Schedule window with the Auto box changed from how the window opened, and the engine took the schedule |
+
 ## Sky bridges (Modern)
 
 From the release after 4.8, the Sky Bridge tool lays a whole bridge between two

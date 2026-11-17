@@ -60,7 +60,10 @@ export function shortFleets(shafts: readonly ShaftFacts[], scheduleOf: (id: numb
   for (const shaft of shafts) {
     if (!isElevator(shaft.kind)) continue;
     const schedule = scheduleOf(shaft.id);
-    if (!schedule) continue;
+    // An Auto shaft's counts are the engine's morning re-tune (Modern), so a
+    // short hour there is measured demand, and a recovery would be undone at
+    // the next 5 AM pass.
+    if (!schedule || schedule.autoTune) continue;
     const rows = rowsOf(schedule, shaft.cars);
     if (rows.length === 0) continue;
     const counts = rows.flat();

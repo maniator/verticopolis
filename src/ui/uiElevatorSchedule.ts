@@ -7,6 +7,7 @@ import { SCHEDULE_HOURS } from "../simport/scheduleSlots";
 import { hotspotFloors, type ElevatorScheduleUX } from "./scheduleDialogRules";
 import type { AssistedPreset, AutoTuneProposal, PresetProposal, ScheduleFacts, SchedulePresetName } from "../simport/enginePort";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
+import { autoAnnouncement, fillFromProposal, tunedAnnouncement } from "./uiElevatorScheduleAuto";
 
 /**
  * The per-shaft elevator Schedule dialog controller (elevator-scheduling #305
@@ -145,6 +146,7 @@ export function showElevatorScheduleDialog(
       homeFloors: seedHomes(),
       waitingCarResponse: ctx.current?.waitingCarResponse ?? 0,
       standardFloorDeparture: ctx.current?.standardFloorDeparture ?? DEFAULT_SFD,
+      autoTune: ctx.ux.autoTune && !!ctx.current?.autoTune,
     },
     adviceMsg: "",
     simMsg: "",
@@ -425,26 +427,24 @@ export function showElevatorScheduleDialog(
       // Ask the engine against the working copy, handing over homes only once
       // the player has staged by hand so an untouched shaft gets the seed.
       const res = ctx.autoTune(workingDraft(), state.day === "weekend");
-      const p = res.proposal;
-      if (res.status !== "available" || !p) {
-        // Only a cold shaft is fixed by waiting; any other refusal (the shaft
-        // is gone, the mode offers none) stays quiet rather than mislead.
+      const days = fillFromProposal(state.schedule, res, fullRow);
+      // Only a cold shaft is fixed by waiting; any other refusal (the shaft
+      // is gone, the mode offers none) stays quiet rather than mislead.
+      if (!days) {
         if (res.status === "insufficient-data") announce("Auto-tune needs a day or two of measured traffic first.");
         return;
       }
-      // A day the engine left untuned (its ring unmeasured, #466) keeps ITS OWN
-      // working row; falling back to curRow() would copy the visible day across.
-      state.schedule.activeCars = {
-        weekday: p.weekday ? [...p.weekday] : [...(state.schedule.activeCars?.weekday ?? fullRow())],
-        weekend: p.weekend ? [...p.weekend] : [...(state.schedule.activeCars?.weekend ?? fullRow())],
-      };
-      state.schedule.homeFloors = [...p.homeFloors];
-      // Name the days that were actually tuned: on a cold Weekend tab a blanket
-      // "auto-tuned" would claim a change the visible row never shows (#466).
-      const tunedDays = [res.weekday.warm ? "weekday" : null, res.weekend.warm ? "weekend" : null].filter(Boolean);
-      announce(
-        `Auto-tuned the ${tunedDays.join(" and ")} ${tunedDays.length > 1 ? "schedules" : "schedule"} and staging to measured demand.`,
-      );
+      announce(tunedAnnouncement(days));
+      after();
+    },
+    onAutoToggle: () => {
+      // Auto owns the car counts from here on, so it fills them now from the
+      // same proposal the morning re-tune reads, when there is one. Like the
+      // Auto-tune button, it seeds the staging floors only when the player
+      // has set none; the morning re-tune never touches them.
+      state.schedule.autoTune = !state.schedule.autoTune;
+      if (state.schedule.autoTune) fillFromProposal(state.schedule, ctx.autoTune(workingDraft(), state.day === "weekend"), fullRow, !homesDirty);
+      announce(autoAnnouncement(state.schedule.autoTune));
       after();
     },
     onToggleAdvanced: () => {
@@ -462,6 +462,7 @@ export function showElevatorScheduleDialog(
         waitingCarResponse: state.schedule.waitingCarResponse,
         standardFloorDeparture: state.schedule.standardFloorDeparture,
         homeFloors: [...state.schedule.homeFloors],
+        autoTune: state.schedule.autoTune,
       }).finally(() => box.isConnected && ui.closeModal());
     },
     onCancel: () => {

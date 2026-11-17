@@ -17,6 +17,7 @@ import { NOT_ENOUGH_MONEY } from "../simport/request";
 import { sayHeldRefusal, type HeldRefusal } from "./dragRefusal";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 import { rememberPlayerText } from "../analyticsPlayerText";
+import { trackAppAction } from "../analytics";
 
 
 /**
@@ -135,6 +136,7 @@ export class EditorActions {
     };
     const kit = this.deps.kit();
     const header = this.deps.reader().header;
+    const opened = kit.currentSchedule(id);
     this.deps.ui.showElevatorScheduleDialog(
       {
         title: `Schedule: ${catalogFacility(kit.catalog(), t.kind).name} (floors ${t.bottom}-${t.top})`,
@@ -153,7 +155,7 @@ export class EditorActions {
         autoTune: (draft, weekendView) => this.deps.engine().autoTuneProposal(id, scheduleSlots(draft), weekendView),
         facts: (draft, weekendView) => this.deps.engine().scheduleFacts(id, scheduleSlots(draft), weekendView),
         preset: (name) => this.deps.engine().schedulePreset(id, name),
-        current: kit.currentSchedule(id),
+        current: opened,
         initialWeekend: clockOf(header).isWeekend,
         announce: (msg) => this.deps.announce(msg),
       },
@@ -174,6 +176,7 @@ export class EditorActions {
           const res = outcome(engine, engine.scheduleShaft(id, scheduleSlots(schedule)));
           this.deps.commitUndo();
           if (!res.ok) return Promise.resolve(this.refuse(res.reason ?? "That schedule could not be saved."));
+          if (!!schedule.autoTune !== !!opened?.autoTune) trackAppAction("elevator_auto_tune", schedule.autoTune ? "on" : "off");
           this.deps.audio.sfx("build");
           this.deps.announce("Elevator schedule saved.");
           this.deps.refreshEditor();
