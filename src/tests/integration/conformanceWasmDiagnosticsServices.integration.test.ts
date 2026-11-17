@@ -234,13 +234,15 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
  *  slower than the cars, it lands in the lobby and guts a cinema, a
  *  housekeeping room, a parking floor and ramp, a restaurant and a shop.
  *  Once riders boarded only a car leaving their way, it lands on floor 42
- *  and guts none of them. */
+ *  and guts none of them. Once Modern riders counted the walk to their
+ *  first shaft, it lands in the lobby again and guts all six. */
 const CORPUS_SECTIONS: readonly string[] = [
   "commercial:lobbyFar:false", "commercial:lobbyFar:true",
   "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:infested", "hotel:excluded:other",
   "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
-  "inert:amusements", "inert:boutiqueBay", "inert:daycare", "inert:fastFood", "inert:foodHall",
-  "inert:nightclub",
+  "inert:amusements", "inert:boutiqueBay", "inert:cinema", "inert:daycare", "inert:fastFood", "inert:foodHall",
+  "inert:housekeeping",
+  "inert:nightclub", "inert:parking", "inert:parkingRamp", "inert:restaurant", "inert:shop",
   "inert:skyBar", "inert:spa",
   "parking:connected", "parking:connected:short", "parking:disconnected", "parking:ramp", "parking:ramp:short",
   "recycling:met:filling",
