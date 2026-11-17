@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 
 use crate::clock::GameMode;
+use crate::crowd::fasthash::FastSet;
 use crate::demand::{compute_demand_map, origin_demand, unmet_coverage, DemandMap};
 use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
@@ -54,7 +55,7 @@ pub(crate) fn casts_halo(c: &Unit) -> bool {
 pub struct SatisfactionContext {
     pub cong_map: Option<IndexMap<i64, f64>>,
     pub global_cong: f64,
-    pub served_set: std::collections::HashSet<i64>,
+    pub served_set: FastSet<i64>,
     /// For each row of `GameMode::halos`, in order, every story a served
     /// venue casting it fills, open or not.
     pub halo_floors: Vec<Vec<i64>>,
@@ -141,7 +142,7 @@ impl Simulation {
                 }
             }
         }
-        let served_set = self.tower.served_floors();
+        let served_set: FastSet<i64> = self.tower.served_floors().into_iter().collect();
         let mut halo_floors = vec![Vec::new(); self.mode.halos().len()];
         for c in self.tower.room_units() {
             if casts_halo(c) && served_set.contains(&c.floor) {
@@ -362,7 +363,14 @@ impl Simulation {
 
     /// `wouldEvictFreshTenant`.
     pub fn would_evict_fresh_tenant(&mut self, u: &Unit, ctx: &mut SatisfactionContext) -> bool {
-        let probe = self.fresh_probe(u, ctx);
+        self.would_evict_probe(u.clone(), ctx)
+    }
+
+    /// [`Simulation::would_evict_fresh_tenant`] for a copy of the room the
+    /// caller already holds, so the move-in pass copies each room once.
+    pub(crate) fn would_evict_probe(&mut self, room: Unit, ctx: &mut SatisfactionContext) -> bool {
+        let need = fresh_tenant_need(&room);
+        let probe = self.fresh_probe(room, ctx);
         // The nightclub is felt only while it is open, so the gate walks its
         // horizon hour by hour from now and opens the clubs in their hours:
         // a night run would otherwise hold every spot near a club, and a day
@@ -370,39 +378,36 @@ impl Simulation {
         // The newcomer adds to the trash and parking need it is judged by,
         // only while the probe runs.
         let hour_now = ctx.hour;
-        ctx.shortfalls.set_candidate(Some(fresh_tenant_need(u)));
+        ctx.shortfalls.set_candidate(Some(need));
         let doomed = self.gate_horizon_dooms(&probe, ctx);
         ctx.shortfalls.set_candidate(None);
         ctx.hour = hour_now;
         doomed
     }
 
-    /// The newcomer the move-in gate judges for `u`: a fresh tenant who has
-    /// moved in, with a household where the room houses one, whose demand
-    /// the context's demand map counts.
-    fn fresh_probe(&mut self, u: &Unit, ctx: &mut SatisfactionContext) -> Unit {
-        let mut probe = u.clone();
+    /// The newcomer the move-in gate judges, made from `probe`, a copy of the
+    /// room: a fresh tenant who has moved in, with a household where the
+    /// room houses one, whose demand the context's demand map counts.
+    fn fresh_probe(&mut self, mut probe: Unit, ctx: &mut SatisfactionContext) -> Unit {
         probe.ever_occupied = true;
-        probe.residents = if u.kind == Kind::Condo || u.kind == Kind::RentalApartment {
-            Some(CLASSIC_HOUSEHOLD as i64)
-        } else {
-            u.residents
-        };
-        if u.kind.is_unmet_demand_kind() {
+        if probe.kind == Kind::Condo || probe.kind == Kind::RentalApartment {
+            probe.residents = Some(CLASSIC_HOUSEHOLD as i64);
+        }
+        if probe.kind.is_unmet_demand_kind() {
             if ctx.demand_map.is_none() {
                 ctx.demand_map = Some(compute_demand_map(self));
             }
             // Floor-level on purpose: the TypeScript probe reads
             // `sim.floorReachable(u.floor)` here, so the segment probe would
             // be the wrong one.
-            let reachable = self.floor_reachable(u.floor);
+            let reachable = self.floor_reachable(probe.floor);
             let dm = ctx.demand_map.as_mut().unwrap();
             let n = if reachable {
                 dm.fraction_by_unit.len() as i64
             } else {
                 0
             };
-            dm.reachable_venues_by_origin.insert(u.id, n);
+            dm.reachable_venues_by_origin.insert(probe.id, n);
             let od = origin_demand(self, probe.kind, probe.residents, dm.bonus);
             dm.share = if dm.total_cap > 0.0 {
                 (dm.pool + od) / dm.total_cap

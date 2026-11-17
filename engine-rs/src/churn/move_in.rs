@@ -19,28 +19,28 @@ impl Simulation {
         let parking = self.parking_move_in_reading();
         let parking_penalty = if parking.office_short { 0.5 } else { 1.0 };
         let home_parking_factor = parking.home_factor;
-        let served_set = self.tower.served_floors();
         let mut reach_memo: FastMap<i64, bool> = FastMap::default();
         let mut sat_ctx: Option<SatisfactionContext> = None;
         let evening = self.clock.is_evening();
         for i in self.tower.room_indices() {
+            // The room is copied only for the gate's probe; the pass reads
+            // the rest in place.
             let u = &self.tower.units[i];
             if u.state != UnitState::Empty || u.no_rate {
                 continue;
             }
-            let u = u.clone();
-            let f = u.kind.facility();
-            if f.population == 0 && !u.kind.is_hotel() {
+            let (kind, floor, x) = (u.kind, u.floor, u.x);
+            if kind.facility().population == 0 && !kind.is_hotel() {
                 continue;
             }
-            if !served_set.contains(&u.floor) {
+            if !self.tower.is_floor_served(floor) {
                 continue;
             }
-            let key = self.tower.seg_at(u.floor, Some(u.x as f64));
+            let key = self.tower.seg_at(floor, Some(x as f64));
             let reachable = match reach_memo.get(&key) {
                 Some(&h) => h,
                 None => {
-                    let h = self.position_reachable(u.floor, u.x);
+                    let h = self.position_reachable(floor, x);
                     reach_memo.insert(key, h);
                     h
                 }
@@ -48,21 +48,22 @@ impl Simulation {
             if !reachable {
                 continue;
             }
-            if u.kind == Kind::Condo
-                || u.kind == Kind::Office
-                || u.kind.is_lease_amenity()
-                || u.kind.is_rental()
+            if kind == Kind::Condo
+                || kind == Kind::Office
+                || kind.is_lease_amenity()
+                || kind.is_rental()
             {
                 if sat_ctx.is_none() {
                     sat_ctx = Some(self.build_satisfaction_context(true));
                 }
-                if self.would_evict_fresh_tenant(&u, sat_ctx.as_mut().unwrap()) {
+                let room = self.tower.units[i].clone();
+                if self.would_evict_probe(room, sat_ctx.as_mut().unwrap()) {
                     continue;
                 }
             }
-            let demand = self.demand_factor(&u);
+            let demand = self.demand_factor(&self.tower.units[i]);
             let mut filled = false;
-            match u.kind {
+            match kind {
                 Kind::Office => {
                     if !weekend && self.rng.chance(0.25 * demand * parking_penalty) {
                         filled = true;
@@ -77,14 +78,18 @@ impl Simulation {
                     if self.rng.chance(0.22 * demand) {
                         self.move_in(i);
                         if let Some(ctx) = sat_ctx.as_mut() {
-                            if u.kind == Kind::FitnessClub && served_set.contains(&u.floor) {
-                                note_halo_venue(&mut ctx.halo_floors, self.mode, &u);
+                            if kind == Kind::FitnessClub && self.tower.is_floor_served(floor) {
+                                note_halo_venue(
+                                    &mut ctx.halo_floors,
+                                    self.mode,
+                                    &self.tower.units[i],
+                                );
                             }
                         }
                     }
                 }
                 Kind::RentalStudio | Kind::RentalApartment => {
-                    let fill_rate = if u.kind == Kind::RentalStudio {
+                    let fill_rate = if kind == Kind::RentalStudio {
                         0.22
                     } else {
                         0.16
@@ -101,8 +106,7 @@ impl Simulation {
                         self.move_ins_today.rooms += 1;
                         if let Some(ctx) = sat_ctx.as_mut() {
                             if let Some(dm) = ctx.demand_map.as_mut() {
-                                let w = self.tower.units[i].clone();
-                                fold_origin_demand(dm, self, &w);
+                                fold_origin_demand(dm, self, &self.tower.units[i]);
                             }
                         }
                     }
@@ -113,8 +117,7 @@ impl Simulation {
                 self.move_in(i);
                 if let Some(ctx) = sat_ctx.as_mut() {
                     if let Some(dm) = ctx.demand_map.as_mut() {
-                        let w = self.tower.units[i].clone();
-                        fold_origin_demand(dm, self, &w);
+                        fold_origin_demand(dm, self, &self.tower.units[i]);
                     }
                 }
             }
