@@ -58,6 +58,7 @@ under this posture, is in
 | `returning` | boolean | client | Coarse on-device returning signal |
 | `tenure`, `recency` | coarse buckets | client | How established the tower is, how long since the last save |
 | `display` | `standalone`, `browser` | client | Installed app or browser tab |
+| `scheme` | `standard`, `skyline`, `high_contrast` | client | The appearance scheme the page wears (Options > Appearance…), read at boot and updated when the player changes it. Help site events carry it too: the manual wears the scheme the game's link named (`?scheme=`, left out for Standard) or the one it kept on its host |
 
 The last five arrive with the boot enrichment (`src/analyticsEnrichment.ts`);
 an event sent before boot carries `version` only.
@@ -370,7 +371,7 @@ never the name).
 | `via` (open) | `click`, `keys`, `alt` | A click on a title, the keyboard on a focused title, or Alt with the underlined letter |
 | `via` (pick) | `pointer`, `keys` | A mouse, pen or finger, or the keyboard |
 | `screen` | `title`, `tower` | Over the title screen, or over a tower |
-| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `exterminator`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `manual`, `compare`, `replay`, `sponsor`, `about`, `window_tools`, `window_info`, `window_map`, `window_bulletin`, `window_tower_info`, `recent_1` to `recent_5`, `recent_none`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
+| `item` | `new_tower`, `quick_save`, `close`, `import`, `export`, `install_app`, `undo`, `redo`, `tower_info`, `map`, `statistics`, `rename`, `fire_rescue`, `exterminator`, `rules`, `tools`, `bulletin`, `status_bar`, `full_screen`, `settings`, `sound`, `screen_saver`, `appearance`, `manual`, `compare`, `replay`, `sponsor`, `about`, `window_tools`, `window_info`, `window_map`, `window_bulletin`, `window_tower_info`, `recent_1` to `recent_5`, `recent_none`, `other` | The item, by a code that does not change with its label (`MENU_ITEM_CODES`) |
 | `browsed` | a count | Menus the trip showed, the last one included |
 | `after` | an `item` code or `none` | The page life's previous real pick, so a breakdown shows what follows what without a paths query. A grayed click never becomes the next pick's `after` |
 | `grayed` | `true`, `false` | The item was grayed out, so nothing happened |
@@ -433,6 +434,7 @@ The windows and cards that came with the menu bar report through `app_action`:
 | `screensaver_start` | `idle`, `return` or `preview` | The screen saver came up: the paused tower sat untouched for the wait, the player came back to the tab after the wait, or the dialog's Preview |
 | `screensaver_end` | `under_1m`, `1_5m` or `over_5m` | The screen saver ended, with how long it was up as a bucket |
 | `screensaver_set` | `night`, `stars`, `express`, `endless`, `marquee` or `none` | The Screen Saver dialog's OK, with the saver picked |
+| `appearance_set` | `standard`, `skyline` or `high_contrast` | The Appearance dialog's OK changed the scheme, with the new one. An OK that keeps the scheme sends nothing; the common `scheme` property carries the scheme on every event. The "Appearance: scheme changes" dashboard tile splits it by `detail`, and "Appearance: page loads by scheme" splits `boot` by `scheme` |
 | `desk_shown` | none | The 1994 desk came up over a tower on a computer (once per page life) |
 | `desk_title_shown` | none | The title screen came up in its window on the desk (once per page life) |
 | `desk_window` | `<window>_<verb>`: windows `tower`, `info`, `tools`, `map`, `bulletin`, `tower_info`, `control_panel`; verbs `min`, `restore`, `max`, `unmax`, `resize`, `move`, `close` | A desk window changed: minimized, brought back, maximized or put back (from its title-bar buttons, a double-click on its title, its taskbar button or its window menu), resized from its grip, or moved for the first time in a page life. `close` is the tower's ✕ (it runs File > Close) or the Control Panel's ✕ only; the Map, Bulletin and Tower Info ✕ keep their own events (`docs/ui/desk-windows.md`) |
@@ -442,7 +444,7 @@ The windows and cards that came with the menu bar report through `app_action`:
 | `desk_tray` | `display` or `sound` | A tray button: the monitor (opens the Control Panel) or the speaker (sound on or off, which also sends `mute`) |
 | `desk_win_menu_open` | `taskbar` or `title_bar` | A window menu opened, from a taskbar button (right-click, Shift+F10 or the context menu key) or a window's title bar (right-click) |
 | `desk_win_menu` | `<window>_<command>`, commands `restore`, `minimize`, `maximize`, `close` | A window menu pick. Restore, Minimize and Maximize also send their `desk_window` row |
-| `desk_control` | `display`, `sounds` or `settings` | A Control Panel icon (the Screen Saver dialog, sound on or off, or Settings) |
+| `desk_control` | `display`, `appearance`, `sounds` or `settings` | A Control Panel icon (the Screen Saver dialog, the Appearance dialog, sound on or off, or Settings) |
 
 ## `engine_status`
 
