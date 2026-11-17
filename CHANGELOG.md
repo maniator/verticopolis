@@ -25,6 +25,27 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.11.0
+
+- Every tower is now a file of its own in My Towers, named after the tower. The game saves your tower into its file every 30 seconds and File > Save saves it right away, so the Auto-save row is gone from the Open window and Continue opens the last tower you played. A tower from your linked folder is saved back into its own file there every minute.
+- Right-click (or long-press) a tower in My Towers and choose Previous versions… to go back: the game keeps a version every 10 minutes (the last five) and the last one you saved yourself. Opening one makes it a new tower file and leaves the tower as it was.
+- Keep a copy of my towers here too (the linked folder's copy, once "Keep the Auto-save here too") now copies each tower under its own name.
+- Security guards now fight fires: when a fire breaks out, each Security office sends its six guards down the outside emergency stairs to it, and you can watch them climb and work the burning room. They only help once they get there, and only from an office within 8 floors.
+- Fire Rescue is now a helicopter you can see: it flies in, puts the fire out for good when it lands, sprays a while and flies off. The rooms already burning are still gutted. In Classic it costs $500,000, as in the 1994 game; Modern keeps its star-based price.
+- Studios and apartments now go dark between 11 PM and 6 AM while their residents sleep, like condos, instead of staying brighter than the condo next door.
+- Busy lunch and dinner hours at top speed no longer repaint every room on almost every frame, so big towers with restaurants and fast food stay smoother.
+- Zoomed far out, where the crowd is hidden, the game no longer reads every person each frame.
+- Modern towers with hundreds of stairs and escalators do less work on each drawn frame.
+- Classic: the Tower Statistics "Parking demand" line now counts what Classic asks for, one space for all the offices plus one per hotel suite, so the number agrees with its green or red color. Modern still counts a space for every 24 workers.
+- The Double Room is now the Twin Room, its name in the 1994 game. Nothing else about it changes, and saved towers keep every room.
+- Classic: thieves now come only to a tower with Security, like fires and bomb threats, as in the 1994 game. A Classic tower without Security is no longer robbed.
+- The elevator schedule's busiest-floor markers, its "Most riders board on" note and Auto-tune now count everyone who gets on, so a cinema or party hall floor can show up as a busy floor, a service elevator no longer counts the same waiting staff twice, and Auto-tune aims its up-tower cars at the busiest floor above the lobby even when the lobby is busier.
+- A tenant complaining of crowded elevators now names the elevator on their floor with room for more cars and how many it runs, so you can add cars before building another shaft. When every elevator there already runs all its cars, the tenant says a parallel shaft is the next step (#2251).
+- Dragging an elevator's arrow past a floor it can't serve, such as an unbuilt lobby or another shaft, now grows the shaft as far as it can go and says why it stopped when you let go.
+- A bulldoze drag that leaves tiles behind, such as Classic's rule that a floor comes out only from either end, now says why once when you let go.
+- In Modern, each tower's doorman and lobby receptionist now come to work only once someone rents space in that tower, so a new empty tower no longer shows a doorman at its door.
+- When someone waits so long for their first car that they give up on the trip, that trip now counts against their floor as a very long wait. Before, a person who gave up waiting for their first car counted no wait at all, so a floor whose people kept giving up never counted as jammed. Now it does, in both Classic and Modern.
+
 ## 4.10.1
 
 - People now get on only an elevator going their way. Someone on 45 bound for 47 no longer boards a car heading down and rides it to the bottom and back up.
