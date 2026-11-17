@@ -178,17 +178,31 @@ fn frame_field_writes(rel: &str, code: &str) -> Vec<(String, usize)> {
 }
 
 /// Whether the field at `dot` belongs to `name`, a local the function copied
-/// from a unit (`let mut probe = u.clone();`): its writes reach no room.
+/// from a unit (`let mut probe = u.clone();`) or an owned copy it was handed
+/// (`mut probe: Unit`, in the same function): its writes reach no room. The
+/// nearest binding of `name` before the write decides, so a later `let`
+/// rebinds it whatever the parameter held.
 fn local_copy(code: &str, dot: usize, name: &str) -> bool {
+    let before = &code[..dot];
     let binding = format!("let mut {name}=");
-    receiver(code, dot) == name
-        && code[..dot].rfind(&binding).is_some_and(|at| {
+    let handed = format!("mut {name}:Unit,");
+    let bound = before.rfind(&binding);
+    // Any later `let`, with `mut` or without, rebinds the parameter.
+    let rebound = bound.max(before.rfind(&format!("let {name}=")));
+    let param = before
+        .rfind(&handed)
+        .filter(|&at| !code[at..dot].contains("fn "));
+    let copied = bound.is_some_and(|at| {
+        rebound == Some(at) && param.is_none_or(|p| at > p) && {
             let value = &code[at + binding.len()..dot];
             value.find(';').is_some_and(|end| {
                 let copy = &value[..end];
                 copy.ends_with(".clone()") && !copy.contains(['{', '}'])
             })
-        })
+        }
+    });
+    let owned = param.is_some_and(|p| rebound.is_none_or(|at| at < p));
+    receiver(code, dot) == name && (copied || owned)
 }
 
 /// Whether `value` is a person's state: a `PState` variant (on any path,
@@ -310,6 +324,27 @@ fn only_the_setters_write_the_frame_fields() {
     let copy = "let mut probe = u.clone(); probe.residents = None;";
     assert!(!room("satisfaction.rs", copy), "the local copy");
     assert!(room("satisfaction.rs", "probe.residents = None;"));
+    let handed = "fn f(mut probe: Unit, n: i64) { probe.residents = None; }";
+    assert!(!room("satisfaction.rs", handed), "the owned copy");
+    let later = "fn f(mut probe: Unit, n: i64) {} fn g(&mut self) { let probe = &mut self.units[0]; probe.residents = None; }";
+    assert!(room("satisfaction.rs", later), "a room in another function");
+    let shadow = "fn f(mut probe: Unit, n: i64) { let mut probe = &mut self.units[0]; probe.residents = None; }";
+    assert!(
+        room("satisfaction.rs", shadow),
+        "a room rebound over the owned copy"
+    );
+    let plain =
+        "fn f(mut probe: Unit, n: i64) { let probe = &mut self.units[0]; probe.residents = None; }";
+    assert!(
+        room("satisfaction.rs", plain),
+        "a room rebound over the owned copy without mut"
+    );
+    let again =
+        "let mut probe = u.clone(); let probe = &mut self.units[0]; probe.residents = None;";
+    assert!(
+        room("satisfaction.rs", again),
+        "a room rebound over the local copy"
+    );
     assert!(room(
         "satisfaction.rs",
         "let mut probe = &mut self.units[i]; probe.residents = None;"

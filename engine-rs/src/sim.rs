@@ -17,7 +17,7 @@
 use indexmap::IndexSet;
 use serde_json::Value;
 
-use std::collections::HashMap;
+use crate::crowd::fasthash::FastMap;
 
 use crate::clock::{resolve_calendar, CalendarKind, Clock, GameMode};
 use crate::crowd::Crowd;
@@ -293,7 +293,7 @@ pub struct Simulation {
     pub metro_platform_nudged: bool,
     #[doc(hidden)]
     /// `floorReachable` memo keyed by tower revision.
-    pub reach_memo: (i64, HashMap<i64, bool>),
+    pub reach_memo: (i64, FastMap<i64, bool>),
     #[doc(hidden)]
     /// `noiseMemo`: unit id to `noiseAfflicted`, keyed by tower revision.
     pub noise_memo: (i64, crate::crowd::fasthash::FastMap<i64, bool>),
@@ -382,7 +382,7 @@ impl Simulation {
             stranded_nudged: false,
             metro_platform_nudged: false,
             extermination_room_ids: None,
-            reach_memo: (-1, HashMap::new()),
+            reach_memo: (-1, Default::default()),
             noise_memo: (-1, Default::default()),
             diag_memo: Default::default(),
             view: None,
@@ -410,7 +410,7 @@ impl Simulation {
             return true;
         }
         if self.reach_memo.0 != self.tower.revision {
-            self.reach_memo = (self.tower.revision, HashMap::new());
+            self.reach_memo = (self.tower.revision, Default::default());
         }
         if let Some(&hit) = self.reach_memo.1.get(&floor) {
             return hit;

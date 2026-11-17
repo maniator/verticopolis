@@ -10,7 +10,7 @@ use crate::rule_tests::{at_time, fixture_save};
 /// The gate as it ran before the placement was read once: the whole
 /// `satisfaction_step` for every hour of the horizon.
 fn stepwise_dooms(sim: &mut Simulation, u: &Unit, ctx: &mut SatisfactionContext) -> bool {
-    let probe = sim.fresh_probe(u, ctx);
+    let probe = sim.fresh_probe(u.clone(), ctx);
     let hour_now = ctx.hour;
     ctx.shortfalls.set_candidate(Some(fresh_tenant_need(u)));
     let mut s = 1.0;
