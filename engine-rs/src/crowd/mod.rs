@@ -24,6 +24,7 @@ pub(crate) mod save;
 pub(crate) mod seg_set;
 pub mod spawn;
 pub mod spawn_floors;
+pub(crate) mod staff_routes;
 pub mod staff_shift;
 pub mod street;
 pub mod trip;
@@ -326,6 +327,8 @@ pub struct Crowd {
     pub waits_seen: line_count::waits_seen::WaitsSeen,
     /// The route search's seen set, kept between searches. Never saved.
     pub(crate) route_seen: seg_set::SegSet,
+    /// The staff routes found on the staff graph as it stands (`staff_routes`). Never saved.
+    pub(crate) staff_routes: staff_routes::StaffRoutes,
     /// The people by floor band, for a view's people window. Never saved.
     pub(crate) by_floor: floor_index::FloorIndex,
 }
@@ -376,6 +379,7 @@ impl Crowd {
             shaft_lines: fasthash::FastMap::default(),
             waits_seen: Default::default(),
             route_seen: Default::default(),
+            staff_routes: Default::default(),
             by_floor: Default::default(),
         }
     }
