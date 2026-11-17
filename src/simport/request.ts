@@ -37,7 +37,9 @@ export const MAX_BRUSH_TILES = 32;
 
 /** The longest text one command may store (a tower name, a label, a
  *  bulletin). The web's own are far shorter (a name box holds 28); the cap
- *  keeps a hostile request from growing every save and undo step. */
+ *  keeps a hostile request from growing every save and undo step. The Rust
+ *  port refuses the same length on `labelUnit`, `nameTower` and `logLine`
+ *  (`MAX_TEXT` in `engine-rs/src/wasm_port_edit.rs`, #1405). */
 export const MAX_TEXT = 4096;
 
 type Fields = Readonly<Record<string, unknown>>;

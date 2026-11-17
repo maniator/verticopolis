@@ -12,6 +12,19 @@ use super::facade_commands::UNKNOWN_FACILITY;
 use super::port::{kind_of, record};
 use super::Engine;
 
+/// The longest text one command may store (a unit label, a tower name, a
+/// bulletin line), in UTF-16 code units, the unit a JS string's `length`
+/// counts. The web's own are far shorter (a name box holds 28); the cap keeps
+/// a hostile request from growing every save and undo step. Pinned to
+/// `MAX_TEXT` in `src/simport/request.ts` (#1405).
+pub(crate) const MAX_TEXT: usize = 4096;
+
+/// Whether `text` fits [`MAX_TEXT`]. A UTF-8 byte count is never below the
+/// UTF-16 count, so short text skips the count.
+pub(crate) fn text_fits(text: &str) -> bool {
+    text.len() <= MAX_TEXT || text.encode_utf16().count() <= MAX_TEXT
+}
+
 /// `rentBatch`'s own slots, in `BatchRentResult` order.
 pub(crate) const BATCH_SLOTS: [&str; 8] = [
     "matched",
@@ -263,17 +276,29 @@ impl Engine {
         record(true, 0.0, &[])
     }
 
+    /// Label a unit; text over [`MAX_TEXT`] is refused.
     pub(crate) fn port_label_unit(&mut self, id: f64, text: &str) -> Vec<f64> {
         self.reason = None;
+        if !text_fits(text) {
+            return self.refuse(INVALID_REQUEST, &[]);
+        }
         let before = self.sim.money;
         let done = whole(id).is_some_and(|id| self.sim.tower.set_label(id, text));
         self.plain(before, done)
     }
 
-    /// Name the tower; no text clears the name.
+    /// Name the tower; no text clears the name, and text over
+    /// [`MAX_TEXT`] is refused.
     pub(crate) fn port_name_tower(&mut self, text: Option<String>) -> Vec<f64> {
         self.reason = None;
+        if text.as_deref().is_some_and(|t| !text_fits(t)) {
+            return self.refuse(INVALID_REQUEST, &[]);
+        }
         self.sim.tower.tower_name = text;
         record(true, 0.0, &[])
     }
 }
+
+#[cfg(test)]
+#[path = "wasm_port_text_tests.rs"]
+mod text_tests;

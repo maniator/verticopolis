@@ -15,6 +15,7 @@ use crate::tower::Transport;
 use crate::view::layout::{CALENDARS, MODES};
 
 use super::port::record;
+use super::port_edit::text_fits;
 use super::Engine;
 
 /// The log kinds by code, as `logAfter` and `logLine` carry them.
@@ -310,10 +311,11 @@ impl Engine {
         self.sim.log.get(i).map(|e| e.text.clone())
     }
 
-    /// Add a line to the tower's log.
+    /// Add a line to the tower's log; text over [`super::port_edit::MAX_TEXT`]
+    /// is refused.
     pub(crate) fn port_log_line(&mut self, text: &str, kind: f64) -> Vec<f64> {
         self.reason = None;
-        let Some(kind) = log_kind(kind) else {
+        let (true, Some(kind)) = (text_fits(text), log_kind(kind)) else {
             return self.refuse(INVALID_REQUEST, &[]);
         };
         self.sim.emit(text, kind);
