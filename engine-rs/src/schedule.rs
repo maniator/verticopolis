@@ -309,6 +309,28 @@ impl Schedule {
         }
     }
 
+    /// The cars an Auto shaft runs while riders back up at its stops: every
+    /// car once more people wait than the cars on shift could take in one
+    /// trip, else the row's `active`. The morning re-tune learns from the
+    /// riders the cars carry, and a shaft cut to one car carries no more than
+    /// one car holds, so its reading could never win the cars back while
+    /// crowds stood at its stops (split-tower 29, 4.12.0). A schedule the
+    /// player wrote, Auto off, keeps its row as written.
+    pub fn cars_for_backlog(
+        s: Option<&Schedule>,
+        active: usize,
+        cars: usize,
+        waiting: f64,
+        car_capacity: f64,
+    ) -> usize {
+        let auto = s.is_some_and(|s| s.auto_tune);
+        if auto && active < cars && waiting > active as f64 * car_capacity {
+            cars
+        } else {
+            active
+        }
+    }
+
     /// `homeFloorFor`.
     pub fn home_floor_for(s: Option<&Schedule>, car_index: usize, fallback: i64) -> i64 {
         let Some(hf) = s.and_then(|s| s.home_floors.as_ref()) else {
