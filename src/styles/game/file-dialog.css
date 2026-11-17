@@ -192,6 +192,13 @@
   user-select: none;
   -webkit-touch-callout: none;
 }
+/* Both of those reach the rename box inside a row, where a hold must still
+ * select and paste as in any text box. */
+.fd-row .fd-rename {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
 .fd-row.selected {
   background: var(--r-title);
   color: var(--r-title-fg);
