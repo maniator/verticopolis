@@ -1,6 +1,7 @@
 //! The thief: once a day a thief may prowl one stretch of floor, and
 //! Security catches him only when an office reaches that stretch by the
-//! emergency stairs (`super::stairs`).
+//! emergency stairs (`super::stairs`). In Classic he comes only to a tower
+//! with Security, like the fire and the ransom call (#2364).
 
 use indexmap::IndexSet;
 
@@ -17,6 +18,11 @@ impl Simulation {
             return;
         }
         if !self.events.extra.chance(THIEF_DAILY_CHANCE) {
+            return;
+        }
+        // After the draw, so the stream keeps its step and the Security scan
+        // runs only on the days a thief rolls.
+        if self.mode.thief_needs_security() && !self.has_any(Kind::Security) {
             return;
         }
         // The spot places the cosmetic (`triggerThief`); the draw also keeps

@@ -64,4 +64,12 @@ impl GameMode {
     pub fn fire_needs_security(self) -> bool {
         self == GameMode::Classic
     }
+
+    /// Whether a thief needs Security in the tower before he can prowl it:
+    /// the SimTower manual brings its emergencies only to a tower with
+    /// security personnel, and the thief joins the fire and the ransom call
+    /// (#2364). Modern thieves strike with or without it.
+    pub fn thief_needs_security(self) -> bool {
+        self == GameMode::Classic
+    }
 }
