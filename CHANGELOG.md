@@ -25,6 +25,17 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.12.0
+
+- Modern: elevators can re-tune their own schedules. Tick Auto in an elevator's Schedule window and it sets how many cars run each hour every morning at 5 AM from the traffic it measured, so a schedule never goes stale as the tower grows. Your staging floors, door time and waiting-car response stay as you set them. New Modern elevators start with Auto on; elevators in towers saved before this version start with it off. Classic is unchanged.
+- New Options > Appearance… picks how the game's windows, menus and buttons look. Standard stays the look everyone starts with. Skyline gives softer windows with rounded tops, violet title bars, a rose close button and a dusk-sky desktop. High Contrast puts white text and lines on black, with yellow title bars and a yellow highlight on the tool you've picked. On a computer the Control Panel has an Appearance icon too. The title screen's buttons on a phone follow the scheme, greyed-out items stay grey in High Contrast, and the manual wears the same scheme when the game opens it. Only the frame changes: the tower, its rules and its saves stay the same in Classic and Modern, and the choice is remembered on this device.
+- An elevator's Avg load, the schedule's advice and auto-tune now count everyone riding, so a shaft busy with shoppers, moviegoers, residents, hotel guests or staff no longer reads emptier than it is.
+- The game takes about 470 KB less space once installed, and a game day on the big towers runs up to 3% faster in the browser, because the engine is now built as one piece.
+- Big Classic towers run faster too: with staff reusing their routes, a day on a maxed Classic tower takes about a tenth less time.
+- Big Modern towers run faster: a game day on a maxed Modern tower takes about a tenth less work, because hotel, security and maintenance staff no longer work out the same route again every time they set off.
+- The manual's front page buttons now follow the Skyline and High Contrast appearance schemes, the manual on its own site keeps up when you change the scheme in the game, and the manual's Back to game button no longer looks bold.
+- A floor of shops and restaurants no longer stays "Backed up" forever from an old jam. Its shops stop losing rating, and the Traffic readout and the Map name a floor that is really crowded.
+
 ## 4.11.2
 
 - Closing Previous versions… without opening a version now goes back to the Open or Save As window you came from, with the same tower picked and the list as you left it, instead of back to the game.

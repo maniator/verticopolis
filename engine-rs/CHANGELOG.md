@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.49.0 (2026-11-17)
+
+- The hourly demand ring and utilization (`sample_elevator_util`) count each car's estimate seats plus the crowd's own riders there (`Crowd::car_riders`), each rider once (#2397). The dispatch keeps the estimate's seats beside `car_load` without changing how any car moves, in one per-shaft record with the callers each car has seen and the time it has waited (`dispatch_cars.rs`), so a step looks a shaft up twice where it looked it up three times, and a save's `dispatch` carries them as `estimateSeats`; a save without them loads. The conformance lock is unchanged.
+- `Schedule::auto_tune` (`autoTune` in the save, one more `scheduleShaft` slot, view layout 32): at 5 AM each game day (`schedule_auto::AUTO_TUNE_HOUR`) a Modern shaft on Auto takes `auto_tune_proposal`'s rows for the hours its ring has measured; other hours, the staging and the timings stay. A Modern elevator is built with it on. A save with a shaft on Auto is version 12 and carries `elevatorLoad`, the hourly load rings, so a reload re-tunes the same. Undo steps on the shaft survive a re-tune (`Schedule::same_but_auto_rows`). The pass moves no tower revision, so no cache rebuilds at 5 AM, and finds a shaft's twins with one floor-set comparison per elevator. The conformance lock moved for Modern scenarios only.
+- A floor's average commute wait now lasts between hours only while an office, home or hotel room on it is settled. A floor with only shops and venues keeps its average for the hour its customers made it, so an old average can no longer drain its shops with no trip left to replace it. The conformance lock, the frame-day golden and one fuzz-corpus golden move with it.
+
 ## 1.48.1 (2026-11-17)
 
 - The Modern router (`crowd::expected_time`) prices the walk from the tile a rider stands on to the first shaft, stair or escalator, at half the walking time (`crowd::expected_time::walk`); the kept routes are keyed by that tile too. The walks between legs and at the far end stay free. `auto_tune_proposal` proposes for each hour the fewest cars that carry its load below 0.9 of capacity each (it proposed the rounded load, which left those cars full and kept a one-car hour at one car), and tunes each hour from the larger of a shaft's own load and the mean load of its twins (same kind, stopping at every floor it does). The conformance lock moved for Modern scenarios only.
