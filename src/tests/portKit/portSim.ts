@@ -212,6 +212,12 @@ export class PortSim {
     return this.leaf.port.floorCongestion(floor);
   }
 
+  /** The ids of the transports behind one floor's reading, as the engine
+   *  reports them. */
+  congestionCause(floor: number): number[] {
+    return Array.from(this.leaf.port.congestionCause(floor));
+  }
+
   /** The busiest floor's raw ratio and which floor it is (undefined when no
    *  floor has a reading). */
   hotspot(): { ratio: number; floor: number | undefined } {

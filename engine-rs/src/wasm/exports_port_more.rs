@@ -211,6 +211,16 @@ impl Engine {
         self.sim.peak_congestion_hotspot().to_string()
     }
 
+    /// The ids of the transports behind one floor's congestion reading
+    /// (`Simulation::congestion_cause`), in the tower's transport order:
+    /// what the Traffic readout points at when the player taps it. Empty for
+    /// a floor with no reading and for one that is not a whole number. It
+    /// builds the reading, so it is a read for a tap, not a frame.
+    #[wasm_bindgen(js_name = congestionCause)]
+    pub fn congestion_cause(&self, floor: f64) -> Vec<f64> {
+        self.port_congestion_cause(floor)
+    }
+
     /// The five onboarding facts as JSON.
     #[wasm_bindgen(js_name = onboardingFacts)]
     pub fn onboarding_facts(&self) -> String {

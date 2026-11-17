@@ -605,6 +605,12 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Bridges")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sky_bridge"])] }),
     },
     {
+      name: "Traffic readout taps",
+      description:
+        "Taps, clicks, Enter or Space on the HUD's Traffic readout while it names a floor (app_action traffic_jump), production: the view zoomed in on that floor. detail is shafts when the transports behind the reading were outlined, none when the engine named none. Only builds from the release after 4.12.0 send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, traffic_jump.",
+      query: trends([series("app_action", "Taps")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["traffic_jump"])] }),
+    },
+    {
       name: "Drags stopped by a rule",
       description:
         "Releases of a drag that said why it stopped (app_action drag_stopped, #1847 and #2046), split by detail: extend (an elevator's arrow drag that stopped for any reason: a floor it can't serve, such as an unbuilt lobby or another shaft, too little money, the kind's longest span or the edge of the lot) or bulldoze (a bulldoze drag that left tiles), production. A refusal the press already said is not counted. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Drags that stop.",
