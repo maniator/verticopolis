@@ -176,7 +176,7 @@ impl FloorIndex {
     /// in, and the newcomers make up the rest: the check a debug build makes
     /// before a frame trusts the index, so a path that moves someone outside
     /// the step's walk fails a test.
-    #[cfg(debug_assertions)]
+    #[cfg(any(test, debug_assertions))]
     pub fn agrees(&self, people: &[Person]) -> bool {
         let banded = |(i, (p, &s)): (usize, (&Person, &u16))| {
             let b = i64::from(s) + LOWEST_BAND;
