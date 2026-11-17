@@ -1,8 +1,8 @@
-import { render } from "lit-html";
-import { html } from "lit-html";
+import { html, render } from "lit-html";
 import type { UI } from "./UI";
 import { cleanFileName, freeName, type TowerFileEntry } from "../storage/fileSpace";
 import type { FilePlace } from "./templates/fileDialogPlaces";
+import { rowPress } from "./fileDialogPress";
 import { lastPlace, pickFolderFiles, placeHandlers, rememberPlace, whereWords, type LinkedPlaceCtx } from "./fileDialogPlaces";
 import {
   fileDialogTemplate,
@@ -28,7 +28,8 @@ import {
  * Keys in the list: arrows, Home and End move; Enter opens or saves; F2
  * renames; Delete deletes; Ctrl+C and Ctrl+V copy and paste a tower (the
  * paste is a copy beside it); the context menu key or Shift+F10 opens the
- * right-click menu. Tower files dropped on the window are added to the folder.
+ * right-click menu, as does a finger held on a row. Tower files dropped on
+ * the window are added to the folder.
  */
 
 /** A line the window shows under its fields. */
@@ -374,10 +375,10 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
       e.preventDefault();
       const rect = document.getElementById(rowDomId(state.selected))?.getBoundingClientRect();
       openMenu(state.selected, rect ? rect.left + 24 : 0, rect ? rect.bottom : 0);
+      handlers.press.key();
     }
   }
 
-  /** The menu opens at the pointer, placed within the window's body. */
   /** The right-click menu at (x, y) on the screen, kept inside the window:
    *  a press near the right or bottom edge (a phone's long-press) opens it
    *  to the left of or above the finger instead of off the edge. */
@@ -413,6 +414,7 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     versions,
     answer,
     openMenu,
+    press: rowPress(openMenu),
     closeMenu: () => {
       if (state.menu || state.look) set({ menu: null, look: false });
     },

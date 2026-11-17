@@ -183,10 +183,14 @@
   outline: 1px dotted var(--r-title-fg);
   outline-offset: -2px;
 }
+/* A finger held on a row opens its menu (fileDialogPress.ts), so Safari's
+ * own text callout and selection stay off the rows. */
 .fd-row {
   padding: 1px 4px 1px 6px;
   cursor: default;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 .fd-row.selected {
   background: var(--r-title);
