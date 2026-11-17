@@ -20,8 +20,8 @@ impl Simulation {
         if !self.events.extra.chance(THIEF_DAILY_CHANCE) {
             return;
         }
-        // After the draw, so the stream keeps its step and the Security scan
-        // runs only on the days a thief rolls.
+        // After the daily draw, so every tower still spends it, and the
+        // Security scan runs only on the days a thief rolls.
         if self.mode.thief_needs_security() && !self.has_any(Kind::Security) {
             return;
         }
