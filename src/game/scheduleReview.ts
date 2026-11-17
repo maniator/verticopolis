@@ -94,7 +94,7 @@ export class ScheduleReview {
       ? `${unmentioned.length} elevators have more cars than their schedules put`
       : "An elevator has more cars than its schedule puts";
     this.deps.ui.toast(
-      `${who} on shift. Open Full Statistics to review ${many ? "them" : "it"}. Nothing changes unless you choose it.`,
+      `${who} on shift. Choose Tower > Statistics… to review ${many ? "them" : "it"}. Nothing changes unless you choose it.`,
       "info",
     );
   }

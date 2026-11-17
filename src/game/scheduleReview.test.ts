@@ -89,7 +89,7 @@ describe("ScheduleReview", () => {
     review.tick();
     review.tick();
     expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "An elevator has more cars than its schedule puts on shift. Open Full Statistics to review it. Nothing changes unless you choose it.",
+      "An elevator has more cars than its schedule puts on shift. Choose Tower > Statistics… to review it. Nothing changes unless you choose it.",
       "info",
     );
     expect([...decisions]).toEqual([["classic:42:7:elevatorStandard:10", "told"]]);

@@ -376,7 +376,7 @@ describe.skipIf(noEngine)("the review's notices, focus and copy (#1548)", () => 
     dialog.remove();
     g.review.tick();
     expect(g.toasts).toHaveLength(1);
-    expect(g.toasts[0]).toMatch(/Open Full Statistics/);
+    expect(g.toasts[0]).toMatch(/Choose Tower > Statistics…/);
   });
 
   it("holds Keep and the one-time mention for the session when the browser will not store them", () => {
@@ -450,7 +450,7 @@ describe.skipIf(noEngine)("the review's notices, focus and copy (#1548)", () => 
     const g = play(load("split-tower"));
     g.review.tick();
     expect(g.toasts[0]).toBe(
-      "An elevator has more cars than its schedule puts on shift. Open Full Statistics to review it. Nothing changes unless you choose it.",
+      "An elevator has more cars than its schedule puts on shift. Choose Tower > Statistics… to review it. Nothing changes unless you choose it.",
     );
     g.port.scheduleShaft(1735, scheduleSlots({ activeCars: { weekday: Array(24).fill(0), weekend: Array(24).fill(0) } }));
     g.review.open();
