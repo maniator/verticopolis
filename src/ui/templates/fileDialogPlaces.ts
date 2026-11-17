@@ -88,7 +88,7 @@ function mirrorItem(on: boolean, busy: boolean, toggle: () => void): TemplateRes
     @click=${(e: Event) => {
       e.stopPropagation();
       toggle();
-    }}><span class="fd-icon-pad fd-check" aria-hidden="true">${on ? "✓" : ""}</span><span>Keep the Auto-save here too</span></button>`;
+    }}><span class="fd-icon-pad fd-check" aria-hidden="true">${on ? "✓" : ""}</span><span>Keep a copy of my towers here too</span></button>`;
 }
 
 /** The list's note while the browser wants the player's OK for the linked

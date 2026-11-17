@@ -1,6 +1,7 @@
 import { swapDone } from "./portLifecycle";
 import { trackFileImported } from "../analytics";
 import { keepOpenedFile } from "./fileKeep";
+import { claimTower } from "./towerDocument";
 import type { SaveLoadDeps } from "./saveLoad";
 
 /**
@@ -53,15 +54,19 @@ export function adoptConfirmedLegacyImport(
   // Keep the 1994 file in My Towers (owner, 2026-11-15), so the player can
   // always get back to it: a bad import clobbers nothing, and the file opens
   // again from there. A file opened from My Towers is already there and is
-  // not added twice (`keepOpenedFile`). The Auto-save holds the imported
-  // tower from the swap on (`towerSwapped`).
+  // not added twice (`keepOpenedFile`). The Auto-save, the crash copy, holds
+  // the imported tower from the swap on (`towerSwapped`).
   // "info" keeps this bulletin log-only: renderLog also toasts "good" entries,
   // and the explicit success toast below already covers that.
   port.logLine(`Imported from SimTower (1994): welcome back to ${towerName}.`, deps.portCodes().code("logKinds", "info"));
-  void keepOpenedFile(file.filename, file.bytes, "tdt").then((kept) =>
-    deps.ui.toast(
-      kept ? `Tower imported. The 1994 file is in My Towers as "${kept.name}".` : "Tower imported. Use File > Save As… to keep it.",
-      "good",
+  // The tower's own file comes once the 1994 file is in (`towerDocument.ts`),
+  // so the 1994 file keeps its name.
+  void claimTower(() =>
+    keepOpenedFile(file.filename, file.bytes, "tdt").then((kept) =>
+      deps.ui.toast(
+        kept ? `Tower imported. The 1994 file is in My Towers as "${kept.name}".` : "Tower imported. Use File > Save As… to keep it.",
+        "good",
+      ),
     ),
   );
   if (flushFailed) {

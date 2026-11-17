@@ -110,6 +110,10 @@ export const SHARDS: Record<string, string[]> = {
   // gone tower's note, the title screen's menu and the phone's in-place
   // submenu, DOM stills over the default new tower; its own shard.
   "open-recent": ["open-recent", "open-recent-title", "open-recent-mobile"],
+  // Previous versions of a My Towers tower (#2380): the row menu, the window
+  // with versions and empty, and on a phone; DOM stills over the default new
+  // tower, its own shard as new features get.
+  "previous-versions": ["previous-versions", "previous-versions-mobile"],
   // The 1994 desk and the sunrise startup screen (owner, 2026-11-15: their own
   // shard, every design and option): one canon tower on the desk, the
   // README's day and night pair on a second one, the title window, and the

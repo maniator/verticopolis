@@ -84,8 +84,9 @@ test("opening a file keeps the tower being played, unsaved minutes and all, and 
   const left = await towerState(page);
 
   await openRow(page, "My Old Slot One");
-  // My Towers already holds a "Tower One" (4.2's second slot), so the kept tower is numbered.
-  await expect(page.locator(".toast", { hasText: 'Kept your last tower in My Towers as "Tower One (2)".' })).toBeVisible();
+  // The Auto-save's tower got its own file at boot, numbered since My Towers
+  // holds a "Tower One" already (4.2's second slot); leaving it writes there.
+  await expect(page.locator(".toast", { hasText: 'Saved "Tower One (2)" in My Towers.' })).toBeVisible();
 
   await openRow(page, "Tower One (2)");
   expect(await towerState(page), "the kept file is the tower that was left, to the minute").toEqual(left);
@@ -126,7 +127,7 @@ test("opening a file from the title screen keeps the Auto-save's tower, the one 
   await seed(page);
   await boot(page);
   await openRow(page, "My Old Slot One");
-  await expect(page.locator(".toast", { hasText: 'Kept your last tower in My Towers as "Tower One (2)".' })).toBeVisible();
+  await expect(page.locator(".toast", { hasText: 'Saved "Tower One (2)" in My Towers.' })).toBeVisible();
   await openRow(page, "Tower One (2)");
   expect(await towerState(page), "the kept file is the Auto-save's tower").toEqual(continued);
   await ctx2.close();

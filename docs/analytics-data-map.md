@@ -115,7 +115,7 @@ Four `app_action` codes report a save, load, import or export that failed (#1533
 
 | `action` | `detail` | When | Reading |
 | --- | --- | --- | --- |
-| `autosave_failed` | `timer` or `manual` | A background or system save (`timer`: the timer and tower-swap autosaves, the pre-update flush, the context-loss flush and the .TDT adoption flush) or a Quick Save or slot save (`manual`) threw, such as a full or blocked `localStorage` | Latched once per page life, so events can exceed sessions; read sessions with a failed save, not failures. The `detail` is the first source that failed |
+| `autosave_failed` | `timer`, `manual` or `file` | A background or system save (`timer`: the timer and tower-swap autosaves, the pre-update flush, the context-loss flush and the .TDT adoption flush) or a Quick Save or slot save (`manual`) threw, or (`file`, from 4.11) the autosave's write of the tower's own My Towers file failed after the crash copy was written, such as a full or blocked `localStorage` | Latched once per page life, so events can exceed sessions; read sessions with a failed save, not failures. The `detail` is the first source that failed |
 | `load_failed` | none | A slot load from the saves manager or the title-screen picker adopted nothing | An empty slot and an unreadable one read alike. Quick Load ("No saved tower found") is not counted |
 | `import_failed` | `save` (.vctower) or `tdt` (.TDT) | An imported file was refused or unreadable | Counted per attempt |
 | `export_failed` | `save` (.vctower) or `tdt` (.TDT) | An export wrote no file: the engine threw (a memory failure on a huge tower) or refused (a Modern tower cannot become a `.TDT`) | Counted per attempt. A download the browser blocks is not seen |
@@ -176,8 +176,10 @@ player's own text and is never sent, and neither is a tower's contents.
 | --- | --- | --- |
 | `files_open` | `open`, `open_key`, `open_title`, `recent` or `save_as` | The Open or Save As window opened, or a tower was asked for without it. Open says where the player asked: `open` for File > Open… in the menu, `open_key` for its Ctrl+O key, and `open_title` for the title screen's Open Tower… button (called Load Tower up to 4.2). `recent` is a tower picked from File > Open Recent (2026-11-16): no window shows, and the tower opens as its row would, so `file_open` or `folder_open` follows. `save_as` is File > Save As… |
 | `files_waited` | `open` or `save_as` | That window opened while My Towers was still getting ready (its first open on the device, or the old slots still copying in); it said "Opening My Towers…" and filled in once ready. Before 4.3 shipped, File > Open… showed the device's file picker at that moment |
-| `file_open` | `tower`, `tdt` or `auto` | A row opened: a tower file, a 1994 `.TDT` file, or the Auto-save |
-| `file_save` | `new`, `replace` or `current` | The tower written into My Towers: under a new name, over a file the player agreed to replace, or into the live tower's own file by File > Save |
+| `file_open` | `tower`, `tdt`, `live` or `auto` | A row opened: a tower file, a 1994 `.TDT` file, or (from 4.11, #2380) the live tower's own file, `live`, which loads nothing in a tower and opens it as Continue does behind the title screen. `auto` was the Auto-save's row, gone in 4.11 |
+| `file_save` | `new`, `replace`, `current` or `created` | The tower written into My Towers: under a new name, over a file the player agreed to replace, or by File > Save: into the live tower's own file (`current`), or into a new file under the tower's name when it had none yet (`created`, 4.11) |
+| `tower_file` | `founded`, `adopted` or `synced` | From 4.11 (#2380, a tower is a document): the live tower got its own My Towers file from its autosave (`founded`: a new tower, or one whose file was deleted in another window), the crash copy found at boot got a file of its own (`adopted`: the first boot after updating from 4.10 or earlier, or a crash copy whose file can't be proven), or the crash copy was newer than its file at boot and was written into it (`synced`) |
+| `file_versions` | `list`, `none` or `open` | From 4.11: right-click > Previous versions… on a My Towers tower opened its window on a tower with versions (`list`) or with none yet (`none`), or a version was opened as a new file (`open`) |
 | `file_add` | `picked`, `drop` or `folder` | A file added to My Towers: `picked` once a file opened from the device has loaded, `drop` for a file dropped onto the Open or Save As window, `folder` for each tower file From a folder… copied in (from 4.4) |
 | `file_dropped` | none | A file dropped on the game itself, to open as a picked file does |
 | `file_rename` | none | A file renamed |
@@ -186,7 +188,7 @@ player's own text and is never sent, and neither is a tower's contents.
 | `file_ask` | `replace` or `delete` | The window asked in its message box before replacing or deleting a file. A Yes (Replace) goes on to `file_save` `replace` or `file_delete`; from 4.4 the replace box also offers the next numbered name ("Sky (2)"), which goes on to `file_save` `new`. So the asks a player declined are the asks less all three |
 | `file_failed` | `full` or `error` | A write to My Towers refused: the device is out of room, or another error |
 | `files_copied` | a count | Once per device: the old save slots copied into My Towers, and how many |
-| `tower_kept` | `file`, `new`, `offered`, `download` or `failed` | From 4.9.0: another tower opened (File > Open…, New…, a picked or dropped file, or a 1994 import) and the tower left behind was kept: in its own My Towers file (`file`), as a new file under its name (`new`), or not at all (`failed`, said to the player). When My Towers couldn't take it, a message box offered it as a `.vctower` file (`offered`), and `download` follows when the player's click downloads it. Loading the Auto-save (Continue, or its row in the Open window) brings the same tower back, so it leaves nothing behind and sends nothing |
+| `tower_kept` | `file`, `folder`, `new`, `offered`, `download` or `failed` | From 4.9.0: another tower opened (File > Open…, New…, a picked or dropped file, or a 1994 import) and the tower left behind was kept: in its own My Towers file (`file`), in its own file in the linked folder (`folder`, from 4.11), as a new file under its name (`new`), or not at all (`failed`, said to the player). When My Towers couldn't take it, a message box offered it as a `.vctower` file (`offered`), and `download` follows when the player's click downloads it. Loading the Auto-save (Continue, or its row in the Open window) brings the same tower back, so it leaves nothing behind and sends nothing |
 | `recent_missing` | `towers` or `folder` | A tower picked from File > Open Recent was gone: deleted from My Towers, or moved, renamed or deleted in the linked folder (or that folder unlinked). The game said so and took it off the list; nothing else changed |
 
 File > Open Recent (2026-11-16) lists the last five towers opened or saved,
@@ -197,9 +199,9 @@ sends its `menu_pick` (`recent_1` to `recent_5`, by line), then `files_open`
 the list quietly as the File menu opens, so `recent_missing` counts only the
 gone files a player actually picked.
 
-`load_slot` still counts the Auto-save loading as the live tower (its row in
-the Open window; File > Load in 4.1 and 4.2), and `load_failed` a load that
-failed. Up to
+`load_slot` still counts the Auto-save loading as the live tower (Continue;
+its row in the Open window up to 4.10; File > Load in 4.1 and 4.2), and
+`load_failed` a load that failed. Up to
 4.2 the slots sent `save_slot`, `delete_save`, `rename_slot`, `saves_open`
 (the Saved Towers window) and `splash_load_open` (the title screen's picker);
 no build from 4.3 sends them, so a series that reads them stops there. A
@@ -222,8 +224,8 @@ name are the player's own text and are never sent.
 | `folder_open` | `tower` or `tdt` | A file in the folder opened: a tower file or a 1994 `.TDT` file. It is not also a `file_open` or an `import_save`/`import_tdt` |
 | `folder_save` | `new`, `replace` or `current` | The tower written into the folder: under a new name, over a tower file the player agreed to replace, or into the live tower's own file by File > Save |
 | `folder_copy` | none | A file in the folder duplicated |
-| `folder_failed` | none, or `empty` | A folder step failed: the browser refused access, the disk was full, a name was taken, or another error. `empty`: the player opened an empty file, such as one a failed new-name save left (#2337) |
-| `folder_mirror` | `on`, `off` or `failed` | The player turned the Auto-save copy in the folder on or off (Keep the Auto-save here too), or a copy failed to write. `failed` is latched once a page life, since the copy retries every minute; a copy that worked sends nothing |
+| `folder_failed` | none, `empty` or `autosave` | A folder step failed: the browser refused access, the disk was full, a name was taken, or another error. `empty`: the player opened an empty file, such as one a failed new-name save left (#2337). `autosave` (4.11): the once-a-minute autosave of a tower from the folder into its own file there failed; latched once a page life |
+| `folder_mirror` | `on`, `off` or `failed` | The player turned the tower copy in the folder on or off (Keep a copy of my towers here too; "Keep the Auto-save here too" before 4.11), or a copy failed to write. `failed` is latched once a page life, since the copy retries every minute; a copy that worked sends nothing |
 
 There is no `folder_delete` or `folder_rename`: the game never deletes or
 renames a file on the player's computer (owner, 2026-11-15).

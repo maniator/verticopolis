@@ -21,7 +21,7 @@ import {
 import { packVctower, payloadLine } from "./vctowerWriter";
 import { packHere, PackerLostError, packSave } from "./savePacker";
 import { stashedText, stashUnreadable } from "./unreadableStash";
-import { stampText } from "./saveStamp";
+import { stampText, type SaveStamp } from "./saveStamp";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { slotPopulation } from "./slotCensus";
 import { rememberedSlotInfo } from "./slotInfoMemo";
@@ -76,16 +76,10 @@ export function openSaves(factory?: IDBFactory): Promise<boolean> {
 // over a newer durable flush.
 let latestAsyncSave: object | null = null;
 
-/**
- * The Verticopolis tower-file container (.vctower): a magic first line naming
- * the format and its version, then the save payload — deflate-compressed
- * JSON, base64-encoded. The file is deliberately NOT raw JSON — exports
- * travel as downloads and come back through the file picker, never through a
- * copy-paste textarea — and the compression makes it a fraction of the JSON
- * it replaces (a ~1.2MB tower packs to ~40KB). Bumping the container format
- * later means a new magic line (VCTOWER2), with this one still accepted on
- * import.
- */
+/** The Verticopolis tower-file container (.vctower): a magic first line
+ *  naming the format and its version, then the deflate-compressed save, so a
+ *  ~1.2MB tower packs to ~40KB. A new container version is a new magic line,
+ *  with the old ones still accepted on import. */
 export const TOWER_FILE_EXT = ".vctower";
 
 /** A save as the engine writes it (`EnginePort.serialize()`): the JSON text
@@ -127,16 +121,13 @@ export function autosaveKey(): string {
     : LEGACY_AUTO_KEY;
 }
 
-/** The largest timestamp JS Date can represent (ECMA-262: 8,640,000,000,000,000
- *  ms either side of the epoch). A finite savedAt beyond this still renders
- *  "Invalid Date", so the read treats it as absent. */
+/** The largest timestamp JS Date can represent (ECMA-262), in ms either side
+ *  of the epoch: a savedAt beyond it reads as absent. */
 const MAX_DATE_MS = 8.64e15;
 
 /** A save's write time, trusted only when it is a finite number Date can
- *  represent (+/-8.64e15 ms). A forged savedAt (string, NaN, or out of range)
- *  reads as absent, never as a confidently wrong date. Shared by the Saves
- *  dialog metadata and the boot-time return-recency read so the trust posture
- *  is defined once. */
+ *  represent; a forged one (string, NaN, out of range) reads as absent. Shared
+ *  by the slot rows and the boot-time return-recency read. */
 function parseSavedAt(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= MAX_DATE_MS ? value : undefined;
 }
@@ -217,14 +208,24 @@ function foundedMode(mode: unknown): GameMode {
   return mode === "modern" ? "modern" : "classic";
 }
 
+/** Stamp and pack `text` into a store value, synchronously. DEFLATE level 1
+ *  on purpose: sparse v3 saves have already shed their redundancy, so it
+ *  compresses within 0.8% of level 6 at a third of the cost. */
+function packStamped(text: SaveText): { value: string; stamp: SaveStamp } {
+  const { json, stamp } = stampText(text);
+  return { value: STORE_MAGIC + payloadLine(packVctower(json, encodeSaveJson(json), stamp)), stamp };
+}
+
 export const SaveGame = {
   // ---- Auto-save slot (used on startup) --------------------------------
-  save(text: SaveText): void {
-    this.saveTo(AUTO_KEY, text);
+  /** Save `text` into the Auto-save now; answers the stamp it was written with. */
+  save(text: SaveText): SaveStamp {
+    return this.saveTo(AUTO_KEY, text);
   },
-  /** Autosave `save` (its text, or a maker of the engine's stamped bytes). */
-  async saveAsync(save: SaveText | (() => Uint8Array)): Promise<void> {
-    await this.saveToAsync(AUTO_KEY, save);
+  /** Autosave `save` (its text, or a maker of the engine's stamped bytes).
+   *  Answers the raw DEFLATE it wrote, or null when a newer save took over. */
+  saveAsync(save: SaveText | (() => Uint8Array)): Promise<Uint8Array | null> {
+    return this.saveToAsync(AUTO_KEY, save);
   },
   hasSave(): boolean {
     return saveStore.get(AUTO_KEY) !== null || saveStore.get(LEGACY_AUTO_KEY) !== null;
@@ -327,36 +328,31 @@ export const SaveGame = {
     return slots;
   },
 
-  /**
-   * Pack a sim into the `VCZ1:` store value SYNCHRONOUSLY, without writing it
-   * anywhere. The desktop sync save path needs the packed value to hand to
-   * `writeSync` (converted to `.vctower` by the pure re-header), and it cannot
-   * await: the crash flush running right before a reload is the documented
-   * reason this codec is synchronous at all. Identical stamping and packing to
-   * {@link SaveGame.saveTo}, which now delegates here.
-   */
+  /** Pack a sim into the `VCZ1:` store value SYNCHRONOUSLY, without writing
+   *  it anywhere (the desktop sync save path cannot await a crash flush).
+   *  {@link SaveGame.saveTo} packs the same way. */
   packSync(text: SaveText): string {
-    const { json, stamp } = stampText(text);
-    return STORE_MAGIC + payloadLine(packVctower(json, encodeSaveJson(json), stamp));
+    return packStamped(text).value;
   },
 
   // ---- Shared writer + export/import -----------------------------------
-  saveTo(key: string, text: SaveText): void {
+  saveTo(key: string, text: SaveText): SaveStamp {
     // Only an AUTOSAVE-slot write invalidates an in-flight async autosave (the
     // token exists so older compressed state can't commit over this newer
     // flush of the SAME slot). A manual slot save targets a different key, so
-    // it must not cancel the pending autosave commit; that would leave the
-    // autosave slot stale until the next timer tick.
+    // it must not cancel the pending autosave commit.
     if (key === AUTO_KEY) latestAsyncSave = null;
-    // DEFLATE via packSync (level 1 on purpose: sparse v3 saves have already
-    // shed their redundancy, so level 1 compresses within 0.8% of level 6 at a
-    // third of the cost, keeping the pre-reload flush short). Synchronous by
-    // design: this runs just before a reload in the crash-recovery path, where
-    // an async write could be lost.
-    writeSlot(key, this.packSync(text));
+    // Synchronous by design: this runs just before a reload in the
+    // crash-recovery path, where an async write could be lost.
+    const { value, stamp } = packStamped(text);
+    writeSlot(key, value);
+    return stamp;
   },
-  async saveToAsync(key: string, save: SaveText | (() => Uint8Array)): Promise<void> {
-    if (typeof save === "string" && !compressionEncodeSupported()) return this.saveTo(key, save);
+  async saveToAsync(key: string, save: SaveText | (() => Uint8Array)): Promise<Uint8Array | null> {
+    if (typeof save === "string" && !compressionEncodeSupported()) {
+      this.saveTo(key, save);
+      return null;
+    }
     // Encode (and refuse an oversized save) before claiming the token: a
     // refused save leaves no token behind, so an older save of the same slot
     // still in flight commits instead of the slot keeping neither. The engine's
@@ -370,9 +366,10 @@ export const SaveGame = {
       if (err instanceof PackerLostError) return packHere(make());
       throw err;
     });
-    if (latestAsyncSave !== token) return;
+    if (latestAsyncSave !== token) return null;
     latestAsyncSave = null;
     writeSlot(key, STORE_MAGIC + base64, packed);
+    return packed;
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */

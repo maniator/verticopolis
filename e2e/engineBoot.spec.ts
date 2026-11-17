@@ -117,12 +117,17 @@ test.describe("starts on the WASM engine", () => {
       // Read after the save: a tower file carries the camera, which the save
       // stamps into the tower first.
       const digest = (window as any).__vcEngine.port.stateDigest() as string;
-      return { built: built.every(Boolean), digest, id };
+      // Copies of the same save: leaving a tower writes it into its own file,
+      // so each run and the reload open a file no run has played yet.
+      const again = (await g.saveFile("Replay again")) as string;
+      const reload = (await g.saveFile("Replay reload")) as string;
+      await g.saveFile("Replay live");
+      return { built: built.every(Boolean), digest, id, again, reload };
     });
     expect(setup.built, "the setup tower built").toBe(true);
 
     // Two runs of the same two days from the same save land on the same state.
-    const run = () =>
+    const run = (file: string) =>
       page.evaluate(async (id) => {
         const g = (window as any).game;
         await g.openFile(id);
@@ -130,9 +135,9 @@ test.describe("starts on the WASM engine", () => {
         const start = engine().stateDigest() as string;
         for (let i = 0; i < 96; i++) g.enginePort.tick(30);
         return { start, end: engine().stateDigest() as string, minutes: g.sim.clock.minutes as number };
-      }, setup.id);
-    const first = await run();
-    const second = await run();
+      }, file);
+    const first = await run(setup.id);
+    const second = await run(setup.again);
     expect(first.start).toBe(setup.digest);
     expect(second).toEqual(first);
     expect(first.end).not.toBe(first.start);
@@ -146,7 +151,7 @@ test.describe("starts on the WASM engine", () => {
       g.setSpeed(0);
       await g.openFile(id);
       return (window as any).__vcEngine.port.stateDigest() as string;
-    }, setup.id);
+    }, setup.reload);
     expect(reloaded).toBe(setup.digest);
   });
 });

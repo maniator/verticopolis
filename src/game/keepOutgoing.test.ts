@@ -8,6 +8,12 @@ const m = vi.hoisted(() => ({
   packSave: vi.fn(),
   stored: null as string | null,
   autoName: "Harmony Tower 2.0" as string | undefined,
+  link: null as string | null,
+  access: "granted",
+  saveOver: vi.fn(async (_id: string, _bytes: Uint8Array) => undefined),
+}));
+vi.mock("../storage/linkedFolder", () => ({
+  linkedFolder: { linkId: () => m.link, state: () => ({ name: "Towers", access: m.access }), saveOver: m.saveOver },
 }));
 vi.mock("../analytics", () => ({ trackAppAction: m.track }));
 vi.mock("./autosaveSchedule", () => ({ autosaveLive: () => m.live }));
@@ -54,6 +60,9 @@ beforeEach(async () => {
   m.live = true;
   m.stored = STORED;
   m.autoName = "Harmony Tower 2.0";
+  m.link = null;
+  m.access = "granted";
+  m.saveOver.mockReset();
   localStorage.clear();
   setCurrentFile(null);
   resetOutgoingForTests();
@@ -110,13 +119,47 @@ describe("the tower left by opening another", () => {
     expect(recentTowers()[0], "the kept file tops Open Recent").toMatchObject({ place: "towers", id: kept!.id, name: "Harmony Tower 2.0 (2)" });
   });
 
-  it("from the linked folder is kept in My Towers, never written back to the player's own file", async () => {
+  it("from the linked folder is written back to its own file there while the folder has its OK", async () => {
+    m.link = "L1";
+    setCurrentLinkedFile("Harmony.vctower");
+    const { app, raw, swap } = makeApp();
+    captureOutgoing(app, "open");
+    swap();
+    expect(await keepOutgoing(app)).toBe("folder");
+    expect(m.saveOver).toHaveBeenCalledExactlyOnceWith("Harmony.vctower", VCTOWER2);
+    expect(fileSpace.list(), "no My Towers copy").toEqual([]);
+    expect(m.track).toHaveBeenCalledExactlyOnceWith("tower_kept", "folder");
+    expect(raw.ui.toast).toHaveBeenCalledWith('Saved "Harmony.vctower" in Towers.', "good");
+  });
+
+  it("from a linked folder that was unlinked, linked again or lost its OK is kept in My Towers instead", async () => {
+    m.link = "L1";
+    m.access = "prompt";
     setCurrentLinkedFile("Harmony.vctower");
     const { app, swap } = makeApp();
     captureOutgoing(app, "open");
     swap();
     expect(await keepOutgoing(app)).toBe("new");
     expect(fileSpace.list().map((f) => f.name)).toEqual(["Harmony Tower 2.0"]);
+    expect(m.saveOver).not.toHaveBeenCalled();
+    m.access = "granted";
+    captureOutgoing(app, "open");
+    m.link = "L2";
+    swap();
+    expect(await keepOutgoing(app)).toBe("new");
+    expect(m.saveOver, "never into a file of another folder").not.toHaveBeenCalled();
+  });
+
+  it("behind the title screen is written into the tower's own file, the one Continue opens", async () => {
+    m.live = false;
+    const own = await fileSpace.save("Harmony", "tower", Uint8Array.from([0]));
+    setCurrentFile(own.id);
+    const { app, swap } = makeApp("Throwaway");
+    captureOutgoing(app, "open");
+    swap();
+    expect(await keepOutgoing(app)).toBe("file");
+    expect(fileSpace.list()).toHaveLength(1);
+    expect(new TextDecoder().decode((await fileSpace.read(own.id))!)).toBe(`VCTOWER1\n${STORED.slice("VCZ1:".length)}\n`);
   });
 
   it("behind the title screen is the Auto-save's tower, kept re-headered without a decode", async () => {

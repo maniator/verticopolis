@@ -11,8 +11,13 @@
  * files (names, kinds, sizes, times) is one record read once into memory, so
  * the File menu and the dialogs list it without waiting; each file's bytes are
  * read only when it is opened. Writes go to the database in order, and a tab
- * hears another tab's changes over a BroadcastChannel.
+ * hears another tab's changes over a BroadcastChannel. Each tower file also
+ * keeps its earlier versions here (`fileVersions.ts`), out of the list.
  */
+
+import { cleanFileName, copyName, freeName, sameName } from "./fileNames";
+import { planVersions, readVersions, versionsKey, type TowerVersion } from "./fileVersions";
+export { cleanFileName, copyName, FILE_NAME_MAX, freeName } from "./fileNames";
 
 export type TowerFileKind = "tower" | "tdt";
 
@@ -25,9 +30,6 @@ export interface TowerFileEntry {
   /** When it was last written, in milliseconds since 1970. */
   readonly modified: number;
 }
-
-/** The longest name a file may have. */
-export const FILE_NAME_MAX = 60;
 
 const DB_NAME = "verticopolis-files";
 const DB_VERSION = 1;
@@ -45,6 +47,14 @@ export class FileSpaceFullError extends Error {
   }
 }
 
+/** A write to a file that is no longer there (deleted in another tab). */
+export class FileGoneError extends Error {
+  constructor() {
+    super("That tower is gone. It may have been deleted in another window.");
+    this.name = "FileGoneError";
+  }
+}
+
 /** A name another file already has. */
 export class FileNameTakenError extends Error {
   constructor(name: string) {
@@ -52,18 +62,6 @@ export class FileNameTakenError extends Error {
     this.name = "FileNameTakenError";
   }
 }
-
-/** A name as a file keeps it: control characters and the characters a disk
- *  refuses in a file name are dropped, runs of spaces become one, and it is
- *  cut at {@link FILE_NAME_MAX}. Empty when nothing is left. */
-export function cleanFileName(name: string): string {
-  // eslint-disable-next-line no-control-regex
-  const kept = name.replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, "");
-  return kept.replace(/\s+/g, " ").trim().slice(0, FILE_NAME_MAX).trim();
-}
-
-/** Two names that differ only in case name the same file, as on most disks. */
-const sameName = (a: string, b: string): boolean => a.toLocaleLowerCase() === b.toLocaleLowerCase();
 
 interface Open {
   readonly db: IDBDatabase;
@@ -183,31 +181,12 @@ function newId(): string {
   return c?.randomUUID ? c.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-/** `name`, or the first of "name (2)", "name (3)" and up that no file has. */
-export function freeName(name: string, entries: readonly TowerFileEntry[]): string {
-  const clean = cleanFileName(name);
-  for (let n = 1; ; n++) {
-    const suffix = n === 1 ? "" : ` (${n})`;
-    const candidate = cleanFileName(clean.slice(0, FILE_NAME_MAX - suffix.length) + suffix);
-    if (!entries.some((e) => sameName(e.name, candidate))) return candidate;
-  }
-}
-
 /** A file to write, for {@link fileSpace.addOnce}. */
 export interface NewTowerFile {
   readonly name: string;
   readonly kind: TowerFileKind;
   readonly bytes: Uint8Array;
   readonly modified: number;
-}
-
-/** The first free "Copy of …" name, the way a desktop names a pasted copy. */
-export function copyName(name: string, entries: readonly TowerFileEntry[]): string {
-  for (let n = 1; ; n++) {
-    const prefix = n === 1 ? "Copy of " : `Copy (${n}) of `;
-    const candidate = cleanFileName(prefix + name);
-    if (!entries.some((e) => sameName(e.name, candidate))) return candidate;
-  }
 }
 
 function need(): Open {
@@ -361,9 +340,93 @@ export const fileSpace = {
       id,
     );
   },
+  /**
+   * Write `bytes` over tower file `id`, keeping its name and place, and keep a
+   * version of them when one is due (`fileVersions.ts`; `manual` for a save
+   * by hand). With `onlyNewer`, a file already written after `modified` (a
+   * save by hand while an autosave packed) is left as it is. Rejects with
+   * {@link FileGoneError} when there is no such tower file (deleted in another
+   * tab), and with {@link FileSpaceFullError} when the device has no room;
+   * nothing changes then.
+   */
+  overwrite(id: string, bytes: Uint8Array, modified = Date.now(), manual = false, onlyNewer = false): Promise<TowerFileEntry> {
+    const o = need();
+    return queue(o, async () => {
+      const tx = o.db.transaction([META, BODIES], "readwrite");
+      const meta = tx.objectStore(META);
+      const bodies = tx.objectStore(BODIES);
+      const out: { entries: TowerFileEntry[] | null; entry: TowerFileEntry | null } = { entries: null, entry: null };
+      const indexReq = meta.get(INDEX);
+      const versionsReq = meta.get(versionsKey(id));
+      versionsReq.onsuccess = () => {
+        const list = readIndex(indexReq.result);
+        const old = list.find((e) => e.id === id);
+        if (!old || old.kind !== "tower") return;
+        if (onlyNewer && old.modified > modified) {
+          out.entries = list;
+          out.entry = old;
+          return;
+        }
+        const entry: TowerFileEntry = { ...old, size: bytes.byteLength, modified };
+        bodies.put(bytes, id);
+        const plan = planVersions(readVersions(versionsReq.result), id, modified, bytes.byteLength, manual);
+        if (plan.put) bodies.put(bytes, plan.put.key);
+        for (const key of plan.drop) bodies.delete(key);
+        meta.put(plan.versions, versionsKey(id));
+        out.entries = list.map((e) => (e.id === id ? entry : e));
+        out.entry = entry;
+        meta.put(out.entries, INDEX);
+      };
+      try {
+        await committed(tx);
+      } catch (err) {
+        throw asWriteError(err);
+      }
+      if (!out.entries || !out.entry) throw new FileGoneError();
+      o.entries = out.entries;
+      o.channel?.postMessage("changed");
+      changed();
+      return out.entry;
+    });
+  },
+  /** File `id`'s earlier versions, newest first. */
+  async versions(id: string): Promise<TowerVersion[]> {
+    const o = need();
+    const tx = o.db.transaction(META, "readonly");
+    return readVersions(await done(tx.objectStore(META).get(versionsKey(id)))).sort((a, b) => b.at - a.at);
+  },
+  /** A version's bytes, or null when it is gone. */
+  async readVersion(key: string): Promise<Uint8Array | null> {
+    const o = need();
+    const tx = o.db.transaction(BODIES, "readonly");
+    const bytes = await done(tx.objectStore(BODIES).get(key));
+    return bytes instanceof Uint8Array ? bytes : null;
+  },
+  /** Delete file `id` and its versions. */
   remove(id: string): Promise<void> {
     const o = need();
-    return update(o, (list) => ({ entries: list.filter((e) => e.id !== id), body: { id, bytes: null }, result: undefined }));
+    return queue(o, async () => {
+      const tx = o.db.transaction([META, BODIES], "readwrite");
+      const meta = tx.objectStore(META);
+      const out: { entries: TowerFileEntry[] | null } = { entries: null };
+      const indexReq = meta.get(INDEX);
+      const versionsReq = meta.get(versionsKey(id));
+      versionsReq.onsuccess = () => {
+        for (const v of readVersions(versionsReq.result)) tx.objectStore(BODIES).delete(v.key);
+        tx.objectStore(BODIES).delete(id);
+        meta.delete(versionsKey(id));
+        out.entries = readIndex(indexReq.result).filter((e) => e.id !== id);
+        meta.put(out.entries, INDEX);
+      };
+      try {
+        await committed(tx);
+      } catch (err) {
+        throw asWriteError(err);
+      }
+      if (out.entries) o.entries = out.entries;
+      o.channel?.postMessage("changed");
+      changed();
+    });
   },
   /**
    * Add `files` (each under a free name) and set the flag `key`, all in one

@@ -33,6 +33,9 @@ async function playSaveAndLoad(page: Page): Promise<void> {
     const host = (window as any).__vcEngine;
     const lobbyAt = (x: number) => (JSON.parse(host.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === x);
     const id = await g.saveFile("Offline test");
+    // Go on in a copy, so the file saved is not the tower being played (that
+    // file is the live tower itself, and opening it again loads nothing).
+    await g.saveFile("Offline scratch");
     // A change after the save, which the load must undo (it lands in the
     // engine first, so a load that did nothing would leave it there).
     const after = g.sim.build("lobby", 1, 200).ok;

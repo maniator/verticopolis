@@ -1,3 +1,4 @@
+import { crashCopyLoaded } from "./towerDocument";
 import { html } from "lit-html";
 import type { GameApp } from "../main";
 import { SaveGame } from "../storage/SaveGame";
@@ -138,6 +139,7 @@ export function loadFromSlot(app: GameApp, slot: "auto"): void {
     return loaded;
   };
   if (slot === "auto" && SaveGame.load(load)) {
+    crashCopyLoaded(app); // the tower the Auto-save's file names
     trackAppAction("load_slot"); // the autosave adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
@@ -178,6 +180,7 @@ export function loadFromSplash(app: GameApp, slot: "auto"): boolean {
     trackAppAction("load_failed");
     return false;
   }
+  crashCopyLoaded(app); // the tower the Auto-save's file names
   trackAppAction("load_slot"); // the autosave adopted as the live tower
   return true;
 }

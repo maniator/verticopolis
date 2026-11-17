@@ -10,7 +10,9 @@ import type { FileRow } from "../ui/templates/fileDialog";
 import { decodeTowerText, isBinaryTowerFile } from "../ui/uiImport";
 import { autosaveLive } from "./autosaveSchedule";
 import { forgetMirrorFile, mirrorAutosave, mirrorOn, setMirror } from "./autosaveMirror";
-import { currentLinkedFile, setCurrentLinkedFile } from "./currentFile";
+import { currentFileId, currentLinkedFile, setCurrentLinkedFile } from "./currentFile";
+import { openLive } from "./loadMenu";
+import { claimTower } from "./towerDocument";
 import { exportFile } from "./portLifecycle";
 
 /**
@@ -19,13 +21,16 @@ import { exportFile } from "./portLifecycle";
  * `docs/architecture/linked-folder.md`). Opening a file there hands its bytes
  * to the same importer My Towers and a picked file use, and saving writes the
  * bytes Save As would download, so the folder adds no format. My Towers and
- * the Auto-save are never read or written here.
+ * the Auto-save are never read or written here. A tower opened from the
+ * folder is its file there: Save writes it, and so does the autosave, once a
+ * minute while the browser's OK holds (`autosaveMirror.ts`, #2380).
  *
  * Analytics (`docs/analytics-data-map.md`, "Linked folder"): `app_action`
  * `folder_link` (`linked`, `cancel` or `refused`), `folder_allow` (`granted`
  * or `denied`), `folder_unlink`, `folder_open` (`tower` or `tdt`),
  * `folder_save` (`new`, `replace` or `current`), `folder_copy`,
- * `folder_failed` (`empty` for an empty file opened) and `folder_mirror` (`on`, `off`, or `failed` once a visit,
+ * `folder_failed` (`empty` for an empty file opened, `autosave` once a visit
+ * for an autosave that couldn't write it) and `folder_mirror` (`on`, `off`, or `failed` once a visit,
  * `autosaveMirror.ts`). Codes only, never a folder's or a file's name.
  */
 
@@ -46,6 +51,10 @@ function folderFailed(err: unknown): FileNote {
  *  Answers false when the file isn't there any more (said on screen); true
  *  otherwise, a refused or failed open included (also said). */
 export async function openLinkedRow(app: GameApp, row: Pick<FileRow, "id" | "name" | "type">): Promise<boolean> {
+  if (row.id === currentLinkedFile()) {
+    openLive(app, row.name);
+    return true;
+  }
   let bytes: Uint8Array | null;
   try {
     bytes = await linkedFolder.read(row.id);
@@ -70,12 +79,15 @@ export async function openLinkedRow(app: GameApp, row: Pick<FileRow, "id" | "nam
     void app.saveLoad.importLegacy(bytes.slice().buffer, row.id);
     return true;
   }
-  const before = app.enginePort.generation();
-  await app.saveLoad.importGame(isBinaryTowerFile(bytes) ? bytes : decodeTowerText(bytes));
-  if (app.enginePort.generation() !== before) {
-    setCurrentLinkedFile(row.id);
-    noteFolderFile({ id: row.id, kind: "tower" }, linkedFolder.linkId());
-  }
+  const tower = bytes;
+  await claimTower(async () => {
+    const before = app.enginePort.generation();
+    await app.saveLoad.importGame(isBinaryTowerFile(tower) ? tower : decodeTowerText(tower));
+    if (app.enginePort.generation() !== before) {
+      setCurrentLinkedFile(row.id);
+      noteFolderFile({ id: row.id, kind: "tower" }, linkedFolder.linkId());
+    }
+  });
   return true;
 }
 
@@ -149,18 +161,18 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
       const name = linkedFolder.state()?.name ?? "the linked folder";
       setMirror(on);
       trackAppAction("folder_mirror", on ? "on" : "off");
-      if (!on) return { text: `The Auto-save is no longer copied to "${name}". The copy there stays.`, kind: "info" };
+      if (!on) return { text: `Your towers are no longer copied to "${name}". The copies there stay.`, kind: "info" };
       // The copy never asks the browser, so a folder still waiting for its
       // OK gets the copy only once a window has the OK.
       if (linkedFolder.state()?.access !== "granted") {
-        return { text: `The Auto-save will be copied to "${name}" once your browser allows the folder.`, kind: "info" };
+        return { text: `Your towers will be copied to "${name}" once your browser allows the folder.`, kind: "info" };
       }
       // Write it now, so the player sees the file arrive. A tower that can't
       // be saved yet starts later.
-      if (autosaveLive() && !(await mirrorAutosave(app, Date.now(), true))) {
-        return { text: `Couldn't copy the Auto-save to "${name}". The game tries again every minute.`, kind: "bad" };
+      if (autosaveLive() && currentFileId() !== null && !(await mirrorAutosave(app, Date.now(), true))) {
+        return { text: `Couldn't copy your tower to "${name}". The game tries again every minute.`, kind: "bad" };
       }
-      return { text: `The Auto-save is copied to "${name}" every minute while you play.`, kind: "info" };
+      return { text: `The tower you play is copied to "${name}" every minute, under its own name.`, kind: "info" };
     },
     open: (row) => void openLinkedRow(app, row),
     save: async (name, replace) => {

@@ -43,6 +43,10 @@ export interface SaveLoadDeps {
    *  being left (`keepOutgoing.ts`); `refused` forgets it when none swapped. */
   beforeSwap?(kind: SwapKind): void;
   swapRefused?(): void;
+  /** The Auto-save (the crash copy) now holds tower `generation`, written
+   *  with stamp `savedAt`; `packed` is the raw DEFLATE an autosave wrote, null
+   *  for a synchronous save (`towerDocument.ts`). Never throws. */
+  crashCopy?(generation: number, savedAt: number, packed: Uint8Array | null): void;
   /** The live camera as save cargo (GameApp reads TowerEngine.viewState).
    *  Stamped onto the sim right before every save/export of the CURRENT
    *  tower so the view travels with it; an imported sim keeps the view its
@@ -82,21 +86,15 @@ export interface SaveLoadDeps {
 
 /**
  * sessionStorage key stamped right before the WebGL context-loss recovery
- * reload. The fresh boot reads (and clears) it to learn this reload was an
- * app-initiated recovery, so it drops the player straight back into their tower
- * (paused) instead of showing the title screen. Same idea as the update-resume
- * flag in main.ts. Kept SEPARATE from `vc-gl-lost-reload`, which must persist
- * across the boot to detect a rapid double crash; this one is consumed at boot
- * so a later manual reload still shows the splash.
+ * reload: the fresh boot reads and clears it, and drops the player straight
+ * back into their tower (paused). Kept apart from `vc-gl-lost-reload`, which
+ * persists across the boot to detect a rapid double crash.
  */
 export const RESUME_AFTER_RECOVERY_KEY = "vc-resume-after-recovery";
 
-/**
- * sessionStorage key holding the time of the last context loss (or recovery
- * completion, or recovery reload). Two losses inside 90s of each other read
- * as a "repeat": the device is genuinely struggling, and the crash screen's
- * advice matters more than a silent recovery would.
- */
+/** sessionStorage key holding the time of the last context loss (or
+ *  recovery). Two losses inside 90s read as a "repeat": the crash screen's
+ *  advice matters more than a silent recovery then. */
 const GL_LOSS_STAMP_KEY = "vc-gl-lost-reload";
 
 export class SaveLoad {
@@ -105,9 +103,7 @@ export class SaveLoad {
   /** What the player hears about failed saves; public so the slot saves use it too. */
   readonly notice = new SaveFailureNotice(() => this.deps);
   /** In-memory shadow of {@link GL_LOSS_STAMP_KEY}, so the repeat guard still
-   *  trips when sessionStorage is unavailable (otherwise a flapping GPU would
-   *  loop flush, toast, and rebuild forever without ever reaching the crash
-   *  screen's advice). */
+   *  trips when sessionStorage is unavailable. */
   private lastLossAt = 0;
 
   constructor(private readonly deps: SaveLoadDeps) {}
@@ -127,11 +123,21 @@ export class SaveLoad {
     return saveText(this.deps.enginePort(), this.deps.getView());
   }
 
+  /** Tell `crashCopy` the Auto-save holds the live tower now; it never fails a save. */
+  private wroteCrashCopy(generation: () => number, savedAt: number, packed: Uint8Array | null): void {
+    try {
+      this.deps.crashCopy?.(generation(), savedAt, packed);
+    } catch {
+      /* the file follows on the next autosave */
+    }
+  }
+
   save(silent = false): void {
     try {
       // Stamp inside the try: a disposed or context-lost engine can throw from
       // viewState() too, and the no-escaped-throw contract must cover it.
-      SaveGame.save(this.saveText());
+      const { savedAt } = SaveGame.save(this.saveText());
+      this.wroteCrashCopy(() => this.deps.enginePort().generation(), savedAt, null);
     } catch (err) {
       // Silent callers rely on the THROW: saveBeforeUpdate's caller must not
       // reload on a failed write, recoverFromContextLoss words the failure on
@@ -181,7 +187,14 @@ export class SaveLoad {
         this.autosaveQueued = false;
         // Re-stamp per iteration: the camera may have moved while the previous
         // async compression was in flight. The engine hands over stamped bytes.
-        await SaveGame.saveAsync(() => saveBytes(this.deps.enginePort(), this.deps.getView(), currentStamp()));
+        let made = { generation: 0, savedAt: 0 };
+        const packed = await SaveGame.saveAsync(() => {
+          const port = this.deps.enginePort();
+          const stamp = currentStamp();
+          made = { generation: port.generation(), savedAt: stamp.savedAt };
+          return saveBytes(port, this.deps.getView(), stamp);
+        });
+        if (packed) this.wroteCrashCopy(() => made.generation, made.savedAt, packed);
       } while (this.autosaveQueued);
       this.notice.worked();
     } catch (err) {
@@ -192,21 +205,14 @@ export class SaveLoad {
 
   /**
    * Flush the tower to the autosave slot just before the app reloads onto a new
-   * build (the "Update now" path). The player already chose to update via the
-   * modal, so there's no toast here — the reload is imminent. Throws if the save
-   * fails (e.g. localStorage quota); the caller must NOT reload on a throw, or a
-   * failed save would cost the player their progress — the one thing this exists
-   * to prevent.
+   * build (the "Update now" path), with no toast. Throws if the save fails; the
+   * caller must NOT reload on a throw, or the player would lose their progress.
    */
   saveBeforeUpdate(): void {
-    // Same guard as the autosave timer and recoverFromContextLoss. The splash
-    // shows on EVERY boot: for a first-timer the sim behind it is a throwaway
-    // boot sim (persisting it would flip hasSave() true for a tower the player
-    // never started); for a returning player it's their real tower, but the
-    // splash pauses time and blocks all input, so in-memory state still equals
-    // the autosave byte-for-byte — skipping the save loses nothing. That
-    // invariant is load-bearing: never let anything mutate the sim while the
-    // splash is up.
+    // Same guard as the autosave timer. Behind the splash the sim is either a
+    // first-timer's throwaway boot sim (never persisted) or the returning
+    // player's tower, frozen, so it still equals the autosave byte for byte.
+    // Load-bearing: never let anything mutate the sim while the splash is up.
     if (isSplashUp()) return;
     this.save(true);
   }
@@ -248,16 +254,10 @@ export class SaveLoad {
       try {
         this.save(true);
       } catch (err) {
-        // The pre-crash flush failed. Left unhandled this throw would escape
-        // the onContextLost handler and skip the crash screen, stranding the
-        // player on a dead GPU canvas with no explanation. A failed setItem is
-        // atomic (it never clobbers), so any prior autosave is intact, but we
-        // must not promise "your tower was saved" either; the screen words the
-        // failure. Only promise the prior tower is safe when one actually
-        // exists: a first-session crash before any autosave has none to
-        // reassure about. hasSave() READS localStorage, which itself throws
-        // when storage is *disabled* (a SecurityError) rather than merely full,
-        // so guard it in its own try/catch.
+        // The pre-crash flush failed: the screen words it instead of promising
+        // "your tower was saved". A failed setItem is atomic, so any prior
+        // autosave is intact; say so only when one exists. hasSave() itself
+        // throws when storage is disabled, so it has its own try/catch.
         flushed = false;
         try {
           hadPriorSave = SaveGame.hasSave();

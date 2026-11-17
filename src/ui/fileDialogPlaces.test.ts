@@ -164,7 +164,7 @@ describe("the Look in box", () => {
     folder = { name: "Towers", access: "granted" };
     show("open", { startIn: "linked" });
     q(".fd-look").click();
-    expect(lookItems().slice(-3)).toEqual(["Link a different folder…", "Keep the Auto-save here too", 'Unlink "Towers"its files stay']);
+    expect(lookItems().slice(-3)).toEqual(["Link a different folder…", "Keep a copy of my towers here too", 'Unlink "Towers"its files stay']);
     const item = () => q(".fd-mirror");
     expect(item().getAttribute("role")).toBe("menuitemcheckbox");
     expect(item().getAttribute("aria-checked")).toBe("false");

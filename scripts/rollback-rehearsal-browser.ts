@@ -181,14 +181,15 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
       await picker.or(openWindow).first().waitFor({ timeout: 10_000 });
     }
     if (await openWindow.count()) {
-      // From 4.3, Open Tower… (Load Tower before) opens File > Open…: the Auto-save's row, and the
+      // From 4.3, Open Tower… (Load Tower before) opens File > Open…: the Auto-save's row ("Auto-save
+      // (name)"; from 4.11 the Auto-save's tower is a file of its own under its name), and the
       // slots copied into My Towers as files named for their towers. A row
       // shows a name, type, size and time, so the check is the tower's name.
       await page.locator("#modal .fd-row").first().waitFor({ timeout: 10_000 });
       const texts = await page.locator("#modal .fd-row").allInnerTexts();
       for (const s of seeds) {
         const expected = expectedRow(heldNow.get(s.key) ?? s.save);
-        const shown = texts.find((t) => (s.key === AUTO_KEY ? t.includes("Auto-save") : true) && t.includes(expected.name));
+        const shown = texts.find((t) => t.includes(expected.name));
         rows.push({ label: s.label, expected, shown: shown?.replace(/\s+/g, " "), ok: shown !== undefined });
         if (shown === undefined) problems.push(`${s.label}: the Open window lists no row for ${expected.name}`);
       }

@@ -93,20 +93,22 @@ test("lists the towers saved last, newest first, opens one by mouse or by its nu
   await page.keyboard.press("ArrowRight");
   await expect(page.locator("#mb-recent-menu")).toBeVisible();
   before = await generation(page);
-  await page.keyboard.press("2");
+  // Alpha is the tower being played again (the reload brought it back), so
+  // line 1, Beta, is the other tower.
+  await page.keyboard.press("1");
   await waitForNewTower(page, before);
-  // The file called Alpha still contains a tower named "Tower One": Save As
-  // changes the file name, not the tower name. The exact list pins that the
-  // numbered pick opened the file and the departing tower was kept on top.
-  await expect.poll(() => recentLines(page)).toEqual(["1Tower One", "2Alpha", "3Beta"]);
+  // The exact list pins that the numbered pick opened Beta and the departing
+  // tower was written into its own file, Alpha, on top.
+  await expect.poll(() => recentLines(page)).toEqual(["1Alpha", "2Beta"]);
 });
 
 test("a tower deleted from My Towers drops off the list, and the other towers stay", async () => {
   const page = await ctx.newPage();
   await boot(page);
   await page.evaluate(async () => {
-    await (window as any).game.saveFile("Keep");
+    // Gone first, so the tower being played is Keep: its file can't be deleted.
     await (window as any).game.saveFile("Gone");
+    await (window as any).game.saveFile("Keep");
   });
   await page.keyboard.press("Escape");
   await page.locator("#menubar .mb-title", { hasText: "File" }).click();
@@ -130,6 +132,9 @@ test("a linked folder's tower is listed by its file name, and one gone from the 
   await page.locator(".fd-primary").click();
   await expect(page.locator(".fd")).toBeHidden();
   expect(await recentLines(page)).toEqual(["1Lake.vctower"]);
+  // Go on in a My Towers copy, so Lake is a file to open again, not the tower being played.
+  await page.evaluate(() => (window as any).game.saveFile("Other"));
+  expect(await recentLines(page)).toEqual(["1Other", "2Lake.vctower"]);
 
   // Moved away on the player's computer since the list was made.
   await page.keyboard.press("Escape");
@@ -139,8 +144,8 @@ test("a linked folder's tower is listed by its file name, and one gone from the 
   }, FOLDER);
   const before = await generation(page);
   await recentLines(page);
-  await page.locator("#mb-recent-1").click();
+  await page.locator("#mb-recent-2").click();
   await expect(page.getByText(/"Lake\.vctower" isn't in the folder any more/)).toBeVisible();
   expect(await generation(page), "no tower was swapped in").toBe(before);
-  expect(await recentLines(page)).toEqual(["No recent towers"]);
+  expect(await recentLines(page)).toEqual(["1Other"]);
 });

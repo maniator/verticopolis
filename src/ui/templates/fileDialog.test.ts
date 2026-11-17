@@ -28,6 +28,7 @@ const view = (over: Partial<FileDialogView> = {}): FileDialogView => ({
   linked: null,
   canLink: false,
   canPickFolder: false,
+  canVersions: false,
   where: "computer",
   lookOpen: false,
   ...over,
@@ -65,6 +66,15 @@ describe("the Open and Save As windows' text", () => {
     expect(disabled(view())).toEqual(["Rename", "Duplicate", "Delete"]);
     expect(disabled(view({ selected: "auto" }))).toEqual(["Rename", "Duplicate", "Delete"]);
     expect(disabled(view({ selected: "a" }))).toEqual([]);
+  });
+
+  it("offers Previous versions… on a My Towers tower's right-click menu only", () => {
+    const items = (id: string, over: Partial<FileDialogView> = {}) =>
+      [...draw(view({ canVersions: true, menu: { id, x: 0, y: 0 }, ...over })).querySelectorAll(".fd-menu [role=menuitem]")].map((b) => b.textContent!.trim());
+    expect(items("a")).toContain("Previous versions…");
+    expect(items("b"), "a 1994 file has none").not.toContain("Previous versions…");
+    expect(items("a", { canVersions: false })).not.toContain("Previous versions…");
+    expect(items("a", { place: "linked" }), "the linked folder's files have none").not.toContain("Previous versions…");
   });
 
   it("marks the sorted column and offers Save in Save As", () => {

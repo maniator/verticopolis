@@ -57,6 +57,8 @@ export interface FileDialogView {
   readonly renaming: string | null;
   readonly menu: { readonly id: string; readonly x: number; readonly y: number } | null;
   readonly canPaste: boolean;
+  /** My Towers keeps earlier versions of its towers (Previous versions…). */
+  readonly canVersions: boolean;
   readonly busy: boolean;
   readonly dropping: boolean;
   /** An autosave this version couldn't read is kept, and can be downloaded. */
@@ -86,6 +88,7 @@ export interface FileDialogHandlers {
   paste(): void;
   duplicate(): void;
   remove(): void;
+  versions(): void;
   answer(choice: FileAnswer): void;
   openMenu(id: string, x: number, y: number): void;
   closeMenu(): void;
@@ -311,7 +314,8 @@ function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
 
 function contextMenu(v: FileDialogView, h: FileDialogHandlers): TemplateResult {
   const menu = v.menu!;
-  const isFile = v.rows.find((r) => r.id === menu.id)?.type !== "auto";
+  const type = v.rows.find((r) => r.id === menu.id)?.type;
+  const isFile = type !== "auto";
   // The linked folder's files are never renamed or deleted, and Copy and
   // Paste work in My Towers only.
   const local = v.place === "local";
@@ -328,5 +332,6 @@ function contextMenu(v: FileDialogView, h: FileDialogHandlers): TemplateResult {
     ${local ? item("Paste", h.paste, v.canPaste) : nothing}
     ${isFile ? item("Duplicate", h.duplicate) : nothing}
     ${isFile && local ? item("Delete", h.remove) : nothing}
+    ${type === "tower" && local && v.canVersions ? item("Previous versions…", h.versions) : nothing}
   </div>`;
 }
