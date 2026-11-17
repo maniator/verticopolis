@@ -7,7 +7,7 @@ const SECONDS_PER_GAME_MINUTE: f64 = 60.0;
 pub const WAITING_CAR_RESPONSE_MAX: f64 = 30.0;
 pub const STANDARD_FLOOR_DEPARTURE_MAX: f64 = 60.0;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Schedule {
     pub weekday: Option<Vec<i64>>,
     pub weekend: Option<Vec<i64>>,

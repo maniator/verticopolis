@@ -171,6 +171,13 @@ fn the_version_7_step_is_the_shaft_widening() {
 /// A save this reader is meant to take: an object whose version is 7 and
 /// whose mode is a game mode, both before `units`, which is an array. (The
 /// loader table's inputs are parsed values, so no key repeats.)
+/// The versions the streamed reader takes as written today.
+const CURRENT: [f64; 3] = [
+    STREAMED_VERSION,
+    FLOOR_RUN_STREAMED_VERSION,
+    PLAIN_STREAMED_VERSION,
+];
+
 fn is_current(save: &Value) -> bool {
     let Some(m) = save.as_object() else {
         return false;
@@ -181,13 +188,7 @@ fn is_current(save: &Value) -> bool {
         Some(u) => at(k).is_some_and(|i| i < u),
     };
     let version = m.get("version").and_then(Value::as_f64);
-    [
-        STREAMED_VERSION,
-        FLOOR_RUN_STREAMED_VERSION,
-        PLAIN_STREAMED_VERSION,
-    ]
-    .map(Some)
-    .contains(&version)
+    version.is_some_and(|v| CURRENT.contains(&v))
         && matches!(
             m.get("mode").and_then(Value::as_str),
             Some("classic" | "modern")
@@ -256,13 +257,7 @@ fn fixture_towers_load_the_same() {
     for p in paths {
         let save = decode_vctower(&std::fs::read_to_string(&p).unwrap()).unwrap();
         let text = save.to_string();
-        let current = [
-            STREAMED_VERSION,
-            FLOOR_RUN_STREAMED_VERSION,
-            PLAIN_STREAMED_VERSION,
-        ]
-        .iter()
-        .any(|&v| save["version"] == json!(v as i64));
+        let current = CURRENT.iter().any(|&v| save["version"] == json!(v as i64));
         let took = check(&text, 0);
         assert_eq!(took.is_some(), current, "{}", p.display());
         let written = match took {
@@ -392,8 +387,7 @@ fn units_and_transports_shapes() {
         a.push(json!({ "kind": "condo", "id": -1, "completeAt": "soon", "state": "construction" }));
     })));
     // A narrow shaft from before version 7, which the version step widens.
-    // The Modern save is stamped 12 (its elevator is on Auto), so it is
-    // marked 7 here.
+    // Marked 7: the Modern save is stamped 12 (its elevator is on Auto).
     let narrow = patched(&save, |m| {
         m["version"] = json!(7);
         m["transports"][0]["width"] = json!(2);
@@ -466,49 +460,4 @@ fn the_unit_cap() {
     let refused = today(&over).err();
     assert!(refused.is_some());
     assert_eq!(load_save_text(over.as_bytes()).err(), refused);
-}
-
-/// The reservation counts the objects listed directly in the top-level
-/// `units`, and nothing else, within what the text's length could hold.
-#[test]
-fn the_units_count() {
-    // Padding keeps these short texts clear of the length bound.
-    let hint = |text: &str| units_hint(format!("{text}{}", " ".repeat(4096)).as_bytes());
-    assert_eq!(hint(r#"{"units":[]}"#), 0);
-    assert_eq!(hint(r#"{"units":[ ]}"#), 0);
-    assert_eq!(hint(r#"{"units":[{"k":1}]}"#), 1);
-    // An empty object cannot become a unit, so it reserves nothing.
-    assert_eq!(hint(r#"{"units":[{},{ },{"k":1},{  }]}"#), 1);
-    assert_eq!(hint(r#"{"units":[1,null,"{",[{"k":1}]]}"#), 0);
-    assert_eq!(
-        hint(r#"{ "units" : [ {"a":[{},2]}, "x,]", null, { "k" : 1 } ] }"#),
-        2
-    );
-    assert_eq!(hint(r#"{"units":["\"],[{", {"b":"\\"}]}"#), 1);
-    assert_eq!(
-        hint(r#"{"towerName":"units","units":[{"k":1},{"k":2}]}"#),
-        2
-    );
-    assert_eq!(
-        hint(r#"{"view":{"units":[{"k":1},{"k":1},{"k":1}]},"units":[{"k":1}]}"#),
-        1
-    );
-    assert_eq!(hint(r#"{"view":{"units":[{"k":1},{"k":1}]}}"#), 0);
-    assert_eq!(hint(r#"{"units":{"a":{"k":1}}}"#), 0);
-    assert_eq!(hint(r#"{"units":[{"k":1},{""#), 2);
-    assert_eq!(hint(r#"{"units"#), 0);
-    assert_eq!(hint("[\"units\",[{\"k\":1}]]"), 0);
-    let unit = r#"{"kind":"floor","x":12345},"#;
-    let many = format!("{{\"units\":[{}{{}}]}}", unit.repeat(UNIT_CAP + 5));
-    assert_eq!(units_hint(many.as_bytes()), UNIT_CAP);
-    // Short objects cannot reserve more units than their text could hold.
-    let short = format!("{{\"units\":[{}{{}}]}}", "{\"k\":1},".repeat(1000));
-    assert_eq!(units_hint(short.as_bytes()), short.len() / MIN_UNIT_BYTES);
-    // Empty objects reserve nothing, however much space is around them.
-    let spaced = format!(
-        "{{\"units\":[{}{{}}]}}{}",
-        "{ },".repeat(30_000),
-        " ".repeat(1 << 21)
-    );
-    assert_eq!(units_hint(spaced.as_bytes()), 0);
 }

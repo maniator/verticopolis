@@ -81,21 +81,22 @@ fn the_morning_pass_writes_the_rows_and_keeps_the_players_settings() {
     let (mut sim, id) = tower(GameMode::Modern, 8);
     hand_set_auto(&mut sim, id);
     seed(&mut sim, id, Some(0.5), Some(0.25));
-    let proposal = sim.auto_tune_proposal(id, Some(&schedule(&sim, id)), false);
-    let rows = proposal.proposal.unwrap();
     at_hour(&mut sim, AUTO_TUNE_HOUR);
     sim.retune_auto_schedules();
     let s = schedule(&sim, id);
-    // The measured hours (8 to 13) take the button's counts; the hours
+    // The measured hours (8 to 13) cut to the fewest cars their load leaves
+    // short of full: half of 8 cars' load is 4 cars' worth, which 4 cars
+    // would run full, so 5; a quarter is 2 cars' worth, so 3. The hours
     // nobody has measured keep the 8 cars they run.
-    let measured = |row: &Option<Vec<i64>>, tuned: &Option<Vec<i64>>| {
-        let (row, tuned) = (row.as_ref().unwrap(), tuned.as_ref().unwrap());
-        (0..24).all(|h| row[h] == if (8..14).contains(&h) { tuned[h] } else { 8 })
+    let row = |cut: i64| -> Option<Vec<i64>> {
+        Some(
+            (0..24)
+                .map(|h| if (8..14).contains(&h) { cut } else { 8 })
+                .collect(),
+        )
     };
-    assert!(measured(&s.weekday, &rows.weekday), "{:?}", s.weekday);
-    assert!(measured(&s.weekend, &rows.weekend), "{:?}", s.weekend);
-    assert_eq!(s.weekday.as_ref().unwrap()[9], 4, "half load on 8 cars");
-    assert_eq!(s.weekend.as_ref().unwrap()[9], 2, "a quarter on 8 cars");
+    assert_eq!(s.weekday, row(5), "half load on 8 cars");
+    assert_eq!(s.weekend, row(3), "a quarter on 8 cars");
     assert_eq!(s.home_floors, Some(vec![1, 6]), "staging is the player's");
     assert_eq!(s.waiting_car_response, Some(5.0));
     assert_eq!(s.standard_floor_departure, Some(30.0));
@@ -114,7 +115,7 @@ fn the_pass_runs_at_five_only_and_from_the_hourly_pass() {
     }
     at_hour(&mut sim, AUTO_TUNE_HOUR);
     sim.on_hour();
-    assert_eq!(schedule(&sim, id).weekday.unwrap()[9], 4, "the 05:00 pass");
+    assert_eq!(schedule(&sim, id).weekday.unwrap()[9], 5, "the 05:00 pass");
 }
 
 #[test]
@@ -125,7 +126,7 @@ fn a_cold_day_keeps_its_row() {
     at_hour(&mut sim, AUTO_TUNE_HOUR);
     sim.retune_auto_schedules();
     let s = schedule(&sim, id);
-    assert_eq!(s.weekday.unwrap()[9], 4);
+    assert_eq!(s.weekday.unwrap()[9], 5);
     assert_eq!(s.weekend, Some(vec![8; 24]), "nothing measured, row kept");
 }
 
@@ -228,7 +229,7 @@ fn undo_survives_a_morning_re_tune() {
     seed(&mut sim, id, Some(0.5), Some(0.5));
     at_hour(&mut sim, AUTO_TUNE_HOUR);
     sim.retune_auto_schedules();
-    assert_eq!(schedule(&sim, id).weekday.unwrap()[9], 4);
+    assert_eq!(schedule(&sim, id).weekday.unwrap()[9], 5);
     sim.apply_undo_step(&step).expect("the step still applies");
     assert_eq!(schedule(&sim, id), Schedule::auto_only());
 }
@@ -248,7 +249,7 @@ fn a_save_before_the_pass_plays_it_the_same() {
         sim.tick(1.0);
         loaded.tick(1.0);
     }
-    assert_eq!(schedule(&sim, id).weekday.unwrap()[9], 4, "the pass ran");
+    assert_eq!(schedule(&sim, id).weekday.unwrap()[9], 5, "the pass ran");
     assert_eq!(loaded.save_text(), sim.save_text());
 }
 
@@ -286,4 +287,39 @@ fn a_steady_tower_settles() {
         }
     }
     assert!(rows[20].weekday.is_some(), "the pass tuned the weekday row");
+}
+
+/// Run every morning, a cut hour must not swing back and forth: an hour cut
+/// so its cars run full measures at least 0.9 of each and gains a car the
+/// next morning, then measures what it carries. For every load from none to
+/// the whole fleet, 30 mornings of the telemetry's 0.3 blend, with each day
+/// measuring no more than the cars running carry, settle on one count whose
+/// cars have room.
+#[test]
+fn a_cut_hour_never_swings_back_and_forth() {
+    for tenths in 0..=80 {
+        let riders = tenths as f64 / 10.0;
+        let (mut sim, id) = tower(GameMode::Modern, 8);
+        hand_set_auto(&mut sim, id);
+        let mut ring = riders / 8.0;
+        let mut counts = Vec::new();
+        for _ in 0..30 {
+            let running = schedule(&sim, id).weekday.unwrap()[9] as f64;
+            ring = 0.3 * riders.min(running) / 8.0 + 0.7 * ring;
+            seed(&mut sim, id, Some(ring), None);
+            at_hour(&mut sim, AUTO_TUNE_HOUR);
+            sim.retune_auto_schedules();
+            counts.push(schedule(&sim, id).weekday.unwrap()[9]);
+        }
+        let settled = counts[29];
+        assert!(
+            counts[10..].iter().all(|&n| n == settled),
+            "{riders} cars' worth: {counts:?}"
+        );
+        assert!(
+            // The blend lands a hair either side of an exact 0.9.
+            settled == 8 || riders / (settled as f64) < 0.9 + 1e-9,
+            "{riders}: {settled} cars run full"
+        );
+    }
 }

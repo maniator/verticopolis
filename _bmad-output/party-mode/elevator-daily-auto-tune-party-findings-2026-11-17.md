@@ -188,3 +188,20 @@ reads as idle and cuts to one car, morning rush included.
 13. **Unmeasured hours keep their count:** the pass writes the proposal only
     for hours the shaft's own ring has measured; any other hour keeps the
     count it runs now.
+
+## Second amendment (2026-11-17)
+
+The metro thread's first cut of PR #2415 read an hour whose running cars ran
+full as one more car's share. Run every morning, that reading and the plain
+proposal took turns, and a numeric probe of the 0.3 telemetry blend showed
+an hour swinging by one car every day or two for most loads. The
+pre-registered stability test (item 9) passed only because its tower never
+ran a car full. #2415's second round replaced the reading with `cars_for`:
+every proposal is the fewest cars that carry the hour's load below 0.9 of
+each, so a tuned row has room and tuning it again proposes the same row.
+
+14. **No day-to-day swing:** the morning pass needs no rule of its own. A
+    regression drives 30 mornings of the blend for every load from none to
+    the whole fleet, each day measuring no more than the running cars carry,
+    and checks each settles on one count whose cars have room
+    (`a_cut_hour_never_swings_back_and_forth`).

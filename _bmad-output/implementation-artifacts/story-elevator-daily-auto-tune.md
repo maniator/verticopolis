@@ -176,5 +176,10 @@ tower changes.
 
 - Ultimate context engine analysis completed: comprehensive developer guide
   created.
+- Built on #2415 at d7337fc. Its first saturated-hour reading made a daily
+  rerun swing an hour by one car; its second round (`cars_for`) proposes rows
+  with room, so the pass settles. A regression over every load pins it
+  (findings, second amendment, item 14).
+- AC9's pre-registered test passes with no deadband.
 
 ### File List

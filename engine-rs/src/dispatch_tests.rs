@@ -95,10 +95,8 @@ fn scenario() -> Tower {
         weekday: Some((0..24).map(|h| if h < 8 { 1 } else { 8 }).collect()),
         weekend: Some(vec![2; 24]),
         waiting_car_response: Some(3.0),
-        standard_floor_departure: None,
         home_floors: Some(vec![15, 18, 21]),
-        held_back: None,
-        auto_tune: false,
+        ..Schedule::default()
     });
     for t in &mut tower.transports {
         t.cars = 8;

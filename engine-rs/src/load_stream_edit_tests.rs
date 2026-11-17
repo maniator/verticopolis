@@ -45,9 +45,11 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// Modern venue staff started commuting (#2238): the base saves gained
 /// their desks and marks, and the edits shift again. 153 became 140 when
 /// a Modern elevator started on Auto (2026-11-17): the Modern base save
-/// gained a schedule and version 12, so the edits shift once more. No reader
-/// disagreement came with it.
-const STREAMED: usize = 140;
+/// gained a schedule and version 12, so the edits shift once more. 140
+/// became 154 when an Auto shaft started saving its load rings
+/// (`elevatorLoad`) on top of main's newer saves. No reader disagreement
+/// came with it.
+const STREAMED: usize = 154;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

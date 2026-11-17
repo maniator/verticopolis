@@ -395,9 +395,9 @@
       {"label":"t+7200","state":"08c2a291bee89b7a","crowd":"6463f1a7fed04fe3","events":"4f53cda18c2baa0c"},
       {"label":"commuting","state":"08c2a291bee89b7a","crowd":"6463f1a7fed04fe3","events":"4f53cda18c2baa0c"},
       {"label":"t+8640","state":"68b4dbb2cc3ca362","crowd":"7d2c443a8b4a08c1","events":"47bb8d23b6ecbd8e"},
-      {"label":"t+10080","state":"f337cb206dd41ebb","crowd":"745d32f20d512858","events":"4f53cda18c2baa0c"},
-      {"label":"still-four-stars","state":"f337cb206dd41ebb","crowd":"745d32f20d512858","events":"4f53cda18c2baa0c"},
-      {"label":"final","state":"f337cb206dd41ebb","crowd":"745d32f20d512858","events":"4f53cda18c2baa0c"}
+      {"label":"t+10080","state":"a32fcd03c78b74f8","crowd":"53ac3a1dd9bded24","events":"4f53cda18c2baa0c"},
+      {"label":"still-four-stars","state":"a32fcd03c78b74f8","crowd":"53ac3a1dd9bded24","events":"4f53cda18c2baa0c"},
+      {"label":"final","state":"a32fcd03c78b74f8","crowd":"53ac3a1dd9bded24","events":"4f53cda18c2baa0c"}
     ],
     "offshift-schedule-modern": [
       {"label":"start","state":"8e80afc4f2025d61","crowd":"4a8080683207bc4d","events":"d07137320bf02bb4"},

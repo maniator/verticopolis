@@ -262,7 +262,8 @@ impl Simulation {
 impl Simulation {
     /// Replace the telemetry with the `telemetry_json` shape. Tooling only:
     /// the gallery's engine leg carries a scene's authored curve across the
-    /// load that hands the tower to the engine (the save never carries it).
+    /// load that hands the tower to the engine (a save carries the rings only
+    /// with a shaft on Auto, `telemetry_save.rs`).
     /// A malformed document leaves the telemetry as it was.
     pub fn seed_telemetry(&mut self, doc: &Value) -> Result<(), String> {
         fn id_of(v: &Value) -> Result<i64, String> {
