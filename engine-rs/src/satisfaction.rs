@@ -178,14 +178,11 @@ impl Simulation {
         ctx: &mut SatisfactionContext,
     ) -> StepResult {
         let served = ctx.served_set.contains(&u.floor) && self.reaches_lobby(u);
-        let estimate = match &ctx.cong_map {
+        // The map already carries the floor's real commute waits
+        // (`spatial_congestion_by_floor`), so the views read this same value.
+        let cong = match &ctx.cong_map {
             Some(m) => m.get(&u.floor).copied().unwrap_or(0.0),
             None => ctx.global_cong,
-        };
-        let cong = if ctx.cong_map.is_some() {
-            estimate.max(self.commute_wait_congestion(u.floor))
-        } else {
-            estimate
         };
         let churn = self.mode.churn_multiplier(u.residents);
         let mut s = current;

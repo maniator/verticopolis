@@ -17,6 +17,7 @@ mod capacity;
 mod classic_elevator_dispatch;
 mod classic_express_stops;
 mod commute;
+mod commute_views;
 mod condo_relocation;
 mod condos;
 mod congestion_gripe_copy;
