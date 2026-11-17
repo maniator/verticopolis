@@ -4,7 +4,7 @@
 //! price a placement ghost shows; [`Simulation::build_room_row`] places them.
 //!
 //! The row starts at the press and steps one room width at a time toward the
-//! pointer. A spot a room can't take (a shaft, a room already there, open air)
+//! pointer. A spot a room can't take (a room already there, a lobby, open air)
 //! is passed one tile at a time, so the row goes on past it rather than being
 //! refused as a whole. Each room is placed by [`Simulation::build`], so a row
 //! follows every rule, price and cap a single click does.

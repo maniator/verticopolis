@@ -146,6 +146,10 @@ export const SHARDS: Record<string, string[]> = {
   // traffic chip shots use, tapped on desktop and on a phone, with the floor
   // banded and its transports outlined; its own shard, as new features get.
   "traffic-jump": ["traffic-jump", "traffic-jump-mobile"],
+  // The row of rooms (Modern, #646): a drag of offices past a condo, its
+  // ghost and price, the red ghost short of money, and the placed row; its
+  // own shard, as new features get.
+  "room-row": ["room-row"],
   // The answer to a fire (#1889): guards on the stairs and at the room, and
   // the rescue helicopter flying in and spraying; two small frozen towers
   // run by the engine's own ticks; its own shard, as new features get.

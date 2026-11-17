@@ -233,13 +233,20 @@ impl Tower {
         self.lobby_tiles.keys().copied().collect()
     }
 
+    /// How many of `kind` the tower holds. Only a transport kind walks the
+    /// transports: a room's count is the census's, so a capped room's check
+    /// (`cap_reason`, run for every spot a build preview or a row of rooms
+    /// tries) costs the same on any tower.
     pub fn count_kind(&self, kind: Kind) -> i64 {
-        let placed = if kind.is_structural() {
+        if kind.is_transport() {
+            return self.census().kinds[kind as usize]
+                + self.transports.iter().filter(|t| t.kind == kind).count() as i64;
+        }
+        if kind.is_structural() {
             self.units.iter().filter(|u| u.kind == kind).count() as i64
         } else {
             self.census().kinds[kind as usize]
-        };
-        placed + self.transports.iter().filter(|t| t.kind == kind).count() as i64
+        }
     }
 
     fn span_every(
