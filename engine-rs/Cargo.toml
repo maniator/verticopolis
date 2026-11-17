@@ -88,3 +88,8 @@ conformance = []
 
 [profile.release]
 debug = 1
+# One codegen unit: the player .wasm is about 470 KB (15%) smaller and a
+# game day up to 3% faster in WASM than at the default 16, and timing no
+# longer shifts when rustc splits the crate differently after an unrelated
+# change (perf audit, 2026-11-17; owner chose it for the slower build).
+codegen-units = 1
