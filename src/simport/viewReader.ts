@@ -146,6 +146,8 @@ export class ViewReader implements SimView {
   private byId = new Map<number, Room>();
   private shafts: Shaft[] = [];
   private shaftById = new Map<number, Shaft>();
+  /** The shafts the frame sends cars for (elevators), matched by its ids. */
+  private elevators: Shaft[] = [];
   private runs: Run[] = [];
   /** Rooms under every floor they cover, and runs by floor, sorted by x, for
    *  the point lookups. */
@@ -188,6 +190,7 @@ export class ViewReader implements SimView {
     this.tower = Object.defineProperties(lookups, {
       units: { get: () => (this.tiles ??= this.expand()) },
       transports: { get: () => this.shafts },
+      elevators: { get: () => this.elevators },
       revision: { get: () => this.revision },
       mealOverlayRevision: { get: () => this.header.mealOverlayRevision },
       towerName: { get: () => port.towerName() ?? "" },
@@ -317,6 +320,7 @@ export class ViewReader implements SimView {
     const oldShafts = this.shaftById;
     this.shafts = [];
     this.shaftById = new Map();
+    this.elevators = [];
     const t = l.shaft;
     for (let i = 0; i < s[sh.shafts]; i++) {
       const id = s[at + t.id];
@@ -410,8 +414,11 @@ export class ViewReader implements SimView {
     }
     const t = l.transport;
     const c = l.car;
-    for (let i = 0; i < f[h.transports]; i++) {
-      const s = this.shafts[i];
+    const elevators = this.elevators;
+    elevators.length = f[h.transports];
+    for (let i = 0; i < elevators.length; i++) {
+      if (elevators[i]?.id !== f[at + t.id]) elevators[i] = this.shaftById.get(f[at + t.id])!;
+      const s = elevators[i];
       const cars = f[at + t.cars];
       at += l.transportFixed;
       s.cars = cars;

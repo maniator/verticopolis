@@ -53,7 +53,8 @@ export function drawShaftNumbers(engine: TowerEngine, ctx: CanvasRenderingContex
   // than the bottom; both are integers via Math.ceil), matching drawStatsMap.
   const topFloor = engine.screenToFloor(0) + 1;
   const botFloor = engine.screenToFloor(engine.viewHeight) - 1;
-  for (const t of engine.sim.tower.transports) {
+  const tower = engine.sim.tower;
+  for (const t of tower.elevators ?? tower.transports) {
     if (!isElevatorKind(t.kind)) continue;
     const shaftWpx = t.width * TILE * z;
     if (shaftWpx < 9) continue; // shaft too thin to fit a number

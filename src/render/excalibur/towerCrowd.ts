@@ -194,7 +194,7 @@ function positionPerson(engine: TowerEngine, p: PersonView, rec: CrowdActor, loo
   const z = through !== undefined ? doorPlane(through) : walkingPlane(p);
   if (rec.actor.z !== z) rec.actor.z = z;
   if (p.state === "waiting" && rec.shaftMid === undefined) {
-    rec.shaftMid = waitShaftMid(engine.sim.tower.transports, p);
+    rec.shaftMid = waitShaftMid(engine.sim.tower.elevators ?? engine.sim.tower.transports, p);
     rec.shaftFloor = p.floor;
   }
   const key = personFigure(p, g, look, through, rec.shaftMid);

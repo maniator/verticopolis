@@ -50,7 +50,13 @@ impl PeopleWindow {
     /// on screen has its middle at most half its width outside, and every
     /// rider of a car the view shows is in the frame.
     pub fn padded(self, transports: &[Transport]) -> PeopleWindow {
-        let widest = transports.iter().map(|t| t.width).max().unwrap_or(0);
+        self.padded_by(widest_shaft(transports))
+    }
+
+    /// [`PeopleWindow::padded`] with the widest shaft's width already
+    /// found, so a reader that keeps it per tower revision pads each frame's
+    /// window without a walk over the transports.
+    pub(crate) fn padded_by(self, widest: i64) -> PeopleWindow {
         let x_pad = widest as f64 / 2.0 + 1.0;
         PeopleWindow {
             floor_lo: self.floor_lo - FLOOR_PAD,
@@ -64,6 +70,12 @@ impl PeopleWindow {
     pub fn holds(&self, p: &Person) -> bool {
         (self.floor_lo..=self.floor_hi).contains(&p.fy) && (self.x_lo..=self.x_hi).contains(&p.x)
     }
+}
+
+/// The widest transport's width in tiles, 0 with none: the width
+/// [`PeopleWindow::padded`] pads by. One pass over the transports.
+pub(crate) fn widest_shaft(transports: &[Transport]) -> i64 {
+    transports.iter().map(|t| t.width).max().unwrap_or(0)
 }
 
 #[cfg(test)]

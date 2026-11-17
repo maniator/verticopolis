@@ -31,6 +31,8 @@ const RUNS: RunSpec[] = [
 
 const SHAFTS: ShaftSpec[] = [
   { id: 20, kind: "elevatorStandard", x: 162, bottom: 1, top: 4, cars: 1 },
+  // Stairs run no car, so the frame carries no record for them.
+  { id: 25, kind: "stairs", x: 240, bottom: 1, top: 2, cars: 0 },
   { id: 21, kind: "elevatorExpress", x: 300, bottom: 1, top: 4, cars: 2, skips: [2, 3] },
 ];
 
@@ -123,8 +125,12 @@ describe("ViewReader", () => {
     ]);
     expect(reader.tower.transports.map((t) => [t.id, t.kind, t.bottom, t.top, t.skipFloors, t.cars, t.carPositions, t.carLoad, t.carDir])).toEqual([
       [20, "elevatorStandard", 1, 4, undefined, 1, [2.5], [4], [1]],
+      [25, "stairs", 1, 2, undefined, 0, [], [], []],
       [21, "elevatorExpress", 1, 4, [2, 3], 2, [1, 4], [0, 9], [0, -1]],
     ]);
+    // The frame's records land on the elevators, read past the stairs.
+    expect(reader.tower.elevators?.map((t) => t.id)).toEqual([20, 21]);
+    expect(reader.tower.elevators?.[1]).toBe(reader.tower.getTransport(21));
     const h = reader.header;
     expect([h.money, h.star, h.weather, h.minuteOfDay, h.day, h.isWeekend, h.mode, h.modernCalendar, h.sceneSeed]).toEqual([1_250_000, 3, "cloudy", 600, 5, true, "modern", "canon", 77]);
     expect([h.camera, h.pendingChoice, h.bombSearch]).toEqual([{ tile: 200, floor: 2, zoom: 1.5 }, null, null]);
@@ -207,7 +213,7 @@ describe("ViewReader", () => {
     expect([tile.kind, tile.x, Number.isNaN(tile.id), tile.state, tile.occupants, tile.label]).toEqual(["floor", 200, true, "occupied", 2, "Floor"]);
     expect([reader.tower.unitAt(2, 400), reader.tower.unitAt(9, 200)]).toEqual([undefined, undefined]);
     expect([reader.tower.hasStructure(1, 200), reader.tower.structureKindAt(1, 200), reader.tower.hasStructure(5, 200)]).toEqual([true, "lobby", false]);
-    expect(reader.tower.getTransport(21)).toBe(reader.tower.transports[1]);
+    expect(reader.tower.getTransport(21)).toBe(reader.tower.transports[2]);
     // The rooms, then every tile, built once.
     expect(reader.tower.units.length).toBe(3 + 120 + 10 + 11 + 60 + 20);
     expect(reader.tower.units).toBe(reader.tower.units);
