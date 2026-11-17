@@ -263,6 +263,7 @@ impl Person {
                 .and_then(routine_name),
             linger_for: opt_finite("lingerFor")?,
             from_metro: flag("fromMetro"),
+            gave_up: flag("gaveUp"),
             crew_id,
             staff_trip,
             walk_in: flag("walkIn"),
@@ -311,6 +312,7 @@ impl SaveEntries for Person {
             ("countedHotelGuest", self.counted_hotel_guest),
             ("returning", self.returning),
             ("fromMetro", self.from_metro),
+            ("gaveUp", self.gave_up),
             ("walkIn", self.walk_in),
         ];
         for (key, set) in flags {

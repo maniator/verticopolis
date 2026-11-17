@@ -76,6 +76,7 @@ pub fn make_person(
         routine: None,
         linger_for: None,
         from_metro: false,
+        gave_up: false,
         crew_id: None,
         staff_trip: None,
         errand: None,

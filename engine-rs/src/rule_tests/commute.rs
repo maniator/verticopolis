@@ -5,9 +5,9 @@
 //! are `crowd::tests::commute_stress_lists_each_floor_in_order` and its
 //! neighbors.
 use crate::clock::GameMode;
-use crate::crowd::motion::finish;
+use crate::crowd::motion::{advance, finish};
 use crate::crowd::spawn::add;
-use crate::crowd::PState;
+use crate::crowd::{PState, GIVE_UP};
 use crate::facilities::Kind;
 use crate::load::deserialize;
 use crate::rules::{CLASSIC_WAIT_LIMIT, MODERN_WAIT_LIMIT};
@@ -138,6 +138,104 @@ fn a_trip_off_the_metro_counts_on_the_tenant_floor_it_serves() {
             (office_wait, platform_wait)
         );
     }
+}
+
+/// A rider bound from the lobby to the office on 5 who has run out of
+/// patience at the elevator, standing `back` tiles from where they set out.
+fn stranded_commuter(mode: GameMode, back: i64) -> Simulation {
+    let mut sim = commuter_tower_in(3, mode);
+    let i = add(&mut sim.crowd, &sim.tower, 1, 5, Some(C + 2), None).unwrap();
+    let p = &mut sim.crowd.people[i];
+    p.x = (C + 2 + back) as f64;
+    p.age = 10.0 * GIVE_UP;
+    sim
+}
+
+/// Moves the crowd alone (no new trips) until nobody is left.
+fn until_everyone_is_done(sim: &mut Simulation) {
+    for _ in 0..600 {
+        if sim.crowd.people.is_empty() {
+            return;
+        }
+        advance(&mut sim.crowd, 0.1, &mut sim.tower);
+    }
+    panic!("the crowd never finished: {:?}", sim.crowd.people.len());
+}
+
+#[test]
+fn a_trip_that_gives_up_counts_as_an_over_limit_wait_in_each_mode() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let over = mode.given_up_commute_wait();
+        assert!(over > mode.commute_wait_limit(), "{mode:?}");
+        // (gave up, waited) -> what the office floor (5) records.
+        for (gave_up, waited, recorded) in [
+            (true, 10.0, over),
+            (true, 2.0 * over, 2.0 * over),
+            (false, 10.0, 10.0),
+        ] {
+            let mut sim = commuter_tower_in(1, mode);
+            let i = add(&mut sim.crowd, &sim.tower, 1, 5, None, None).unwrap();
+            let p = &mut sim.crowd.people[i];
+            (p.gave_up, p.trip_wait, p.wait) = (gave_up, waited, 0.0);
+            finish(&mut sim.crowd, i, &mut sim.tower);
+            assert_eq!(stress(&sim, 5), recorded, "{mode:?} {gave_up} {waited}");
+        }
+    }
+}
+
+/// #2019's rule: a floor whose commuters give up drains in both modes, where
+/// before a turned-back rider counted no wait at all.
+#[test]
+fn a_floor_whose_commuters_give_up_drains_in_both_modes() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = stranded_commuter(mode, 18);
+        until_everyone_is_done(&mut sim);
+        assert_eq!(stress(&sim, 5), mode.given_up_commute_wait(), "{mode:?}");
+        let id = sim.tower.units_of_kind(Kind::Office).next().unwrap().id;
+        sim.tower.get_unit_mut(id).unwrap().satisfaction = 0.6;
+        for _ in 0..4 {
+            sim.update_satisfaction();
+        }
+        let after = sim.tower.get_unit(id).unwrap().satisfaction;
+        assert!(after < 0.6, "{mode:?}: the stranded floor drains: {after}");
+    }
+}
+
+/// Only patience counts as giving up: a rider sent back because the player
+/// removed their elevator, or one who found another way, records the wait
+/// they really had.
+#[test]
+fn a_trip_cut_short_by_a_removed_elevator_is_no_give_up() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = stranded_commuter(mode, 18);
+        sim.crowd.people[0].age = 0.0;
+        let shaft = sim.tower.transports[0].id;
+        assert!(sim.tower.remove_transport(shaft).is_some());
+        until_everyone_is_done(&mut sim);
+        assert!(
+            sim.crowd.commute_wait_by_floor.get(&5).is_some(),
+            "recorded"
+        );
+        assert!(
+            stress(&sim, 5) < mode.commute_wait_limit(),
+            "{mode:?}: {}",
+            stress(&sim, 5)
+        );
+    }
+}
+
+#[test]
+fn a_save_keeps_a_give_up_that_is_still_walking_back() {
+    let mut sim = stranded_commuter(GameMode::Classic, 18);
+    advance(&mut sim.crowd, 0.1, &mut sim.tower);
+    assert!(sim.crowd.people[0].gave_up && sim.crowd.people[0].returning);
+    let mut loaded = deserialize(&sim.serialize()).unwrap();
+    assert!(loaded.crowd.people[0].gave_up, "the save carries it");
+    until_everyone_is_done(&mut loaded);
+    assert_eq!(
+        stress(&loaded, 5),
+        GameMode::Classic.given_up_commute_wait()
+    );
 }
 
 /// The office's satisfaction after `hours` hourly passes, starting at 0.6,

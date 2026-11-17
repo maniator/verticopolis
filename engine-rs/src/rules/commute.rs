@@ -15,6 +15,14 @@ use crate::crowd::GIVE_UP;
 pub const CLASSIC_WAIT_LIMIT: f64 = GIVE_UP;
 pub const MODERN_WAIT_LIMIT: f64 = 1.5 * GIVE_UP;
 
+/// A commute that gives up counts as waiting at least this many times the
+/// mode's limit (owner, 2026-11-17, #2019). A rider runs out of patience at
+/// about the Classic limit and below the Modern one, so without this a jam
+/// that strands a floor's commuters would hardly lift its average past the
+/// limit. A wait right at the limit only stops recovery; past it the floor
+/// drains, here as fast as a floor whose every trip waits twice the limit.
+pub(crate) const GIVE_UP_WAIT_LIMITS: f64 = 2.0;
+
 /// Real office commutes in Modern, with its faster cars (owner,
 /// 2026-11-14). They merged switched off in #2199, when the owner's own Modern
 /// tower (about 4,950 office workers) kept only 56% of its tenants over four
@@ -51,11 +59,23 @@ impl GameMode {
     /// (#1971): the wait over this mode's limit, so a floor whose tenants
     /// wait past it drains as an overloaded transport does.
     pub fn commute_wait_congestion(self, average_wait: f64) -> f64 {
-        let limit = match self {
+        average_wait / self.commute_wait_limit()
+    }
+
+    /// The average commute wait that reads as a full transport in this mode
+    /// ([`CLASSIC_WAIT_LIMIT`], [`MODERN_WAIT_LIMIT`]).
+    pub(crate) fn commute_wait_limit(self) -> f64 {
+        match self {
             GameMode::Classic => CLASSIC_WAIT_LIMIT,
             GameMode::Modern => MODERN_WAIT_LIMIT,
-        };
-        average_wait / limit
+        }
+    }
+
+    /// The least wait a commute that gave up counts as (#2019): over this
+    /// mode's limit ([`GIVE_UP_WAIT_LIMITS`]), so a floor whose commuters
+    /// keep giving up drains.
+    pub(crate) fn given_up_commute_wait(self) -> f64 {
+        GIVE_UP_WAIT_LIMITS * self.commute_wait_limit()
     }
 
     /// Whether office workers come in and go home as people

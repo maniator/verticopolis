@@ -1,6 +1,6 @@
 //! The person's save entry walk (`SaveEntries for Person`) against
 //! `Person::save_form` as it was when each entry was built as a `Value`,
-//! kept verbatim below (but for `self`): the tree and the written text read
+//! kept verbatim below (but for `self`, and the `gaveUp` flag of #2019): the tree and the written text read
 //! the same entry, for everyone in every committed tower each hour of
 //! twelve played hours, and for a person carrying every optional key with values a
 //! JSON writer can spell differently.
@@ -43,6 +43,7 @@ fn reference(p: &Person) -> Value {
         ("countedHotelGuest", p.counted_hotel_guest),
         ("returning", p.returning),
         ("fromMetro", p.from_metro),
+        ("gaveUp", p.gave_up),
         ("walkIn", p.walk_in),
     ];
     for (key, set) in flags {
@@ -168,6 +169,7 @@ fn a_person_with_every_key_writes_as_before() {
         p.counted_hotel_guest = true;
         p.returning = true;
         p.from_metro = true;
+        p.gave_up = true;
         p.walk_in = true;
         p.clean_unit_id = Some(1);
         p.meal_venue_id = Some(2);
