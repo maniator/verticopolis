@@ -4,13 +4,13 @@ import type { UnitView } from "../../simport/view";
 import { lobbyVariant } from "../sprites";
 import type { TowerEngine } from "./TowerEngine";
 import type { EntranceKind } from "../sprites/structure/lobby";
-
-/** The slices of a grand entrance, which carry its staff. */
-type GrandKind = Exclude<EntranceKind, "service">;
 import { hallDoors } from "../lobbyHalls";
 import { relightHallDoors, syncHallDoors } from "./towerHallDoors";
 import { stampGroundEntrances, towerOfSpan } from "../groundEntrances";
 import { towerCatalog } from "../../catalog/towerCatalog";
+
+/** The slices of a grand entrance, which carry its staff. */
+type GrandKind = Exclude<EntranceKind, "service">;
 
 /**
  * The scene sync's structure pass: the floor and lobby cells of the structure
@@ -158,7 +158,10 @@ function lobbyTileGfx(engine: TowerEngine, u: UnitView, story = 0, height = 1): 
     // with the hall's wall carried up over it in place of its own cornice.
     const kind = u.floor === 1 ? floor1EntranceKind(engine, u.x) : "none";
     const slot = kind === "none" ? lobbyVariant(u.x) : kind;
-    return engine.tallLobbyGfx(lit === 1, u.floor === 1, height, story, slot, entranceStaffed(engine, u.x));
+    // Only a grand entrance has staff to send home; every other slice is
+    // drawn the same whoever is in.
+    const staffed = !isGrand(kind) || entranceStaffed(engine, u.x);
+    return engine.tallLobbyGfx(lit === 1, u.floor === 1, height, story, slot, staffed);
   }
   if (u.floor === 1) {
     const kind = floor1EntranceKind(engine, u.x);

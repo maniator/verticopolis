@@ -111,7 +111,11 @@ function fakeEngine(state: { units: UnitView[]; revision: number; tall?: LobbyHa
       "grand-right": ["empty grand-right 0", "empty grand-right 1"],
       "grand-solo": ["empty grand-solo 0", "empty grand-solo 1"],
     },
-    tallLobbyGfx: vi.fn((lit: boolean, ground: boolean, height: number, story: number, slot: number | string) => `tall ${lit ? 1 : 0}:${ground ? "ground" : "sky"}:${height}:${story}:${slot}`),
+    // An entrance hall drawn without its staff says so.
+    tallLobbyGfx: vi.fn(
+      (lit: boolean, ground: boolean, height: number, story: number, slot: number | string, staffed: boolean) =>
+        `tall ${lit ? 1 : 0}:${ground ? "ground" : "sky"}:${height}:${story}:${slot}${staffed ? "" : ":empty"}`,
+    ),
     floor1EntranceMap: new Map(),
     groundTowers: [],
     towerStaffed: [],
@@ -454,6 +458,24 @@ describe("the scene sync walks the structure tiles only when what they draw from
       syncScene(classic.engine);
       expect(classic.engine.towerStaffed).toEqual([true]);
       expect(classic.cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
+    } finally {
+      catalogRules.frontDoorPerTower = false;
+    }
+  });
+
+  it("staffs a tall ground lobby's doors from its own tower's tenants (#2384)", () => {
+    const state = { ...twoTowers(true, false), tall: lobbyHalls([1, 12, 15, 2]) };
+    try {
+      catalogRules.frontDoorPerTower = true;
+      const modern = fakeEngine(state);
+      syncScene(modern.engine);
+      expect(modern.cell(12, 1)?.gfx).toEqual(["tall 0:ground:2:0:grand-left:empty"]);
+      expect(modern.cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
+      // A lease in the right tower staffs its tall doors on the next sync.
+      (state.units[1] as { state: string }).state = "occupied";
+      modern.engine.d.hour = 10;
+      syncScene(modern.engine);
+      expect(modern.cell(12, 1)?.gfx).toEqual(["tall 0:ground:2:0:grand-left"]);
     } finally {
       catalogRules.frontDoorPerTower = false;
     }
