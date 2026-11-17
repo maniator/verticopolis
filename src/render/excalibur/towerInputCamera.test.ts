@@ -262,6 +262,28 @@ describe("focus resolves the dominant facility in the visible band", () => {
   });
 });
 
+describe("focus counts the crowd a lobby shows", () => {
+  it("keeps its last count of people while the zoom cull sends none (#2151)", () => {
+    const now = vi.spyOn(performance, "now");
+    const units = [{ kind: "lobby", floor: 15, x: 100, width: 40, occupants: 0 }];
+    const people = Array.from({ length: 12 }, (_, i) => ({ floor: 15, x: 110 + i }));
+    const e = eng({ crowdCulled: false, sim: { tower: { highestFloor: 40, lowestFloor: 1, units }, clock: { isNight: () => false, minuteOfDay: 720 }, weather: "clear", crowd: { people } } });
+    setCamera(e, 120, 15, 1);
+    now.mockReturnValue(10_000);
+    expect(focus(e).crowd).toBe(0.5);
+    // Culled: the view carries nobody, and the count holds.
+    e.crowdCulled = true;
+    e.sim.crowd.people = [];
+    now.mockReturnValue(12_000);
+    expect(focus(e).crowd).toBe(0.5);
+    // Drawn again: the count follows the people the view carries.
+    e.crowdCulled = false;
+    now.mockReturnValue(14_000);
+    expect(focus(e).crowd).toBe(0);
+    now.mockRestore();
+  });
+});
+
 describe("pickEntityAt: transports by collider, every unit by grid lookup", () => {
   const world = ex.vec(100, -100);
   const hit = (z: number) => ({ z, contains: () => true });
