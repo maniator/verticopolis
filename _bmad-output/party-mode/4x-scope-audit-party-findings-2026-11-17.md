@@ -108,7 +108,7 @@ Requested by Naftali (2026-11-17 23:09Z, "Do an audit with a proper roundtable p
 
 😤 **Grumbal:** Fine. One condition: the PR shows a real old save with an overlap opening to the identical game, before and after. Not a fixture we made up.
 
-**Verdict on the shaft question: bug, 4.x fix, both modes.** An elevator shaft (standard, service or express) and a room can no longer be placed on the same tiles, in either order: placing a room through a shaft, placing a shaft over a room, and resizing or extending a shaft through a room are all refused with an engine reason. Stairs and escalators keep overlapping rooms as they do now (canon). Existing towers are untouched: no loader change, no save change, and a real save that already has an overlap opens to the identical game (the room's condition). The ported rule test flips. It's an engine change, so it carries `crate: patch` and `app: patch`. The docket thread owns it.
+**Verdict on the shaft question: bug, 4.x fix, both modes.** An elevator shaft (standard, service or express) and a room can no longer be placed on the same tiles, in either order: placing a room through a shaft, placing a shaft over a room, and resizing or extending a shaft through a room are all refused with an engine reason. Stairs and escalators keep overlapping rooms as they do now (canon). Existing towers are untouched: no loader change, no save change, and a real save that already has an overlap opens to the identical game (Grumbal's condition). The ported rule test flips. It's an engine change, so it carries `crate: patch` and `app: patch`. The docket thread owns it.
 
 ---
 
@@ -118,7 +118,7 @@ Requested by Naftali (2026-11-17 23:09Z, "Do an audit with a proper roundtable p
 
 | Issue | Why |
 |---|---|
-| #1336 Retire the TypeScript save codec | Done. The TypeScript engine (#1956) and the TypeScript `.TDT` codec are gone. What remains is `towerFileCodec.ts`, a byte-preserving container rewrap that never decodes a tower and that the shipped save model (#2411) uses, and `vctowerContainer.ts`, which only tests and tools import. |
+| #1336 Retire the TypeScript save codec | Done. The TypeScript engine (#1956) and the TypeScript `.TDT` codec are gone. What remains is `towerFileCodec.ts`, a byte-preserving container rewrap that never decodes a tower and that the shipped save model (#2411) uses; `vctowerContainer.ts`, which only tests and tools import; and the fflate writer in `vctowerWriter.ts` (`packVctower`), kept on purpose as the never-lose-a-save fallback when the engine writer throws and for saves over the engine writer's size cap. |
 | #372 Tap the traffic chip to fly to the hotspot floor | Shipped in #2437 (in 4.13.0): tapping "Backed up" zooms to the floor and outlines the shafts. |
 | #1161 Pin the pub API in the crate version guard | Not planned. It extends a guard test that scans source, which the owner barred on 2026-11-14. The risk it covered (an API change without a crate bump) is now the reviewer-checked crate tier rule (2026-11-17). |
 | #1247 Hold .mjs scripts to the 500-line ceiling | Not planned. The guard half is barred by the same rule; splitting one script alone has no taker and no player effect. |
