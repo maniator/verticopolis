@@ -17,3 +17,5 @@ verticopolis-engine = { path = "../engine-rs" }
 
 [profile.release]
 debug = 1
+# Match the engine crate's release profile, so a bench times what ships.
+codegen-units = 1
