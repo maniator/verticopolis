@@ -4,6 +4,7 @@ use super::banks::balance_shafts;
 use super::expected_time;
 use super::fasthash::{FastMap, FastSet};
 use super::seg_set::SegSet;
+use super::staff_routes;
 use super::street::street_start;
 use super::{AdjGraph, Crowd, Edge, ElevatorCalls, HallCall, PState, Route, StaffParts};
 use crate::facilities::{LOT_WIDTH, MIN_FLOOR};
@@ -273,17 +274,7 @@ pub fn staff_route(
     if let Some(decided) = off_run_pair(a, b, from_floor, from_x, to_floor, to_x) {
         return decided.map(|r| balance_shafts(crowd, tower, r));
     }
-    let mut seen = std::mem::take(&mut crowd.route_seen);
-    let (adj, parts) = staff_adjacency(crowd, tower);
-    // A search between two parts of the staff graph visits all of the
-    // first one before it gives up, and dispatch keeps asking for such
-    // routes: a floor-level staff link can leave a room's segment off the
-    // crew's network (#1143 item 6). The parts answer that without a search.
-    let found = (!parts_split(parts, a, b))
-        .then(|| bfs_route_in(adj, a, b, &mut seen))
-        .flatten();
-    crowd.route_seen = seen;
-    let mut r = found?;
+    let mut r = staff_routes::staff_search(crowd, tower, a, b)?;
     to_real_floors(&mut r);
     Some(balance_shafts(crowd, tower, r))
 }
@@ -294,7 +285,7 @@ pub fn bfs_route(adj: &AdjGraph, from: i64, to: i64) -> Option<Route> {
 }
 
 /// `bfs_route` with the seen set the crowd keeps between searches.
-fn bfs_route_in(adj: &AdjGraph, from: i64, to: i64, seen: &mut SegSet) -> Option<Route> {
+pub(super) fn bfs_route_in(adj: &AdjGraph, from: i64, to: i64, seen: &mut SegSet) -> Option<Route> {
     seen.clear();
     if from == to {
         return Some(Route {
