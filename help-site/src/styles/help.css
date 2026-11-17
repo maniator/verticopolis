@@ -38,6 +38,12 @@
   box-shadow: var(--bevel-in);
   white-space: nowrap;
 }
+/* The header's Back to game / Play the game button reads at the weight of
+   the rest of the header (owner, 2026-11-17: the engine docs' bold label was
+   too heavy here, most of all on a phone). */
+.header .vc-bar-game {
+  font-weight: 400;
+}
 .vc-help-bar-actions {
   display: flex;
   gap: 0.4rem;
