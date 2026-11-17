@@ -44,6 +44,7 @@ mod faq_complete_mechanics;
 mod fixed_step;
 mod flight_scans;
 mod floor_run_lockstep;
+mod fresh_waits;
 mod full_car_passes;
 mod game_events;
 mod gap_flight_walkers;
