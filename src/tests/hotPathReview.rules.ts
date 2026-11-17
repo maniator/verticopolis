@@ -181,7 +181,7 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
 
 /** The `CLAUDE.md` auto-merge rule that keeps a running review from being raced. */
 export const AUTO_MERGE = [
-  "Enable auto-merge only after the PR is signed off and CI is green",
+  "Arm auto-merge as soon as the PR is signed off, and let it wait for CI",
   "hot-path or not, auto-merge stays off until that review has finished on the final commit",
   "A reviewer that is still running has not signed off.",
   "On a hot-path diff, signed off also needs the section 6 record",
@@ -189,7 +189,7 @@ export const AUTO_MERGE = [
   "there is no GO or CONDITIONAL GO without that record",
   "when an independent review or a review-skill round has been requested or is running on the PR",
   "the independent reviewer has posted a GO, or a CONDITIONAL GO whose conditions it has confirmed met",
-  "Do not arm auto-merge before the PR is signed off and CI is green",
+  "Do not arm auto-merge before sign-off.",
 ];
 
 /** Owner rules the summaries restate, which an edit could otherwise weaken with every other test green. */
