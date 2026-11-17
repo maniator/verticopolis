@@ -13,7 +13,7 @@ import { scheduleDialogUX } from "../ui/scheduleDialogRules";
 import { scheduleSlots } from "../simport/scheduleSlots";
 import type { ViewReader } from "../simport/viewReader";
 import { groupDigits } from "../ui/format";
-import { INVALID_COMMAND, MAX_TEXT, NOT_ENOUGH_MONEY } from "../simport/request";
+import { NOT_ENOUGH_MONEY } from "../simport/request";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 
 
@@ -305,8 +305,6 @@ export class EditorActions {
       if (action === "rename") {
         const input = root.querySelector<HTMLInputElement>("#ed-name");
         if (input) {
-          // The port takes any length; the cap stays here until it moves into the engines (see the PR).
-          if (input.value.length > MAX_TEXT) return this.refuse(INVALID_COMMAND);
           const res = outcome(engine, engine.labelUnit(u.id, input.value));
           if (!res.ok) return this.refuse(res.reason ?? "That name could not be saved.");
         }
@@ -447,9 +445,8 @@ export class EditorActions {
   }
 
   /** Rename the tower from the top bar. A refused name (longer than the
-   *  engine takes) says why, as a refused unit name does. */
+   *  engine's text cap, #1405) says why, as a refused unit name does. */
   renameTower(name: string): void {
-    if (name.length > MAX_TEXT) return this.refuse(INVALID_COMMAND);
     const engine = this.deps.engine();
     const res = outcome(engine, engine.nameTower(name));
     if (!res.ok) this.refuse(res.reason ?? "That name could not be saved.");

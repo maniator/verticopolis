@@ -279,7 +279,7 @@ stays the one that survives (3.x).
 | --- | --- | --- | --- |
 | `viewLayout()` | JSON | static tables, read once | once per boot |
 | `serialize()` / `loadSave()` / `restore()` | JSON | the save format | rare |
-| `labelUnit`, `nameTower`, `logLine` | string argument | free text | per command, short |
+| `labelUnit`, `nameTower`, `logLine` | string argument | free text, at most `MAX_TEXT` (4,096) UTF-16 code units; longer is refused with the invalid-request reason (#1405) | per command, short |
 | `eventText(i)` | JSON string | an analytics event's `{ name, payload }` | per gameplay event, rare (a drain's `count` is 0 on almost every step) |
 | `scheduleShaft` (inside the engine) | a small JSON value built from the slots | the slots cross as numbers; the engine builds the input `Schedule::coerce` reads, so the schedule's coercion rules stay in one place for this setter and the legacy one | per schedule edit (one value of two 24-hour rows and a few fields, under 1 KB) |
 | `loadVctower()` / `exportVctower()` | `.vctower` text | the save's file format | rare |

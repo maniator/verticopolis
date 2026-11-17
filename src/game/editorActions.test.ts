@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  INVALID_COMMAND,
   MAX_TEXT,
   NOT_ENOUGH_MONEY,
 } from "../simport/request";
@@ -72,15 +71,17 @@ describe("EditorActions: unit card", () => {
     expect(deps.refreshEditor).toHaveBeenCalledOnce();
     expect(deps.commitUndo).toHaveBeenCalledOnce();
 
-    const long = setup({ labelUnit: () => rec("labelUnit", true) });
+    // The text cap is the engine's (#1405): an over-long name goes to the
+    // port, and its refusal is what the player hears about.
+    const longName = "x".repeat(MAX_TEXT + 1);
+    const long = setup({ labelUnit: () => rec("labelUnit", false) });
     await long.actions.handleEditAction(
       "rename",
-      root(`<input id="ed-name" value="${"x".repeat(MAX_TEXT + 1)}">`),
+      root(`<input id="ed-name" value="${longName}">`),
     );
-    expect(long.port.labelUnit).not.toHaveBeenCalled();
-    expect(long.deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      INVALID_COMMAND,
-      "bad",
+    expect(long.port.labelUnit).toHaveBeenCalledExactlyOnceWith(
+      office.id,
+      longName,
     );
     expect(long.deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
   });
@@ -463,7 +464,7 @@ describe("EditorActions: shaft card", () => {
 });
 
 describe("EditorActions.renameTower", () => {
-  it("names the tower, refusing an over-long name before the port and a refused one with its reason", () => {
+  it("names the tower, handing every name to the port and toasting a refusal's reason", () => {
     const { actions, port, deps } = setup({
       nameTower: vi
         .fn()
@@ -473,10 +474,8 @@ describe("EditorActions.renameTower", () => {
     actions.renameTower("Spire");
     expect(port.nameTower).toHaveBeenCalledExactlyOnceWith("Spire");
     expect(deps.ui.toast).not.toHaveBeenCalled();
-    actions.renameTower("x".repeat(MAX_TEXT + 1));
-    expect(port.nameTower).toHaveBeenCalledOnce();
-    expect(deps.ui.toast).toHaveBeenLastCalledWith(INVALID_COMMAND, "bad");
     actions.renameTower("Spire II");
+    expect(port.nameTower).toHaveBeenLastCalledWith("Spire II");
     expect(deps.ui.toast).toHaveBeenLastCalledWith(
       "The engine said no.",
       "bad",
