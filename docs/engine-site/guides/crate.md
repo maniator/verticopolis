@@ -197,7 +197,7 @@ The crate has no default features.
 - **A save holds the moment.** The save's `crowd` carries everyone in the
   building as they stand (walking, waiting, riding, at a venue, cleaning)
   and, in a Modern tower, how long riders have lately waited at each
-  elevator stop (`waitsSeen`, which the routes weigh), its `dispatch` carries the elevator cars' timers mid-stop, and its
+  elevator stop (`waitsSeen`, which the routes weigh), its `dispatch` carries the elevator cars' timers mid-stop and the seats in each car the waiting estimate filled (`estimateSeats`), and its
   `housekeeping` carries the rooms cleaned today, yesterday's shift and the
   days its nudges last fired, and its `moveIns` carries the day's move-ins
   so far, so a loaded game's people, cars and crews carry on where they
@@ -211,7 +211,8 @@ The crate has no default features.
   (`elevatorLoad`, below). A save from before the crowd
   was saved loads with nobody in the building, and the tower fills again
   from the lobby; one from before `waitsSeen` starts with no waits
-  remembered. The `.TDT` format carries none of the four.
+  remembered; one from before `estimateSeats` counts a passenger car's whole
+  load as the estimate's until the car empties. The `.TDT` format carries none of the four.
 - **The loader repairs.** A damaged or hand-edited save is coerced the way
   the web game's loader does. It refuses a file it cannot read, a save with
   no numeric `minutes` or no `units` list at its top level (which would

@@ -27,6 +27,9 @@ mod leaving;
 
 #[path = "dispatch_lists.rs"]
 mod lists;
+
+#[path = "dispatch_cars.rs"]
+mod car_state;
 use leaving::{departure, toward_riders};
 pub use leaving::{first_aboard, leaving_at, Leaving, OpenCar};
 pub(crate) use modern::{idle_home, DispatchRules};
@@ -48,12 +51,9 @@ pub struct ElevatorDispatch {
     /// Transient per-car dwell timers, by shaft id. An ordered map, so the
     /// prune's `retain` iterates no hashed collection.
     car_dwell: BTreeMap<i64, Vec<f64>>,
-    /// Transient per-car crowd callers seen at the car's stop, by shaft id,
-    /// so Standard Floor Departure counts only newcomers.
-    car_seen: BTreeMap<i64, Vec<f64>>,
-    /// Transient per-car minutes waited at the car's current stop, by shaft
-    /// id, so Modern's Standard Floor Departure stops at its limit.
-    car_held: BTreeMap<i64, Vec<f64>>,
+    /// Each car's callers seen, time waited and estimate seats, by shaft id
+    /// (`dispatch_cars.rs`). Ordered for the prune, as above.
+    cars: BTreeMap<i64, car_state::Cars>,
     /// Waiting passengers per floor. An ordered map, so a floor lookup
     /// compares small integer keys where a hash map ran SipHash on each.
     /// Every read and write is by floor, and `retain` decays each entry on
@@ -100,14 +100,6 @@ pub struct ElevatorDispatch {
 impl ElevatorDispatch {
     pub fn new() -> ElevatorDispatch {
         ElevatorDispatch::default()
-    }
-
-    fn prune_removed_shafts(&mut self, tower: &Tower) {
-        // The shaft index answers "is this id live" without building a set.
-        let live = |id: &i64| tower.transport_index(*id).is_some();
-        self.car_dwell.retain(|id, _| live(id));
-        self.car_seen.retain(|id, _| live(id));
-        self.car_held.retain(|id, _| live(id));
     }
 
     /// `accumulate(tower, dt, rush)`: once per outer step. Returns the tower's
@@ -169,8 +161,7 @@ impl ElevatorDispatch {
                     rules.car_speed
                 };
             let dwell = self.car_dwell.entry(id).or_default();
-            let seen = self.car_seen.entry(id).or_default();
-            let held = self.car_held.entry(id).or_default();
+            let car_state::Cars { seen, held, seats } = self.cars.entry(id).or_default();
             if dwell.len() != cars || seen.len() != cars || held.len() != cars {
                 (*dwell, *seen, *held) = (vec![0.0; cars], vec![0.0; cars], vec![0.0; cars]);
             }
@@ -178,6 +169,7 @@ impl ElevatorDispatch {
                 t.car_load = Some(vec![0.0; cars]);
             }
             let car_load = t.car_load.as_mut().unwrap();
+            let est = car_state::Cars::seats(seats, car_load, staff_only);
             let cap = kind.car_capacity();
             // Most steps fill no car, and then nothing is looked up.
             let any_full = rules.full_car_passes && !calls.full.is_empty();
@@ -244,7 +236,7 @@ impl ElevatorDispatch {
                     .and_then(|c| c.get(&(i as i64)))
                     .is_some_and(|c| !c.is_empty());
                 if stood_down && !riders_aboard {
-                    car_load[i] = 0.0;
+                    (car_load[i], est[i]) = (0.0, 0.0);
                     dwell[i] = 0.0;
                     let cur = t.car_positions[i];
                     let home = car_home as f64;
@@ -275,7 +267,7 @@ impl ElevatorDispatch {
                             tally: &mut self.board_tally,
                         };
                         let (room, live) = (cap - car_load[i], has_bit(call_bits, k));
-                        let got = b.arrivals(
+                        let (got, from_estimate) = b.arrivals(
                             id,
                             fl,
                             (takes_at(fl, t.car_dir[i]), &mut seen[i]),
@@ -284,7 +276,10 @@ impl ElevatorDispatch {
                             live,
                         );
                         if got > 0.0 {
-                            car_load[i] += got;
+                            // Seats left on a car whose load emptied between steps (sold
+                            // and bought back while paused) go with the load.
+                            let kept = est[i].min(car_load[i]);
+                            (car_load[i], est[i]) = (car_load[i] + got, kept + from_estimate);
                             let left = wait_limit.map_or(shaft_dwell, |l| l - held[i]);
                             dwell[i] = shaft_dwell.min(left).max(0.0);
                         }
@@ -399,7 +394,7 @@ impl ElevatorDispatch {
                         let tg = car_home as f64;
                         if (pos - tg).abs() < 0.05 {
                             t.car_dir[i] = 0;
-                            car_load[i] = 0.0;
+                            (car_load[i], est[i]) = (0.0, 0.0);
                             // Parked at home: it settles on the floor and
                             // opens for whoever waits there.
                             t.car_positions[i] = tg;
@@ -417,7 +412,8 @@ impl ElevatorDispatch {
                     pos = target;
                     dwell[i] = shaft_dwell;
                     held[i] = 0.0;
-                    car_load[i] = (car_load[i] - (car_load[i] * 0.45).ceil()).max(0.0);
+                    let left = (car_load[i] - (car_load[i] * 0.45).ceil()).max(0.0);
+                    (est[i], car_load[i]) = (car_state::share(est[i], car_load[i], left), left);
                     let tf = target as i64;
                     let w = if staff_only {
                         hall_at(tf)
@@ -434,6 +430,8 @@ impl ElevatorDispatch {
                     let board = b.board(id, tf, w, room, staff_only, live);
                     if board > 0.0 {
                         car_load[i] += board;
+                        // A staff car boards only the crowd's callers.
+                        est[i] += if staff_only { 0.0 } else { board };
                         t.rides += 1;
                     }
                     if pos >= t.top as f64 {

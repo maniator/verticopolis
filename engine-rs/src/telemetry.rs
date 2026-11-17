@@ -6,12 +6,9 @@
 //! carries the hourly rings (`telemetry_save.rs`); any other load starts
 //! every ring empty.
 
-use std::collections::HashMap;
-
 use indexmap::IndexMap;
 use serde_json::{json, Value};
 
-use crate::crowd::PState;
 use crate::sim::Simulation;
 
 pub const ORIGIN_HOURS: usize = 24;
@@ -139,23 +136,14 @@ impl Simulation {
         let mut boardings = self.elevators.drain_boardings();
         // The crowd's riders are outside the dispatch's estimate, so their
         // boardings join the estimate's here (#477): a cinema's evening
-        // crowd marks its own floor. Office workers (`crowd::commuters`) also
-        // add the seats they fill: a shaft full of commuters reads full.
-        // Drained in place, so the map keeps its room from hour to hour.
+        // crowd marks its own floor. Drained in place, so the map keeps its
+        // room from hour to hour.
         for ((shaft, floor), n) in self.crowd.elevator_boardings.drain(..) {
             *boardings
                 .entry(shaft)
                 .or_default()
                 .entry(floor)
                 .or_insert(0.0) += n;
-        }
-        let mut commuters_aboard: HashMap<i64, f64> = HashMap::new();
-        for p in &self.crowd.people {
-            if p.commuter && p.state == PState::Riding {
-                if let Some(shaft) = p.shaft_id {
-                    *commuters_aboard.entry(shaft).or_insert(0.0) += 1.0;
-                }
-            }
         }
         let prev_minutes = self.clock.minutes - 60.0;
         let origin_hour = ((prev_minutes / 60.0).floor() as i64).rem_euclid(24);
@@ -169,12 +157,7 @@ impl Simulation {
         for &ti in &floors.elevators {
             let t = &self.tower.transports[ti];
             let cap = t.cars as f64 * t.kind.car_capacity();
-            let load: f64 = t
-                .car_load
-                .as_ref()
-                .map(|l| l.iter().fold(0.0, |sum, n| sum + n))
-                .unwrap_or(0.0)
-                + commuters_aboard.get(&t.id).copied().unwrap_or(0.0);
+            let load = self.elevators.riders_aboard(t, &self.crowd);
             let frac = if cap > 0.0 {
                 (load / cap).min(1.0)
             } else {

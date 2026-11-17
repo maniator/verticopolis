@@ -1,6 +1,7 @@
 //! The cars' in-flight timers in a save: how long each car has stood at its
 //! stop with its doors open, the callers it has already seen there, and the
-//! time it has waited, plus the statistical waiting estimate on each floor.
+//! time it has waited, and its estimate seats (`dispatch_cars.rs`), plus the
+//! statistical waiting estimate on each floor.
 //! With them a reloaded tower's cars pick up mid-stop where they left off,
 //! so the riders aboard and the people waiting at the doors carry on as they
 //! would have (`crowd::save` carries the people).
@@ -9,10 +10,13 @@
 //! with every timer at zero, as all saves did. Entries that do not read, or
 //! name a shaft the tower does not hold, are skipped; a car list whose length
 //! is not the shaft's car count is reset by the next `move_cars`, as for a
-//! shaft whose cars changed.
+//! shaft whose cars changed. The estimate seats are optional within an entry:
+//! a save from before they were kept loads, and the next `move_cars` takes
+//! them from the cars' load.
 
 use serde_json::{json, Value};
 
+use super::car_state::Cars;
 use super::ElevatorDispatch;
 use crate::charges::whole;
 use crate::facilities::{MAX_FLOOR, MIN_FLOOR};
@@ -34,13 +38,18 @@ impl ElevatorDispatch {
             .car_dwell
             .iter()
             .map(|(id, dwell)| {
-                let none = Vec::new();
-                json!({
+                let none = Cars::default();
+                let cars = self.cars.get(id).unwrap_or(&none);
+                let mut car = json!({
                     "shaftId": id,
                     "dwell": dwell,
-                    "seen": self.car_seen.get(id).unwrap_or(&none),
-                    "held": self.car_held.get(id).unwrap_or(&none),
-                })
+                    "seen": cars.seen,
+                    "held": cars.held,
+                });
+                if let Some(seats) = &cars.seats {
+                    car["estimateSeats"] = json!(seats);
+                }
+                car
             })
             .collect();
         let waiting: Vec<Value> = self
@@ -70,9 +79,13 @@ impl ElevatorDispatch {
                 if tower.transport_index(id).is_none() || self.car_dwell.contains_key(&id) {
                     continue;
                 }
+                // A save from before the seats were kept has none: the next
+                // `move_cars` takes them from the load (`Cars::seats`).
+                let load = tower.get_transport(id).and_then(|t| t.car_load.as_deref());
+                let seats = car_list(car.get("estimateSeats"))
+                    .map(|seats| Cars::restored_seats(seats, load));
                 self.car_dwell.insert(id, dwell);
-                self.car_seen.insert(id, seen);
-                self.car_held.insert(id, held);
+                self.cars.insert(id, Cars { seen, held, seats });
             }
         }
         if let Some(rows) = v.get("waiting").and_then(Value::as_array) {

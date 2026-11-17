@@ -11,6 +11,7 @@ use crate::tower::UnitState;
 #[cfg(test)]
 #[path = "attendance.rs"]
 mod attendance;
+mod busy_meter_riders;
 mod calendar;
 mod canon;
 mod capacity;
