@@ -28,7 +28,7 @@ are documentation only: no build that a client fetches carries them.
 ## 4.11.0
 
 - Every tower is now a file of its own in My Towers, named after the tower. The game saves your tower into its file every 30 seconds and File > Save saves it right away, so the Auto-save row is gone from the Open window and Continue opens the last tower you played. A tower from your linked folder is saved back into its own file there every minute.
-- Right-click a tower in My Towers and choose Previous versions… to go back: the game keeps a version every 10 minutes (the last five) and the last one you saved yourself. Opening one makes it a new tower file and leaves the tower as it was.
+- Right-click (or long-press) a tower in My Towers and choose Previous versions… to go back: the game keeps a version every 10 minutes (the last five) and the last one you saved yourself. Opening one makes it a new tower file and leaves the tower as it was.
 - Keep a copy of my towers here too (the linked folder's copy, once "Keep the Auto-save here too") now copies each tower under its own name.
 - Security guards now fight fires: when a fire breaks out, each Security office sends its six guards down the outside emergency stairs to it, and you can watch them climb and work the burning room. They only help once they get there, and only from an office within 8 floors.
 - Fire Rescue is now a helicopter you can see: it flies in, puts the fire out for good when it lands, sprays a while and flies off. The rooms already burning are still gutted. In Classic it costs $500,000, as in the 1994 game; Modern keeps its star-based price.
