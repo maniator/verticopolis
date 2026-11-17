@@ -177,16 +177,18 @@ interface WriteOver {
   readonly onlyNewer: boolean;
 }
 
-/** One {@link fileSpace.overwrite} transaction, with its versions when
- *  `withVersions`, else the file alone and its versions as they were. */
-async function writeOver(o: Open, w: WriteOver, withVersions: boolean): Promise<TowerFileEntry> {
+/** One {@link fileSpace.overwrite} transaction. A file's first write keeps
+ *  what it held as its original, always; `newVersion` also keeps the new
+ *  bytes as a version when one is due. */
+async function writeOver(o: Open, w: WriteOver, newVersion: boolean): Promise<TowerFileEntry> {
   const tx = o.db.transaction([META, BODIES], "readwrite");
   const meta = tx.objectStore(META);
   const bodies = tx.objectStore(BODIES);
   const out: { entries: TowerFileEntry[] | null; entry: TowerFileEntry | null; refused: Error | null } = { entries: null, entry: null, refused: null };
   const indexReq = meta.get(INDEX);
   const versionsReq = meta.get(versionsKey(w.id));
-  // The body is read only for a file with no versions yet: its original.
+  // The body is read only for a file with no versions yet: its original,
+  // kept on every first write, the full-device retry too.
   const write = (oldBody: unknown) => {
     const list = readIndex(indexReq.result);
     const old = list.find((e) => e.id === w.id);
@@ -203,28 +205,26 @@ async function writeOver(o: Open, w: WriteOver, withVersions: boolean): Promise<
     }
     const entry: TowerFileEntry = { ...old, size: w.bytes.byteLength, modified: w.modified };
     bodies.put(w.bytes, w.id);
-    if (withVersions) {
-      let kept = readVersions(versionsReq.result);
-      if (versionsReq.result === undefined && oldBody instanceof Uint8Array) {
-        const original = originalVersion(w.id, old.modified, oldBody.byteLength);
-        bodies.put(oldBody, original.key);
-        kept = [original];
-      }
+    let kept = readVersions(versionsReq.result);
+    if (versionsReq.result === undefined && oldBody instanceof Uint8Array) {
+      const original = originalVersion(w.id, old.modified, oldBody.byteLength);
+      bodies.put(oldBody, original.key);
+      kept = [original];
+    }
+    if (newVersion) {
       const plan = planVersions(kept, w.id, w.modified, w.bytes.byteLength, w.manual);
       if (plan.put) bodies.put(w.bytes, plan.put.key);
       for (const key of plan.drop) bodies.delete(key);
       meta.put(plan.versions, versionsKey(w.id));
     } else if (versionsReq.result === undefined) {
-      // No room for the original: it can't be kept, and a later write must
-      // not keep this one in its place as if it were.
-      meta.put([], versionsKey(w.id));
+      meta.put(kept, versionsKey(w.id));
     }
     out.entries = list.map((e) => (e.id === w.id ? entry : e));
     out.entry = entry;
     meta.put(out.entries, INDEX);
   };
   versionsReq.onsuccess = () => {
-    if (!withVersions || versionsReq.result !== undefined) return write(null);
+    if (versionsReq.result !== undefined) return write(null);
     const bodyReq = bodies.get(w.id);
     bodyReq.onsuccess = () => write(bodyReq.result);
   };
@@ -364,9 +364,10 @@ export const fileSpace = {
    * {@link FileGoneError} when there is no such tower file (deleted in another
    * tab), with {@link FileConflictError} when another tab wrote it since this
    * one last read or wrote it, and with {@link FileSpaceFullError} when the
-   * device has no room even for the file alone; nothing changes then.
-   * Versions never cost the save: when they don't fit, the file is written
-   * without them.
+   * device has no room for the file (and, on its first write, its original);
+   * nothing changes then. A new version never costs the save: when it
+   * doesn't fit, the file is written without it, but never without its
+   * original.
    */
   overwrite(id: string, bytes: Uint8Array, modified = Date.now(), manual = false, onlyNewer = false): Promise<TowerFileEntry> {
     const o = need();

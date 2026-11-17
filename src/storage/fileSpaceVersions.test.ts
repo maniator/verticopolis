@@ -76,14 +76,28 @@ describe("fileSpace.overwrite", () => {
     expect((await fileSpace.versions(a.id)).map((v) => v.at / VERSION_GAP_MS), "the versions are as they were").toEqual([1, 0]);
   });
 
-  it("writes a file with no room for its original, and never keeps a later body in the original's place", async () => {
+  it("keeps a file's original on a nearly full device, dropping only the new version", async () => {
     const a = await fileSpace.save("Sky", "tower", bytes(1), 0);
-    fake.failPutsOf = (key) => key.startsWith("v:");
+    fake.failPutsOf = (key) => key.startsWith("v:") && !key.includes(":o");
     await fileSpace.overwrite(a.id, bytes(2), VERSION_GAP_MS);
     fake.failPutsOf = null;
-    expect(await fileSpace.read(a.id)).toEqual(bytes(2));
+    expect(await fileSpace.read(a.id), "the save landed").toEqual(bytes(2));
+    const [v, ...rest] = await fileSpace.versions(a.id);
+    expect(rest).toEqual([]);
+    expect(v.original, "the only version is the file as it was").toBe(true);
+    expect(await fileSpace.readVersion(v.key)).toEqual(bytes(1));
+  });
+
+  it("refuses a file's first write when even its original doesn't fit, and leaves the file as it was", async () => {
+    const a = await fileSpace.save("Sky", "tower", bytes(1), 0);
+    fake.failPutsOf = (key) => key.startsWith("v:");
+    await expect(fileSpace.overwrite(a.id, bytes(2), VERSION_GAP_MS)).rejects.toBeInstanceOf(FileSpaceFullError);
+    fake.failPutsOf = null;
+    expect(await fileSpace.read(a.id)).toEqual(bytes(1));
+    expect(await fileSpace.versions(a.id)).toEqual([]);
+    // With room again, the first write keeps the original after all.
     await fileSpace.overwrite(a.id, bytes(3), 2 * VERSION_GAP_MS);
-    expect((await fileSpace.versions(a.id)).map((v) => [v.at / VERSION_GAP_MS, v.original ?? false])).toEqual([[2, false]]);
+    expect((await fileSpace.versions(a.id)).map((v) => [v.at / VERSION_GAP_MS, v.original ?? false])).toEqual([[2, false], [0, true]]);
   });
 
   it("refuses to write over a file another window wrote since this one read or wrote it, and writes nothing", async () => {
