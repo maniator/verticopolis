@@ -15,6 +15,7 @@
 //
 // `src/simport/enginePort.types.test.ts` holds the engine to this shape.
 import type { EnginePortSkyBridge } from "./skyBridgePort";
+import type { EnginePortTraffic } from "./trafficPort";
 
 /** Low-frequency keyed inspector facts. Rust produces the status verdicts
  * and the numbers; neither the UI nor the binding recomputes game rules. */
@@ -462,11 +463,6 @@ export interface EnginePortFiles {
 export interface EnginePortRender {
   /** The mean congestion over populated floors; read per frame. */
   congestion(): number;
-  /** The raw congestion ratio of one floor: the value `hotspot` takes its peak
-   *  from, 0 for a floor with no reading (empty, stranded, or not a whole
-   *  number). For tests and tools that need the number itself; the overlay's
-   *  severity ramp saturates. It walks the rooms, so it is not a per-frame read. */
-  floorCongestion(floor: number): number;
   /** The elevator queue projection as `queueView`, `queueLanding` and
    *  `queueCar` slots; kept per step and revision, so read per frame. */
   queueView(): PortRecord;
@@ -497,4 +493,5 @@ export interface EnginePort
     EnginePortQueries,
     EnginePortFiles,
     EnginePortRender,
-    EnginePortSkyBridge {}
+    EnginePortSkyBridge,
+    EnginePortTraffic {}

@@ -57,6 +57,7 @@ import { PREVIOUS_VERSIONS_SCENES } from "./scenes/previousVersions.ts";
 import { DESK_SCENES } from "./scenes/desk.ts";
 import { APPEARANCE_SCENES } from "./scenes/appearance.ts";
 import { STAR_UP_SCENES } from "./scenes/starUp.ts";
+import { TRAFFIC_JUMP_SCENES } from "./scenes/trafficJump.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -86,4 +87,5 @@ export const SCENES: Scene[] = [
   ...APPEARANCE_SCENES,
   ...STAR_UP_SCENES,
   ...FRONT_DOOR_SCENES,
+  ...TRAFFIC_JUMP_SCENES,
 ];

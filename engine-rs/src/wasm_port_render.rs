@@ -77,6 +77,18 @@ impl Engine {
             .unwrap_or(0.0)
     }
 
+    /// `congestionCause`: the transport ids behind one floor's reading,
+    /// empty for a floor with no reading or one that is not a whole number.
+    pub(crate) fn port_congestion_cause(&self, floor: f64) -> Vec<f64> {
+        whole(floor).map_or_else(Vec::new, |f| {
+            self.sim
+                .congestion_cause(f)
+                .into_iter()
+                .map(|id| id as f64)
+                .collect()
+        })
+    }
+
     /// What the congestion answers read: the tower, the crowd step, the
     /// revision, the clock's minutes and the mark log's position.
     fn congestion_key(&self) -> CongestionKey {

@@ -142,6 +142,10 @@ export const SHARDS: Record<string, string[]> = {
   // Each Modern tower's own front door (owner, 2026-11-16): one small frozen
   // pair of towers, day and night; its own shard, as new features get.
   "front-doors": ["front-doors"],
+  // The Traffic readout's jump (owner, 2026-11-17): the jammed tower the
+  // traffic chip shots use, tapped on desktop and on a phone, with the floor
+  // banded and its transports outlined; its own shard, as new features get.
+  "traffic-jump": ["traffic-jump", "traffic-jump-mobile"],
   // The answer to a fire (#1889): guards on the stairs and at the room, and
   // the rescue helicopter flying in and spraying; two small frozen towers
   // run by the engine's own ticks; its own shard, as new features get.

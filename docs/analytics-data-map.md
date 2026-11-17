@@ -287,6 +287,17 @@ menu) is that menu's own `menu_pick` or `desk_start`, never a `title_pick`.
 The "Title screen: buttons pressed" dashboard tile splits it by `detail`. Read
 it beside `desk_title_shown` to tell a computer's title screen from a phone's.
 
+## The Traffic readout's tap
+
+`app_action` `traffic_jump` counts a click, tap, Enter or Space on the HUD's
+Traffic readout while it names a floor (above Smooth): the view zoomed in on
+that floor (`src/game/trafficHud.ts`). `detail` is `shafts` when the engine named
+the elevators, stairs or escalators behind the floor's reading and they were
+outlined, or `none` when it named none. A tap while the readout says Smooth
+does nothing and sends nothing. Read it against sessions that saw the readout
+above Smooth to tell whether players find the tap. The "Traffic readout taps"
+dashboard tile splits it by `detail`.
+
 ## The manual's links to the game
 
 The help site (help.verticopolis.com) reports through the same relay:

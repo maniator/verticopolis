@@ -182,4 +182,8 @@ export type AppActionName =
   | "help_game_link"
   // A drag's release said why it stopped (src/game/dragRefusal.ts, #1847,
   // #2046): `detail` `extend` (an elevator's arrow) or `bulldoze`.
-  | "drag_stopped";
+  | "drag_stopped"
+  // A tap on the HUD's Traffic readout above Smooth (src/game/trafficHud.ts):
+  // the camera went to the floor it names. `detail` `shafts` when the
+  // transports behind the reading were found and lit, `none` when not.
+  | "traffic_jump";

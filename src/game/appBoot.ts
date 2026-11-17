@@ -51,6 +51,7 @@ import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
 import { wireMovableWindows } from "./movableWindows";
 import { wireDesk } from "../ui/desk/deskController";
 import { wireTitlePicks } from "./titlePicks";
+import { wireTrafficJump } from "./trafficHud";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { placeSkyBridge } from "./skyBridgeGestures";
 import { wirePlayerTextSources } from "./playerTextSources";
@@ -297,6 +298,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   wireMenus(app); // the menu bar, its Tower Info and Bulletin windows, the status bar
   wireDesk(); // on a computer, every part of the game in its own window (option C)
   wireTitlePicks(); // each title-screen button press, as app_action title_pick
+  wireTrafficJump(app); // a tap on the Traffic readout goes to the floor it names
   // My Towers and the one-time copy of the save slots; then the loaded tower's
   // own file is found, or made (`towerDocument.ts`).
   void bootTowerDocument(app, savedAtBoot, openFileSpace(app));

@@ -311,3 +311,28 @@ fn a_floors_congestion_is_its_spatial_reading() {
         assert_eq!(e.port_floor_congestion(floor), 0.0, "{floor}");
     }
 }
+
+/// `congestionCause` hands the port the engine's answer as numbers, and a
+/// floor with no reading or one that is not a whole number names nothing.
+#[test]
+fn a_floors_congestion_cause_is_the_engines_answer() {
+    let mut e = built();
+    let office = e
+        .sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Office)
+        .unwrap()
+        .id;
+    let (u, at) = e.sim.tower.marked_by_id(office).unwrap();
+    u.set_state(at, UnitState::Vacating);
+    let floor = e.sim.peak_congestion().1.expect("a hotspot");
+    let ids = e.sim.congestion_cause(floor);
+    assert!(!ids.is_empty(), "the hotspot has a cause");
+    let answer: Vec<f64> = ids.iter().map(|&id| id as f64).collect();
+    assert_eq!(e.port_congestion_cause(floor as f64), answer);
+    for floor in [9999.0, -40.0, floor as f64 + 0.5, f64::NAN, f64::INFINITY] {
+        assert!(e.port_congestion_cause(floor).is_empty(), "{floor}");
+    }
+}

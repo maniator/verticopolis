@@ -129,7 +129,7 @@
 /* One line always: the value carries a glyph + tier word + optional floor suffix;
    letting it wrap would make this stat taller than its neighbors and break the
    bar's vertical centering. */
-#traffic { white-space: nowrap; }
+#traffic { white-space: nowrap; cursor: pointer; }
 /* The old text meter set this line's height with Courier's metrics, a pixel
    taller than the chip font alone. A zero-width space in the same face keeps
    that line box, so the top bar and everything under it stay where they were. */

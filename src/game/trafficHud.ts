@@ -2,6 +2,10 @@ import type { GameApp } from "../main";
 import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficLevel } from "../presentation/traffic";
 import { floorLabel } from "../ui/floorLabel";
 import { noteFrameError } from "./frameErrors";
+import { trackAppAction } from "../analytics";
+import { spotlightTraffic, type SpotShaft } from "../render/excalibur/trafficSpotlight";
+import { TILE } from "../render/scale";
+import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../shared/viewZoom";
 
 /**
  * The color-blind-safe traffic HUD, split out of the `GameApp` class. It asks
@@ -82,4 +86,64 @@ function drawTraffic(app: GameApp, { ratio: cong, floor: hotspot }: { ratio: num
     wrapEl?.setAttribute("aria-label", aria);
     wrapEl?.classList.toggle("traffic-warn", tier >= 2); // red is a redundant cue, not the only one
   }
+}
+
+/** The readout as a control: above Smooth, a click, a tap, Enter or Space on
+ *  it brings the tower to the floor it names and lights up what backs it up
+ *  ({@link jumpToTraffic}). Wired once at boot. */
+export function wireTrafficJump(app: GameApp): void {
+  const el = document.getElementById("traffic");
+  if (!el) return;
+  el.addEventListener("click", () => jumpToTraffic(app));
+  el.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    jumpToTraffic(app);
+  });
+}
+
+/** Center the camera on the floor the readout names, across the transports
+ *  behind its reading (`congestionCause`), zoomed in on them ({@link jumpFrame}),
+ *  and put the spotlight on them. Does nothing while the readout says Smooth, since it names no floor then.
+ *  Reports `app_action` `traffic_jump` with the cause found: `shafts` or
+ *  `none`. Answers whether the camera moved. */
+export function jumpToTraffic(app: GameApp): boolean {
+  if (app.lastTrafficTier === 0) return false;
+  const floor = app.portCodes.slot(app.enginePort.hotspot(), "hotspot", "floor");
+  if (Number.isNaN(floor)) return false;
+  const shafts: SpotShaft[] = [];
+  for (const id of app.enginePort.congestionCause(floor)) {
+    const t = app.engine.sim.tower.getTransport(id);
+    if (t) shafts.push(t);
+  }
+  const frame = jumpFrame(shafts, app.engine.viewState().tile, app.engine.viewWidth);
+  // A view's floor is the camera's center; a floor's row sits half a floor
+  // below its number's line.
+  app.engine.applyView({ tile: frame.tile, floor: floor - 0.5, zoom: frame.zoom });
+  spotlightTraffic(app.engine, floor, shafts);
+  trackAppAction("traffic_jump", shafts.length > 0 ? "shafts" : "none");
+  return true;
+}
+
+/** How close the jump comes in: a floor is then 90 pixels tall, near enough
+ *  to see the people waiting at the landings. */
+export const JUMP_ZOOM = 2;
+/** Tiles of tower kept beside the outermost transport behind the reading. */
+const JUMP_MARGIN_TILES = 8;
+
+/** Where the jump puts the camera across the lot, and how close: centered on
+ *  the transports behind the reading (`tile` when there are none), zoomed in
+ *  to {@link JUMP_ZOOM} or as far as still shows all of them across a view
+ *  `viewWidth` pixels wide. */
+export function jumpFrame(shafts: readonly SpotShaft[], tile: number, viewWidth: number): { tile: number; zoom: number } {
+  if (shafts.length === 0) return { tile, zoom: JUMP_ZOOM };
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const t of shafts) {
+    lo = Math.min(lo, t.x);
+    hi = Math.max(hi, t.x + t.width);
+  }
+  const fit = viewWidth / ((hi - lo + 2 * JUMP_MARGIN_TILES) * TILE);
+  const zoom = Math.max(VIEW_ZOOM_MIN, Math.min(JUMP_ZOOM, VIEW_ZOOM_MAX, fit));
+  return { tile: (lo + hi) / 2, zoom };
 }

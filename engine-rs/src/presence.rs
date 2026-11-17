@@ -27,7 +27,23 @@ pub struct ShaftsByFloor {
     /// How many transports hold a slot: one per transport that stops at a
     /// served floor, numbered in list order.
     slots: usize,
+    /// Each slot's transport id, by slot.
+    ids: Vec<i64>,
 }
+
+/// The pieces every congestion reading starts from (`shaft_loads`).
+struct ShaftLoads {
+    shafts: Arc<ShaftsByFloor>,
+    /// Each slot's share of the floors' demand.
+    load_by_shaft: Vec<f64>,
+    /// The populated floors (the ground lobby left out), in room order.
+    pop_by_floor: IndexMap<i64, f64>,
+    rush: f64,
+}
+
+/// `HEADROOM` in `buildSpatialCongestion`: how many loads a transport's
+/// capacity carries before it reads as full.
+const HEADROOM: f64 = 12.0;
 
 #[doc(hidden)]
 impl Simulation {
@@ -147,6 +163,52 @@ impl Simulation {
         (ratios, attribution)
     }
 
+    /// The transports behind a floor's congestion reading
+    /// (`spatial_congestion_by_floor`), as ids in the tower's transport
+    /// order, so a frontend can point at them. Where the floor's real
+    /// commute wait sets its reading (`fold_commute_waits`), that is every
+    /// passenger elevator stopping there, since the wait is a wait for a car.
+    /// Otherwise it is the transport, or the transports tied for it, with
+    /// the highest estimate on the floor. Empty for a floor with no reading.
+    /// It runs the reading's load pass once and reads both the floor's
+    /// reading and each transport's estimate from it, so the two cannot
+    /// disagree; still a read for a tap, not a frame.
+    pub fn congestion_cause(&self, floor: i64) -> Vec<i64> {
+        let loads = self.shaft_loads();
+        let (mut ratios, _) = Self::spatial_from(loads.as_ref(), false);
+        self.fold_commute_waits(&mut ratios, None);
+        let Some(&reading) = ratios.get(&floor) else {
+            return Vec::new();
+        };
+        let at_floor = loads
+            .as_ref()
+            .and_then(|l| l.shafts.floors.get(&floor))
+            .map_or(&[][..], |(_, at)| at.as_slice());
+        let readings: Vec<f64> = at_floor
+            .iter()
+            .map(|&(slot, cap, _)| {
+                loads
+                    .as_ref()
+                    .map_or(0.0, |l| shaft_reading(l.load_by_shaft[slot], cap, l.rush))
+            })
+            .collect();
+        let estimate = readings.iter().copied().fold(0.0, f64::max);
+        let waits_set_it = reading > estimate;
+        let ids = |slot: usize| loads.as_ref().map(|l| l.shafts.ids[slot]);
+        at_floor
+            .iter()
+            .zip(&readings)
+            .filter(|((_, _, kind), &r)| {
+                if waits_set_it {
+                    kind.is_elevator()
+                } else {
+                    r == estimate && r > 0.0
+                }
+            })
+            .filter_map(|(&(slot, _, _), _)| ids(slot))
+            .collect()
+    }
+
     /// Raises each floor's transport estimate to the floor's real average
     /// commute wait over the mode's limit where that is higher
     /// (`commute_wait_congestion`, #1971). A floor the estimate has no
@@ -210,42 +272,27 @@ impl Simulation {
         &self,
         with_attribution: bool,
     ) -> (IndexMap<i64, f64>, IndexMap<i64, CongestionAttribution>) {
-        const HEADROOM: f64 = 12.0;
-        let rush = self.rush_factor();
+        Self::spatial_from(self.shaft_loads().as_ref(), with_attribution)
+    }
+
+    /// The readings of `build_spatial_congestion` from loads already
+    /// gathered, so a reader that also needs the per-transport loads
+    /// (`congestion_cause`) gathers them once.
+    fn spatial_from(
+        loads: Option<&ShaftLoads>,
+        with_attribution: bool,
+    ) -> (IndexMap<i64, f64>, IndexMap<i64, CongestionAttribution>) {
         let mut result: IndexMap<i64, f64> = IndexMap::new();
         let mut attribution: IndexMap<i64, CongestionAttribution> = IndexMap::new();
-        let mut pop_by_floor: IndexMap<i64, f64> = IndexMap::new();
-        let mut metro = 0;
-        for u in self.tower.room_units() {
-            if u.kind == Kind::Metro && u.is_operational() {
-                metro += 1;
-            }
-            if u.is_present() {
-                let p = u.live_load();
-                if p > 0 && u.floor != 1 {
-                    *pop_by_floor.entry(u.floor).or_insert(0.0) += p as f64;
-                }
-            }
-        }
-        if pop_by_floor.is_empty() {
+        let Some(&ShaftLoads {
+            shafts: ref shafts_by_floor,
+            ref load_by_shaft,
+            ref pop_by_floor,
+            rush,
+        }) = loads
+        else {
             return (result, attribution);
-        }
-        let parking = self.tower.functional_parking_spots();
-        let relief = (1.0 - metro as f64 * 0.25 - parking as f64 * 0.02).max(0.4);
-        let shafts_by_floor = self.congestion_shafts();
-        let mut load_by_shaft = vec![0.0; shafts_by_floor.slots];
-        for (f, pop) in &pop_by_floor {
-            let Some((total_cap, shafts)) = shafts_by_floor.floors.get(f) else {
-                continue;
-            };
-            if *total_cap <= 0.0 {
-                continue;
-            }
-            let demand = pop * relief;
-            for &(slot, cap, _) in shafts {
-                load_by_shaft[slot] += demand * (cap / total_cap);
-            }
-        }
+        };
         for (f, (_, shafts)) in &shafts_by_floor.floors {
             if *f != 1 && !pop_by_floor.contains_key(f) {
                 continue;
@@ -253,11 +300,7 @@ impl Simulation {
             let mut c = 0.0;
             let mut att = CongestionAttribution::default();
             for (slot, cap, kind) in shafts {
-                let cong = if *cap > 0.0 {
-                    (load_by_shaft[*slot] * rush) / (cap * HEADROOM)
-                } else {
-                    99.0
-                };
+                let cong = shaft_reading(load_by_shaft[*slot], *cap, rush);
                 if cong > c {
                     c = cong;
                 }
@@ -286,6 +329,51 @@ impl Simulation {
         (result, attribution)
     }
 
+    /// The demand each transport carries: the populated floors' people
+    /// (less the Metro's and the garage's relief) shared over the transports
+    /// that stop on each floor by capacity. `None` when no floor off the
+    /// ground lobby holds anyone, the case where every reading is empty.
+    fn shaft_loads(&self) -> Option<ShaftLoads> {
+        let mut pop_by_floor: IndexMap<i64, f64> = IndexMap::new();
+        let mut metro = 0;
+        for u in self.tower.room_units() {
+            if u.kind == Kind::Metro && u.is_operational() {
+                metro += 1;
+            }
+            if u.is_present() {
+                let p = u.live_load();
+                if p > 0 && u.floor != 1 {
+                    *pop_by_floor.entry(u.floor).or_insert(0.0) += p as f64;
+                }
+            }
+        }
+        if pop_by_floor.is_empty() {
+            return None;
+        }
+        let parking = self.tower.functional_parking_spots();
+        let relief = (1.0 - metro as f64 * 0.25 - parking as f64 * 0.02).max(0.4);
+        let shafts = self.congestion_shafts();
+        let mut load_by_shaft = vec![0.0; shafts.slots];
+        for (f, pop) in &pop_by_floor {
+            let Some((total_cap, at_floor)) = shafts.floors.get(f) else {
+                continue;
+            };
+            if *total_cap <= 0.0 {
+                continue;
+            }
+            let demand = pop * relief;
+            for &(slot, cap, _) in at_floor {
+                load_by_shaft[slot] += demand * (cap / total_cap);
+            }
+        }
+        Some(ShaftLoads {
+            shafts,
+            load_by_shaft,
+            pop_by_floor,
+            rush: self.rush_factor(),
+        })
+    }
+
     /// The congestion reading's transports per served floor, built once per
     /// tower revision: the HUD reads congestion several times a second and a
     /// Modern tower may hold thousands of flights. Placing, removing or
@@ -310,6 +398,7 @@ impl Simulation {
             }
             let (slot, cap) = (table.slots, Simulation::transport_capacity(t.kind, t.cars));
             table.slots += 1;
+            table.ids.push(t.id);
             for f in stops.into_iter().filter(|f| served.contains(f)) {
                 let (_, shafts) = table.floors.entry(f).or_default();
                 shafts.push((slot, cap, t.kind));
@@ -344,5 +433,16 @@ impl Simulation {
         } else {
             0.0
         }
+    }
+}
+
+/// One transport's congestion reading: its share of the demand at the rush
+/// over the load its capacity carries. A transport with no capacity reads
+/// as fully jammed.
+fn shaft_reading(load: f64, cap: f64, rush: f64) -> f64 {
+    if cap > 0.0 {
+        (load * rush) / (cap * HEADROOM)
+    } else {
+        99.0
     }
 }

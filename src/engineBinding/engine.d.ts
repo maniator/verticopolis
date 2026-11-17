@@ -130,6 +130,14 @@ export class Engine {
      * it with the crowd; a save without one starts empty and fills as trips finish.
      */
     commuteStress(): string;
+    /**
+     * The ids of the transports behind one floor's congestion reading
+     * (`Simulation::congestion_cause`), in the tower's transport order:
+     * what the Traffic readout points at when the player taps it. Empty for
+     * a floor with no reading and for one that is not a whole number. It
+     * builds the reading, so it is a read for a tap, not a frame.
+     */
+    congestionCause(floor: number): Float64Array;
     congestion(): number;
     crewCoverage(): Float64Array;
     /**

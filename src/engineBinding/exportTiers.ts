@@ -269,6 +269,8 @@ export const BINDING_EXPORT_TIERS = {
   congestion: T2,
   // A test and tooling read (one pass over the rooms), not a per-frame one.
   floorCongestion: T2,
+  // The Traffic readout's tap (one pass over the rooms), not a per-frame read.
+  congestionCause: T2,
   queueView: T2,
   parkingSet: T2,
   parkingUsage: T2,

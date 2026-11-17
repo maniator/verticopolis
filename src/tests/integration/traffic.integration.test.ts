@@ -99,6 +99,9 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
     // pressure the office floors above share, not a signal of its own residents.
     expect(sim.floorCongestion(1)).toBeCloseTo(ratio, 10);
     expect(trafficTier(ratio)).toBeGreaterThanOrEqual(2);
+    // Tapping the readout points at that one weak shaft.
+    expect(sim.congestionCause(1)).toEqual([draft.tower.transports[0].id]);
+    expect(sim.congestionCause(1.5)).toEqual([]);
   });
 
   it("a well-built tower stays Smooth and names no floor (peak below the first boundary)", () => {
