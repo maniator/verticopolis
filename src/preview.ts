@@ -21,7 +21,7 @@ const ENTRIES: Entry[] = [
   { label: "Condominium: evening", kind: "condo", state: "occupied", occ: 3, hour: 20 },
   { label: "Single Room: ready", kind: "hotelSingle", state: "empty", occ: 0, hour: 20 },
   { label: "Single Room: asleep", kind: "hotelSingle", state: "asleep", occ: 1, hour: 1 },
-  { label: "Double Room: asleep", kind: "hotelDouble", state: "asleep", occ: 2, hour: 1 },
+  { label: "Twin Room: asleep", kind: "hotelDouble", state: "asleep", occ: 2, hour: 1 },
   { label: "Suite: ready", kind: "hotelSuite", state: "empty", occ: 0, hour: 20 },
   { label: "Hotel: needs cleaning", kind: "hotelDouble", state: "dirty", occ: 0, hour: 10 },
   { label: "Fast Food: lunch", kind: "fastFood", state: "occupied", occ: 5, hour: 12 },

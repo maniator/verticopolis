@@ -150,7 +150,7 @@ describe("importReport", () => {
       "4 hotel rooms (1 with sleeping guests, 2 awaiting housekeeping).",
     );
     expect(text).toContain(
-      "Of those, 2 are twin rooms, which are Double Rooms here.",
+      "Of those, 2 are Twin Rooms.",
     );
     expect(text).toContain("3 food, retail, and entertainment venues.");
     expect(text).toContain("1 service and special facility.");
@@ -187,7 +187,7 @@ describe("importReport", () => {
     expect(text).toContain("1 condo (0 sold).");
     expect(text).toContain("1 hotel room, ready for guests.");
     expect(text).toContain(
-      "Of those, 1 is a twin room, which is a Double Room here.",
+      "Of those, 1 is a Twin Room.",
     );
     expect(text).toContain("1 food, retail, and entertainment venue.");
     expect(text).toContain("2 service and special facilities.");

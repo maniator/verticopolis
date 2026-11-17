@@ -118,11 +118,11 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     );
   }
   if (counts.twinRooms > 0) {
-    // The original's twin room is our Double Room: same width, same two guests. A rename, not a loss.
+    // The original's twin room is our Twin Room (`hotelDouble`): same width, same two guests.
     broughtOver.push(
       counts.twinRooms === 1
-        ? "Of those, 1 is a twin room, which is a Double Room here."
-        : `Of those, ${counts.twinRooms} are twin rooms, which are Double Rooms here.`,
+        ? "Of those, 1 is a Twin Room."
+        : `Of those, ${counts.twinRooms} are Twin Rooms.`,
     );
   }
   if (counts.venues > 0) {

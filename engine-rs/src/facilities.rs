@@ -44,7 +44,7 @@ pub enum Kind {
     Condo,
     /// Single Room.
     HotelSingle,
-    /// Double Room.
+    /// Twin Room (the 1994 name, #380; the kind id stays `hotelDouble`).
     HotelDouble,
     /// Suite.
     HotelSuite,
