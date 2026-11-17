@@ -14,6 +14,9 @@ import { lobbyHeightFor } from "./lobbyHeight";
 import { finishesHalfBridge, quoteSkyBridge } from "./skyBridgeTool";
 import { trackAppAction } from "../analyticsActions";
 
+/** Takes a drag step's refusal reason in place of a toast (`dragRefusal.ts`). */
+type RefusalSink = (reason: string) => void;
+
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
  * sells (mouse, touch, keyboard cursor, editor buttons) funnels through this
@@ -249,20 +252,22 @@ export class BuildActions {
 
   /**
    * Shared player-removal path: the engine's demolish member refuses a
-   * burning unit or load-bearing structure (with an error toast unless
-   * `quiet`; drag steps stay silent, like build drags) and pays the refund.
+   * burning unit or load-bearing structure (with an error toast, or the
+   * reason handed to `held` on a drag step) and pays the refund.
    * Returns true on success.
    */
-  tryRemoveUnit(u: { readonly id: number }, verb: "sell" | "bulldoze", quiet = false): boolean {
+  tryRemoveUnit(u: { readonly id: number }, verb: "sell" | "bulldoze", held?: RefusalSink): boolean {
     const port = this.deps.enginePort();
-    return this.removed(port.demolish(u.id, verb === "bulldoze"), quiet);
+    return this.removed(port.demolish(u.id, verb === "bulldoze"), held);
   }
 
-  /** The demolish's outcome, with a refusal's toast unless `quiet`. */
-  private removed(rec: PortRecord, quiet: boolean): boolean {
+  /** The demolish's outcome, with a refusal's toast, or with its reason
+   *  handed to `held` when a drag keeps it for its release (#2046). */
+  private removed(rec: PortRecord, held?: RefusalSink): boolean {
     const res = outcome(this.deps.enginePort(), rec);
     if (!res.ok) {
-      if (!quiet && res.reason) {
+      if (res.reason && held) held(res.reason);
+      else if (res.reason) {
         this.deps.audio.sfx("error");
         this.deps.ui.toast(res.reason, "bad");
       }
@@ -285,14 +290,15 @@ export class BuildActions {
   }
 
   /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
-   *  `quiet` suppresses blocked-removal feedback on the drag path, so sweeping
-   *  across load-bearing floors doesn't machine-gun toasts and error sfx.
+   *  On the drag path `held` takes a blocked removal's reason instead of a
+   *  toast, so sweeping across load-bearing floors doesn't machine-gun toasts
+   *  and error sfx; the drag says it once on release (#2046).
    *  Returns true only when the engine removed the picked facility. */
-  bulldozePicked(p: Picked | null, quiet = false): boolean {
+  bulldozePicked(p: Picked | null, held?: RefusalSink): boolean {
     if (!p) return false;
     // A floor or lobby tile has no id in the view, so it goes by its cell (#1417).
     if (p.type === "unit" && (p.kind === "floor" || p.kind === "lobby") && p.cell) {
-      if (!this.removed(this.deps.enginePort().demolishTile(p.cell.floor, p.cell.x, true), quiet)) return false;
+      if (!this.removed(this.deps.enginePort().demolishTile(p.cell.floor, p.cell.x, true), held)) return false;
       this.deps.audio.sfx("sell");
       return true;
     }
@@ -307,7 +313,7 @@ export class BuildActions {
     }
     if (!found) return false;
     if (p.type === "unit") {
-      if (!this.tryRemoveUnit(found, "bulldoze", quiet)) return false;
+      if (!this.tryRemoveUnit(found, "bulldoze", held)) return false;
     } else if (!this.removeTransportWithRefund(found, "bulldoze")) return false;
     this.deps.audio.sfx("sell");
     if (this.deps.selectedId() === p.id) this.deps.clearSelection();

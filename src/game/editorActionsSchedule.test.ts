@@ -186,15 +186,24 @@ describe("EditorActions: schedule dialog", () => {
 describe("EditorActions: extend drag", () => {
   const onLift = { type: "transport" as const, id: lift.id };
 
-  function dragging(steps: Float64Array[], generation = 3) {
+  /** A drag whose steps answer `steps`, each with the `lastReason` at the
+   *  same index (none when it is missing). */
+  function dragging(
+    steps: Float64Array[],
+    generation = 3,
+    reasons: (string | undefined)[] = [],
+  ) {
     const extendShaft = vi.fn();
     for (const s of steps) extendShaft.mockReturnValueOnce(s);
+    const lastReason = () =>
+      reasons[extendShaft.mock.calls.length - 1] ?? undefined;
     return setup(
       {
         generation: () => generation,
         startExtend: () => rec("buildAt", true),
         stopExtend: () => rec("buildAt", true),
         extendShaft,
+        lastReason,
       },
       onLift,
     );
@@ -222,9 +231,13 @@ describe("EditorActions: extend drag", () => {
       true,
     );
     expect(port.stopExtend).toHaveBeenCalledOnce();
+    expect(
+      deps.ui.toast,
+      "a drag that went where aimed says nothing",
+    ).not.toHaveBeenCalled();
   });
 
-  it("a step that moved nothing or was refused is silent", () => {
+  it("a step that moved nothing or was refused is silent while the drag moves", () => {
     const { actions, deps } = dragging([
       rec("extendShaft", true, { bottom: 1, top: 5 }),
       rec("extendShaft", false, { bottom: 1, top: 9 }),
@@ -233,6 +246,58 @@ describe("EditorActions: extend drag", () => {
     actions.extendSelectedTo("up", 9);
     expect(deps.audio.sfx).not.toHaveBeenCalled();
     expect(deps.refreshEditor).not.toHaveBeenCalled();
+  });
+
+  it("the release says once why the drag stopped short of a lobby (#1847)", () => {
+    const why = "Build the lobby on floor 1 first, then extend through it.";
+    const { actions, deps } = dragging(
+      [
+        rec("extendShaft", true, { bottom: -5, top: 0, added: 3 }),
+        rec("extendShaft", false, { bottom: -5, top: 0 }),
+      ],
+      3,
+      [why, why],
+    );
+    actions.extendSelectedTo("up", 2);
+    actions.extendSelectedTo("up", 3);
+    expect(deps.ui.toast).not.toHaveBeenCalled();
+    expect(deps.audio.sfx.mock.calls).toEqual([["build"]]);
+    actions.endExtend();
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(why, "bad");
+    expect(deps.audio.sfx.mock.calls).toEqual([["build"], ["error"]]);
+  });
+
+  it("a later step that went where it was aimed drops the held reason", () => {
+    const { actions, deps } = dragging(
+      [
+        rec("extendShaft", false, { bottom: 1, top: 5 }),
+        rec("extendShaft", true, { bottom: 1, top: 4 }),
+      ],
+      3,
+      ["Transport shafts cannot overlap."],
+    );
+    actions.extendSelectedTo("up", 7);
+    actions.extendSelectedTo("up", 4);
+    actions.endExtend();
+    expect(deps.ui.toast).not.toHaveBeenCalled();
+  });
+
+  it("a drag a swapped-in tower ended says nothing on release", () => {
+    let generation = 3;
+    const s = setup(
+      {
+        generation: () => generation,
+        startExtend: () => rec("buildAt", true),
+        stopExtend: () => rec("buildAt", true),
+        extendShaft: () => rec("extendShaft", false, { bottom: 1, top: 5 }),
+        lastReason: () => "Transport shafts cannot overlap.",
+      },
+      onLift,
+    );
+    s.actions.extendSelectedTo("up", 7);
+    generation = 4;
+    s.actions.endExtend();
+    expect(s.deps.ui.toast).not.toHaveBeenCalled();
   });
 
   it("a tower swapped in mid-drag ends it, and the release leaves the new gesture open", () => {

@@ -326,7 +326,14 @@ impl Engine {
         let before = self.sim.money;
         let r = self.sim.extend_transport(id, end, target);
         let own = [r.bottom as f64, r.top as f64, r.added as f64];
-        self.finish(before, r.charge.ok, r.charge.reason, &own)
+        // A step stopped short of a floor that refuses is done and still
+        // leaves that floor's reason in `lastReason()` (#1847).
+        let short = r.charge.reason.clone().filter(|_| r.charge.ok);
+        let answer = self.finish(before, r.charge.ok, r.charge.reason, &own);
+        if short.is_some() {
+            self.reason = short;
+        }
+        answer
     }
 
     /// Book the exterminator, with its cost and the rooms it treats. A

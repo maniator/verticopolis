@@ -226,7 +226,7 @@ impl Tower {
     }
 
     /// `transportOverlaps(t, x, width, floor)`.
-    fn transport_overlaps(t: &Transport, x: i64, width: i64, floor: i64) -> bool {
+    pub(super) fn transport_overlaps(t: &Transport, x: i64, width: i64, floor: i64) -> bool {
         if floor < t.bottom || floor > t.top {
             return false;
         }
@@ -260,6 +260,21 @@ impl Tower {
     /// served range, laying plain floor behind newly served floors. Returns
     /// the floors added (negative for a shrink) and the floor tiles laid.
     pub fn resize_transport(&mut self, id: i64, new_bottom: i64, new_top: i64) -> ResizeResult {
+        self.resize_transport_noting(id, new_bottom, new_top, &mut None)
+    }
+
+    /// `resize_transport`, also noting in `refused_at` the newly served floor
+    /// that refused it (another shaft in the way, or a lobby not built). New
+    /// floors are checked outward from the old span, so for a one-ended
+    /// extend that is the refusing floor nearest the old end, and the extend
+    /// can stop just short of it without walking the floors twice (#1847).
+    pub(crate) fn resize_transport_noting(
+        &mut self,
+        id: i64,
+        new_bottom: i64,
+        new_top: i64,
+        refused_at: &mut Option<i64>,
+    ) -> ResizeResult {
         let Some(i) = self.transport_index_edit(id) else {
             return ResizeResult::fail("No such transport.");
         };
@@ -283,34 +298,17 @@ impl Tower {
         {
             return ResizeResult::fail(reason);
         }
+        let above = (prev_top + 1).max(new_bottom)..=new_top;
+        let below = (new_bottom..=(prev_bottom - 1).min(new_top)).rev();
         let mut new_floors = Vec::new();
-        for fl in new_bottom..=new_top {
-            if fl >= prev_bottom && fl <= prev_top {
-                continue;
-            }
-            for other in &self.transports {
-                if other.id == id {
-                    continue;
-                }
-                if Self::transport_overlaps(other, tx, twidth, fl) {
-                    return ResizeResult::fail(SHAFT_OVERLAP);
-                }
-            }
-            // The extend would lay plain floor where a lobby is due: on the
-            // ground floor, which holds only lobby, or on a sky lobby floor
-            // where a tile under the shaft is not built yet.
-            if is_lobby_floor(fl) && !self.span_has_floor(fl, tx, twidth) {
-                let lobby = if is_sky_lobby_floor(fl) {
-                    "sky lobby"
-                } else {
-                    "lobby"
-                };
-                return ResizeResult::fail(format!(
-                    "Build the {lobby} on floor {fl} first, then extend through it."
-                ));
+        for fl in above.chain(below) {
+            if let Some(reason) = self.new_floor_refusal(id, tx, twidth, fl) {
+                *refused_at = Some(fl);
+                return ResizeResult::fail(reason);
             }
             new_floors.push(fl);
         }
+        new_floors.sort_unstable();
         let Some(created) = self.lay_shaft_floors(&new_floors, tx, twidth) else {
             return ResizeResult::fail(NEEDS_FLOORS);
         };

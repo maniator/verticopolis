@@ -16,6 +16,7 @@ mod placement;
 mod removal;
 mod skybridge;
 mod tall_lobby;
+mod transport_reach;
 mod transports;
 mod types;
 mod undoing;

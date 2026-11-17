@@ -186,7 +186,7 @@ shapes for each one.
 | `buildTransport(kind, x, bottom, top)` | Place stairs, an escalator or an elevator shaft between two floors. `{ ok, reason? }`. |
 | `validateTransport(kind, x, bottom, top)` | The same check without building. |
 | `addCar(id)`, `removeCar(id)` | Add or remove an elevator car, charging or refunding it. `{ ok, reason?, delta }`. |
-| `extendTransport(id, end, targetFloor)` | Stretch a shaft `"up"` or `"down"`, billing the new floors. |
+| `extendTransport(id, end, targetFloor)` | Stretch a shaft `"up"` or `"down"`, billing the new floors. A floor the shaft cannot serve (another shaft, a lobby floor whose lobby is not built under it) stops it just short, and the answer is done with that floor's reason. |
 | `removeFacility(id, method)` | Sell or bulldoze a unit or shaft by id (`"sell"` or `"bulldoze"`), paying the refund. `{ ok, reason?, delta }`. |
 | `sellAt(floor, x)` | Remove whatever covers a tile. `true` when something went. |
 | `adjustRent(id, dir)`, `priceUnit(id, target)`, `setNoRate(id)` | Change a room's rent: one step up (`1`) or down (`-1`), a chosen price, or off the market. |

@@ -84,7 +84,8 @@ pub fn car_resale_refund() -> f64 {
 pub struct ChargeResult {
     /// Whether it was carried out.
     pub ok: bool,
-    /// Why it was refused, ready to show a player. `None` when carried out.
+    /// Why it was refused, ready to show a player. `None` when carried out,
+    /// except an extend stopped short of a floor that refuses (#1847).
     pub reason: Option<String>,
     /// The change to the player's money: negative for a charge, positive for
     /// a refund, 0 when refused.
@@ -142,39 +143,9 @@ impl ExtendEnd {
     }
 }
 
-#[doc(hidden)]
-/// `extendBill`: one step of budget-clamped billing for an elevator extend.
-/// Returns the new ends and the count of floors past the high-water mark.
-pub fn extend_bill(
-    cur: (i64, i64),
-    hwm: (i64, i64),
-    end: ExtendEnd,
-    target_floor: i64,
-    money: f64,
-    per_floor: f64,
-) -> (i64, i64, i64) {
-    let (mut nb, mut nt) = cur;
-    match end {
-        ExtendEnd::Up => nt = (cur.0 + 1).max(target_floor),
-        ExtendEnd::Down => nb = (cur.1 - 1).min(target_floor),
-    }
-    let budget = (money / per_floor).floor().max(0.0);
-    // The budget is a whole count of floors; a balance too large for i64
-    // saturates, which still pays for any span the tower can hold.
-    let budget = if budget > i64::MAX as f64 {
-        i64::MAX
-    } else {
-        budget as i64
-    };
-    if nt > hwm.1 {
-        nt = hwm.1 + (nt - hwm.1).min(budget);
-    }
-    if nb < hwm.0 {
-        nb = hwm.0 - (hwm.0 - nb).min(budget);
-    }
-    let added = (nt - hwm.1).max(0) + (hwm.0 - nb).max(0);
-    (nb, nt, added)
-}
+#[path = "charges_extend.rs"]
+mod extend;
+pub use extend::extend_bill;
 
 impl Simulation {
     /// The shaft behind an elevator command: `(kind, cars, bottom, top)`, or
@@ -318,24 +289,22 @@ impl Simulation {
             .map(|(_, b, t)| (b, t));
         let (hb, ht) = gesture.unwrap_or((bottom, top));
         let mark = (hb.min(bottom), ht.max(top));
-        let (nb, nt, added) = extend_bill(
-            (bottom, top),
-            mark,
-            end,
-            target_floor,
-            self.money,
-            TRANSPORT_FLOOR_COST,
-        );
+        let up = end == ExtendEnd::Up;
+        let money = self.money;
+        let bill =
+            |reach: i64| extend_bill((bottom, top), mark, end, reach, money, TRANSPORT_FLOOR_COST);
         let unchanged = |charge: ChargeResult| ExtendResult {
             charge,
             bottom,
             top,
             added: 0,
         };
+        let (mut nb, mut nt, mut added) = bill(target_floor);
         if nb == bottom && nt == top {
-            let wanted = match end {
-                ExtendEnd::Up => target_floor > mark.1,
-                ExtendEnd::Down => target_floor < mark.0,
+            let wanted = if up {
+                target_floor > mark.1
+            } else {
+                target_floor < mark.0
             };
             return unchanged(if wanted {
                 ChargeResult::refuse(NOT_ENOUGH_MONEY)
@@ -343,7 +312,21 @@ impl Simulation {
                 ChargeResult::paid(0.0)
             });
         }
-        let r = self.resize_transport(id, nb, nt);
+        // A floor the shaft cannot newly serve (another shaft in the way, a
+        // lobby due and not built) stops the extend just short of it, and its
+        // reason rides along with the shorter step (#1847). The span up to
+        // that floor was paid for already, so money cannot cut it shorter.
+        let mut refused_at = None;
+        let mut r = self.resize_transport_noting(id, nb, nt, &mut refused_at);
+        let mut stopped = None;
+        if let Some(fl) = refused_at {
+            stopped = r.reason.take();
+            (nb, nt, added) = bill(if up { fl - 1 } else { fl + 1 });
+            if nb == bottom && nt == top {
+                return unchanged(ChargeResult::refuse(stopped.unwrap_or_default()));
+            }
+            r = self.resize_transport(id, nb, nt);
+        }
         if !r.ok {
             return unchanged(ChargeResult {
                 ok: false,
@@ -357,8 +340,10 @@ impl Simulation {
         if gesture.is_some() {
             self.extend_gesture = Some((id, mark.0.min(nb), mark.1.max(nt)));
         }
+        let mut charge = ChargeResult::paid(if cost == 0.0 { 0.0 } else { -cost });
+        charge.reason = stopped;
         ExtendResult {
-            charge: ChargeResult::paid(if cost == 0.0 { 0.0 } else { -cost }),
+            charge,
             bottom: nb,
             top: nt,
             added,

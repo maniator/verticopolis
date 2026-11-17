@@ -12,6 +12,7 @@ import { catalogOf, isUnlocked, quoteShaft } from "./portAccess";
 import { noteFrameError } from "./frameErrors";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 import { appPlacementPaused, refuseAppPlacementWhilePaused } from "./pausedBuild";
+import { holdRefusal, sayHeldRefusal, sayPressRefusal } from "./dragRefusal";
 import { pickPersonAt } from "../render/excalibur/personFocus";
 import { placeSkyBridge, tapSkyBridge } from "./skyBridgeGestures";
 import { SKY_BRIDGE_STEP } from "./skyBridgeTool";
@@ -47,6 +48,8 @@ interface DragGesture {
   /** The drag's paint run stopped because the game paused in a mode that
    *  refuses building while paused (#1936), and said so once. */
   pausedNoted?: boolean;
+  /** A bulldoze step's latest refusal, said once on release (#2046). */
+  stoppedBy?: string;
   /** The kind a bulldoze drag first touched (#644). Unless the Bulldoze card
    *  says a drag clears everything, the drag removes only this kind, so a
    *  sweep across a floor's tiles leaves the elevator it crosses. */
@@ -150,7 +153,7 @@ export function wireEngine(app: GameApp): void {
     }
     if (app.tool.type === "bulldoze") {
       if (picked && drag) drag.bulldozes = picked.kind;
-      app.build.bulldozePicked(picked);
+      app.build.bulldozePicked(picked, drag ? sayPressRefusal(app, drag) : undefined);
     } else if (app.tool.type === "build") {
       // Simple placements (strip paint, two-floor flight, room) happen on
       // the press; a drag-sized shaft instead anchors here and sizes with
@@ -194,7 +197,7 @@ export function wireEngine(app: GameApp): void {
       // A drag removes only the kind it first touched (#644), unless the
       // player picked Everything on the Bulldoze card.
       drag.bulldozes ??= picked.kind;
-      if (dragRemoves(app.bulldozeDrag.clears, drag.bulldozes, picked.kind)) app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
+      if (dragRemoves(app.bulldozeDrag.clears, drag.bulldozes, picked.kind)) app.build.bulldozePicked(picked, holdRefusal(drag));
       return;
     }
     if (app.tool.type !== "build") return;
@@ -248,6 +251,7 @@ export function wireEngine(app: GameApp): void {
     const acts = dragActs() && !refused;
     // Another gesture opened over the drag is that gesture's to close.
     const closes = drag === null || app.undoGesture() === drag.gesture;
+    if (drag && dragActs()) sayHeldRefusal(app, drag, "bulldoze"); // why a drag kept tiles (#2046)
     drag = null;
     // A deferred touch paint that never moved is a TAP: lay the same brush
     // strip a desktop click lays (a drag already laid its run via
