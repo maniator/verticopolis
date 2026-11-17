@@ -86,6 +86,7 @@ pub fn make_person(
     };
     crowd.next_id += 1;
     crowd.people.push(person);
+    super::floor_index::joined(crowd);
     crowd.people.len() - 1
 }
 

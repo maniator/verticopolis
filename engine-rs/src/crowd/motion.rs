@@ -83,7 +83,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     };
     crowd.frustration += (target - crowd.frustration) * (dt_sec * 0.5).min(1.0);
     super::line_count::waits_seen::keep_lines(crowd, lines.counted(), dt_sec);
-    crowd.people.retain(|p| p.state != PState::Done);
+    super::floor_index::settle(crowd);
 }
 
 fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut Landings) {

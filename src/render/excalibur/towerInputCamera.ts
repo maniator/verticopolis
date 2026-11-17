@@ -7,6 +7,7 @@ import { wheelZoomDelta } from "../../shared/inputEvents";
 import { clampCameraY, fitZoom } from "../cameraBounds";
 import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
+import { crowdCullNext } from "./crowdCull";
 import { armLongPress, cancelLongPressOnMove, finishLongPress } from "./longPress";
 import { cancelPress, endPress, isFirstContact, isUnusedMouseButton, movesWithButtonUp } from "./pressLifecycle";
 import type { TowerEngine } from "./TowerEngine";
@@ -401,17 +402,15 @@ export function setCamera(engine: TowerEngine, tileX: number, floor: number, zoo
 /** Census cache per engine: the occupancy tally refreshes at most once per second
  *  (the GDD's cap), while the cheap dominant/zoom/clock reads stay per call. Keyed
  *  weakly so a torn-down engine drops its entry. */
-const censusCache = new WeakMap<TowerEngine, { at: number; dominant: string; crowd: number }>();
+const censusCache = new WeakMap<TowerEngine, { at: number; dominant: string; crowd: number; seen: number }>();
 const CENSUS_REFRESH_MS = 1000;
 
 /** The occupancy walk behind {@link ViewFocus.crowd}: fill of the dominant kind's
  *  units in view, with a drawn-crowd fallback for kinds that track no occupants
- *  (lobbies, the street). 24 visible people count as a full house for it. */
-function censusCrowd(
-  engine: TowerEngine,
-  dominant: ViewFocus["dominant"],
-  bounds: { t0: number; t1: number; f0: number; f1: number },
-): number {
+ *  (lobbies, the street), 24 visible people a full house. While culled the view
+ *  carries nobody (#2151), so the fallback keeps `seen`, its last people count. */
+type Bounds = { t0: number; t1: number; f0: number; f1: number };
+function censusCrowd(engine: TowerEngine, dominant: ViewFocus["dominant"], bounds: Bounds, seen: number): { crowd: number; seen: number } {
   let occ = 0;
   let cap = 0;
   if (dominant !== "empty" && dominant !== "outside") {
@@ -436,14 +435,16 @@ function censusCrowd(
       }
     }
   }
-  if (cap > 0) return Math.min(1, Math.max(0, occ / cap));
+  if (cap > 0) return { crowd: Math.min(1, Math.max(0, occ / cap)), seen };
+  // Judged as the frame's people window is (`frameWindow`), from this frame's zoom.
+  if (crowdCullNext(engine.cam.zoom, engine.crowdCulled)) return { crowd: seen, seen };
   let visible = 0;
   for (const p of engine.sim.crowd.people) {
     if (p.floor < bounds.f0 || p.floor > bounds.f1) continue;
     if (p.x < bounds.t0 || p.x > bounds.t1) continue;
     visible++;
   }
-  return Math.min(1, visible / 24);
+  return { crowd: Math.min(1, visible / 24), seen: Math.min(1, visible / 24) };
 }
 
 export function focus(engine: TowerEngine): ViewFocus {
@@ -482,8 +483,9 @@ export function focus(engine: TowerEngine): ViewFocus {
   if (cached && cached.dominant === dominant && now - cached.at < CENSUS_REFRESH_MS) {
     crowd = cached.crowd;
   } else {
-    crowd = censusCrowd(engine, dominant, { t0, t1, f0, f1 });
-    censusCache.set(engine, { at: now, dominant, crowd });
+    const census = censusCrowd(engine, dominant, { t0, t1, f0, f1 }, cached?.seen ?? 0);
+    crowd = census.crowd;
+    censusCache.set(engine, { at: now, dominant, crowd, seen: census.seen });
   }
   const hour = engine.sim.clock.minuteOfDay / 60;
   return {

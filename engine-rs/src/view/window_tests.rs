@@ -36,6 +36,8 @@ fn place(sim: &mut Simulation, spots: &[(f64, f64)]) -> Vec<i64> {
             p
         })
         .collect();
+    // The people moved outside a step, so the floor index follows by hand.
+    sim.crowd.by_floor.rebuild(&sim.crowd.people);
     sim.crowd.people.iter().map(|p| p.id).collect()
 }
 

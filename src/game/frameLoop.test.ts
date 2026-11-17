@@ -5,6 +5,8 @@ import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
 import { makeApp, makeSim } from "./frameLoop.fixture";
+import { CROWD_CULL_ZOOM } from "../render/excalibur/crowdCull";
+import { NO_PEOPLE } from "../render/excalibur/peopleWindow";
 import { TOAST_SHOWN_MS } from "../ui/uiStatus";
 import { maybeShowStarUp, noteStarUp } from "./starUpFlow";
 
@@ -73,6 +75,14 @@ describe("runFrame freeze path", () => {
     expect(raw.enginePort.advance).not.toHaveBeenCalled();
     expect(raw.enginePort.setPeopleWindow).toHaveBeenCalledExactlyOnceWith(9, 41, -2, 102);
     expect(raw.reader.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends an empty people window while the zoom cull hides the crowd (#2151)", () => {
+    const { app, raw } = makeApp({ accMinutes: 0 });
+    raw.engine.cam.zoom = CROWD_CULL_ZOOM / 2;
+    runFrame(app, 16);
+    expect(raw.enginePort.setPeopleWindow).toHaveBeenCalledExactlyOnceWith(NO_PEOPLE.floorLo, NO_PEOPLE.floorHi, NO_PEOPLE.xLo, NO_PEOPLE.xHi);
+    expect(raw.enginePort.setPeopleWindow.mock.invocationCallOrder[0]).toBeLessThan(raw.reader.update.mock.invocationCallOrder[0]);
   });
 
   it("stops time for good once a wasm-only build has stopped on its engine, whatever the speed", () => {

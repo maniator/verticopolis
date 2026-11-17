@@ -99,7 +99,7 @@ export function makeApp(over: Record<string, unknown> = {}) {
     portCodes,
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn(), setMusicDucked: vi.fn() },
-    engine: { focus: vi.fn(() => ({})), viewWidth: 800, viewHeight: 600, screenToTile: vi.fn((sx: number) => sx / 8), screenToFloor: vi.fn((sy: number) => 40 - sy / 20) },
+    engine: { focus: vi.fn(() => ({})), cam: { zoom: 1 }, crowdCulled: false, viewWidth: 800, viewHeight: 600, screenToTile: vi.fn((sx: number) => sx / 8), screenToFloor: vi.fn((sy: number) => 40 - sy / 20) },
     reader: fakeReader(sim),
     ui: {
       update: vi.fn(),

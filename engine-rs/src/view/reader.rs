@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use super::layout::header::PEOPLE;
 use super::layout::{HEADER, PERSON_RECORD, UNIT_RECORD};
-use super::window::{widest_shaft, PeopleWindow};
+use super::window::{marked, widest_shaft, PeopleWindow};
 use crate::frame::{person_state_code, push_transport, transport_len, unit_fields, weather_code};
 use crate::sim::Simulation;
 use crate::tower::Unit;
@@ -36,6 +36,10 @@ pub struct ViewReader {
     /// Modern tower may hold thousands of them.
     carried: Vec<usize>,
     widest: i64,
+    /// The people a windowed frame tests, one bit per crowd index
+    /// (`PeopleWindow::mark`), kept between frames so a frame allocates
+    /// nothing for them.
+    marks: Vec<u64>,
 }
 
 impl ViewReader {
@@ -168,11 +172,27 @@ impl ViewReader {
         // The reader's key holds the revision, and every transport edit moves
         // it, so the places index the list a full frame read them from.
         let carried = || self.carried.iter().filter_map(|&i| tower.transports.get(i));
-        let shown = |p: &&crate::crowd::Person| window.is_none_or(|w| w.holds(p));
-        // Reserved for every person, so the frame is one allocation whatever
-        // the window keeps; the people count is written once they are in.
+        // A window reads the people in its floors from the crowd's floor
+        // index (#2151), which the step keeps; an index out of step with the
+        // crowd (a load, before its first step) leaves the frame a test of
+        // every person, as a frame with no window makes.
+        let mut marks = std::mem::take(&mut self.marks);
+        let by_floor = &sim.crowd.by_floor;
+        let indexed = match window {
+            Some(w) if by_floor.fits(people) => {
+                #[cfg(debug_assertions)]
+                debug_assert!(by_floor.agrees(people), "floor index out of step");
+                w.mark(by_floor, people.len(), &mut marks)
+            }
+            _ => None,
+        };
+        let held = |p: &&crate::crowd::Person| window.is_none_or(|w| w.holds(p));
+        // Reserved for the people the index marked, or for every person when
+        // it is not read, so the frame is one allocation; the people count
+        // is written once they are in.
+        let room = indexed.unwrap_or(people.len());
         let rest = self.changed.len() + carried().map(transport_len).sum::<usize>();
-        let mut v = Vec::with_capacity(HEADER + people.len() * PERSON_RECORD + rest);
+        let mut v = Vec::with_capacity(HEADER + room * PERSON_RECORD + rest);
         let fx = &sim.fx;
         let clock = &sim.clock;
         v.extend_from_slice(&[
@@ -225,18 +245,17 @@ impl ViewReader {
         ]);
         debug_assert_eq!(v.len(), HEADER);
         let mut sent = 0;
-        for p in people.iter().filter(shown) {
+        let send = |p: &crate::crowd::Person| {
+            push_person(&mut v, p);
             sent += 1;
-            v.extend_from_slice(&[
-                p.id as f64,
-                p.seed as f64,
-                if p.staff { 1.0 } else { 0.0 },
-                person_state_code(p.state),
-                p.floor as f64,
-                p.x,
-                p.fy,
-                p.wait,
-            ]);
+        };
+        if indexed.is_some() {
+            marked(&marks)
+                .map(|i| &people[i])
+                .filter(held)
+                .for_each(send);
+        } else {
+            people.iter().filter(held).for_each(send);
         }
         v[PEOPLE] = sent as f64;
         v.extend_from_slice(&self.changed);
@@ -244,6 +263,7 @@ impl ViewReader {
             push_transport(&mut v, t);
         }
         debug_assert_eq!(v.len(), HEADER + sent * PERSON_RECORD + rest);
+        self.marks = marks;
         v
     }
 
@@ -281,6 +301,20 @@ impl ViewReader {
 /// room.
 pub(super) fn compare_all(marks: usize, rooms: usize) -> bool {
     marks * 2 >= rooms
+}
+
+/// One person's record, as `frame_view` writes it.
+fn push_person(v: &mut Vec<f64>, p: &crate::crowd::Person) {
+    v.extend_from_slice(&[
+        p.id as f64,
+        p.seed as f64,
+        if p.staff { 1.0 } else { 0.0 },
+        person_state_code(p.state),
+        p.floor as f64,
+        p.x,
+        p.fy,
+        p.wait,
+    ]);
 }
 
 /// The unlocked kinds as a bitmask by kind code: bit k is set when the kind
