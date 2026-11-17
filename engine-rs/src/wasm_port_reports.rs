@@ -6,6 +6,7 @@
 //! JSON getter wraps, so the port computes nothing the game does not
 //! already. The wording stays in TypeScript, as it does today.
 use crate::diagnostics::GripeFacts;
+use crate::facilities::Kind;
 use crate::ledger::LEDGER_CATS;
 use crate::panels::progress::MILESTONE_IDS;
 use crate::services::parking_short_of;
@@ -90,8 +91,11 @@ pub(crate) const MIX_ROW: [&str; 2] = ["size", "count"];
 /// `adjacent`, `club`, `floorReachable`) is NaN when absent, else 0 or 1.
 /// The gripe slots repeat for the gripe a held-vacant spot was held for.
 /// `amenity` (a kind code) and `amenityLift` name the amenity helping the
-/// room, both NaN when none does (#1980).
-pub(crate) const UNIT_FACTS: [&str; 39] = [
+/// room, both NaN when none does (#1980). A gripe's `Shaft` slots name the
+/// elevator stopping on the floor with the most room for cars (kind code,
+/// bottom, top, cars, max cars) when its elevators bind the congestion, all
+/// NaN when every one is full or the gripe is another (#2251).
+pub(crate) const UNIT_FACTS: [&str; 49] = [
     "id",
     "kindCode",
     "modeCode",
@@ -114,6 +118,11 @@ pub(crate) const UNIT_FACTS: [&str; 39] = [
     "gripeClub",
     "gripeCoverage",
     "gripeFloorReachable",
+    "gripeShaftKind",
+    "gripeShaftBottom",
+    "gripeShaftTop",
+    "gripeShaftCars",
+    "gripeShaftMaxCars",
     "wontLease",
     "carry",
     "leaseGripe",
@@ -124,6 +133,11 @@ pub(crate) const UNIT_FACTS: [&str; 39] = [
     "leaseGripeClub",
     "leaseGripeCoverage",
     "leaseGripeFloorReachable",
+    "leaseGripeShaftKind",
+    "leaseGripeShaftBottom",
+    "leaseGripeShaftTop",
+    "leaseGripeShaftCars",
+    "leaseGripeShaftMaxCars",
     "notice",
     "noticeReason",
     "minutesLeft",
@@ -167,29 +181,32 @@ fn opt_flag(b: Option<bool>) -> f64 {
     b.map_or(f64::NAN, flag)
 }
 
-/// A gripe's eight slots (present flag first), NaN when there is none.
+/// A gripe's thirteen slots (present flag first), NaN when there is none.
 fn gripe_slots(r: &mut Vec<f64>, g: Option<&GripeFacts>) {
-    match g {
-        Some(g) => r.extend_from_slice(&[
-            1.0,
-            code_of(&VACATE_REASONS, Some(g.cause)),
-            code_of(&BINDINGS, g.binding),
-            opt_flag(g.elevator_here),
-            opt_flag(g.adjacent),
-            opt_flag(g.club),
-            g.coverage.unwrap_or(f64::NAN),
-            opt_flag(g.floor_reachable),
+    let Some(g) = g else {
+        r.push(0.0);
+        r.extend_from_slice(&[f64::NAN; 12]);
+        return;
+    };
+    r.extend_from_slice(&[
+        1.0,
+        code_of(&VACATE_REASONS, Some(g.cause)),
+        code_of(&BINDINGS, g.binding),
+        opt_flag(g.elevator_here),
+        opt_flag(g.adjacent),
+        opt_flag(g.club),
+        g.coverage.unwrap_or(f64::NAN),
+        opt_flag(g.floor_reachable),
+    ]);
+    match g.roomy_shaft {
+        Some(s) => r.extend_from_slice(&[
+            Kind::parse(s.kind).map_or(f64::NAN, |k| k as usize as f64),
+            s.bottom as f64,
+            s.top as f64,
+            s.cars as f64,
+            s.max_cars as f64,
         ]),
-        None => r.extend_from_slice(&[
-            0.0,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-            f64::NAN,
-        ]),
+        None => r.extend_from_slice(&[f64::NAN; 5]),
     }
 }
 

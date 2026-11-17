@@ -104,6 +104,16 @@ export function createPortUnitParts(
     Number.isSafeInteger(code) && code >= 0 ? values[code] : undefined;
   const flag = (r: PortRecord, field: string): boolean => at(r, field) === 1;
 
+  /** The engine's roomy elevator for the advice (#2251), named from the
+   *  catalog; absent when the engine sent none (every shaft here is full). */
+  const roomyShaft = (r: PortRecord, prefix: "gripe" | "leaseGripe"): GripeCopyFacts["roomyShaft"] => {
+    const kind = named(layout.kinds, at(r, `${prefix}ShaftKind`));
+    if (!kind) return undefined;
+    const field = (name: string) => at(r, `${prefix}Shaft${name}`);
+    const name = facilityName?.(kind) ?? "elevator";
+    return { name, bottom: field("Bottom"), top: field("Top"), cars: field("Cars"), maxCars: field("MaxCars") };
+  };
+
   /** Engine supplies cause and contributing flags, never a TypeScript
    *  recomputation. The words, and the manual page that answers them. */
   const cause = (r: PortRecord, prefix: "gripe" | "leaseGripe"): { copy: string; topic?: HelpTopic } | undefined => {
@@ -118,6 +128,7 @@ export function createPortUnitParts(
       club: flag(r, `${prefix}Club`),
       coverage: at(r, `${prefix}Coverage`),
       floorReachable: flag(r, `${prefix}FloorReachable`),
+      roomyShaft: roomyShaft(r, prefix),
     };
     const copy = gripeCopy(facts);
     return copy === undefined ? undefined : { copy, topic: gripeTopic(reason, facts.binding) };

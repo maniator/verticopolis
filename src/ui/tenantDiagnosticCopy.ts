@@ -1,5 +1,6 @@
 import type { VacateReason } from "../shared/types";
 import { VACATE_REASON_TEXT } from "../shared/vacateReasonText";
+import { floorLabel } from "./floorLabel";
 import { groupDigits } from "./format";
 
 /**
@@ -15,6 +16,26 @@ export interface GripeCopyFacts {
   club?: boolean;
   coverage?: number | null;
   floorReachable?: boolean;
+  /** With an elevator binding: the passenger elevator stopping here with the
+   *  most room for cars, or absent when every one is full (#2251). */
+  roomyShaft?: RoomyShaftCopy;
+}
+
+/** A shaft that can take more cars, as the advice names it. */
+export interface RoomyShaftCopy {
+  name: string;
+  bottom: number;
+  top: number;
+  cars: number;
+  maxCars: number;
+}
+
+/** Elevator congestion advice: cars on a shaft with room come first, since a
+ *  car is cheaper than a shaft and needs no new column (#2251). */
+function crowdedElevatorCopy(s: RoomyShaftCopy | undefined): string {
+  if (!s) return "crowded elevators. Every elevator stopping here already runs all its cars; add a parallel shaft to this block.";
+  const floors = `${floorLabel(s.bottom)}–${floorLabel(s.top)}`;
+  return `crowded elevators. The ${s.name.toLowerCase()} on floors ${floors} runs ${s.cars} of ${s.maxCars} cars; add cars to it before building a parallel shaft.`;
 }
 
 /** A service coverage (0 to 1) as a whole percent, or "too little" when the
@@ -35,7 +56,7 @@ export function gripeCopy(f: GripeCopyFacts): string | undefined {
     return "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.";
   }
   if (f.cause === "congestion") {
-    if (f.binding === "elevator") return "crowded elevators. Add cars or a parallel shaft to this block.";
+    if (f.binding === "elevator") return crowdedElevatorCopy(f.roomyShaft);
     if (f.binding === "none") return "overcrowded vertical transport. Add capacity to this block.";
     if (f.binding === "walkways") {
       return f.elevatorHere
