@@ -19,10 +19,14 @@ impl Simulation {
             );
         }
         let mut notices: Vec<(i64, Kind, &'static str)> = Vec::new();
+        let mut settled = self.settled_floors();
         for i in self.tower.room_indices() {
             if self.tower.units[i].is_dormant() {
                 continue;
             }
+            // Every room kind, shops and venues included: the dormant skip
+            // above passes over no settled occupant.
+            settled.note(self, i);
             // One copy of the room per hour (#1689). The step reads the room
             // by reference and writes nothing to it, so the copy taken before
             // it equals the unit once the new satisfaction is stored.
@@ -85,6 +89,7 @@ impl Simulation {
                 self.vacate(i, reason);
             }
         }
+        self.forget_waits_of_emptied_floors(settled);
         self.emit_notices(&notices);
     }
 

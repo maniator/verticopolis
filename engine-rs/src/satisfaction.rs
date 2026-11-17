@@ -10,6 +10,7 @@ use crate::rules::{HaloEffect, CLASSIC_HOUSEHOLD, NO_DRAIN};
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
+mod fresh_waits;
 mod gripes;
 pub(crate) use gripes::feels_nightclub_halo;
 pub mod shortfall;
