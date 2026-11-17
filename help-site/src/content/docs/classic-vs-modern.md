@@ -45,6 +45,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Films | Pay for a New or a Classic film whenever you like | Two screens, three kinds of film, ticket prices ([Venues](/help/rooms/venues/#cinema)) |
 | Cockroaches | Bulldoze and rebuild | Or call an exterminator ([Hotels](/help/rooms/hotels/)) |
 | Fires | Only once you have Security | With or without Security ([Events](/help/tower/events/#fire)) |
+| Fire Rescue helicopter | $500,000 | $150,000 to $500,000, rising with your stars ([Events](/help/tower/events/#fire)) |
 | Bomb threats | Only once you have Security | With or without; new Security joins the search ([Events](/help/tower/events/)) |
 | The day | The 1994 routine | Livelier: errands and late checkouts, each kind of shop with its own weekend, and rain thins the crowd less ([People and traffic](/help/tower/people/)) |
 | The look | Flat people and rooms, as in 1994 | People lit from the upper left, in shaded rooms ([People and traffic](/help/tower/people/)) |
