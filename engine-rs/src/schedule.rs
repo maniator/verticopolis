@@ -119,6 +119,18 @@ impl Schedule {
             && self.home_floors == other.home_floors
     }
 
+    /// The schedule a tower of a mode keeps: Auto is a Modern assist, so a
+    /// mode without schedule assist clears it, and a schedule that leaves
+    /// empty is none at all. The loader and the schedule setter both go
+    /// through it.
+    pub(crate) fn kept_by_mode(mut self, schedule_assist: bool) -> Option<Schedule> {
+        if schedule_assist {
+            return Some(self);
+        }
+        self.auto_tune = false;
+        (!self.is_empty()).then_some(self)
+    }
+
     pub fn is_empty(&self) -> bool {
         let no_rows = self.weekday.as_ref().is_none_or(|w| w.is_empty())
             && self.weekend.as_ref().is_none_or(|w| w.is_empty());
@@ -311,16 +323,17 @@ impl Schedule {
 
     /// The cars an Auto shaft runs while riders back up at its stops: every
     /// car once more people wait than the cars on shift could take in one
-    /// trip, and every car still while anyone waits and a car past the row
-    /// is out (moving, or away from its home), so the fleet stays out until
-    /// the line clears instead of standing down and coming back each step.
-    /// Else the row's `active`. The morning re-tune learns from the riders
-    /// the cars carry, and a shaft cut to one car carries no more than one
-    /// car holds, so its reading could never win the cars back while crowds
-    /// stood at its stops (split-tower 29, 4.12.0). A schedule the player
-    /// wrote, Auto off, keeps its row as written. `fleet` is the cars'
-    /// positions, ways and the shaft's span; `unset_home` is where a car
-    /// with no home idles.
+    /// trip. While the line is still over half a trip, the cars already out
+    /// (moving, or away from their homes) stay on, so the fleet does not
+    /// stand down and come back each step at the edge of a full trip; a
+    /// parked car is never woken for that, and at half a trip or less the
+    /// shaft falls back to its row's `active`. The morning re-tune once
+    /// learned only from the riders the cars carried, and a shaft cut to one
+    /// car carries no more than one car holds, so its reading could never
+    /// win the cars back while crowds stood at its stops (split-tower 29,
+    /// 4.12.0). A schedule the player wrote, Auto off, keeps its row as
+    /// written. `fleet` is the cars' positions, ways and the shaft's span;
+    /// `unset_home` is where a car with no home idles.
     pub fn cars_for_backlog(
         s: Option<&Schedule>,
         active: usize,
@@ -334,12 +347,19 @@ impl Schedule {
         }
         let home = |i| Self::home_floor_for(s, i, unset_home(i)).clamp(bottom, top) as f64;
         let out = |i: usize| ways[i] != 0 || positions[i] != home(i);
-        let backed_up = waiting > active as f64 * car_capacity;
-        if backed_up || (active..cars).any(out) {
-            cars
-        } else {
-            active
+        let one_trip = active as f64 * car_capacity;
+        if waiting > one_trip {
+            return cars;
         }
+        if waiting <= one_trip / 2.0 {
+            return active;
+        }
+        // Cars run in order, so keeping the last car out keeps every car
+        // before it; a car parked past it stays parked.
+        (active..cars)
+            .rev()
+            .find(|&i| out(i))
+            .map_or(active, |i| i + 1)
     }
 
     /// `homeFloorFor`.

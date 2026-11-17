@@ -127,15 +127,81 @@ fn the_fleet_follows_the_line_as_it_appears_clears_and_comes_back() {
     // A line at the lobby and a crowd up the shaft: every car sets out.
     let rush = [(1, cap + 1.0), (8, cap), (TOP, cap)];
     assert_eq!(stood_down(&mut tower, &rush), 0, "a line: every car");
-    // Down to a few but not gone: the cars are out, so they stay out
-    // rather than stand down and come back as the line wavers.
-    assert_eq!(stood_down(&mut tower, &[(1, 1.0)]), 0, "the last few");
+    // Down to under a trip but over half of one: the cars are out, so they
+    // stay out rather than stand down and come back as the line wavers.
+    let most_of_a_trip = [(1, cap * 0.75)];
+    assert_eq!(stood_down(&mut tower, &most_of_a_trip), 0, "the hold");
+    assert_eq!(stood_down(&mut tower, &[(1, 1.0)]), tuned, "a few: the row");
     assert_eq!(stood_down(&mut tower, &[]), tuned, "cleared: the row");
     assert_eq!(
         stood_down(&mut tower, &rush),
         0,
         "the line again: every car"
     );
+}
+
+#[test]
+fn a_step_down_keeps_parked_cars_parked() {
+    // The row drops from four cars to one: cars 0 to 3 are still out with
+    // the last hour's riders, cars 4 to 7 sit parked at their homes.
+    let auto = Schedule::auto_only();
+    let ways = [1, -1, 1, -1, 0, 0, 0, 0];
+    let positions = [3.0, 9.0, 12.0, 6.0, 1.0, 1.0, 1.0, 1.0];
+    let fleet = (&positions[..], &ways[..], (1, TOP));
+    let cap = Kind::ElevatorStandard.car_capacity();
+    let run =
+        |waiting: f64| Schedule::cars_for_backlog(Some(&auto), 1, (waiting, cap), fleet, |_| 1);
+    assert_eq!(run(1.0), 1, "one rider: the row, the out cars finish");
+    assert_eq!(run(cap * 0.75), 4, "most of a trip: the out cars stay");
+    assert_eq!(run(cap + 1.0), 8, "more than a trip: every car");
+}
+
+#[test]
+fn a_trickle_after_a_rush_lets_the_shaft_fall_back_to_its_row() {
+    let (mut tower, id) = one_car_shaft(true);
+    let (cap, mut d) = (car_capacity(&tower), ElevatorDispatch::new());
+    let mut stood_down = |tower: &mut Tower, at: &[(i64, f64)]| {
+        let mut calls = ElevatorCalls::default();
+        calls
+            .hall
+            .insert(id, at.iter().map(|&(f, n)| (f, n.into())).collect());
+        d.move_cars(tower, 1.0, &calls, NOON, false);
+        d.closed_cars().iter().filter(|&&(s, _)| s == id).count()
+    };
+    let rush = [(1, cap + 1.0), (8, cap), (TOP, cap)];
+    assert_eq!(stood_down(&mut tower, &rush), 0);
+    // One rider a minute at a rotating floor: never more than the row's car
+    // takes, so the shaft runs its row every step.
+    let tuned = (CARS - 1) as usize;
+    for step in 0..120 {
+        let floor = 1 + step % TOP;
+        assert_eq!(
+            stood_down(&mut tower, &[(floor, 1.0)]),
+            tuned,
+            "step {step}"
+        );
+    }
+}
+
+#[test]
+fn a_classic_tower_loads_with_auto_off() {
+    for (mode, kept) in [(GameMode::Classic, false), (GameMode::Modern, true)] {
+        let mut sim = strip_tower(3, mode, 20, TOP);
+        let id = shaft(&mut sim, Kind::ElevatorStandard, 4, 1, TOP);
+        // A crafted save, or a file opened under another mode, can mark it.
+        let t = sim
+            .tower
+            .transports
+            .iter_mut()
+            .find(|t| t.id == id)
+            .unwrap();
+        t.schedule = Some(Schedule::auto_only());
+        let loaded = deserialize(&sim.serialize()).expect("the save loads");
+        let t = loaded.tower.get_transport(id).expect("the shaft");
+        let auto = t.schedule.as_ref().is_some_and(|s| s.auto_tune);
+        assert_eq!(auto, kept, "{mode:?}");
+        assert_eq!(loaded.tower.runs_an_auto_schedule(), kept, "{mode:?}");
+    }
 }
 
 /// The 1 to 15 shaft of the owner's split tower, on Auto and re-tuned to one
