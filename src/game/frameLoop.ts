@@ -15,7 +15,7 @@ import { hudSource } from "./hudSource";
 import { calendarOf } from "../simport/headerClock";
 import { groupDigits } from "../ui/format";
 import { TOAST_SHOWN_MS } from "../ui/uiStatus";
-import { peopleWindow } from "../render/excalibur/peopleWindow";
+import { frameWindow } from "../render/excalibur/peopleWindow";
 
 /** Real milliseconds between two ticks of the bomb's clock. */
 const BOMB_TICK_MS = 1000;
@@ -51,9 +51,9 @@ export function applySpeed(app: GameApp, s: number): void {
 
 /** Read this frame's view. Its people are the ones on screen (the camera's
  *  people window), so the frame's size follows the screen and stays flat as
- *  the crowd grows. */
+ *  the crowd grows, and none while the zoom cull hides the crowd. */
 function readView(app: GameApp): void {
-  const w = peopleWindow(app.engine);
+  const w = frameWindow(app.engine);
   app.enginePort.setPeopleWindow(w.floorLo, w.floorHi, w.xLo, w.xHi);
   app.reader.update();
 }

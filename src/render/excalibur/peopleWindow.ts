@@ -1,3 +1,5 @@
+import { crowdCullNext } from "./crowdCull";
+import { focusedPerson } from "./personFocus";
 import type { TowerEngine } from "./TowerEngine";
 
 /** How far past the screen the people window reaches: tiles past each side,
@@ -27,4 +29,23 @@ export function peopleWindow(camera: Camera): PeopleWindow {
     xLo: camera.screenToTile(0) - WINDOW_MARGIN.tiles,
     xHi: camera.screenToTile(camera.viewWidth) + WINDOW_MARGIN.tiles,
   };
+}
+
+/** A window that holds nobody: floors far below any lot. The engine reads a
+ *  window it cannot use as every person (`view::PeopleWindow::new`), so an
+ *  empty frame needs a real window with nobody in it. */
+export const NO_PEOPLE: PeopleWindow = { floorLo: -1e6, floorHi: -1e6, xLo: 0, xHi: 0 };
+
+type FrameCamera = Camera & Pick<TowerEngine, "cam" | "crowdCulled">;
+
+/** The window this frame's view sends people for. While the zoom cull hides
+ *  the crowd (`crowdCull.ts`), nobody crosses from the engine, since no
+ *  figure is drawn; the frame where the cull lifts already reads the screen,
+ *  because the cull is judged from this frame's zoom without moving the
+ *  latch. A followed person keeps the window, so the camera glides with
+ *  their record at any zoom (#2151). */
+export function frameWindow(engine: FrameCamera): PeopleWindow {
+  const culled = crowdCullNext(engine.cam.zoom, engine.crowdCulled);
+  const following = focusedPerson(engine as TowerEngine)?.follow === true;
+  return culled && !following ? NO_PEOPLE : peopleWindow(engine);
 }
