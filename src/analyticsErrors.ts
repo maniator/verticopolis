@@ -3,6 +3,7 @@ import { sendException } from "./analyticsRelay";
 import { getCommonProps } from "./analytics";
 import { createEventThrottle } from "./analyticsThrottle";
 import { isBrowserExtensionError } from "./analyticsErrorOrigin";
+import { MAX_PLAYER_TEXT, knownPlayerText, mentionsJson, playerTextMatcher, scrubJsonEcho, scrubPlayerText, type PlayerTextMatcher } from "./analyticsPlayerText";
 
 /**
  * Cookieless JavaScript error tracking (spec CAP-2 posture, the S5 follow-up
@@ -38,15 +39,14 @@ import { isBrowserExtensionError } from "./analyticsErrorOrigin";
  * Relay-only, off the adapter seam: `$exception` is a PostHog-only event shape,
  * so it is sent straight through `sendException`.
  *
- * Privacy note: an exception `value` is the thrown message, which the game builds
- * from its own strings and could occasionally interpolate a player-authored tower
- * name. The 500/2000-char bounds cap payload SIZE, not sensitivity: a tower name
- * within the bound is forwarded verbatim. It stays acceptable because there is no
- * IP (the relay disables GeoIP and forwards none), no persistent id, and no
- * cross-session linkage, so a leaked free-text string is not bound to any stable
- * identity and does not de-anonymize. Redacting known player-authored fields from
- * the outgoing message is a tracked follow-up (backlog), alongside the frame
- * parsing below.
+ * Player text (#607): a thrown message can quote a tower, file or facility name,
+ * or a bit of a save that a browser's JSON error echoes. Before a report is sent,
+ * its type, message, stack, source and fingerprint go through the scrubber in
+ * `analyticsPlayerText.ts`, which replaces every piece of player text the game
+ * knows about and blanks a JSON error's quoted input. The 500/2000-char bounds
+ * cap payload SIZE; the scrubber covers what the text says. The scrub runs only
+ * for a report that passed the cap and dedup, so an error repeating every frame
+ * costs nothing more than before.
  * Structured stack FRAMES are deliberately not parsed in this first version: with
  * no source maps uploaded they would point at minified positions, so the bounded
  * raw stack string carries the same debugging value at far less code. Frame
@@ -88,29 +88,55 @@ function clamp(text: string, max: number): string {
 
 /** Normalize an arbitrary thrown value into `{ type, message, stack }`. A real
  *  `Error` gives its name, message, and stack; anything else (a string, a
- *  rejected non-Error) degrades to a stringified value with no stack. */
-function describe(value: unknown): { type: string; message: string; stack: string; rawStack: string } {
+ *  rejected non-Error) degrades to a stringified value with no stack. All three
+ *  are returned whole: `report` bounds each one ({@link sentField}) after the
+ *  player-text scrub, never before it. */
+function describe(value: unknown): { type: string; message: string; stack: string } {
   try {
     if (value instanceof Error) {
-      const rawStack = typeof value.stack === "string" ? value.stack : "";
+      // Reading name/message/stack is wrapped because a hostile subclass can
+      // throw from those getters; on a throw we fall through to the generic
+      // shape, so `report` still counts a cap/dedup slot rather than looping
+      // every frame.
       return {
-        // `type` is clamped like every other field: `error.name` is the one lever
-        // an adversarial Error could use to push the body past the relay's size
-        // cap. Reading name/message/stack is wrapped because a hostile subclass can
-        // throw from those getters; on a throw we fall through to the generic shape,
-        // so `report` still counts a cap/dedup slot rather than looping every frame.
-        type: clamp(value.name || "Error", MAX_TYPE_LEN),
-        message: clamp(value.message || "", MAX_MESSAGE_LEN),
-        stack: clamp(rawStack, MAX_STACK_LEN),
-        // Unbounded, for the browser-extension check only: a game frame past the
-        // clamp must still keep the report. Never sent.
-        rawStack,
+        type: value.name || "Error",
+        message: value.message || "",
+        stack: typeof value.stack === "string" ? value.stack : "",
       };
     }
   } catch {
     /* an Error whose name/message/stack getter throws: use the generic shape */
   }
-  return { type: "UnhandledRejection", message: clamp(safeString(value), MAX_MESSAGE_LEN), stack: "", rawStack: "" };
+  return { type: "UnhandledRejection", message: safeString(value), stack: "" };
+}
+
+/** Where `message` starts in a V8 stack (`Name: message` or the bare message
+ *  on its first line), or -1 when the stack does not open with it (Firefox and
+ *  Safari stacks hold frames only). Reads only as far as the message, so a
+ *  repeat costs no scan of the whole stack. */
+function messageStart(stack: string, type: string, message: string): number {
+  if (!message) return -1;
+  const named = `${type}: `;
+  if (stack.startsWith(named) && stack.startsWith(message, named.length)) return named.length;
+  return stack.startsWith(message) ? 0 : -1;
+}
+
+/**
+ * One text field as it is sent: scrubbed, then bounded to `max`. Only the
+ * first `max` + {@link MAX_PLAYER_TEXT} characters are read, so a pathological
+ * value never makes the scrub expensive, and a name that straddles the `max`
+ * cut is still replaced whole. When the value is longer than that window, the
+ * window's own end may cut a name, and earlier replacements that shortened the
+ * text could pull that piece below `max`; so a cut value also drops as many
+ * trailing characters as the longest known name before the bound. `prepare`
+ * runs on the window before the scrub (the JSON echo blanking).
+ */
+function sentField(raw: string, max: number, known: PlayerTextMatcher, prepare?: (window: string) => string): string {
+  const head = raw.slice(0, max + MAX_PLAYER_TEXT);
+  const scrubbed = scrubPlayerText(prepare ? prepare(head) : head, known);
+  if (raw.length <= head.length) return clamp(scrubbed, max);
+  const safe = scrubbed.slice(0, Math.max(0, scrubbed.length - known.longest));
+  return `${safe.slice(0, max)}...`;
 }
 
 /** Stringify an arbitrary rejection reason without ever throwing (a value with a
@@ -156,7 +182,7 @@ function report(
   reporting = true;
   try {
     if (throttle.exhausted) return;
-    const { type, message, stack, rawStack: fullStack } = describe(value);
+    const { type, message, stack: fullStack } = describe(value);
     const handled = opts.handled ?? false;
     const synthetic = opts.synthetic ?? false;
     // An error thrown by a browser extension's own script (a wallet injector's
@@ -166,7 +192,7 @@ function report(
     if (!synthetic && isBrowserExtensionError(fullStack, extra?.source)) return;
     // A synthetic report has no meaningful stack (it would be the reporter's own),
     // so drop it and rely on the explicit fingerprint below.
-    const rawStack = synthetic ? "" : stack;
+    const stack = synthetic ? "" : fullStack;
     // Fingerprint on type + message + the first stack line, so the same crash
     // (repeated every frame) collapses to one report while two different errors
     // stay distinct. The first stack line pins the throw site. Each PART is
@@ -174,9 +200,40 @@ function report(
     // survives: clamping the join could cut the frame off for a long message and
     // merge two genuinely distinct crashes that share that message. A synthetic
     // incident overrides this with a stable key (it has no throw site to pin).
-    const firstFrame = stack.split("\n", 2)[1]?.trim() ?? "";
-    const fingerprint = opts.fingerprint ?? `${type}|${clamp(message, 180)}|${clamp(firstFrame, 100)}`;
-    if (!throttle.allow(fingerprint)) return;
+    //
+    // Dedup and the cap key on the RAW parts, which stay in this module's memory
+    // and are never sent, so a repeat is dropped before any scrubbing. Only a
+    // report that will go out pays for the scrub, and the fingerprint it sends is
+    // rebuilt from the scrubbed parts.
+    const key = (t: string, m: string, f: string) => `${clamp(t, MAX_TYPE_LEN)}|${clamp(m, 180)}|${clamp(f, 100)}`;
+    // The frame is the line after the message, not after the stack's first
+    // line: a message with a line break in it (a JSON echo of a save) would
+    // otherwise hand its second line over as the frame.
+    const messageAt = messageStart(fullStack, type, message);
+    const afterMessage = messageAt >= 0 ? fullStack.slice(messageAt + message.length) : fullStack;
+    const firstFrame = afterMessage.split("\n", 2)[1]?.trim() ?? "";
+    if (!throttle.allow(opts.fingerprint ?? key(type, message, firstFrame))) return;
+
+    // Replace every piece of player text the game knows about in every field
+    // that carries text. A JSON error's echoed input is blanked first, in the
+    // message and where V8's stack repeats the message on its first line.
+    const known = playerTextMatcher(knownPlayerText());
+    // Judged on the whole message, so a long wrapper before the JSON error
+    // cannot push "JSON" past a field's read window and skip the blanking.
+    const aboutJson = mentionsJson(message);
+    const sentType = sentField(type, MAX_TYPE_LEN, known);
+    const sentMessage = sentField(message, MAX_MESSAGE_LEN, known, aboutJson ? scrubJsonEcho : undefined);
+    // The stack's copy of the message is blanked over its whole length (as
+    // much of it as the read window holds), however long the message is.
+    const echo =
+      aboutJson && messageAt >= 0
+        ? (head: string) => {
+            const end = Math.min(messageAt + message.length, head.length);
+            return messageAt >= end ? head : head.slice(0, messageAt) + scrubJsonEcho(head.slice(messageAt, end)) + head.slice(end);
+          }
+        : undefined;
+    const sentStack = sentField(stack, MAX_STACK_LEN, known, echo);
+    const fingerprint = opts.fingerprint ?? key(sentType, sentMessage, scrubPlayerText(synthetic ? "" : firstFrame, known));
 
     const properties: Record<string, unknown> = {
       ...getCommonProps(), // version / platform / distribution_channel / returning / tenure / recency / display
@@ -184,23 +241,23 @@ function report(
       // first version (no source maps); the raw stack below carries the trace.
       $exception_list: [
         {
-          type,
-          value: message,
+          type: sentType,
+          value: sentMessage,
           mechanism: { handled, synthetic },
           stacktrace: { type: "raw", frames: [] },
         },
       ],
       // Also a top-level copy so a dashboard trend can break errors down by type
       // without reaching into the nested `$exception_list`.
-      $exception_type: type,
+      $exception_type: sentType,
       $exception_fingerprint: fingerprint,
-      $exception_stack_trace_raw: rawStack,
+      $exception_stack_trace_raw: sentStack,
       handled,
       ...opts.extraProps,
     };
     // Location from the ErrorEvent, when the browser supplied it. Omitted for a
     // rejection (no location) and for a cross-origin "Script error." with none.
-    if (extra?.source) properties.source = clamp(extra.source, MAX_MESSAGE_LEN);
+    if (extra?.source) properties.source = sentField(extra.source, MAX_MESSAGE_LEN, known);
     if (Number.isFinite(extra?.lineno)) properties.lineno = extra?.lineno;
     if (Number.isFinite(extra?.colno)) properties.colno = extra?.colno;
 

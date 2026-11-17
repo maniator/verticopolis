@@ -2,6 +2,7 @@ import type { UI } from "./UI";
 import { TOWER_FILE_EXT } from "../storage/SaveGame";
 import { looksLikeLegacyTower } from "../storage/tdtImportHelpers";
 import { isMobileDevice } from "./bugReport";
+import { rememberFileName } from "../analyticsPlayerText";
 
 /**
  * The file-picker entry point, in its own module so both the in-game Saved
@@ -151,6 +152,9 @@ export function decodeTowerText(b: Uint8Array): string {
 
 /** Open a file picked or dropped from the device. */
 export function readPickedFile(ui: UI, file: File): void {
+  // The file's name is the player's text; an error while opening it must not
+  // quote it in a report (#607).
+  rememberFileName(file.name);
   const reader = new FileReader();
   // A file that vanishes or errors mid-read must not fail silently: the
   // launching dialog is already gone by the time the read runs.

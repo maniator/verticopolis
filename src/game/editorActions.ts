@@ -16,6 +16,7 @@ import { groupDigits } from "../ui/format";
 import { NOT_ENOUGH_MONEY } from "../simport/request";
 import { sayHeldRefusal, type HeldRefusal } from "./dragRefusal";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
+import { rememberPlayerText } from "../analyticsPlayerText";
 
 
 /**
@@ -314,6 +315,9 @@ export class EditorActions {
       if (action === "rename") {
         const input = root.querySelector<HTMLInputElement>("#ed-name");
         if (input) {
+          // A facility's name is the player's text; the scrubber has no source for it (#607).
+          rememberPlayerText(u.label);
+          rememberPlayerText(input.value);
           const res = outcome(engine, engine.labelUnit(u.id, input.value));
           if (!res.ok) return this.refuse(res.reason ?? "That name could not be saved.");
         }
@@ -457,6 +461,9 @@ export class EditorActions {
    *  engine's text cap, #1405) says why, as a refused unit name does. */
   renameTower(name: string): void {
     const engine = this.deps.engine();
+    // The old name leaves every source the error scrubber reads (#607).
+    rememberPlayerText(engine.towerName());
+    rememberPlayerText(name);
     const res = outcome(engine, engine.nameTower(name));
     if (!res.ok) this.refuse(res.reason ?? "That name could not be saved.");
   }

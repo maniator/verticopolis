@@ -466,6 +466,7 @@ describe("EditorActions: shaft card", () => {
 describe("EditorActions.renameTower", () => {
   it("names the tower, handing every name to the port and toasting a refusal's reason", () => {
     const { actions, port, deps } = setup({
+      towerName: () => "Old Spire",
       nameTower: vi
         .fn()
         .mockReturnValueOnce(rec("buildAt", true))
