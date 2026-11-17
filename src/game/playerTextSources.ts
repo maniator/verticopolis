@@ -6,7 +6,9 @@ import { recentTowers, type RecentTower } from "../storage/recentTowers";
 /**
  * Tell the error reporter's scrubber (`analyticsPlayerText.ts`, #607) where the
  * player's own names live, so an error that quotes one is sent without it:
- * - the open tower's name;
+ * - the open tower's name, from the engine and from the name box on screen
+ *   (an engine that trapped throws on every call, and its tower's name must
+ *   still be known);
  * - every file in My Towers and in the linked folder;
  * - every tower in File > Open Recent.
  *
@@ -15,9 +17,12 @@ import { recentTowers, type RecentTower } from "../storage/recentTowers";
  * without its extension, since a message may quote either.
  */
 
-/** The narrow piece of the app this reads: the open tower's name. */
+/** The narrow piece of the app this reads: the open tower's name, from the
+ *  engine and from the name box the UI shows. The UI is assigned after the
+ *  controllers are wired, so it may not be there yet. */
 export interface PlayerTextApp {
   readonly enginePort: { towerName(): string | undefined };
+  readonly ui?: { readonly el: { readonly towerName: { readonly value: string } } };
 }
 
 /** Every name in a list of files or recent towers, with its stem. */
@@ -41,6 +46,7 @@ export function wirePlayerTextSources(app: PlayerTextApp): void {
   unwire?.();
   const off = [
     addPlayerTextSource(() => [app.enginePort.towerName()]),
+    addPlayerTextSource(() => [app.ui?.el.towerName.value]),
     addPlayerTextSource(() => namesOf(fileSpace.list())),
     addPlayerTextSource(() => namesOf(linkedFolder.list())),
     addPlayerTextSource(() => recentNames(recentTowers())),

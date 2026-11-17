@@ -4,6 +4,7 @@ import {
   PLAYER_TEXT_PLACEHOLDER as P,
   addPlayerTextSource,
   knownPlayerText,
+  mentionsJson,
   nameAndStem,
   rememberFileName,
   rememberPlayerText,
@@ -53,26 +54,31 @@ describe("scrubPlayerText", () => {
 });
 
 describe("scrubJsonEcho", () => {
-  it("blanks the input a Chrome JSON error quotes", () => {
-    expect(scrubJsonEcho(`Unexpected token 'M', "My Tower" is not valid JSON`)).toBe(
-      `Unexpected token "${P}", "${P}" is not valid JSON`,
-    );
+  it("blanks everything a Chrome JSON error quotes, inner quotes included", () => {
+    expect(scrubJsonEcho(`Unexpected token 'S', "{"a": Secret Spire}" is not valid JSON`)).toBe(`Unexpected token "${P}" is not valid JSON`);
+    expect(scrubJsonEcho(`Unexpected token 'S', ..."a": Secret "... is not valid JSON`)).toBe(`Unexpected token "${P}"... is not valid JSON`);
+  });
+
+  it("blanks across a line break in the echoed text", () => {
+    expect(scrubJsonEcho(`Unexpected token 'x', "{\n Secret}" is not valid JSON`)).toBe(`Unexpected token "${P}" is not valid JSON`);
   });
 
   it("blanks the input a Safari JSON error quotes", () => {
     expect(scrubJsonEcho(`JSON Parse error: Unexpected identifier "Spire"`)).toBe(`JSON Parse error: Unexpected identifier "${P}"`);
   });
 
-  it("keeps the quotes of a message that is not about JSON", () => {
-    const msg = "Cannot read properties of undefined (reading 'floors')";
+  it("blanks to the end when a quote has no partner", () => {
+    expect(scrubJsonEcho(`Unexpected token in JSON: "Secret Spi`)).toBe(`Unexpected token in JSON: "${P}"`);
+  });
+
+  it("returns a message with no quote as it is", () => {
+    const msg = "JSON.parse: unexpected character at line 1 column 1 of the JSON data";
     expect(scrubJsonEcho(msg)).toBe(msg);
   });
 
-  it("follows the caller's answer for a stack whose own text does or does not name JSON", () => {
-    expect(scrubJsonEcho(`SyntaxError: "x" bad\n    at f`, true)).toBe(`SyntaxError: "${P}" bad\n    at f`);
-    expect(scrubJsonEcho(`TypeError: 'a'\n    at JSON.parse (<anonymous>)`, false)).toBe(
-      `TypeError: 'a'\n    at JSON.parse (<anonymous>)`,
-    );
+  it("says which messages are JSON errors", () => {
+    expect(mentionsJson(`"x" is not valid JSON`)).toBe(true);
+    expect(mentionsJson("Cannot read properties of undefined (reading 'json')")).toBe(false);
   });
 });
 

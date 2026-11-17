@@ -134,25 +134,31 @@ export function scrubPlayerText(text: string, known: readonly string[]): string 
   return out;
 }
 
-/** A quoted span: double, single or curly quotes, on one line. */
-const QUOTED = /"[^"\n]*"|'[^'\n]*'|“[^”\n]*”/g;
-
-/** Whether a message is a JSON error, whose quoted spans echo the input. */
+/** Whether a message is a JSON error, whose quotes echo the input. */
 export function mentionsJson(message: string): boolean {
   return /JSON/.test(message);
 }
 
+/** Any opening or closing quote a browser may put around echoed input. */
+const QUOTE = /["'“”]/;
+
 /**
- * Browsers quote the text they failed to parse in a JSON error (Chrome:
- * `Unexpected token 'M', "My Tower" is not valid JSON`; Safari:
- * `JSON Parse error: Unexpected identifier "My"`), and that text is a save's
- * contents. When `aboutJson` (by default, when `text` itself names JSON), every
- * quoted span is replaced; otherwise `text` is returned as it is. The stack
- * passes its message's answer, so a stack that only passes through
- * `JSON.parse` keeps its other quotes.
+ * A JSON error message with everything from its first quote to its last
+ * replaced by one quoted {@link PLAYER_TEXT_PLACEHOLDER}. Browsers quote the
+ * text they failed to parse (Chrome: `Unexpected token 'S', "{"a": Spire}" is
+ * not valid JSON`; Safari: `JSON Parse error: Unexpected identifier "Spire"`),
+ * that text is a file's contents, and it can hold quotes and line breaks of its
+ * own, so pairing quotes would leave pieces of it behind. One quote with no
+ * partner (a message cut short) blanks to the end. A message with no quote is
+ * returned as it is. Callers apply it only to a message {@link mentionsJson}
+ * accepts.
  */
-export function scrubJsonEcho(text: string, aboutJson = mentionsJson(text)): string {
-  return aboutJson ? text.replace(QUOTED, `"${PLAYER_TEXT_PLACEHOLDER}"`) : text;
+export function scrubJsonEcho(message: string): string {
+  const first = message.search(QUOTE);
+  if (first < 0) return message;
+  const last = Math.max(message.lastIndexOf('"'), message.lastIndexOf("'"), message.lastIndexOf("”"), message.lastIndexOf("“"));
+  const end = last > first ? last + 1 : message.length;
+  return `${message.slice(0, first)}"${PLAYER_TEXT_PLACEHOLDER}"${message.slice(end)}`;
 }
 
 /** Test-only: forget every source and remembered piece of text. */

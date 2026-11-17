@@ -68,21 +68,33 @@ describe("$exception scrubs player text (#607)", () => {
     expect(value()).toBe(`could not open ${P}`);
   });
 
-  it("blanks the save text a browser's JSON error echoes, in the message and the stack", () => {
-    const err = new SyntaxError(`Unexpected token 'S', "Spire wit"... is not valid JSON`);
-    err.stack = `SyntaxError: ${err.message}\n    at JSON.parse (<anonymous>)`;
+  it("blanks the save text a V8 JSON error echoes, inner quotes included, in the message and the stack", () => {
+    const err = new SyntaxError(`Unexpected token 'S', "{"a": Secret Spire}" is not valid JSON`);
+    err.stack = `SyntaxError: ${err.message}\n    at JSON.parse (<anonymous>)\n    at load (app.js:1:1)`;
     fireError({ error: err });
-    expect(sentText()).not.toContain("Spire");
-    expect(value()).toBe(`Unexpected token "${P}", "${P}"... is not valid JSON`);
-    expect(sent().$exception_stack_trace_raw).toBe(`SyntaxError: ${value()}\n    at JSON.parse (<anonymous>)`);
+    expect(sentText()).not.toMatch(/Secret|"a"/);
+    expect(value()).toBe(`Unexpected token "${P}" is not valid JSON`);
+    expect(sent().$exception_stack_trace_raw).toBe(`SyntaxError: ${value()}\n    at JSON.parse (<anonymous>)\n    at load (app.js:1:1)`);
   });
 
-  it("replaces a name the 500-character clamp would cut in half", () => {
-    addPlayerTextSource(() => ["Harmony Tower"]);
-    // "Harmony Tower" starts at 495, so the clamp at 500 would leave "Harmo".
-    fireError({ error: new Error(`${"x".repeat(494)} Harmony Tower`) });
-    expect(sentText()).not.toContain("Harmo");
-    expect(value()).toBe(`${"x".repeat(494)} ${P.slice(0, 5)}...`);
+  it("keeps the quotes of an error that is not about JSON, even in a stack through JSON.parse", () => {
+    const err = new TypeError("Cannot read properties of undefined (reading 'floors')");
+    err.stack = `TypeError: ${err.message}\n    at reviver (app.js:1:1)\n    at JSON.parse (<anonymous>)`;
+    fireError({ error: err });
+    expect(value()).toBe(err.message);
+    expect(sent().$exception_stack_trace_raw).toBe(err.stack);
+  });
+
+  it("never sends part of a name the read window cut when earlier names shrank the text", () => {
+    addPlayerTextSource(() => ["Harmony Tower Annex Extended Wing"]);
+    // 25 early names shrink the text by 500, and the read window (1,000
+    // characters) cuts the last name after "Harmony ", which then sits at
+    // 492 to 499, inside the 500 bound, unless the cut tail is dropped.
+    const name = "Harmony Tower Annex Extended Wing";
+    const msg = `${`${name} `.repeat(25)}${"y".repeat(141)} ${name}`;
+    fireError({ error: new Error(msg) });
+    expect(sentText()).not.toContain("Harmony");
+    expect(String(value()).endsWith("...")).toBe(true);
   });
 
   it("reads the sources once for a report that is sent, and never for a repeat it drops", () => {

@@ -36,6 +36,19 @@ describe("the game's player text sources (#607)", () => {
     expect(knownPlayerText()).not.toContain("f1");
   });
 
+  it("still knows the open tower's name from the screen when the engine throws", () => {
+    const app = {
+      enginePort: {
+        towerName: vi.fn((): string | undefined => {
+          throw new Error("engine trapped");
+        }),
+      },
+      ui: { el: { towerName: { value: "Harmony Tower" } } },
+    };
+    wirePlayerTextSources(app);
+    expect(knownPlayerText()).toEqual(["Harmony Tower"]);
+  });
+
   it("reads the open tower at report time, so a renamed or swapped tower is current", () => {
     const app = { enginePort: { towerName: vi.fn(() => "First") } };
     wirePlayerTextSources(app);

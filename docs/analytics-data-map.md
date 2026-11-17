@@ -107,12 +107,14 @@ Outside the typed vocabulary:
   characters, at most 10 a page life. Player text is scrubbed before it is sent
   (#607, `src/analyticsPlayerText.ts`): every whole-word, any-case match of a
   name the game knows becomes `<player text>` in the type, message, stack,
-  source and fingerprint. The known names are the open tower's, every file in My
+  source and fingerprint. The known names are the open tower's (from the engine and from the name box
+  on screen, so a trapped engine does not hide it), every file in My
   Towers and the linked folder, every tower in File > Open Recent (each read
   when a report is about to go out, with and without a file extension), and any
   tower, facility or imported file name from a rename or import in the same page
-  life. A JSON error's quoted text, which is the start of the file being read,
-  is blanked the same way. Names under two characters, and the names the game
+  life. In a JSON error, everything from the first quote to the last (the start
+  of the file being read) is blanked, in the message and where the stack
+  repeats it. Names under two characters, and the names the game
   gives an unnamed tower or file (`Tower`, `Tower One`), are left alone. What the
   scrubber cannot know, such as a facility renamed on an earlier visit, is not
   quoted in any thrown message today. A grouped issue in PostHog Error Tracking
