@@ -47,8 +47,7 @@ fn visitor_at_an_open_car(kind: Kind) -> (Simulation, i64, usize) {
 fn boarded_at(sim: &Simulation, id: i64, floor: i64) -> f64 {
     sim.crowd
         .elevator_boardings
-        .get(&id)
-        .and_then(|m| m.get(&floor))
+        .get(&(id, floor))
         .copied()
         .unwrap_or(0.0)
 }
@@ -72,7 +71,9 @@ fn a_visitor_boarding_marks_their_floor_in_the_origin_rings() {
 }
 
 #[test]
-fn a_rider_on_a_service_car_counts_once() {
+fn a_service_car_rider_marks_their_floor_once_as_they_board() {
+    // The dispatch's half of "once" (it tallies no staff caller) is
+    // `dispatch_staff_tally_tests`.
     let (mut sim, id, i) = visitor_at_an_open_car(Kind::ElevatorService);
     advance(&mut sim.crowd, 0.1, &mut sim.tower);
     assert_eq!(sim.crowd.people[i].state, PState::Riding);

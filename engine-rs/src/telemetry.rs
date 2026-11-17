@@ -139,11 +139,13 @@ impl Simulation {
         // boardings join the estimate's here (#477): a cinema's evening
         // crowd marks its own floor. Office workers (`crowd::commuters`) also
         // add the seats they fill: a shaft full of commuters reads full.
-        for (shaft, floors) in std::mem::take(&mut self.crowd.elevator_boardings) {
-            let tally = boardings.entry(shaft).or_default();
-            for (floor, n) in floors {
-                *tally.entry(floor).or_insert(0.0) += n;
-            }
+        // Drained in place, so the map keeps its room from hour to hour.
+        for ((shaft, floor), n) in self.crowd.elevator_boardings.drain(..) {
+            *boardings
+                .entry(shaft)
+                .or_default()
+                .entry(floor)
+                .or_insert(0.0) += n;
         }
         let mut commuters_aboard: HashMap<i64, f64> = HashMap::new();
         for p in &self.crowd.people {

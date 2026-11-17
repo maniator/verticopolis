@@ -811,8 +811,8 @@ so the spec and the build cannot drift silently:
   elevator joins the tally beside the statistical estimate's riders (#477): visitors to
   attendance venues (cinema, party hall), guests, residents, staff and commuters, so a
   cinema's floor can become a hotspot. Staff on a service car are counted once, as they step
-  aboard, and the dispatch no longer tallies its staff callers on every arrival. Known
-  limit, tracked: the dialog's origin snapshot goes stale across undo/adoptSim (#475).
+  aboard, and the dispatch no longer tallies its staff callers on every arrival. The dialog
+  reads the live rings, so undo and adoptSim no longer leave its origin snapshot stale (#475).
 - **Day-split rings (#466, v1.59.0)**: the measured accumulator keeps one 24-slot ring per
   day type, keyed on `clock.isWeekend` at sample time. The ghost, the advice sentence, the
   Simulate peak, and Auto-tune are all day-scoped: an unmeasured weekend shows no ghost and

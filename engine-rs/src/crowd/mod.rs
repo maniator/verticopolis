@@ -313,7 +313,7 @@ pub struct Crowd {
     pub desk_revision: Option<i64>,
     /// Everyone in the crowd who boarded an elevator this hour, by shaft and
     /// floor, for the origin rings (`sample_elevator_util`, #477). Not saved.
-    pub elevator_boardings: indexmap::IndexMap<i64, indexmap::IndexMap<i64, f64>>,
+    pub elevator_boardings: fasthash::FastIndexMap<(i64, i64), f64>,
     /// The Modern router's transit graph and this step's lines. Never saved.
     pub router: Option<expected_time::Router>,
     /// Each shaft's line, keyed (shaft, floor), as the last motion slice counted it
