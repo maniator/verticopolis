@@ -28,18 +28,13 @@ import type { CabActor } from "./cabGraphics";
 import type { MetroTrain } from "./towerMetro";
 import type { PeopleGraphics } from "./peopleGfx";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
+import type { ThiefSpan } from "./thiefSpan";
 
 export { FLOOR, TILE };
 // The camera zoom range lives in its friend-module; re-exported so consumers
 // keep importing it (and the `ViewFocus`/`Picked` shapes) from this file.
 export { MIN_ZOOM, MAX_ZOOM } from "./towerInputCamera";
 export type { ViewFocus, Picked } from "./towerInputCamera";
-
-/** The tile span of a floor's rooms: left edge, right edge (exclusive). */
-export interface ThiefSpan {
-  readonly left: number;
-  readonly right: number;
-}
 
 /**
  * The Excalibur-powered tower renderer. Excalibur owns the game loop, scene,
