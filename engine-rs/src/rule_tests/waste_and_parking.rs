@@ -324,3 +324,51 @@ fn the_stats_report_calls_parking_short_by_the_mode_rule() {
         );
     }
 }
+
+/// The stats screen's "Parking demand" counts what the mode's rule needs
+/// (#2024): in Classic one space serves every office, so eight offices whose
+/// cars fill two spaces need one, plus one per suite; Modern needs a space
+/// per 24 workers. The catalog says which way the count goes.
+#[test]
+fn the_stats_report_counts_the_need_the_mode_rule_asks_for() {
+    for (mode, offices) in [(GameMode::Classic, 1.0), (GameMode::Modern, 2.0)] {
+        let mut sim = Simulation::new_game(17, mode);
+        sim.money = 1e12;
+        lay(&mut sim, Kind::Lobby, 1);
+        lay(&mut sim, Kind::Floor, 2);
+        sim.star = 3;
+        for i in 0..8 {
+            occupy(
+                &mut sim,
+                Kind::Office,
+                2,
+                i * OFFICE_WIDTH,
+                UnitState::Occupied,
+            );
+        }
+        occupy(&mut sim, Kind::HotelSuite, 2, 80, UnitState::Occupied);
+        assert_eq!(sim.parking_demand().offices, 2.0, "{mode:?}: the cars");
+        let report = sim.stats_report()["parkingDemand"].clone();
+        assert_eq!(report["offices"], offices, "{mode:?}");
+        assert_eq!(report["suites"], 1.0, "{mode:?}");
+        assert_eq!(report["total"], offices + 1.0, "{mode:?}");
+        assert_eq!(
+            report["officePop"],
+            8.0 * Kind::Office.facility().population as f64,
+            "{mode:?}: the garage still draws every car"
+        );
+        let one_space = crate::catalog::catalog(mode)
+            .rules
+            .offices_share_one_parking_space;
+        assert_eq!(one_space, mode == GameMode::Classic, "{mode:?}");
+    }
+    // No tenanted office needs no space for offices in either count.
+    let mut empty = floor_two(18);
+    empty.star = 3;
+    occupy(&mut empty, Kind::HotelSuite, 2, 80, UnitState::Occupied);
+    let report = empty.stats_report()["parkingDemand"].clone();
+    assert_eq!(
+        (report["offices"].clone(), report["total"].clone()),
+        (0.0.into(), 1.0.into())
+    );
+}

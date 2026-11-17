@@ -2077,6 +2077,7 @@
     "fedUpWait": 25,
     "frontDoorPerTower": false,
     "maxLobbyHeight": 3,
+    "officesShareOneParkingSpace": true,
     "previewNamesRefusal": false,
     "quotesLobbyDistance": false,
     "scheduleAssist": false,

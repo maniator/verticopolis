@@ -227,7 +227,9 @@ impl Simulation {
                 ParkingStatus::Disconnected
             };
             if facts.parking.status != ParkingStatus::Disconnected {
-                let demand = self.parking_demand();
+                let demand = self
+                    .parking_demand()
+                    .as_the_rule_counts(self.mode.office_parking());
                 // Short by the mode's rule (#1970), from the spaces and demand
                 // already in hand.
                 let coverage = self.service_shortfalls().parking_coverage();

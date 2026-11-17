@@ -168,8 +168,9 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
     // (the demand rounds up to a second space the tower lacks).
     const atOneSpace = PARKING_WORKERS_PER_SPACE / OFFICE_POPULATION - 1;
     for (const [added, overOneSpace] of [[atOneSpace, false], [atOneSpace + 1, true]] as const) {
-      // Both modes count the cars, but Classic's rule asks for one free
-      // stall only (#1970), so only Modern runs a stall short.
+      // Modern counts the cars, a space per 24 workers. Classic's rule asks
+      // for one free stall for every office (#1970), so it counts one
+      // (#2024) and never runs a stall short here.
       const shortage = overOneSpace && mode === "modern";
       it(`${mode}: ${added} more offices ${shortage ? "leave a stall short of" : "fill one stall with"} their cars`, () => {
         expect(PARKING_WORKERS_PER_SPACE % OFFICE_POPULATION, "offices fill a space exactly").toBe(0);
@@ -182,7 +183,7 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
         try {
           expect(rust.serviceDiagnostics(f.ramp.id)?.parking.status).toBe("ramp");
           expect(rust.serviceDiagnostics(f.connectedParking.id)?.parking).toMatchObject({
-            status: "connected", shortage, have: 1, total: overOneSpace ? 2 : 1, offices: overOneSpace ? 2 : 1, suites: 0,
+            status: "connected", shortage, have: 1, total: shortage ? 2 : 1, offices: shortage ? 2 : 1, suites: 0,
           });
         } finally {
           rust.free();

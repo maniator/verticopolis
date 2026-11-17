@@ -151,9 +151,8 @@ export interface CatalogEconomy {
 /** Mode rules a frontend shows the player, each from the engine's own rule
  *  method, so a frontend reads them here instead of deciding by mode name. */
 export interface CatalogRules extends CatalogStarDutyRules, CatalogSkyBridgeRules {
-  /** Whether a sold condo carries its own household of 2 to 5 that prices
-   *  the sale and counts its residents. When false every condo houses the
-   *  flat family and stores no household. */
+  /** Whether a sold condo carries its own household of 2 to 5 that prices the sale and counts
+   *  its residents. When false every condo houses the flat family and stores no household. */
   readonly variantHouseholds: boolean;
   /** Whether the build preview names the engine's refusal before the click.
    *  When false the refusal shows only once a click is refused. */
@@ -194,8 +193,9 @@ export interface CatalogRules extends CatalogStarDutyRules, CatalogSkyBridgeRule
   readonly frontDoorPerTower: boolean;
   /** Whether an express keeps the 1994 stops (#1527): ground, every 15th floor, every basement. */
   readonly expressStopsOn15thFloors: boolean;
-  /** Seconds a person waits before the wait counts as stress and the
-   *  frontend shows them fed up (red). The same in both modes. */
+  /** Whether one free parking space serves every office (#1970), so the stats count offices as one space (#2024). */
+  readonly officesShareOneParkingSpace: boolean;
+  /** Seconds a person waits before it counts as stress and the frontend shows them fed up (red). Same in both modes. */
   readonly fedUpWait: number;
 }
 

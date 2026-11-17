@@ -200,7 +200,9 @@ impl Engine {
     pub(crate) fn port_stats_sheet(&mut self) -> Vec<f64> {
         let sim = &mut self.sim;
         let stranded = sim.stranded_floors(false);
-        let parking = sim.parking_demand();
+        let parking = sim
+            .parking_demand()
+            .as_the_rule_counts(sim.mode.office_parking());
         let parking_coverage = sim.service_shortfalls().parking_coverage();
         let spots = sim.tower.functional_parking_set().len() as f64;
         let next = sim.next_star();

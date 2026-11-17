@@ -37,6 +37,7 @@ describe("the Classic and Modern summary", () => {
     venueFlights: "Spiral stairs and switchback escalators beside venues",
     frontDoorPerTower: "with its own front door and doorman",
     expressStopsOn15thFloors: "Express stops", // #1527
+    officesShareOneParkingSpace: "Any spare space serves every office", // #1970, #2024
     fedUpWait: null, // the same wait turns a person red in both modes
     announcesStarDuties: "warns what the rating starts asking for",
     starDuties: null, // the duties themselves, which the star-up box words

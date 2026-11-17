@@ -161,7 +161,9 @@ impl Simulation {
     /// Takes `&mut self` only because the stranded-floor scan memoizes floor
     /// reachability by tower revision, as the engine's own reads do.
     pub fn stats_report(&mut self) -> Value {
-        let parking = self.parking_demand();
+        let parking = self
+            .parking_demand()
+            .as_the_rule_counts(self.mode.office_parking());
         let spots = self.tower.functional_parking_set().len();
         let coverage = self.service_shortfalls().parking_coverage();
         let mut out = Map::new();

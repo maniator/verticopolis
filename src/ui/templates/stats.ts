@@ -40,6 +40,20 @@ export interface StatsScreen {
   readonly catalog: Catalog;
 }
 
+/** The "Parking demand" count: what the engine says the mode's rule needs.
+ *  Where one free space serves every office (Classic, #2024) the offices
+ *  count as that one space, so the words name it as the offices' share. */
+export function parkingNeedWords(
+  d: StatsReport["parkingDemand"],
+  officesShareOneSpace: boolean,
+  fmt: (n: number) => string,
+): string {
+  if (officesShareOneSpace) {
+    return `${fmt(d.total)} needed (offices ${fmt(d.offices)} + ${fmt(d.suites)} suite${d.suites === 1 ? "" : "s"})`;
+  }
+  return `${fmt(d.total)} needed (${fmt(d.offices)} offices + ${fmt(d.suites)} suites${d.homes > 0 ? ` + ${fmt(d.homes)} homes` : ""})`;
+}
+
 /** The screen for a stats report, the port's view and the tower's catalog:
  *  the one place the game (`showStats`) and the tests put it together. */
 export function statsScreen(
@@ -200,7 +214,7 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
         }
         ${
           s.parkingSpaces > 0 || parkingDemand.total > 0
-            ? html`<span class="k">Parking demand</span><span class="v" style="color:${parkingDemand.short ? "var(--bad)" : "var(--good)"}">${fmt(parkingDemand.total)} needed (${fmt(parkingDemand.offices)} offices + ${fmt(parkingDemand.suites)} suites${parkingDemand.homes > 0 ? ` + ${fmt(parkingDemand.homes)} homes` : ""})${parkingDemand.coverage !== null ? ` · ${Math.round(parkingDemand.coverage * 100)}% covered` : ""}${helpIf(parkingDemand.short, "parking")}</span>`
+            ? html`<span class="k">Parking demand</span><span class="v" style="color:${parkingDemand.short ? "var(--bad)" : "var(--good)"}">${parkingNeedWords(parkingDemand, catalog.rules.officesShareOneParkingSpace, fmt)}${parkingDemand.coverage !== null ? ` · ${Math.round(parkingDemand.coverage * 100)}% covered` : ""}${helpIf(parkingDemand.short, "parking")}</span>`
             : nothing
         }
         ${

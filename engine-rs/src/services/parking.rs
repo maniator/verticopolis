@@ -54,6 +54,27 @@ pub struct ParkingDemand {
     pub shared_need: f64,
 }
 
+impl ParkingDemand {
+    /// The demand as the mode's office rule counts it, what the statistics
+    /// and the parking card show (#2024). Classic offices need one free
+    /// space between them (#1970), so they count as one space while any is
+    /// tenanted; Modern counts every worker's car, so it is the demand as it
+    /// stands. The garage still draws `office_pop`'s cars in both modes.
+    pub fn as_the_rule_counts(self, rule: OfficeParking) -> ParkingDemand {
+        match rule {
+            OfficeParking::AnyFreeSpace => {
+                let offices = self.offices.min(1.0);
+                ParkingDemand {
+                    offices,
+                    total: offices + self.homes + self.suites,
+                    ..self
+                }
+            }
+            OfficeParking::WorkersPerSpace(_) => self,
+        }
+    }
+}
+
 /// What the parking means for the daily move-in pass.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ParkingMoveIn {
