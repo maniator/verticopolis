@@ -15,6 +15,25 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.48.0 (2026-11-17)
+
+- From 512 people the crowd keeps a per-floor index of its people in the step, and a view's people window reads the people on its floors from it, so the frame's cost follows the screen instead of the crowd (#2151). Smaller crowds, today's included, keep no index and cost what they did.
+- The view's frame carries only the elevators' transport records, in tower order; stairs and escalators run no car and come only with the structure (#2383). View layout version 29.
+- A people window keeps its widest-shaft pad per tower revision instead of walking every transport each frame.
+- The catalog publishes `rules.officesShareOneParkingSpace`, true in Classic, where one free space serves every office (#1970).
+- `statsReport`, `statsSheet` and the parking ramp's diagnostics count the offices' parking need by the mode's rule (#2024): in Classic the offices count as one space while any is tenanted. `officePop` still carries every worker, and the garage still draws every car.
+- The catalog names `hotelDouble` "Twin Room" (#380); the kind id stays `hotelDouble`, so saves and the binding are unchanged. The catalog digests and the `.TDT` referee's labels moved.
+- `GameMode::thief_needs_security` (Classic): the daily thief roll still draws, but in a Classic tower without a Security office no thief comes, no money is lost and no thief effect plays (#2364).
+- The fuzz corpus's uncaught-thief entry runs as Modern now, and the Classic four-star smoke golden re-pinned.
+- Every crowd rider who boards an elevator joins the shaft's origin tally (`Crowd::elevator_boardings`, renamed from `commuter_boardings`), and the dispatch tallies only the waiting estimate's riders, no longer a staff car's callers (#477). Auto-tune's staging aim picks the busiest boarding floor above the base lobby, since the lobby now counts every crowd rider coming in. The tally is counting only: the conformance lock and every golden are unchanged.
+- The tenant gripe facts carry `roomyShaft` for an elevator-bound congestion gripe: the passenger elevator stopping on the floor with the most free car slots (kind, bottom, top, cars, max cars), or none when each is full. `unitFacts` adds `gripeShaftKind`, `gripeShaftBottom`, `gripeShaftTop`, `gripeShaftCars` and `gripeShaftMaxCars`, and the same five for the lease gripe; view layout version 30.
+- `extend_transport` stops a shaft just short of the first floor it cannot newly serve (another shaft in the way, or a lobby floor whose lobby is not built under it) and reports that floor's reason with the done step; the whole step is no longer refused. `extendShaft` leaves the reason in `lastReason()` (#1847).
+- `labelUnit`, `nameTower` and `logLine` refuse text longer than 4,096 UTF-16 code units with "That request is not valid." and change nothing, so every caller meets the same cap the web's editor used to apply on its own (#1405).
+- A tenant trip that runs out of patience before boarding and turns back folds a wait of at least twice the mode's commute wait limit onto its floor's commute average (240 s Classic, 360 s Modern). A trip cut short by an edit (a shaft or car removed) is not a give-up. Saves carry the person's `gaveUp` flag. The conformance lock and the frame-day and port-edit goldens moved.
+- New `FireResponse` on `EventSystem::fire`: the guards Security sends to a fire by the emergency stairs and the rescue helicopter. `Simulation::advance_fire_response` runs each step; a paid rescue lands after `HELICOPTER_FLIGHT_MINUTES` instead of putting the fire out at once. Saves carry it as `events.fire` while a fire burns; an older save's fire gets its guards on the next step.
+- `control_chance` takes Security's share from guards who reached the fire. `call_fire_rescue` refuses with `coming` while the helicopter is on its way. Classic's rescue costs a fixed $500,000 (`GameMode::fire_rescue_fixed_price`).
+- New gameplay event `fire_out` (`by`: `security`, `rescue` or `burnedOut`). `VIEW_LAYOUT_VERSION` is 31: the frame header appends `fireResponseSeq`, and the binding adds `fireResponse()`.
+
 ## 1.47.1 (2026-11-17)
 
 - Each open car carries the way it leaves (`Leaving`: up, down or either), and a waiting rider boards only a car leaving their way; the crowd's hall calls carry their way, so a car passes a stop whose callers are all bound the other way unless it turns there, and Modern's best-car choice counts a car that will pass them as coming the long way round. The conformance lock, the frame-day and port-edit goldens moved, and the Classic ransom scenario now runs 592 hours to its threat.
