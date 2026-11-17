@@ -3,24 +3,26 @@ import { buildFrame, titleButton } from "./deskWindow";
 /**
  * The Control Panel on the 1994 desk: the settings a 1995 player looked for
  * there, each as an icon that opens what the game already has. Display opens
- * the Screen Saver dialog, Sounds turns the sound on or off, Settings opens
- * the game's Settings. It opens from the Verticopolis menu and the tray.
+ * the Screen Saver dialog, Appearance the Appearance dialog, Sounds turns the
+ * sound on or off, Settings opens the game's Settings. It opens from the Verticopolis menu and the tray.
  *
  * Cost: built once with the desk; nothing runs until an icon is pressed.
  */
 
 /** The Control Panel's icons, in the order they sit. */
-export type ControlIcon = "display" | "sounds" | "settings";
+export type ControlIcon = "display" | "appearance" | "sounds" | "settings";
 
 /** The game menu item each icon runs. */
 export const CONTROL_ITEM: Record<ControlIcon, string> = {
   display: "mb-screensaver",
+  appearance: "mb-appearance",
   sounds: "mb-sound",
   settings: "btn-settings",
 };
 
 const ICONS: ReadonlyArray<readonly [ControlIcon, string, string]> = [
   ["display", "Display", "Screen saver"],
+  ["appearance", "Appearance", "Windows, menus and buttons"],
   ["sounds", "Sounds", "Sound on or off"],
   ["settings", "Settings", "Game settings"],
 ];
@@ -29,6 +31,8 @@ const ICONS: ReadonlyArray<readonly [ControlIcon, string, string]> = [
 const ART: Record<ControlIcon, string> = {
   display:
     '<rect x="4" y="4" width="24" height="18" fill="#c0c0c0" stroke="#000"/><rect x="7" y="7" width="18" height="12" fill="#008080"/><rect x="12" y="22" width="8" height="3" fill="#808080"/><rect x="8" y="25" width="16" height="3" fill="#c0c0c0" stroke="#000"/>',
+  appearance:
+    '<rect x="3" y="5" width="22" height="17" fill="#c0c0c0" stroke="#000"/><rect x="4" y="6" width="20" height="4" fill="#000080"/><rect x="9" y="11" width="20" height="16" fill="#ebe7dc" stroke="#000"/><rect x="10" y="12" width="18" height="4" fill="#5c66c9"/><rect x="23" y="13" width="3" height="2" fill="#c65a63"/>',
   sounds:
     '<path d="M5 12h6l7-6v20l-7-6H5z" fill="#c0c0c0" stroke="#000"/><path d="M21 11q3 5 0 10M24 8q5 8 0 16" fill="none" stroke="#000080" stroke-width="2"/>',
   settings:

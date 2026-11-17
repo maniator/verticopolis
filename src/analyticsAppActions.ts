@@ -156,6 +156,11 @@ export type AppActionName =
   | "screensaver_start"
   | "screensaver_end"
   | "screensaver_set"
+  // Options > Appearance… (owner, 2026-11-17): the dialog's OK changed the
+  // scheme, `detail` the new one (`standard`, `skyline` or `high_contrast`).
+  // An OK that keeps the scheme sends nothing. The scheme itself rides every
+  // event as the common `scheme` property.
+  | "appearance_set"
   // The 1994 desk on a computer; names and details in docs/ui/desk-windows.md
   // (src/ui/desk/deskAnalytics.ts holds the codes).
   | "desk_shown"

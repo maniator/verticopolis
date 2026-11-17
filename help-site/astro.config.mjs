@@ -19,7 +19,7 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import { satteri } from "@astrojs/markdown-satteri";
 import { GITHUB } from "../docs/engine-site/title-bar.mjs";
-import { HELP_BASE, OLD_ANCHORS, SITE_ORIGIN, oldAnchorRedirects, sharedHead, sidebar, siteHref } from "./site.mjs";
+import { HELP_BASE, OLD_ANCHORS, SITE_ORIGIN, oldAnchorRedirects, schemeBootScript, sharedHead, sidebar, siteHref } from "./site.mjs";
 
 const site = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(site, "..");
@@ -90,8 +90,9 @@ export default defineConfig({
         join(repo, "docs/engine-site/src/styles/title-bar.css"),
         join(repo, "src/styles/menu-bar.css"),
         "./src/styles/help.css",
+        "./src/styles/help-schemes.css",
       ],
-      head: [...sharedHead, { tag: "script", content: oldAnchorRedirects(OLD_ANCHORS) }],
+      head: [...sharedHead, { tag: "script", content: schemeBootScript() }, { tag: "script", content: oldAnchorRedirects(OLD_ANCHORS) }],
       sidebar,
     }),
   ],

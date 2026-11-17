@@ -58,14 +58,47 @@ export type HelpSource = GameHelpSource | "game" | "direct";
  *  page, which lands again once the marks are gone, reports it again. */
 export const HELP_SOURCE_STORAGE_KEY = "vc.page.helpSource";
 
+/** The query the game adds beside `from=game` to name the appearance scheme
+ *  it wears (Options > Appearance…), so the manual, on its own host, dresses
+ *  the same way. Left out for Standard: a page the game opened with no
+ *  `scheme` wears Standard (help-site/site.mjs schemeBootScript). */
+export const SCHEME_PARAM = "scheme";
+
+/** The appearance scheme the page wears: the `data-scheme` attribute that
+ *  src/ui/appearance/appearancePrefs.ts sets on `<html>`, or null for
+ *  Standard (and where there is no document). */
+export function wornScheme(): string | null {
+  return typeof document === "undefined" ? null : document.documentElement.getAttribute("data-scheme");
+}
+
 /** `href` (a same-origin path or a manual address, with or without a
- *  `#fragment`) marked as opened by the running game from `source`. */
-export function fromGameHref(href: string, source: GameHelpSource): string {
+ *  `#fragment`) marked as opened by the running game from `source`, wearing
+ *  `scheme` (by default the page's own, read now). */
+export function fromGameHref(href: string, source: GameHelpSource, scheme: string | null = wornScheme()): string {
   const hashAt = href.indexOf("#");
   const path = hashAt < 0 ? href : href.slice(0, hashAt);
   const hash = hashAt < 0 ? "" : href.slice(hashAt);
-  const marker = `${FROM_GAME_PARAM}=${FROM_GAME_VALUE}&${HELP_SOURCE_PARAM}=${source}`;
+  const marker = `${FROM_GAME_PARAM}=${FROM_GAME_VALUE}&${HELP_SOURCE_PARAM}=${source}${scheme ? `&${SCHEME_PARAM}=${scheme}` : ""}`;
   return `${path}${path.includes("?") ? "&" : "?"}${marker}${hash}`;
+}
+
+/** A game-marked `href` re-marked with `scheme` (null: Standard, no mark).
+ *  Links built before the scheme was known, or before the player changed it,
+ *  are brought up to date this way just before they are followed. Any other
+ *  link comes back unchanged. */
+export function withScheme(href: string, scheme: string | null): string {
+  let url: URL;
+  try {
+    url = new URL(href, "http://x.invalid");
+  } catch {
+    return href;
+  }
+  if (url.searchParams.get(FROM_GAME_PARAM) !== FROM_GAME_VALUE) return href;
+  if ((url.searchParams.get(SCHEME_PARAM) ?? null) === scheme) return href;
+  if (scheme) url.searchParams.set(SCHEME_PARAM, scheme);
+  else url.searchParams.delete(SCHEME_PARAM);
+  const absolute = /^[a-z][a-z0-9+.-]*:/i.test(href);
+  return absolute ? url.href : `${url.pathname}${url.search}${url.hash}`;
 }
 
 function isGameSource(value: string | null): value is GameHelpSource {
@@ -132,6 +165,7 @@ export function takeFromGameFlag(
     const rest = new URLSearchParams(loc.search);
     rest.delete(FROM_GAME_PARAM);
     rest.delete(HELP_SOURCE_PARAM);
+    rest.delete(SCHEME_PARAM);
     const query = rest.toString();
     hist.replaceState(null, "", `${loc.pathname}${query ? `?${query}` : ""}${loc.hash}`);
     try {

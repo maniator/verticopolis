@@ -56,3 +56,11 @@
 @import "./styles/game/media-tablet-touch.css";
 @import "./styles/game/desk.css";
 @import "./styles/game/desk-title.css";
+@import "./styles/game/appearance.css";
+
+/* ---- APPEARANCE SCHEMES ---------------------------------------------------
+   Options > Appearance… (src/ui/appearance/). Each scheme is scoped to its
+   html[data-scheme] value and comes last so it restyles the layers above;
+   Standard sets no attribute and is the cascade above, unchanged. */
+@import "./styles/schemes/skyline.css";
+@import "./styles/schemes/high-contrast.css";

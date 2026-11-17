@@ -1,0 +1,134 @@
+/* Skyline (Options > Appearance…, owner's pick 2026-11-17, variant B): an
+   early-2000s feel in our own dusk colors, borrowing no operating system's
+   art, fonts or wording. Scoped to html[data-scheme="skyline"]. Style only:
+   no images, blur, backdrop-filter or animation; the canvas is untouched. */
+html[data-scheme="skyline"] body.desk #app,
+html[data-scheme="skyline"] body.desk-title::before {
+  background: var(--splash-sky);
+}
+
+/* Windows: rounded tops, a dark frame, gradient title bars. */
+html[data-scheme="skyline"] .win {
+  border-radius: 8px 8px 3px 3px;
+  box-shadow: 0 0 0 1px #2a2766, var(--win-shadow);
+}
+html[data-scheme="skyline"] .win-title,
+html[data-scheme="skyline"] .desk-title-bar {
+  background: var(--sky-title);
+  border-radius: 7px 7px 0 0;
+  text-shadow: 0 1px 0 #15123a;
+}
+html[data-scheme="skyline"] body.desk .desk-win:not(.desk-active) > .win-title {
+  background: var(--sky-title-off);
+  text-shadow: none;
+}
+html[data-scheme="skyline"] body.desk-title #splash {
+  border-radius: 8px 8px 3px 3px;
+  box-shadow: 0 0 0 1px #2a2766, var(--win-shadow);
+}
+
+/* Buttons: soft gradient, 1 px line, small radius. */
+html[data-scheme="skyline"] .btn,
+html[data-scheme="skyline"] body.desk-title .splash-btn {
+  background: var(--sky-btn);
+  border-radius: 4px;
+}
+html[data-scheme="skyline"] .btn:active,
+html[data-scheme="skyline"] .btn.active,
+html[data-scheme="skyline"] body.desk-title .splash-btn:active {
+  background: var(--sky-btn-down);
+}
+
+/* Title-bar buttons: violet, and the close button rose. */
+html[data-scheme="skyline"] .win-title > .btn,
+html[data-scheme="skyline"] body.desk .desk-win > .win-title > .desk-btn {
+  background: var(--sky-violet);
+  box-shadow: inset 0 0 0 1px #ffffff;
+  color: #ffffff;
+  border-radius: 4px;
+}
+html[data-scheme="skyline"] body.desk .desk-win > .win-title > .desk-btn svg {
+  fill: #ffffff;
+}
+html[data-scheme="skyline"] .win-title > .btn[aria-label^="Close"],
+html[data-scheme="skyline"] .win-title > .modal-x,
+html[data-scheme="skyline"] body.desk .desk-win > .win-title > .desk-btn-close {
+  background: var(--sky-rose);
+}
+
+/* Info readouts: flat cards instead of sunken wells. The traffic meter's
+   pale bars need a darker tone on the light card. */
+html[data-scheme="skyline"] .stat {
+  background: #fbfaf6;
+  box-shadow: inset 0 0 0 1px #c9c4b6;
+  border-radius: 3px;
+}
+html[data-scheme="skyline"] #traffic-glyph {
+  --bar-off: #cfcabd;
+}
+
+/* Menu bar and its menus. */
+html[data-scheme="skyline"] .menubar {
+  background: linear-gradient(#f6f4ee, #e7e3d8);
+  box-shadow: inset 0 -1px #cfcabd;
+}
+html[data-scheme="skyline"] .mb-title[aria-expanded="true"] {
+  background: #4a50b0;
+  color: #ffffff;
+  box-shadow: none;
+  border-radius: 3px;
+}
+html[data-scheme="skyline"] .mb-pop {
+  border-radius: 0 0 4px 4px;
+}
+
+/* The selected tool: violet. */
+html[data-scheme="skyline"] .pal-item.active {
+  background: linear-gradient(#5a63c8, #3d429e);
+  border-radius: 3px;
+}
+
+/* Taskbar: a deep dusk band, violet buttons and a cream Verticopolis button. */
+html[data-scheme="skyline"] .desk-taskbar {
+  background: linear-gradient(180deg, #4b4f9e 0%, #2f2c6e 40%, #241f4c 100%);
+  box-shadow: inset 0 1px #8c95ea;
+}
+html[data-scheme="skyline"] .desk-task {
+  background: linear-gradient(#5a63c8, #3d429e);
+  color: #ffffff;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px #1d1a4a;
+}
+html[data-scheme="skyline"] .desk-task.on {
+  background: linear-gradient(#2a2766, #3d429e);
+  box-shadow: inset 0 0 0 1px #1d1a4a, inset 1px 1px 0 1px rgba(0, 0, 0, 0.3);
+}
+html[data-scheme="skyline"] .desk-start {
+  background: linear-gradient(#fbf6e6, #e6dcc0);
+  color: #241f4c;
+  border-radius: 0 10px 10px 0;
+  box-shadow: inset 0 0 0 1px #8b8698;
+}
+html[data-scheme="skyline"] .desk-tray {
+  background: linear-gradient(#5c66c9, #33378f);
+  color: #ffffff;
+  box-shadow: inset 1px 0 #1d1a4a;
+}
+
+/* The title screen's buttons away from the desk (phones, tablets): soft
+   rounded buttons, the main one violet. */
+html[data-scheme="skyline"] body:not(.desk-title) .splash-btn:not(.ghost) {
+  color: #241f4c;
+  background: var(--sky-btn);
+  border: 1px solid #2a2766;
+  border-radius: 8px;
+  box-shadow: 0 2px 0 rgba(20, 16, 50, 0.35);
+}
+html[data-scheme="skyline"] body:not(.desk-title) .splash-btn.primary {
+  color: #fff;
+  background: var(--sky-title);
+  text-shadow: 0 1px 0 #15123a;
+}
+html[data-scheme="skyline"] body:not(.desk-title) .splash-btn:not(.ghost):active {
+  box-shadow: inset 0 1px 2px rgba(20, 16, 50, 0.35);
+}

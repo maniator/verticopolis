@@ -105,6 +105,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
       tenure: "d7-29",
       recency: "1d",
       display: "browser",
+      scheme: "standard",
     });
     // The enrichment is set BEFORE the boot snapshot fires, so `boot` carries it.
     expect(setSpy.mock.invocationCallOrder[0]).toBeLessThan(bootSpy.mock.invocationCallOrder[0]);
@@ -142,7 +143,19 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
       tenure: "d0",
       recency: "30d",
       display: "browser",
+      scheme: "standard",
     });
+    setSpy.mockRestore();
+  });
+
+  it("dresses the page in the kept scheme and puts it on every event", () => {
+    const setSpy = vi.spyOn(analyticsModule, "setCommonProps");
+    localStorage.setItem("vc.appearance", "skyline");
+    runBootFlow(makeApp(), Date.now());
+    expect(document.documentElement.getAttribute("data-scheme")).toBe("skyline");
+    expect(setSpy).toHaveBeenCalledWith(expect.objectContaining({ scheme: "skyline" }));
+    localStorage.removeItem("vc.appearance");
+    document.documentElement.removeAttribute("data-scheme");
     setSpy.mockRestore();
   });
 

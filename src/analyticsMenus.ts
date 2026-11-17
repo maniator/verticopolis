@@ -54,6 +54,7 @@ export const MENU_ITEM_CODES = {
   "btn-settings": "settings",
   "mb-sound": "sound",
   "mb-screensaver": "screen_saver",
+  "mb-appearance": "appearance",
   "btn-help": "manual",
   "mb-compare": "compare",
   "mb-replay": "replay",

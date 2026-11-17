@@ -186,7 +186,7 @@ test.describe("the desk on a computer", () => {
     const panel = page.locator("#desk-win-control");
     await expect(panel).toBeVisible();
     await expect(task(page, "control")).toHaveCount(1);
-    await expect(panel.locator(".desk-control-icon")).toHaveCount(3);
+    await expect(panel.locator(".desk-control-icon")).toHaveCount(4);
     await expect(page.locator("#mb-desk")).toHaveCount(0);
   });
 });
