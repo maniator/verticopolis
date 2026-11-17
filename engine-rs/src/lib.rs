@@ -228,6 +228,7 @@ mod tower_index;
 pub mod tower_query;
 mod tower_query_state;
 mod tower_removal;
+mod tower_stop_bits;
 mod undo;
 mod undo_journal;
 pub mod view;
