@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.13.2
+
+- An elevator shaft and a room no longer share tiles. A room can't be built where an elevator runs, and an elevator can't be built or stretched through a room; the game names the one in the way. Stairs and escalators still stand in front of rooms, an elevator still runs down to a Metro platform, and a tower saved with a room already inside a shaft opens and plays exactly as before.
+- The Traffic readout now follows the worst line of people waiting for an elevator right now, so "Backed up · B4" means a crowd you can find, and it no longer stays red at night with nobody waiting. Tapping it zooms in on that line and marks just its stretch of the floor and its elevator, instead of the whole floor and every elevator that stops there.
+- On the desktop, Info's meters keep one width each, so a named floor, a longer date or a bigger fund can no longer push the speed buttons under the tower's title bar.
+
 ## 4.13.1
 
 - The note about elevators with idle cars now says to choose Tower > Statistics… to review them, the menu item's real name.

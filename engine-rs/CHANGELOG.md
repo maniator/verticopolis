@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.52.0 (2026-11-18)
+
+- `Simulation::can_build`, `Simulation::can_build_transport`, a shaft resize or extend, and the binding's `validateTransport`, `placeTransportDryRun` and shaft quote refuse an elevator shaft and a room on the same tile, with a reason naming the one in the way. No public item is added. The raw `Tower::place` and `Tower::place_transport` and the loader are unchanged, so saved towers load as they were. Ten conformance scenarios moved their builds off shafts and the lock moved with them.
+- New `queueLine(shaft, floor)` read: how far one elevator landing's waiting line reaches along its floor, from the shaft face to the rider standing farthest from it, so a host can mark one line in a bank of elevators whose lines run across each other.
+
 ## 1.51.0 (2026-11-18)
 
 - The hourly move-in pass copies each vacant room once for the move-in gate instead of twice, and the served-floor and floor-reachability lookups it and the satisfaction pass make use the engine's fast hasher, so a game day does less work (up to 6% on the bench towers) with every result unchanged.
