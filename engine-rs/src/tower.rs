@@ -332,6 +332,7 @@ impl Tower {
             }
         }
         if u.kind == Kind::Lobby {
+            self.memo.get_mut().lobby_changes += 1;
             *self.lobby_tiles.entry(u.floor).or_insert(0) += u.width;
             if hgt > 1 {
                 *self.tall_lobby_tiles.entry((u.floor, hgt)).or_insert(0) += u.width;
@@ -361,6 +362,7 @@ impl Tower {
             }
         }
         if u.kind == Kind::Lobby {
+            self.memo.get_mut().lobby_changes += 1;
             if let Some(c) = self.lobby_tiles.get_mut(&u.floor) {
                 *c -= u.width;
                 if *c <= 0 {

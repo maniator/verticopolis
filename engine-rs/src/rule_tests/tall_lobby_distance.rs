@@ -91,3 +91,39 @@ fn a_tall_ground_lobby_counts_to_its_top_story_in_classic() {
     assert_eq!(distance(0), 1);
     assert_eq!(distance(-2), 3);
 }
+
+#[test]
+fn the_distance_follows_a_hall_laid_and_taken_away_after_it_was_read() {
+    let mut sim = Simulation::new_game(1, GameMode::Modern);
+    sim.money = 1e9;
+    sim.star = 5;
+    lay_row(&mut sim, Kind::Lobby, 1);
+    for floor in 2..=14 {
+        lay_row(&mut sim, Kind::Floor, floor);
+    }
+    assert_eq!(
+        sim.tower.nearest_lobby_floor_distance(18),
+        17,
+        "ground only"
+    );
+    sim.with_lobby_height(3, |sim| lay_row(sim, Kind::Lobby, 15));
+    assert_eq!(
+        sim.tower.nearest_lobby_floor_distance(18),
+        1,
+        "the new hall's top story is 17"
+    );
+    let hall: Vec<i64> = sim
+        .tower
+        .units
+        .iter()
+        .filter(|u| u.kind == Kind::Lobby && u.floor == 15)
+        .map(|u| u.id)
+        .collect();
+    assert!(!hall.is_empty());
+    sim.tower.remove_units(&hall);
+    assert_eq!(
+        sim.tower.nearest_lobby_floor_distance(18),
+        17,
+        "the hall is gone again"
+    );
+}

@@ -260,11 +260,44 @@ impl Tower {
     /// fills, so the floor just above a three-story hall is one floor from
     /// it, the same as the floor above a one-story lobby. Without this a
     /// shop over a tall sky lobby read as three floors away and lost half
-    /// its trade. Both lists run up the tower, so one walk of each finds
-    /// every lobby floor's tallest hall (a floor's halls come tallest last).
+    /// its trade. The lobby floors and their tallest halls are read once per
+    /// lobby change ([`Memo::lobby_reach`]), not walked per call.
+    ///
+    /// [`Memo::lobby_reach`]: crate::tower_query_state::Memo::lobby_reach
     pub fn nearest_lobby_floor_distance(&self, floor: i64) -> i64 {
-        let mut best = (floor - 1).abs();
+        let nearest = |reach: &[(i64, i64)]| {
+            let mut best = (floor - 1).abs();
+            for &(lf, top) in reach {
+                let d = if floor > top {
+                    floor - top
+                } else {
+                    (lf - floor).max(0)
+                };
+                best = best.min(d);
+            }
+            best
+        };
+        {
+            let memo = self.memo.borrow();
+            if let Some((built, reach)) = &memo.lobby_reach {
+                if *built == memo.lobby_changes {
+                    return nearest(reach);
+                }
+            }
+        }
+        nearest(&self.fill_lobby_reach())
+    }
+
+    /// Each lobby floor with the top story of its tallest hall, in floor
+    /// order, stored in [`Memo::lobby_reach`]. Both lists run up the tower,
+    /// so one walk of each finds every lobby floor's tallest hall (a floor's
+    /// halls come tallest last).
+    ///
+    /// [`Memo::lobby_reach`]: crate::tower_query_state::Memo::lobby_reach
+    #[cold]
+    fn fill_lobby_reach(&self) -> std::sync::Arc<[(i64, i64)]> {
         let mut tall = self.tall_lobby_tiles.keys().peekable();
+        let mut reach = Vec::with_capacity(self.lobby_tiles.len());
         for &lf in self.lobby_tiles.keys() {
             let mut top = lf;
             while let Some(&&(hall, height)) = tall.peek() {
@@ -276,14 +309,12 @@ impl Tower {
                 }
                 tall.next();
             }
-            let d = if floor > top {
-                floor - top
-            } else {
-                (lf - floor).max(0)
-            };
-            best = best.min(d);
+            reach.push((lf, top));
         }
-        best
+        let reach: std::sync::Arc<[(i64, i64)]> = reach.into();
+        let mut memo = self.memo.borrow_mut();
+        memo.lobby_reach = Some((memo.lobby_changes, reach.clone()));
+        reach
     }
 
     /// `transportColumns`.
