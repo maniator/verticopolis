@@ -25,6 +25,15 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.13.5
+
+- Modern: office workers who go out for dinner or a movie after office hours now go home from the restaurant or cinema. Before, they rode back to the office first, and a few were still leaving after midnight (#2481).
+- An installed copy of the game now refuses an older version's page when a rollback lands while an update installs. Before, it could store that page with the new version's files, and a cold start with no network then asked for files the update had removed (#2206).
+- Holding Enter on a dialog's button no longer reopens the dialog. Enter's repeats now go only to the button you pressed, so the button that opened the dialog, which gets focus back when it closes, is not pressed again (#1842).
+- Modern: an elevator on Auto no longer gives the last hour of a rush too few cars. Each hour now counts the bigger crowd of its start and its end, so a rush that ends on the hour keeps the cars it needed, and the morning rush reads as before. The schedule's advice, the auto-tune button and the hourly curves count the same way (#2466).
+- Classic: the tower's notices and Tower Statistics now say what went wrong without telling you what to do, the way the 1994 game did, matching a room's card. That covers a floor only stairs reach, a metro cut off from the tower, a fire, a theft or a bomb with no Security, rooms a fire gutted, cockroaches, the VIP's verdict, and a recycling shortfall. Modern still says what to do about each one (#549).
+- If you open the game just as a new version goes live, and your browser hands you the old page with the new engine files, the game now reloads once by itself onto the new version instead of stopping with "do not match this version of the game". If the reload still finds the old page, the game stops and explains what to try, as before.
+
 ## 4.13.4
 
 - After File > Open… brings in a tower from your computer, or a 1994 tower is imported, File > Open Recent now always lists the tower you just left on line 1, so going back is one pick. Before, the tower you opened could sometimes land above it.

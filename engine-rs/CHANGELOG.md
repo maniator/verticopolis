@@ -15,6 +15,15 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.54.0 (2026-11-18)
+
+- The satisfaction pass and the move-in check find each room's nearest amenity with a binary search over a sorted list of venue floors, where they used to walk every venue's floors, and the hotel and condo passes walk the rooms rather than every tile. That is up to 3% fewer instructions per step on large Modern towers, with identical results.
+- Fires and bomb blasts look units up by id and walk only the rooms, where they used to search and walk every unit and tile. A random-event check costs 62 to 93% fewer instructions, with identical results.
+- The motion pass and the queue projection refill their waiting-line lists in place each step instead of building them again, 0.7% to 2.5% fewer instructions per step with identical results.
+- A Modern office worker whose outing (a meal or a cinema visit) ends outside office hours leaves the tower from the venue (`workplace::off_work_after_outing`): the office's desk and head count drop by one and its `out_for_meal` comes back down, and the return leg goes to the ground lobby. During office hours, and in Classic, the outing still returns to the office (#2481).
+- `sample_elevator_util` files the larger of the demand at the top of the hour that ended and the demand now under that hour, both the riders aboard and the Modern lines at the shaft's stops. `ElevatorTelemetry::hour_start` (new) keeps each elevator's demand at the top of the hour under way, and a save's `elevatorLoad` entries carry it as `hourStart`. A save without it reads the first hour after its load from the hour's end alone, as before. The conformance lock moves for the Modern scenarios that sample a rush edge (`metro-express-modern`, `starter-modern`) (#2466).
+- The Classic notices drop their fix (`GameMode::advises_fixes`): the stranded-floor and metro cut-off notices, the Security tip after a fire, the theft, bomb and refused-ransom notices, the burned-room, helicopter and cockroach notices, and the unimpressed VIP. Modern's text is unchanged (#549).
+
 ## 1.53.0 (2026-11-18)
 
 - The roots an undo step's ground-floor lobby tiles joined (`joined_roots`) leave out of their flood the basement the step takes out, so each part that basement linked keeps its own root and its undo is no longer refused as `Blocked` (#2210).
