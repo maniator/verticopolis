@@ -25,6 +25,15 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.13.1
+
+- The note about elevators with idle cars now says to choose Tower > Statistics… to review them, the menu item's real name.
+- The Player's Manual catches up with the game: it describes the strip of readouts across the top on a phone or tablet, the Traffic readout's jump to the busiest floor by click, tap or keyboard, touch and hold for a tower's menu in Open or Save As, and the review of elevators whose schedules leave cars idle.
+- One rider who gives up waiting no longer makes a quiet floor read "Backed up" or cost its shops their rating. It takes several long waits before a floor counts as jammed.
+- Modern: an elevator's measured demand, its schedule advice and the Auto-tune button now count the people left waiting in line at its stops, not only the people who rode. A shaft running too few cars could only ever read as full as its few cars, so its line never showed up as demand; now it does, and the 5 AM re-tune on an Auto shaft gives back the cars a busy shaft needs instead of cutting it again the next morning.
+- Modern: once an Auto shaft has put every car to work for a line, the cars already out stay out until fewer than half a trip of people wait, so the fleet no longer flips on and off at the edge of a full carload. A shaft whose hourly count drops lets its extra cars finish their trips, and the cars parked beyond the last one still out stay parked.
+- Classic: an elevator never keeps Auto on, even in a tower that came in with it ticked, so its hour counts are never locked.
+
 ## 4.13.0
 
 - Click or tap the Traffic readout when it names a floor, such as "Backed up · B2", and the view zooms in on that floor, centered on what is backing it up. The floor flashes red for a few seconds and the elevators, stairs or escalators backing it up are outlined in yellow.
