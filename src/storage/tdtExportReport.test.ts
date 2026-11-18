@@ -39,6 +39,7 @@ function facts(
 ): ExportReportFacts {
   return {
     towerName: "My Tower!",
+    filename: "ENGINE.TDT",
     counts: { ...COUNTS, ...counts },
     stats: { ...STATS, ...stats },
     topFloor: 30,
@@ -51,7 +52,7 @@ const said = (list: string[]) => list.join("\n");
 describe("exportReport", () => {
   it("lists what comes along and the fixed losses", () => {
     const r = exportReport(facts());
-    expect(r.filename).toBe("MYTOWER.TDT");
+    expect(r.filename, "the engine names the file (#1676)").toBe("ENGINE.TDT");
     expect(r).toMatchObject({
       star: 4,
       money: 1_000_000,

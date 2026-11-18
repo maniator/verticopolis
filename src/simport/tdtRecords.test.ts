@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PortCodes } from "./portCodes";
 import { exportFacts, importFacts } from "./tdtRecords";
 
@@ -104,12 +104,16 @@ describe("exportFacts", () => {
       "topFloor",
       "basements",
     ];
+    const port = { towerName: vi.fn(() => "Tower"), tdtFilename: vi.fn(() => "TOWER.TDT") };
     const facts = exportFacts(
       Float64Array.from([1, 40, 2, 500, 50000, 4, 3, 30, 2]),
       codes(fields),
-      "Tower",
+      port,
     );
     expect(facts.towerName).toBe("Tower");
+    // The download's name is the engine's (#1676), not one worked out here.
+    expect(facts.filename).toBe("TOWER.TDT");
+    expect(port.tdtFilename).toHaveBeenCalledExactlyOnceWith();
     expect(facts.counts.rooms).toBe(40);
     expect(facts.counts.burnedOut).toBe(2);
     expect(facts.stats).toMatchObject({
@@ -120,8 +124,7 @@ describe("exportFacts", () => {
     });
     expect(facts.topFloor).toBe(30);
     expect(facts.basements).toBe(2);
-    expect(
-      exportFacts(Float64Array.from([1]), codes(["ok"]), undefined).towerName,
-    ).toBe("");
+    const unnamed = { towerName: vi.fn(() => undefined), tdtFilename: vi.fn(() => "TOWER1.TDT") };
+    expect(exportFacts(Float64Array.from([1]), codes(["ok"]), unnamed)).toMatchObject({ towerName: "", filename: "TOWER1.TDT" });
   });
 });

@@ -1,4 +1,3 @@
-import { legacyFilename } from "./tdtFilename";
 import { groupDigits } from "../ui/format";
 
 /** The elevator slots a `.TDT` file holds. */
@@ -67,6 +66,8 @@ export interface ExportReport {
  *  `tdtExport` record, with the tower's name. */
 export interface ExportReportFacts {
   towerName: string;
+  /** The download's name, from the engine (`tdtFilename`). */
+  filename: string;
   counts: ExportCounts;
   stats: EncodeStats;
   /** The highest floor and the basement levels the file can contain. */
@@ -76,7 +77,7 @@ export interface ExportReportFacts {
 
 /** The reverse fidelity report from its numbers. */
 export function exportReport(facts: ExportReportFacts): ExportReport {
-  const { counts, stats, topFloor, basements, towerName } = facts;
+  const { counts, stats, topFloor, basements, towerName, filename } = facts;
   const { balance, money, star } = stats;
 
   const shafts = Math.min(stats.elevatorsLen, TDT_ELEVATOR_SLOTS);
@@ -154,7 +155,7 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
 
   return {
     towerName,
-    filename: legacyFilename(towerName),
+    filename,
     star,
     money: balance * 100,
     floors: topFloor,

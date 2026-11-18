@@ -403,6 +403,13 @@ impl Engine {
         r
     }
 
+    /// The `.TDT` file name for the tower as it is named now.
+    pub(crate) fn port_tdt_filename(&self) -> String {
+        crate::tdt::export_tables::legacy_filename(
+            self.sim.tower.tower_name.as_deref().unwrap_or(""),
+        )
+    }
+
     /// The bytes the last done `tdtExport` wrote, handed over once.
     pub(crate) fn port_tdt_file(&mut self) -> Option<Vec<u8>> {
         self.tdt_file.take()

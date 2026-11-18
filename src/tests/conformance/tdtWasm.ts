@@ -102,7 +102,7 @@ export function buildTDT(save: SerializedGame | string): BuiltTdt {
     const record = engine.tdtExport();
     const bytes = record[0] === 1 ? engine.tdtFile() : undefined;
     if (!bytes) throw new LegacyExportError(engine.lastReason() ?? "Export failed.");
-    return { bytes, record, report: exportReport(exportFacts(record, new PortCodes(engine), engine.towerName())) };
+    return { bytes, record, report: exportReport(exportFacts(record, new PortCodes(engine), engine)) };
   } finally {
     engine.free();
   }

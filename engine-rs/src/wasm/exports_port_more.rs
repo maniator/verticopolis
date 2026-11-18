@@ -275,6 +275,14 @@ impl Engine {
     pub fn tower_name(&self) -> Option<String> {
         self.sim.tower.tower_name.clone()
     }
+
+    /// The file name a `.TDT` export of this tower downloads as: A to Z and
+    /// 0 to 9 from its name, upper-cased and cut to 8 characters, and
+    /// `TOWER1.TDT` for a name with none or a DOS device name (#1676).
+    #[wasm_bindgen(js_name = tdtFilename)]
+    pub fn tdt_filename(&self) -> String {
+        self.port_tdt_filename()
+    }
 }
 
 /// The binary `.vctower` file members (`wasm_port_files.rs`).
