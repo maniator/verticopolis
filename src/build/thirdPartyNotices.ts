@@ -20,13 +20,17 @@ export interface NoticePackage {
   license: string;
   /** Every license and NOTICE file the package ships, in file-name order. */
   licenseText: string;
-  /** Where it comes from: an npm package (the default) or a Rust crate compiled into the WASM engine. */
-  kind?: "npm" | "crate";
+  /**
+   * Where it comes from: an npm package (the default), a Rust crate compiled
+   * into the WASM engine, or an npm package whose code the engine ports (#1356).
+   */
+  kind?: "npm" | "crate" | "port";
 }
 
 /** The label a package carries in the notices, so an npm package and a crate of the same name stay apart. */
 function kindLabel(p: NoticePackage): string {
-  return p.kind === "crate" ? " (Rust engine crate)" : "";
+  if (p.kind === "crate") return " (Rust engine crate)";
+  return p.kind === "port" ? " (ported into the Rust engine)" : "";
 }
 
 const NODE_MODULES = "/node_modules/";

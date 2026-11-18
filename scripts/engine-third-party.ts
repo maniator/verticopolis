@@ -21,7 +21,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, relative, isAbsolute, sep } from "node:path";
 import { noticeProblem, type NoticePackage } from "../src/build/thirdPartyNotices.ts";
-import { ENGINE_THIRD_PARTY, STD_LICENSE, STD_NAME, cargoTreePackages, htmlText, shippedCrates, stdLicenseProblems, type CargoMetadata } from "../src/build/rustNotices.ts";
+import { ENGINE_PORTS, ENGINE_THIRD_PARTY, STD_LICENSE, STD_NAME, cargoTreePackages, htmlText, portEntry, shippedCrates, stdLicenseProblems, type CargoMetadata } from "../src/build/rustNotices.ts";
 import { readLicenseFiles } from "./license-files.ts";
 
 export { ENGINE_THIRD_PARTY };
@@ -160,7 +160,9 @@ export function engineThirdParty(crate: string, features: string): (NoticePackag
   const std = standardLibrary(crate);
   const stdProblem = noticeProblem(std);
   if (stdProblem) problems.push(stdProblem);
+  const ports = ENGINE_PORTS.filter((p) => existsSync(join(crate, p.source))).map((p) => portEntry(p, readLicenseFiles(join(crate, p.notice)), problems));
   if (problems.length > 0) throw new Error(`the WASM engine cannot be attributed: ${problems.join("; ")}`);
   out.push(std);
+  for (const p of ports) if (p) out.push(p);
   return out;
 }

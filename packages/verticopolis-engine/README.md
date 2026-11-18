@@ -42,4 +42,5 @@ of the [Verticopolis repository](https://github.com/maniator/verticopolis).
 ## License
 
 MIT. See [`LICENSE`](./LICENSE). The licenses of the Rust crates compiled
-into the WebAssembly are in `web/THIRD-PARTY.json`.
+into the WebAssembly, and of fflate, whose deflate the engine ports, are in
+`web/THIRD-PARTY.json`.

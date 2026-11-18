@@ -33,7 +33,7 @@ release.
 | `node/verticopolis_engine.d.ts` | The TypeScript declarations, with a doc comment on most calls. `web/verticopolis_engine.d.ts` declares the same calls plus the browser build's loader. |
 | `web/` | The browser build (an ES module). Call its default export once to load the `.wasm` before you use anything else. |
 | `web/BUILD.json` | The build record: the engine version, a hash of the Rust sources it was built from and a SHA-256 for each file. |
-| `web/THIRD-PARTY.json` | The licenses of the Rust crates compiled into the `.wasm`. |
+| `web/THIRD-PARTY.json` | The licenses of the Rust crates compiled into the `.wasm`, and of fflate, whose deflate the engine ports. |
 | `CHANGELOG.md` | The engine changelog, one section per version. |
 
 Both builds come from the same Rust source at the same version and run the
@@ -341,4 +341,5 @@ prove it runs the real simulation, and the build metadata.
 ## License
 
 MIT. See [`LICENSE`](https://github.com/maniator/verticopolis/blob/main/LICENSE). The licenses of the Rust crates compiled
-into the WebAssembly are in `web/THIRD-PARTY.json`.
+into the WebAssembly, and of fflate, whose deflate the engine ports, are in
+`web/THIRD-PARTY.json`.
