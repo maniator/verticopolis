@@ -199,6 +199,14 @@ describe("a release PR", () => {
     expect(beyond("engine-rs/Cargo.lock", (t) => `${t}\n[[package]]\nname = "serde"\n`)).toHaveLength(1);
     expect(beyond("engine-rs/src/compat-record.json", (t) => JSON.stringify({ ...JSON.parse(t), lockDigest: "bbbb" }))).toHaveLength(1);
     expect(beyond("package-lock.json", (t) => JSON.stringify({ ...JSON.parse(t), packages: { "": { name: "x", version: "2.90.0" }, "node_modules/a": {} } }))).toHaveLength(1);
+    // The engine guides may move only their example pins (#2080).
+    const guide = (v: string) => `Pin \`tag = "engine-v${v}"\`.\nUse \`"${v}"\`, not \`"^${v}"\`.\n`;
+    const withGuide = (v: string, extra = "") => ({ ...cut("2.90.0", "1.22.1"), "docs/engine-site/guides/crate.md": guide(v) + extra });
+    const guideBase = { ...pending, "docs/engine-site/guides/crate.md": guide("1.22.0") };
+    expect(release(guideBase, withGuide("1.22.1"))).toEqual([]);
+    expect(release(guideBase, withGuide("1.22.1", "More prose.\n"))).toEqual([
+      "docs/engine-site/guides/crate.md changed beyond its version: a release PR changes only the version there.",
+    ]);
     // The changelogs are the driver's to curate.
     expect(beyond("CHANGELOG.md", (t) => t.replace("- New.", "- Curated."))).toEqual([]);
   });

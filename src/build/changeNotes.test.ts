@@ -11,6 +11,7 @@ import {
   parseNote,
   readNotes,
   setCargoVersion,
+  setEnginePins,
   setLockVersion,
 } from "./changeNotes";
 
@@ -139,5 +140,17 @@ describe("change notes", () => {
     const lock = '[[package]]\nname = "serde"\nversion = "1.22.0"\n\n[[package]]\nname = "verticopolis-engine"\nversion = "1.22.0"\n';
     expect(setLockVersion(lock, "verticopolis-engine", "1.23.0")).toBe(lock.replace(/("verticopolis-engine"\nversion = )"1\.22\.0"/, '$1"1.23.0"'));
     expect(() => setLockVersion(lock, "other", "1.0.0")).toThrow(/no other entry/);
+  });
+
+  it("moves every example pin in an engine guide to the new crate release", () => {
+    const guide = [
+      'verticopolis-engine = { git = "https://github.com/maniator/verticopolis", tag = "engine-v1.24.0" }',
+      'verticopolis-engine = { git = "https://github.com/maniator/verticopolis", tag = "engine-v1.24.0", features = ["conformance"] }',
+      'To pin exactly, depend on an exact version (`"1.24.0"`, not `"^1.24.0"`).',
+      "Tags are named `engine-v<version>`; serde stays at `1.0.210`.",
+    ].join("\n");
+    expect(setEnginePins(guide, "1.56.0")).toBe(guide.replace(/1\.24\.0/g, "1.56.0"));
+    expect(setEnginePins(guide, "1.24.0")).toBe(guide);
+    expect(() => setEnginePins("Tags are named `engine-v<version>`.", "1.56.0")).toThrow(/pins no engine release/);
   });
 });

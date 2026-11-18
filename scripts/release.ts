@@ -11,10 +11,11 @@
  * together) and writes the `CHANGELOG.md` section from the notes' Player lines;
  * when a note has a crate level it raises the crate in `engine-rs/Cargo.toml`
  * and the three `Cargo.lock` files that pin it (the crate, its consumer check
- * and the bench), writes the `engine-rs/CHANGELOG.md` section from
- * the Engine lines and runs `npm run engine:compat`. The notes' Contributors
- * lines go under a `### Contributors` heading in each section it writes. Then
- * it deletes the notes.
+ * and the bench), writes the `engine-rs/CHANGELOG.md` section from the Engine
+ * lines, moves the engine guides' example pins to the new crate release
+ * (`ENGINE_PIN_DOCS`, #2080) and runs `npm run engine:compat`. The notes'
+ * Contributors lines go under a `### Contributors` heading in each section it
+ * writes. Then it deletes the notes.
  * The rules are in `src/build/changeNotes.ts`; CI checks the result with
  * `scripts/version-check.ts`.
  *
@@ -34,7 +35,9 @@ import {
   insertSection,
   readNotes,
   setCargoVersion,
+  setEnginePins,
   setLockVersion,
+  ENGINE_PIN_DOCS,
 } from "../src/build/changeNotes.ts";
 import { cargoPackage, isSemverIncrease } from "../src/build/engineCompat.ts";
 import { MAX_NOTE_LEN, MAX_NOTES } from "../src/pwaUpdateInfo.ts";
@@ -106,6 +109,7 @@ if (crateNow !== crate.version) {
   for (const lock of ["engine-rs/Cargo.lock", "engine-rs/consumer/Cargo.lock", "engine-bench/Cargo.lock"]) write(lock, setLockVersion(read(lock), crate.name, crateNow));
   const changelog = "engine-rs/CHANGELOG.md";
   write(changelog, insertSection(read(changelog), `${crateNow} (${date})`, pending.flatMap((n) => n.engine), engineCredits));
+  for (const guide of ENGINE_PIN_DOCS) write(guide, setEnginePins(read(guide), crateNow));
   node(["scripts/engine-compat.ts"]);
 }
 
