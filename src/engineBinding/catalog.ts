@@ -103,7 +103,7 @@ const ECONOMY: Shape = {
 const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool, buildsWhilePaused: bool, exportsTo1994: bool, quotesLobbyDistance: bool, advisesFixes: bool, tallSkyLobbies: bool, maxLobbyHeight: size, decorativePassersBy: bool, shadedLook: bool, venueFlights: bool, frontDoorPerTower: bool, expressStopsOn15thFloors: bool, officesShareOneParkingSpace: bool, fedUpWait: positive, announcesStarDuties: bool, starDuties: Array.isArray, skyBridge: (v) => v === null || isRecord(v) };
 const STAR_DUTY: Shape = { star: size, id: oneOf("emergencies", "suiteParking", "officeParking", "homeParking", "recycling", "vipVisits", "hotelGuestsUncounted", "bombThreats") };
 const EXTERMINATOR: Shape = { calloutFee: amount, perRoomFee: amount };
-const SKY_BRIDGE: Shape = { minStar: count, maxSpan: size, tileCost: amount };
+const SKY_BRIDGE: Shape = { minStar: count, maxSpan: size, tileCost: amount, looks: (v) => Array.isArray(v) && v.length > 0 && v.every(text) };
 const FILM: Shape = { key: (v) => v === "new" || v === "classic" || v === "blockbuster", label: (v) => typeof v === "string", price: amount };
 const TICKET_PRICE: Shape = { key: text, label: text, incomeMult: positive, pickMult: positive };
 const FILM_REBOOK: Shape = { policy: (v) => typeof v === "string", film: (v) => v === null || v === "new" || v === "classic" || v === "blockbuster" };

@@ -1,4 +1,5 @@
 import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
+import type { SkyBridgeClick } from "./skyBridgeTool";
 import type { FacilityKind } from "../shared/types";
 import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
 import type { Tool, UI } from "../ui/UI";
@@ -9,7 +10,6 @@ import type { EnginePort } from "../simport/enginePort";
 import { outcome, type PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
 import { quoteShaft } from "./portAccess";
-import { SKY_BRIDGE_STEP } from "./skyBridgeTool";
 
 /**
  * Keyboard play (F50–52): the virtual build cursor moved with arrows/WASD,
@@ -65,7 +65,9 @@ export interface KeyboardPlayDeps {
   placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null;
   updateBuildPreview(tile: number, floor: number): void;
   /** Lay the whole sky bridge at a cell (Modern; `skyBridgeGestures`). */
-  placeSkyBridge(tile: number, floor: number): { ok: boolean; reason?: string; tiles: number };
+  placeSkyBridge(tile: number, floor: number): SkyBridgeClick;
+  /** The undo step a Sky Bridge Enter at the cell opens (`skyBridgeGestures`). */
+  skyBridgeStep(tile: number, floor: number): string;
   /** Refuse a new placement while paused where the mode says so
    *  (`pausedBuild.ts`, #1936): true when refused, with its feedback shown. */
   refusePausedPlacement(): boolean;
@@ -177,10 +179,10 @@ export class KeyboardPlay {
       return;
     }
     if (tool.type === "skyBridge") {
-      this.deps.captureUndo(SKY_BRIDGE_STEP);
+      this.deps.captureUndo(this.deps.skyBridgeStep(c.tile, c.floor));
       const laid = this.deps.placeSkyBridge(c.tile, c.floor);
       this.deps.commitUndo();
-      this.deps.announce(laid.ok ? `Sky bridge built, ${laid.tiles} ${laid.tiles === 1 ? "tile" : "tiles"}` : (laid.reason ?? "Can't build a sky bridge here"));
+      this.deps.announce(skyBridgeAnnouncement(laid));
       this.refreshCursorPreview();
       return;
     }
@@ -241,4 +243,11 @@ export class KeyboardPlay {
     this.deps.announce(removed ? `Bulldozed ${name}` : `Could not bulldoze ${name}`);
     this.refreshCursorPreview();
   }
+}
+
+/** What the keyboard says after a Sky Bridge Enter. */
+function skyBridgeAnnouncement(laid: SkyBridgeClick): string {
+  if (!laid.ok) return laid.reason ?? "Can't build a sky bridge here";
+  if (laid.restyled) return "Bridge look changed";
+  return `Sky bridge built, ${laid.tiles} ${laid.tiles === 1 ? "tile" : "tiles"}`;
 }

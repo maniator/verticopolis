@@ -1700,6 +1700,7 @@ describe.skipIf(noEngine)("KeyboardPlay (cursor bounds, transport anchor flow, p
       // two-press anchor flow, exactly like GameApp's placeSimpleBuild.
       placeSimpleBuild: () => null,
       placeSkyBridge: (tile, floor) => build.buildSkyBridge(tile, floor),
+      skyBridgeStep: () => "Build Sky Bridge",
       updateBuildPreview: (tile, floor) => previewCalls.push({ tile, floor }),
       refusePausedPlacement: () => false,
       captureUndo: (label) => undoLog.push(`capture:${label}`),

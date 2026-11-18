@@ -11,7 +11,9 @@ import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { groupDigits } from "../ui/format";
 import { quoteShaft } from "./portAccess";
 import { lobbyHeightFor } from "./lobbyHeight";
-import { finishesHalfBridge, quoteSkyBridge } from "./skyBridgeTool";
+import { finishesHalfBridge, quoteSkyBridge, type SkyBridgeClick } from "./skyBridgeTool";
+import { finishedSkyBridgeAt } from "../simport/skyBridgeView";
+import { pickedSkyBridgeLook } from "../ui/skyBridgeLookStrip";
 import { trackAppAction } from "../analyticsActions";
 
 /** Takes a drag step's refusal reason in place of a toast (`dragRefusal.ts`). */
@@ -81,24 +83,55 @@ export class BuildActions {
     return res.ok;
   }
 
-  /** Lay the whole sky bridge a click at `(floor, tile)` names (Modern), with
-   *  the usual build/error feedback; nothing is laid on a refusal. Reports the
-   *  `sky_bridge` action, `finish` when it completes a half bridge from an old
-   *  save, `new` otherwise. */
-  buildSkyBridge(tile: number, floor: number): { ok: boolean; reason?: string; tiles: number } {
+  /** Lay the whole sky bridge a click at `(floor, tile)` names (Modern) in the
+   *  look picked on the tool's strip, with the usual build/error feedback;
+   *  nothing is laid on a refusal. A click on a finished bridge dresses it in
+   *  the picked look instead, free. Reports the `sky_bridge` action (`finish` when it
+   *  completes a half bridge from an old save, `new` otherwise) and the
+   *  `sky_bridge_look` action with the look's name. */
+  buildSkyBridge(tile: number, floor: number): SkyBridgeClick {
     const port = this.deps.enginePort();
+    const look = pickedSkyBridgeLook();
+    const reader = this.deps.reader();
+    const bridge = finishedSkyBridgeAt(reader.tower, floor, tile);
+    if (bridge) return this.restyleSkyBridge(port, floor, tile, bridge.look === look ? null : look);
     const codes = this.deps.portCodes();
     const quote = quoteSkyBridge(port, codes, floor, tile);
-    const finishing = finishesHalfBridge(this.deps.reader(), floor, quote);
-    const rec = port.buildSkyBridge(floor, tile);
+    const finishing = finishesHalfBridge(reader, floor, quote);
+    const rec = port.buildSkyBridge(floor, tile, look);
     const res = outcome(port, rec);
     this.deps.audio.sfx(res.ok ? "build" : "error");
     if (!res.ok) {
       if (res.reason) this.deps.ui.toast(res.reason, "bad");
-      return { ok: false, reason: res.reason, tiles: 0 };
+      return { ok: false, reason: res.reason, tiles: 0, restyled: false };
     }
     trackAppAction("sky_bridge", finishing ? "finish" : "new");
-    return { ok: true, tiles: codes.slot(rec, "buildSkyBridge", "tiles") };
+    this.trackLook(look);
+    return { ok: true, tiles: codes.slot(rec, "buildSkyBridge", "tiles"), restyled: false };
+  }
+
+  /** Dress the bridge at the cell in `look`; `null` when it already wears it. */
+  private restyleSkyBridge(port: EnginePort, floor: number, tile: number, look: number | null): SkyBridgeClick {
+    if (look === null) {
+      const reason = "This sky bridge already has that look. Pick another look on the strip.";
+      this.deps.ui.toast(reason, "info");
+      return { ok: false, reason, tiles: 0, restyled: false };
+    }
+    const res = outcome(port, port.restyleSkyBridge(floor, tile, look));
+    this.deps.audio.sfx(res.ok ? "build" : "error");
+    if (!res.ok) {
+      if (res.reason) this.deps.ui.toast(res.reason, "bad");
+      return { ok: false, reason: res.reason, tiles: 0, restyled: false };
+    }
+    trackAppAction("sky_bridge", "restyle");
+    this.trackLook(look);
+    return { ok: true, tiles: 0, restyled: true };
+  }
+
+  /** The `sky_bridge_look` action: the look's name from the catalog. */
+  private trackLook(look: number): void {
+    const name = this.deps.catalog().rules.skyBridge?.looks[look];
+    if (name) trackAppAction("sky_bridge_look", name);
   }
 
   /** Place a transport span with the usual build/error feedback. On a refusal

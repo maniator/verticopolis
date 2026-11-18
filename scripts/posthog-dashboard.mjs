@@ -715,8 +715,15 @@ function buildInsights(ids) {
     {
       name: "Sky bridges built (Modern)",
       description:
-        "Sky bridges the Sky Bridge tool laid, production, one event per bridge: new for a fresh bridge, finish for the rest of a half bridge from a save made before the tool. Only builds from the release after 4.8 send it (the tool shipped then), so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Sky bridges (Modern).",
+        "Sky bridges the Sky Bridge tool laid, production, one event per bridge: new for a fresh bridge, finish for the rest of a half bridge from a save made before the tool, restyle (from 4.14.0) for a finished bridge given a new look. Only builds from the release after 4.8 send it (the tool shipped then), so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Sky bridges (Modern).",
       query: trends([series("app_action", "Bridges")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sky_bridge"])] }),
+    },
+    {
+      name: "Sky bridge looks (Modern)",
+      description:
+        "The look each sky bridge went up in or was changed to, production, one event per bridge laid or restyled (app_action sky_bridge_look, detail = the look's name from the catalog's rules.skyBridge.looks). Restyles alone are sky_bridge detail restyle on the tile above. Only builds from 4.14.0 send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Sky bridges (Modern).",
+      overview: true,
+      query: trends([series("app_action", "Bridge looks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sky_bridge_look"])] }),
     },
     {
       name: "Traffic readout taps",

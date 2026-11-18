@@ -10,6 +10,8 @@ import { catalogOf, isUnlocked, quoteBuild, quoteShaft, type BuildQuote } from "
 import { NOT_ENOUGH_MONEY } from "../simport/request";
 import { lobbyHeightFor } from "./lobbyHeight";
 import { quoteSkyBridge, quotedTiles, skyBridgeLabel } from "./skyBridgeTool";
+import { finishedSkyBridgeAt } from "../simport/skyBridgeView";
+import { pickedSkyBridgeLook } from "../ui/skyBridgeLookStrip";
 import { groupDigits } from "../ui/format";
 
 /**
@@ -195,6 +197,16 @@ export function refreshBuildPreview(app: GameApp): void {
  *  above it; red, with the engine's reason, when the click would lay nothing.
  *  Off any gap it marks the pointed tile red. */
 function updateSkyBridgePreview(app: GameApp, tile: number, floor: number, showReasonCard: boolean): void {
+  const bridge = finishedSkyBridgeAt(app.reader.tower, floor, tile);
+  if (bridge) {
+    // A finished bridge: a click dresses it in the picked look, free.
+    const look = catalogOf(app).rules.skyBridge?.looks[pickedSkyBridgeLook()];
+    const label = bridge.look === pickedSkyBridgeLook() ? "Already this look" : `${look ?? "New look"}, free`;
+    app.engine.preview = { kind: "lobby", floor, x: bridge.from, span: bridge.to - bridge.from, valid: true, stories: 1, label };
+    app.engine.transportPreview = null;
+    clearBuildRefusal(app);
+    return;
+  }
   const q = quoteSkyBridge(app.enginePort, app.portCodes, floor, tile);
   const tiles = quotedTiles(q);
   const x = tiles > 0 ? q.from : tile;

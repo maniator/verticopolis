@@ -251,8 +251,10 @@
   pointer-events: auto;
 }
 #lobby-height-strip:not([hidden]),
-#bulldoze-drag-strip:not([hidden]) {
+#bulldoze-drag-strip:not([hidden]),
+#sky-bridge-look-strip:not([hidden]) {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   padding: 4px 6px;
@@ -260,7 +262,7 @@
 }
 /* The picked lobby height (#308) and what a bulldoze drag clears, on the
    tool card and the phone strips. */
-:is(.ti-lobby-height, #lobby-height-strip, .ti-drag-clears, #bulldoze-drag-strip) .btn[aria-pressed="true"] {
+:is(.ti-lobby-height, #lobby-height-strip, .ti-drag-clears, #bulldoze-drag-strip, #sky-bridge-look-strip) .btn[aria-pressed="true"] {
   font-weight: 700;
   box-shadow: var(--bevel-in);
   background: var(--r-title);

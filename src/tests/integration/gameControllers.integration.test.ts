@@ -612,6 +612,7 @@ describe.skipIf(noEngine)("KeyboardPlay (commit announcements)", () => {
       placeSimpleBuild,
       updateBuildPreview: () => {},
       placeSkyBridge: (tile, floor) => build.buildSkyBridge(tile, floor),
+      skyBridgeStep: () => "Build Sky Bridge",
       refusePausedPlacement: () => false,
       captureUndo: (label) => undoLog.push(`capture:${label}`),
       commitUndo: () => undoLog.push("commit"),

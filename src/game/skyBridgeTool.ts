@@ -13,6 +13,18 @@ import type { ViewReader } from "../simport/viewReader";
 /** The undo step a bridge opens. */
 export const SKY_BRIDGE_STEP = "Build Sky Bridge";
 
+/** The undo step a click on a finished bridge opens: it changes the look. */
+export const BRIDGE_LOOK_STEP = "Change Bridge Look";
+
+/** What a click with the tool did: laid `tiles` tiles, or dressed a bridge in
+ *  the picked look (`restyled`), or neither and why. */
+export interface SkyBridgeClick {
+  readonly ok: boolean;
+  readonly reason?: string;
+  readonly tiles: number;
+  readonly restyled: boolean;
+}
+
 /** The engine's answer for a click at a cell: the tiles `from` to `to`
  *  (exclusive) it lays, their full price, and why not. */
 export interface SkyBridgeQuote {

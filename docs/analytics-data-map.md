@@ -225,11 +225,14 @@ It carries the new state only, never the shaft or its schedule.
 
 From the release after 4.8, the Sky Bridge tool lays a whole bridge between two
 towers' sky lobbies in one click, at 3 stars and up (party, 2026-11-16). One
-`app_action` code counts the bridges laid. It carries no floor, place or price.
+`app_action` code counts the bridges laid, and from 4.14.0 a
+second names the look each bridge got (owner, 2026-11-16: "let the users
+choose"). Neither carries a floor, place or price.
 
 | `action` | `detail` | When |
 | --- | --- | --- |
-| `sky_bridge` | `new` or `finish` | The tool laid a bridge. `finish` means it completed a half bridge from a save made before the tool (a bridge tile already stood beside the gap), `new` any other bridge |
+| `sky_bridge` | `new`, `finish` or `restyle` | The tool laid a bridge. `finish` means it completed a half bridge from a save made before the tool (a bridge tile already stood beside the gap), `new` any other bridge. `restyle` (from 4.14.0): a click on a finished bridge changed its look |
+| `sky_bridge_look` | the look's name: `Lobby`, `Glass Skywalk`, `Steel Truss`, `Deco Arcade` or `Garden Walk` | From 4.14.0: the look a bridge went up in or was changed to, one event per bridge laid or restyled. The names are the catalog's `rules.skyBridge.looks` |
 
 ## Drags that stop
 

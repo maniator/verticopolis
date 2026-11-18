@@ -211,6 +211,18 @@ export interface TowerView {
   unitAt(floor: number, x: number): UnitView | undefined;
   hasStructure(floor: number, x: number): boolean;
   structureKindAt(floor: number, x: number): "floor" | "lobby" | undefined;
+  /** Every sky bridge (Modern) with its look, read once per tower revision.
+   *  A reader without bridges leaves it out. */
+  skyBridges?(): readonly SkyBridgeView[];
+}
+
+/** A sky bridge: its floor, its columns `from` to `to` (exclusive) and its look,
+ *  an index into the catalog's `rules.skyBridge.looks` (0, the plain lobby). */
+export interface SkyBridgeView {
+  readonly floor: number;
+  readonly from: number;
+  readonly to: number;
+  readonly look: number;
 }
 
 export interface UnitView {

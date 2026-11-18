@@ -21,4 +21,7 @@ export interface CatalogSkyBridge {
   readonly maxSpan: number;
   /** The price of one bridge tile over open air. */
   readonly tileCost: number;
+  /** The looks a bridge can wear, in the order the tool lists them; the first
+   *  is the plain lobby. A bridge's look is its index here. */
+  readonly looks: readonly string[];
 }
