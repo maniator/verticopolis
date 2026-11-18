@@ -15,6 +15,8 @@
  */
 import {
   CHANGES_DIR,
+  ENGINE_PIN_DOCS,
+  blankEnginePins,
   bumpVersion,
   changelogVersions,
   highestLevel,
@@ -48,6 +50,7 @@ export const RELEASE_FILES = [
   "engine-bench/Cargo.lock",
   "engine-rs/CHANGELOG.md",
   COMPAT_RECORD_PATH,
+  ...ENGINE_PIN_DOCS,
 ] as const;
 
 export const RELEASE_BRANCH = /^release\//;
@@ -213,7 +216,8 @@ const CRATE_LOCK = /(name = "verticopolis-engine"\nversion = )"[^"]*"/;
 
 /** Each release file with its version fields blanked; a release PR may change
  *  nothing else in them. The changelogs are free to edit (the driver curates
- *  the new section), and the compat record may change only its crateVersion. */
+ *  the new section), the compat record may change only its crateVersion, and
+ *  the engine guides only their example pins. */
 const VERSION_FREE: Partial<Record<string, (text: string) => string>> = {
   "package.json": (t) => JSON.stringify({ ...JSON.parse(t), version: null }),
   "package-lock.json": (t) => {
@@ -227,6 +231,7 @@ const VERSION_FREE: Partial<Record<string, (text: string) => string>> = {
   "engine-rs/consumer/Cargo.lock": blank(CRATE_LOCK),
   "engine-bench/Cargo.lock": blank(CRATE_LOCK),
   [COMPAT_RECORD_PATH]: (t) => JSON.stringify({ ...JSON.parse(t), crateVersion: null }),
+  ...Object.fromEntries(ENGINE_PIN_DOCS.map((guide) => [guide, blankEnginePins])),
 };
 
 /** What a release PR got wrong. */

@@ -228,3 +228,27 @@ export function setLockVersion(cargoLock: string, name: string, version: string)
   if (!entry.test(cargoLock)) throw new Error(`the lockfile has no ${name} entry`);
   return cargoLock.replace(entry, `$1${version}$2`);
 }
+
+/** The engine guides whose examples pin a crate release. */
+export const ENGINE_PIN_DOCS = ["docs/engine-site/guides/crate.md", "docs/engine-site/guides/javascript.md"];
+const PIN_TAG = /(tag = "engine-v)\d+\.\d+\.\d+(")/g;
+const PIN_EXACT = /`"\d+\.\d+\.\d+"`, not `"\^\d+\.\d+\.\d+"`/g;
+
+/**
+ * A guide with every example pin set to crate `version`: the git tag
+ * (`tag = "engine-v1.2.3"`) and the exact-version note (`"1.2.3"`, not
+ * `"^1.2.3"`). A guide with no pin throws, so a reworded guide stops the
+ * release instead of going stale (#2080).
+ */
+export function setEnginePins(guide: string, version: string): string {
+  if (guide.match(PIN_TAG) === null && guide.match(PIN_EXACT) === null) throw new Error("the guide pins no engine release");
+  return movePins(guide, version);
+}
+
+/** A guide with its example pins blanked, so the release check can tell a
+ *  moved pin (allowed on a release branch) from any other edit (#2080). */
+export const blankEnginePins = (guide: string): string => movePins(guide, "");
+
+function movePins(guide: string, version: string): string {
+  return guide.replace(PIN_TAG, `$1${version}$2`).replace(PIN_EXACT, `\`"${version}"\`, not \`"^${version}"\``);
+}

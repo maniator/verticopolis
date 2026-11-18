@@ -624,9 +624,11 @@ The release driver cuts a release:
 2. Run `npm run release` (or `npm run release -- --app 3.0.0` for a headline
    release). It raises the app version by the highest pending `app` level,
    writes the `CHANGELOG.md` section from the Player lines, and, when a note
-   has a crate level, raises the crate in `engine-rs/Cargo.toml` and both
-   `Cargo.lock` files, writes the `engine-rs/CHANGELOG.md` section from the
-   Engine lines and runs `npm run engine:compat`. It deletes the notes.
+   has a crate level, raises the crate in `engine-rs/Cargo.toml` and the
+   three `Cargo.lock` files, moves the example pins in the engine guides
+   (`docs/engine-site/guides/crate.md` and `javascript.md`) to the new crate
+   version, writes the `engine-rs/CHANGELOG.md` section from the Engine lines
+   and runs `npm run engine:compat`. It deletes the notes.
 3. Trim the player lines to the few that matter (the prompt shows three),
    commit, and open the PR. It merges like any other PR, and its merge tags
    and publishes the GitHub releases.
