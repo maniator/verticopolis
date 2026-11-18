@@ -180,8 +180,8 @@ export function wireControllers(app: GameApp): void {
       void keepOutgoing(app);
       // Autosave the tower the player just loaded, imported or founded at
       // once, so a Rust crash in the next half minute reloads it rather than
-      // the tower before it (#1422).
-      autosaveIfLive(app.saveLoad);
+      // the tower before it (#1422). Its failure reports as `swap` (#1631).
+      autosaveIfLive(app.saveLoad, "swap");
     },
     ui: {
       toast: (text, kind) => app.ui.toast(text, kind),

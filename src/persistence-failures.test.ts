@@ -64,7 +64,7 @@ describe("the presence probe", () => {
   it("counts live rows (boot or app_action, so a long-lived tab counts) and the sessions with an autosave failure from one grouping-free read, behind the same gate", () => {
     expect(sql).toContain("count() AS live_events");
     expect(sql).toContain("WHERE event IN ('boot', 'app_action')");
-    expect(sql).toContain("uniqIf(distinct_id, event = 'app_action' AND properties.action = 'autosave_failed' AND properties.detail IN ('timer', 'manual')) AS autosave_sessions");
+    expect(sql).toContain("uniqIf(distinct_id, event = 'app_action' AND properties.action = 'autosave_failed' AND properties.detail IN ('timer', 'swap', 'manual', 'file')) AS autosave_sessions");
     expect(sql).toContain("properties.environment = 'production'");
     expect(sql).toContain("INTERVAL 168 HOUR");
     expect(sql).toContain(">= [2, 78, 4]");
@@ -124,6 +124,11 @@ describe("tallyRows", () => {
     expect(t.get("import_failed:tdt")).toEqual({ events: 4, sessions: 4 });
     expect(t.get("load_failed")).toEqual({ events: 3, sessions: 3 });
     expect(t.has("quick_save")).toBe(false);
+  });
+
+  it("keeps every autosave source the game sends: timer, swap (#1631), manual and file", () => {
+    const t = tallyRows(["timer", "swap", "manual", "file"].map((d) => row("autosave_failed", d, 1)));
+    expect([...t.keys()].sort()).toEqual(["autosave_failed:file", "autosave_failed:manual", "autosave_failed:swap", "autosave_failed:timer"]);
   });
 
   it("leaves out a detail the game never sends, and a detail on an action that has none", () => {

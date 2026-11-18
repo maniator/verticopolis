@@ -81,6 +81,32 @@ describe("a failed save reports autosave_failed", () => {
     expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "timer");
   });
 
+  it("reports the autosave right after a tower swap that fails as `swap`, and the next timer one as `timer` (#1631)", async () => {
+    vi.spyOn(SaveGame, "saveAsync").mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
+    const { load } = makeLoad();
+    await load.autosave("swap");
+    expect(trackAppActionOnce).toHaveBeenLastCalledWith("autosave_failed", "swap");
+    await load.autosave();
+    expect(trackAppActionOnce).toHaveBeenLastCalledWith("autosave_failed", "timer");
+  });
+
+  it("reports a drain a swap joined as `swap`, since its save is the one that failed (#1631)", async () => {
+    let fail: (err: unknown) => void = () => {};
+    vi.spyOn(SaveGame, "saveAsync").mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+    );
+    const { load } = makeLoad();
+    const timer = load.autosave();
+    const swap = load.autosave("swap");
+    expect(swap).toBe(timer);
+    fail(new DOMException("quota", "QuotaExceededError"));
+    await timer;
+    expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "swap");
+  });
+
   it("tells the player once while autosave keeps failing, and again after it worked in between", async () => {
     const save = vi.spyOn(SaveGame, "saveAsync").mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
     const { load, ui, saveWarning } = makeLoad();
