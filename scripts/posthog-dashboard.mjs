@@ -1,10 +1,30 @@
 #!/usr/bin/env node
 /**
- * Provision the "Verticopolis | Gameplay Overview" PostHog dashboard from code, so
- * the dashboard the game reports into is reproducible and reviewable rather than
- * a pile of hand-clicked insights. Idempotent: it finds the dashboard and each
- * insight by name and creates or updates in place, so re-running it converges the
- * live dashboard to the definitions below without duplicating tiles.
+ * Add the repository's new tiles to the "Verticopolis | Gameplay Overview"
+ * PostHog dashboard, without touching anything already on it. The dashboard is
+ * hand-curated by the owner (names, descriptions, layout), so a run is
+ * add-only (owner, 2026-11-18):
+ *
+ *  - Only tiles marked `overview: true` below are candidates, so the script's
+ *    full tile set never lands on the dashboard.
+ *  - A candidate already on the dashboard (by name) is left as it is: no rename,
+ *    no new query, no new description.
+ *  - A candidate whose name an insight elsewhere in the project already uses is
+ *    skipped and named in the output, because adding it would mean rewriting
+ *    that insight or making a second one with the same name.
+ *  - Each new tile goes full width below the existing tiles. The mobile layout
+ *    stacks tiles in the desktop order, so both stay readable.
+ *  - The saved view and the action are created when missing and otherwise left
+ *    as they are. Pass --update-view to rewrite the view from SESSION_LENGTHS_SQL;
+ *    it works even when there is no tile to add, and then changes the view only.
+ *  - The dashboard is never created: if it is missing (or renamed), the run stops.
+ *
+ * To put a new tile on the dashboard, add its spec to `buildInsights` with
+ * `overview: true`, run the script, then record the short id it prints as the
+ * spec's `shortId`. A spec with a short id is never added again, so a tile the
+ * owner renames afterwards does not come back as a second copy. The other specs
+ * stay here as the reviewed definitions of insights that already exist in
+ * PostHog; this script no longer syncs them.
  *
  * Runs on plain Node (18+, global fetch), no dependencies. Env:
  *   POSTHOG_PERSONAL_API_KEY  (required)  a personal API key with insight:read,
@@ -12,19 +32,14 @@
  *                                         dashboard:write, action:read,
  *                                         action:write, warehouse_view:read and
  *                                         warehouse_view:write (a phx_... key,
- *                                         NOT the phc_... ingest key). The action
- *                                         scopes are not optional: the new-game
- *                                         tiles read through an action, which is
- *                                         provisioned before any insight, so a
- *                                         key without them aborts the run with
- *                                         nothing written. The warehouse_view
- *                                         scopes provision the session_lengths
- *                                         saved view that the session tiles read.
+ *                                         NOT the phc_... ingest key).
  *   POSTHOG_PROJECT_ID        (default 524085)  the verticopolis project.
  *   POSTHOG_HOST              (default https://us.posthog.com)  US Cloud app host.
  *
  * Usage: POSTHOG_PERSONAL_API_KEY=phx_... node scripts/posthog-dashboard.mjs
- * Pass --dry-run to print the plan without writing.
+ * Pass --dry-run to list exactly what a run would add, and what it would leave
+ * alone, without writing anything (it reads the live dashboard, so it needs the
+ * key; without one it lists the candidate tiles only).
  *
  * All insights filter to environment=production (per the spec: preview traffic
  * lands in the same project tagged environment=preview but never blends into the
@@ -32,16 +47,18 @@
  * The event vocabulary mirrors src/analytics.ts (GameplayEvents).
  */
 
+import { pathToFileURL } from "node:url";
+
 const HOST = (process.env.POSTHOG_HOST || "https://us.posthog.com").replace(/\/+$/, "");
 const PROJECT_ID = process.env.POSTHOG_PROJECT_ID || "524085";
 const KEY = process.env.POSTHOG_PERSONAL_API_KEY;
 const DRY_RUN = process.argv.includes("--dry-run");
+const UPDATE_VIEW = process.argv.includes("--update-view");
 
 /** The live dashboard's name. The owner renamed it from "Verticopolis: Gameplay
  *  Analytics" in PostHog, and the run finds the dashboard by this name, so it
  *  has to match or the run creates a second dashboard. */
 const DASHBOARD_NAME = "Verticopolis | Gameplay Overview";
-const TAG = "analytics-migration";
 /** The one filter every insight carries: production only. */
 const PROD_ONLY = [{ key: "environment", operator: "exact", type: "event", value: ["production"] }];
 const LAST_30D = { date_from: "-30d" };
@@ -229,8 +246,9 @@ function actionSeries(id, name, math = "total") {
   return { kind: "ActionsNode", id, name, math };
 }
 
-/** The dashboard's insight definitions, in display order. Each mirrors what the
- *  live dashboard carries; editing here and re-running is the reproducible path. */
+/** The reviewed insight definitions. Only those marked `overview: true` are
+ *  added to the live dashboard (see the header); the rest record the definitions
+ *  of insights that already exist in PostHog. */
 function buildInsights(ids) {
   return [
     {
@@ -339,7 +357,6 @@ function buildInsights(ids) {
     },
     {
       name: "Session FPS percentiles (median & 5th-percentile low)",
-      formerName: "Session FPS percentiles (median & worst-frame)",
       description:
         "Median of session_fps.p50 and of session_fps.low across the rows each day (production). `low` is the 5th-percentile fps of one page life's sampled frames, a hitch signal, not its single worst frame. Observed in the field on whatever device each player has: it is not a hardware benchmark or the performance gate. From the release after 4.13.1 only frames where the simulation runs are sampled (#603); before it, paused and modal-frozen frames counted too, so compare versions on the same side of that change. The tile beside it gives the number of rows behind each day (#538, #2391).",
       query: trends(
@@ -355,6 +372,8 @@ function buildInsights(ids) {
     },
     {
       name: "Session FPS by tower size and speed",
+      overview: true,
+      shortId: "CvqJXbSp",
       description:
         "session_fps by the session's peak population and the running game speed most sampled frames ran at (3, 15 or 50 game minutes per real second), with the median typical and 5th-percentile low fps, production, 30d. Rows from the release after 4.13.1 only: earlier rows carry no population, and from that release only frames where the simulation runs are sampled. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
       query: hogql(
@@ -377,6 +396,8 @@ function buildInsights(ids) {
     },
     {
       name: "Engine cost per game hour by version, tower size and speed",
+      overview: true,
+      shortId: "SXGRuzl0",
       description:
         "session_sim_cost: the real milliseconds the engine step took per game hour (median and p90), by version, population band and speed (3, 15 or 50 game minutes per real second), production, 30d. Each row is the band and speed its window stepped the most game time at, with that band's peak population, so towers of different sizes are never blended. Sent from the release after 4.13.1, once a visible tab has moved the clock 2 game hours at one band and speed. It depends on the player's machine, and a faster speed takes bigger steps, so compare versions within one population band and speed, and trust a row only with many page lives behind it. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
       query: hogql(
@@ -992,11 +1013,6 @@ async function listAll(path) {
   }
 }
 
-/** Find a dashboard by exact name, or return null. */
-async function findDashboard() {
-  return (await listAll(`/dashboards/`)).find((d) => d.name === DASHBOARD_NAME && !d.deleted) || null;
-}
-
 /** Find a saved insight by exact name, or return null. */
 async function findInsight(name) {
   // `search` is fuzzy and ranked, so the exact-name match is not guaranteed to be
@@ -1015,71 +1031,40 @@ async function findInsight(name) {
   return hit;
 }
 
-/** Create or update the saved view the SQL tiles read, matched by exact name. A
- *  view is referenced BY NAME from HogQL, so it has to exist before an insight
- *  that selects from it runs; provisioning it here keeps the whole dashboard
- *  reproducible from this one script rather than half of it from the SQL editor. */
-/** Tag a caught failure with which branch of {@link ensureView} it came from, so
- *  the caller can say what state the view is actually in. Coerced to an Error
- *  first: an ES module is always strict mode, so assigning onto a primitive or a
- *  frozen throwable throws a TypeError, and that replacement error would carry no
- *  tag and mask the real message. Nothing in `req` throws a non-Error today; this
- *  is here so the diagnostics cannot be defeated by the one thing they exist to
- *  report on. */
-function taggedViewFailure(err, viewState) {
-  const tagged = err instanceof Error ? err : new Error(String(err));
-  tagged.viewState = viewState;
-  return tagged;
-}
-
+/** Find the saved view the SQL tiles read, by exact name, and create it when it
+ *  is missing. A view is referenced BY NAME from HogQL, so it has to exist before
+ *  an insight that selects from it runs. An existing view is left as it is unless
+ *  the run passes --update-view: the live dashboard is hand-curated, and its
+ *  session tiles read this view, so a run never changes their numbers on its own. */
 async function ensureView(spec) {
-  let existing;
-  try {
-    existing = (await listAll(`/warehouse_saved_queries/`)).find((v) => v.name === spec.name && !v.deleted) || null;
-  } catch (err) {
-    // The listing is where the plausible refusals land (a key without warehouse
-    // scope, a plan without saved queries, a host that does not expose them), and
-    // from here we do not know whether a view already exists. Saying "absent"
-    // would be a guess, and the wrong guess is the dangerous one.
-    throw taggedViewFailure(err, "unknown");
-  }
+  const existing = (await listAll(`/warehouse_saved_queries/`)).find((v) => v.name === spec.name && !v.deleted) || null;
   const body = { name: spec.name, description: spec.description, query: { kind: "HogQLQuery", query: spec.query } };
-  // Which branch failed matters to the caller: a failed create leaves no view and
-  // two visibly broken tiles, while a failed update leaves the PREVIOUS
-  // definition serving numbers that look fine and are stale. The error carries
-  // the branch so the warning can say which happened.
+  if (existing && !UPDATE_VIEW) return "exists, left as is (pass --update-view to rewrite it)";
+  if (DRY_RUN) return existing ? "would be rewritten (--update-view)" : "would be created";
   if (existing) {
     // A query edit carries the revision it was based on, so a concurrent edit in
-    // the SQL editor is rejected rather than silently overwritten. Only when the
-    // API actually reported one: without it the PATCH goes out unguarded and
-    // DOES overwrite, so the protection is best-effort, not a guarantee.
+    // the SQL editor is rejected rather than silently overwritten, when the API
+    // reports one.
     if (existing.latest_history_id) body.edited_history_id = existing.latest_history_id;
-    try {
-      await req("PATCH", `/warehouse_saved_queries/${existing.id}/`, body);
-    } catch (err) {
-      throw taggedViewFailure(err, "stale");
-    }
-    return "updated";
+    await req("PATCH", `/warehouse_saved_queries/${existing.id}/`, body);
+    return "rewritten (--update-view)";
   }
-  try {
-    await req("POST", `/warehouse_saved_queries/`, body);
-  } catch (err) {
-    throw taggedViewFailure(err, "absent");
-  }
+  await req("POST", `/warehouse_saved_queries/`, body);
   return "created";
 }
 
-/** Create or update the action the new-tower tiles count, matched by exact name.
- *  Returns its id, which `buildInsights` needs for those tiles' series. */
+/** Find the action the new-tower tiles count, by exact name, and create it when
+ *  it is missing. An existing action is never changed. Returns its id, which
+ *  `buildInsights` needs for those tiles' series (null in a dry run that would
+ *  create it). */
 async function ensureAction(spec) {
   const existing = (await listAll(`/actions/`)).find((a) => a.name === spec.name && !a.deleted) || null;
-  const body = { name: spec.name, description: spec.description, steps: spec.steps };
   if (existing) {
     if (existing.id == null) throw new Error(`the existing action "${spec.name}" has no id; cannot point tiles at it`);
-    await req("PATCH", `/actions/${existing.id}/`, body);
-    return { id: existing.id, outcome: "updated" };
+    return { id: existing.id, outcome: "exists, left as is" };
   }
-  const created = await req("POST", `/actions/`, body);
+  if (DRY_RUN) return { id: null, outcome: "would be created" };
+  const created = await req("POST", `/actions/`, { name: spec.name, description: spec.description, steps: spec.steps });
   // `req` returns null on a 204, and a 2xx body without `id` would yield
   // undefined, which JSON.stringify drops from the series node entirely: the
   // tiles would save clean and render nothing. Refuse instead.
@@ -1089,139 +1074,172 @@ async function ensureAction(spec) {
   return { id: created.id, outcome: "created" };
 }
 
-async function main() {
-  // The dry run builds its plan offline and issues no request, so it does not
-  // need a credential; demanding one only blocks a reviewer previewing the plan.
-  if (!KEY && !DRY_RUN) {
-    console.error("POSTHOG_PERSONAL_API_KEY is required (a phx_... personal API key). Aborting.");
-    process.exit(1);
-  }
-  console.log(`${DRY_RUN ? "[dry-run] " : ""}Provisioning "${DASHBOARD_NAME}" in project ${PROJECT_ID} at ${HOST}`);
+/** Rows a new tile takes on the desktop grid, unless its spec sets `height`. */
+const DEFAULT_TILE_HEIGHT = 5;
 
-  if (DRY_RUN) {
-    // Ids only matter to the live run; a placeholder is enough to list names.
-    const planned = buildInsights({ newGame: 0 });
-    console.log(
-      `Would ensure the "${NEW_GAME_ACTION.name}" action, the "${SESSION_LENGTHS_VIEW.name}" saved view, the dashboard, and ${planned.length} insights:`,
-    );
-    for (const i of planned) console.log(`  - ${i.name}`);
-    return;
+/** The row just below the lowest tile that has a desktop (`sm`) box. Tiles with
+ *  no box yet are left where PostHog puts them. */
+function bottomRow(tiles) {
+  let bottom = 0;
+  for (const tile of tiles) {
+    const box = tile?.layouts?.sm;
+    if (tile?.deleted || !box) continue;
+    bottom = Math.max(bottom, (Number(box.y) || 0) + (Number(box.h) || 0));
   }
-
-  // Both run AHEAD of the insights, because tiles reference them: the action by
-  // id, the view by name from inside HogQL.
-  //
-  // The view failing does not STOP the run, which is not the same as being
-  // tolerated: the run still ends non-zero, because two tiles are then wrong or
-  // missing and nobody should read a green exit as "the dashboard is correct".
-  // What carrying on buys is the other forty-one tiles, which have nothing to do
-  // with the view and would otherwise be abandoned over one object the endpoint
-  // can refuse for unrelated reasons (a key without warehouse scope, a plan
-  // without saved queries, a self-hosted host that does not expose them). What happens to those two tiles afterward depends on whether PostHog
-  // validates their HogQL at save time, which is why the loop below handles each
-  // tile separately: either they are rejected there and named as failures, or
-  // they save and surface the view's own error when rendered. Both are better
-  // than a dead script, and the run still exits non-zero either way. The action
-  // is NOT best-effort: tiles reference it by id and there is no id to invent.
-  // Before any insight, because two tiles point at the action by id. A key minted
-  // from an older copy of the scope list above has no action:* and fails here, so
-  // the abort names the cause rather than surfacing a bare 403. Failing before
-  // anything is written is the right shape: a half-provisioned dashboard would be
-  // harder to reason about than one that was left alone.
-  let action;
-  try {
-    action = await ensureAction(NEW_GAME_ACTION);
-  } catch (err) {
-    const msg = String(err?.message || err);
-    if (/\b(401|403)\b/.test(msg)) {
-      throw new Error(
-        `${msg}\n\nThe key appears to lack the action:read / action:write scopes. ` +
-          "They are required (see the header): the new-game tiles resolve through an " +
-          "action. Add both to the personal API key and re-run. Nothing was written.",
-      );
-    }
-    throw err;
-  }
-  console.log(`Action "${NEW_GAME_ACTION.name}": ${action.outcome} (id ${action.id})`);
-  let viewOk = true;
-  try {
-    console.log(`Saved view "${SESSION_LENGTHS_VIEW.name}": ${await ensureView(SESSION_LENGTHS_VIEW)}`);
-  } catch (err) {
-    viewOk = false;
-    console.warn(`WARNING: could not provision the "${SESSION_LENGTHS_VIEW.name}" view (${err.message || err}).`);
-    const consequence = {
-      stale:
-        "The view still EXISTS at its previous definition, so the two session-length tiles will render numbers computed the OLD way rather than failing visibly. Treat them as untrustworthy until this is fixed.",
-      absent: "The view does not exist, so the two session-length tiles cannot resolve. Every other tile is unaffected.",
-      unknown:
-        "Could not even list the saved queries, so whether the view exists is unknown: the two session-length tiles are either unresolvable or serving an older definition. Check them before trusting either.",
-    };
-    console.warn(consequence[err.viewState] ?? consequence.unknown);
-  }
-
-  const INSIGHTS = buildInsights({ newGame: action.id });
-
-  let dashboard = await findDashboard();
-  if (!dashboard) {
-    dashboard = await req("POST", `/dashboards/`, {
-      name: DASHBOARD_NAME,
-      description:
-        "Cookieless PostHog analytics for Verticopolis (rule D-1). Filtered to environment=production. Provisioned by scripts/posthog-dashboard.mjs.",
-      pinned: true,
-      tags: ["verticopolis", "gameplay", TAG],
-    });
-    console.log(`Created dashboard ${dashboard.id}`);
-  } else {
-    console.log(`Found dashboard ${dashboard.id}`);
-  }
-
-  // Per tile, so one rejected insight does not strand the rest. The two tiles
-  // that select from the saved view are the likeliest to be rejected, if PostHog
-  // validates their HogQL at save time, and they sit eighth of forty-three, so an
-  // all-or-nothing loop would have refreshed almost nothing on exactly the run
-  // where the view failed. Every failure is named and the run still exits
-  // non-zero, so nothing passes silently.
-  let created = 0;
-  let updated = 0;
-  const failures = [];
-  for (const spec of INSIGHTS) {
-    try {
-      // A renamed tile names its old title in `formerName`, so the run renames
-      // the saved insight in place instead of creating a second one beside it.
-      const existing = (await findInsight(spec.name)) ?? (spec.formerName ? await findInsight(spec.formerName) : null);
-      if (existing) {
-        const dashboards = Array.from(new Set([...(existing.dashboards || []), dashboard.id]));
-        await req("PATCH", `/insights/${existing.id}/`, {
-          name: spec.name,
-          query: spec.query,
-          description: spec.description,
-          dashboards,
-        });
-        updated++;
-      } else {
-        await req("POST", `/insights/`, {
-          name: spec.name,
-          description: spec.description,
-          query: spec.query,
-          dashboards: [dashboard.id],
-        });
-        created++;
-      }
-    } catch (err) {
-      failures.push(`${spec.name}: ${err.message || err}`);
-    }
-  }
-  console.log(`Insights: ${created} created, ${updated} updated, ${failures.length} failed. Dashboard: ${HOST}/project/${PROJECT_ID}/dashboard/${dashboard.id}`);
-  for (const f of failures) console.error(`  FAILED ${f}`);
-  if (!viewOk || failures.length) {
-    const parts = [];
-    if (failures.length) parts.push(`${failures.length} insight(s) failed`);
-    if (!viewOk) parts.push("the saved view did not provision");
-    throw new Error(parts.join(", and "));
-  }
+  return bottom;
 }
 
-main().catch((err) => {
-  console.error(err.message || err);
-  process.exit(1);
-});
+/** The names of the live insight tiles on a dashboard. */
+function tileNames(tiles) {
+  const names = new Set();
+  for (const tile of tiles) {
+    const name = tile?.insight?.name;
+    if (name && !tile.deleted && !tile.insight.deleted) names.add(name);
+  }
+  return names;
+}
+
+/** Decide what a run adds to the dashboard. Pure, so it is tested without
+ *  PostHog. Only specs marked `overview: true` are candidates, so the script's
+ *  full tile set never lands on the hand-curated dashboard. A candidate that
+ *  carries `shortId` was added already and is never added again, whatever the
+ *  owner has renamed it to since: record the short id a run prints for each
+ *  tile it adds. A candidate already on the dashboard (by insight name) is left
+ *  alone; one whose name is taken by an insight elsewhere in the project is
+ *  skipped too, because adding it would either rewrite that insight or make a
+ *  second insight with the same name.
+ *  Each addition goes full width below the existing tiles, one under another:
+ *  full width keeps a table readable on desktop, and the mobile layout stacks
+ *  tiles in the desktop order, so they land at the end there as well.
+ *
+ *  `existingElsewhere` is the set of candidate names found outside the
+ *  dashboard. Returns `{ add: [{ spec, layout }], added, onDashboard, elsewhere }`. */
+function planAdditions(specs, dashboardTiles, existingElsewhere) {
+  const present = tileNames(dashboardTiles);
+  const add = [];
+  const added = [];
+  const onDashboard = [];
+  const elsewhere = [];
+  let y = bottomRow(dashboardTiles);
+  for (const spec of specs) {
+    if (!spec.overview) continue;
+    if (spec.shortId) {
+      added.push(spec.name);
+    } else if (present.has(spec.name)) {
+      onDashboard.push(spec.name);
+    } else if (existingElsewhere.has(spec.name)) {
+      elsewhere.push(spec.name);
+    } else {
+      const h = spec.height ?? DEFAULT_TILE_HEIGHT;
+      add.push({ spec, layout: { x: 0, y, w: 12, h } });
+      y += h;
+    }
+  }
+  return { add, added, onDashboard, elsewhere };
+}
+
+/** Whether a tile's query counts through an action (and so needs its id). */
+function usesAction(spec) {
+  return JSON.stringify(spec.query).includes('"ActionsNode"');
+}
+
+/** What a run does once it has planned. `tiles`: there is something to add, which
+ *  also needs the action and the view to exist. `view`: the saved view gets
+ *  checked, because new tiles read it or because --update-view asked for a
+ *  rewrite; the flag works on its own, so a run with no tiles to add can still
+ *  rewrite the view, and it writes no tile while doing so. */
+function runSteps(plan, updateView) {
+  const tiles = plan.add.length > 0;
+  return { tiles, action: tiles, view: tiles || Boolean(updateView) };
+}
+
+async function main() {
+  // Offline, a dry run can only list the candidates: which of them are missing
+  // depends on what the live dashboard already holds.
+  if (!KEY) {
+    if (!DRY_RUN) {
+      console.error("POSTHOG_PERSONAL_API_KEY is required (a phx_... personal API key). Aborting.");
+      process.exit(1);
+    }
+    const candidates = buildInsights({ newGame: 0 }).filter((s) => s.overview);
+    console.log(`[dry-run, no key] Candidate tiles for "${DASHBOARD_NAME}" (a run adds only the ones it does not already hold):`);
+    for (const s of candidates) console.log(`  - ${s.name}${s.shortId ? ` (added already as ${s.shortId}; never added again)` : ""}`);
+    if (UPDATE_VIEW) console.log(`  --update-view: checking the saved view "${SESSION_LENGTHS_VIEW.name}" needs the key`);
+    return;
+  }
+  const tag = DRY_RUN ? "[dry-run] " : "";
+  console.log(`${tag}Adding to "${DASHBOARD_NAME}" in project ${PROJECT_ID} at ${HOST}`);
+
+  const listed = (await listAll(`/dashboards/`)).find((d) => d.name === DASHBOARD_NAME && !d.deleted) || null;
+  if (!listed) {
+    throw new Error(`No dashboard named "${DASHBOARD_NAME}". This script only adds to an existing dashboard; if it was renamed, update DASHBOARD_NAME.`);
+  }
+  const dashboard = await req("GET", `/dashboards/${listed.id}/`);
+  const tiles = Array.isArray(dashboard?.tiles) ? dashboard.tiles : [];
+
+  // Plan first, so a run with nothing to add makes no write at all.
+  const candidates = buildInsights({ newGame: null });
+  const onDashboardNames = tileNames(tiles);
+  const existingElsewhere = new Set();
+  for (const spec of candidates) {
+    if (!spec.overview || spec.shortId || onDashboardNames.has(spec.name)) continue;
+    if (await findInsight(spec.name)) existingElsewhere.add(spec.name);
+  }
+  const plan = planAdditions(candidates, tiles, existingElsewhere);
+  for (const name of plan.added) console.log(`  added by an earlier run (short id recorded), left as is: ${name}`);
+  for (const name of plan.onDashboard) console.log(`  already on the dashboard, left as is: ${name}`);
+  for (const name of plan.elsewhere) console.log(`  SKIPPED, an insight with this name exists elsewhere in the project: ${name}`);
+  for (const { spec, layout } of plan.add) console.log(`  ${DRY_RUN ? "would add" : "adding"}: ${spec.name} (full width, rows ${layout.y} to ${layout.y + layout.h})`);
+  const steps = runSteps(plan, UPDATE_VIEW);
+  if (!steps.tiles) console.log("  nothing to add");
+  if (!steps.view) return;
+
+  // Make sure what the new tiles read exists. With nothing to add, only
+  // --update-view gets here, and it touches the view alone, never a tile.
+  let action = null;
+  if (steps.action) {
+    action = await ensureAction(NEW_GAME_ACTION);
+    console.log(`${tag}Action "${NEW_GAME_ACTION.name}": ${action.outcome}`);
+  }
+  console.log(`${tag}Saved view "${SESSION_LENGTHS_VIEW.name}": ${await ensureView(SESSION_LENGTHS_VIEW)}`);
+  if (DRY_RUN || !steps.tiles) return;
+  const withAction = new Map(buildInsights({ newGame: action.id }).map((s) => [s.name, s]));
+  for (const entry of plan.add) entry.spec = withAction.get(entry.spec.name) ?? entry.spec;
+
+  const missingAction = plan.add.find(({ spec }) => usesAction(spec) && action.id == null);
+  if (missingAction) throw new Error(`"${missingAction.spec.name}" needs the action, which has no id; nothing was added`);
+
+  // Create every insight on the dashboard, then place the new tiles in one write.
+  const created = [];
+  for (const { spec, layout } of plan.add) {
+    const insight = await req("POST", `/insights/`, {
+      name: spec.name,
+      description: spec.description,
+      query: spec.query,
+      dashboards: [dashboard.id],
+    });
+    created.push({ id: insight?.id, shortId: insight?.short_id, name: spec.name, layout });
+  }
+  const after = await req("GET", `/dashboards/${dashboard.id}/`);
+  const placed = [];
+  for (const c of created) {
+    const tile = (after?.tiles || []).find((t) => t?.insight?.id === c.id);
+    if (tile) placed.push({ id: tile.id, layouts: { sm: c.layout } });
+    else console.warn(`  WARNING: could not find the new tile for "${c.name}"; PostHog will place it`);
+  }
+  if (placed.length) await req("PATCH", `/dashboards/${dashboard.id}/`, { tiles: placed });
+  console.log(`Added ${created.length} tile(s). Dashboard: ${HOST}/project/${PROJECT_ID}/dashboard/${dashboard.id}`);
+  console.log("Record each short id on its spec as `shortId`, so a later run never adds the tile again after a rename:");
+  for (const c of created) console.log(`  ${c.name}: shortId "${c.shortId}"`);
+}
+
+// Run only when executed directly, so a test can import the planner without
+// starting a live run.
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  main().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
+}
+
+export { planAdditions, runSteps, bottomRow, buildInsights, DASHBOARD_NAME };
