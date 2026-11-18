@@ -1,4 +1,5 @@
-//! Port of `sim/presence.ts` and `sim/congestion.ts` (the parts the sim reads).
+//! Port of the retired TypeScript `src/engine/sim/presence.ts` and
+//! `src/engine/sim/congestion.ts` (the parts the sim reads).
 
 use std::sync::Arc;
 
@@ -264,10 +265,11 @@ impl Simulation {
         }
     }
 
-    /// `buildSpatialCongestion` (sim/congestion.ts): the ratio map and, when
-    /// `with_attribution` is set, the per-class attribution, from one pass.
-    /// The ratio readers (the overlay, the hotspot, the hourly satisfaction
-    /// pass) leave it unset: the map is empty then, not built and dropped.
+    /// `buildSpatialCongestion` (the retired TypeScript
+    /// `src/engine/sim/congestion.ts`): the ratio map and, when
+    /// `with_attribution` is set, the per-class attribution, from one pass. The
+    /// ratio readers (the overlay, the hotspot, the hourly satisfaction pass)
+    /// leave it unset: the map is empty then, not built and dropped.
     fn build_spatial_congestion(
         &self,
         with_attribution: bool,

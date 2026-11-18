@@ -3,7 +3,10 @@
 `engine-rs/` is the game's simulation, written in Rust and compiled to
 WebAssembly for the web game, where it is the only engine that runs. It began
 as a port of the TypeScript simulation in `src/engine/`, which was deleted in
-#1875; its rules are Rust tests now. Gameplay rules, caps and tuning live
+#1875; its rules are Rust tests now. Comments that name a file under
+`src/engine/` point at that retired reference: read it at commit
+[`a5d0048`](https://github.com/maniator/verticopolis/tree/a5d004820ae620e1f70663449286bbf733772962/src/engine),
+the last one before #1956 removed it. Gameplay rules, caps and tuning live
 here, and a change to how the game plays lands in this crate. The crate can also
 run under hosts other than the browser (a native desktop client, a plain Rust
 program) while staying one simulation.

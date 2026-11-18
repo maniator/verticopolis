@@ -433,7 +433,7 @@ impl Simulation {
     }
 
     #[doc(hidden)]
-    /// `unitReachable` (sim/demand.ts).
+    /// `unitReachable` (the retired TypeScript `src/engine/sim/demand.ts`).
     pub fn unit_reachable(&mut self, floor: i64, x: i64) -> bool {
         self.position_reachable(floor, x)
     }

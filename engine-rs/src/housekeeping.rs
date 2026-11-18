@@ -1,4 +1,4 @@
-//! Port of `economy/housekeeping.ts`.
+//! Port of the retired TypeScript `src/engine/economy/housekeeping.ts`.
 
 use std::collections::BTreeMap;
 

@@ -1,4 +1,4 @@
-//! Port of `crowd/motion.ts`: the per-slice person state machine.
+//! Port of the retired TypeScript `src/engine/crowd/motion.ts`: the per-slice person state machine.
 
 use super::commuters;
 use super::doors::route_out_nearest;

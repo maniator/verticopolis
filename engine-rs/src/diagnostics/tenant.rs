@@ -1,7 +1,8 @@
 //! The tenant family (PR 1 of #1215): the access line, No Rate, the long walk
 //! (W1), lobby distance with its buildable sky lobby slot (#394), "Main
 //! gripe", "Won't lease" and the notice countdown, for the kinds
-//! `facilityDiagnostics.ts` and `gripeCopy.ts` gate them on.
+//! the retired TypeScript `src/tests/diagnostics/facilityDiagnostics.ts` and
+//! `src/tests/diagnostics/gripeCopy.ts` gate them on.
 
 use serde::Serialize;
 

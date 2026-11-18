@@ -93,8 +93,8 @@ pub struct Unit {
 
 /// The facts a unit rarely carries, each unset until something sets it: a
 /// move-out notice (`vacate_*`), the cinema's film policy, its film's age and
-/// its ticket price, a retail room's four daily tallies, a room's opening time (`complete_at*`) and a hotel room's
-/// dirty days.
+/// its ticket price, a retail room's four daily tallies, a room's opening time
+/// (`complete_at*`) and a hotel room's dirty days.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Extras {
     pub vacate_reason: Option<&'static str>,
@@ -239,7 +239,7 @@ pub struct Transport {
 }
 
 impl Transport {
-    /// `serializeTransport` (sim/coerce.ts).
+    /// `serializeTransport` (the retired TypeScript `src/engine/sim/coerce.ts`).
     pub fn serialize(&self) -> Value {
         let mut m = Map::new();
         m.insert("id".into(), json!(self.id));

@@ -1,6 +1,6 @@
 //! The stats readouts: `stats()` for the HUD strip (every UI tick) and the
 //! rest of what `statsTemplate` asks the `Simulation` for while the stats
-//! screen is open (`src/engine/sim/stats.ts`, `src/ui/templates/stats.ts`).
+//! screen is open (the retired TypeScript `src/engine/sim/stats.ts`, `src/ui/templates/stats.ts`).
 //!
 //! `tower_stats` is one pass over the rooms (the tower's room index, so the
 //! floor and lobby tiles are not walked). Unit states, customers and money

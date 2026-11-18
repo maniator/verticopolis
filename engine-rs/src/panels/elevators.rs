@@ -1,5 +1,5 @@
 //! The elevator readouts: the stats screen's utilization list
-//! (`elevatorStats`, `src/engine/sim/congestion.ts`) and the transport
+//! (`elevatorStats`, the retired TypeScript `src/engine/sim/congestion.ts`) and the transport
 //! inspector and editor's detail (`transportCapacity`, `elevatorUtilization`,
 //! `elevatorHourlyLoad`, `elevatorOriginLoad`, `lobbyFloors`, `stopsAt`).
 //! Hourly load, origins and utilization are the engine's transient telemetry

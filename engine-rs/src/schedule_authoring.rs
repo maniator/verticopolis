@@ -1,7 +1,7 @@
 //! The Auto-tune proposal for an elevator's schedule: a read-only query that
 //! turns the shaft's own measured telemetry into the active-car rows and
 //! staging the Modern dialog offers. A port of `autoTuneSchedule`
-//! (`src/engine/scheduleAuthoring.ts`) with the dialog's warm-up gate and
+//! (the retired TypeScript `src/engine/scheduleAuthoring.ts`) with the dialog's warm-up gate and
 //! origin aim (`src/ui/uiElevatorSchedule.ts`) moved into the engine, so the
 //! host reads what is ready and what to propose instead of recomputing it.
 //!

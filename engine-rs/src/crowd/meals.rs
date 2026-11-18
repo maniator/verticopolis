@@ -1,4 +1,4 @@
-//! Port of `crowd/meals.ts`.
+//! Port of the retired TypeScript `src/engine/crowd/meals.ts`.
 
 use crate::facilities::Kind;
 use crate::rules::HousekeepingShift;

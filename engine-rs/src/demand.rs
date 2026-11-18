@@ -1,4 +1,4 @@
-//! Port of `sim/demand.ts`: the commercial demand pool.
+//! Port of the retired TypeScript `src/engine/sim/demand.ts`: the commercial demand pool.
 
 use crate::crowd::fasthash::FastMap;
 use crate::facilities::Kind;

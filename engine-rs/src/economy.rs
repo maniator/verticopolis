@@ -1,4 +1,4 @@
-//! Port of `src/engine/EconomySystem.ts` and `economy/rentalIncome.ts`.
+//! Port of the retired TypeScript `src/engine/EconomySystem.ts` and `src/engine/economy/rentalIncome.ts`.
 
 use indexmap::IndexMap;
 
@@ -220,8 +220,9 @@ pub(crate) enum LeasePeriod {
     Month,
 }
 
-/// The lease line (`LEASE_MESSAGE` in `EconomySystem.ts`): "Quarterly" on a
-/// quarterly collection, "Monthly" on Modern's real-world monthly one.
+/// The lease line (`LEASE_MESSAGE` in the retired TypeScript
+/// `src/engine/EconomySystem.ts`): "Quarterly" on a quarterly collection,
+/// "Monthly" on Modern's real-world monthly one.
 pub(crate) fn lease_message(period: LeasePeriod, kind: Kind, amt: f64, n: i64) -> String {
     let plural = if n > 1 { "s" } else { "" };
     let cadence = match period {
@@ -244,7 +245,8 @@ pub(crate) fn lease_message(period: LeasePeriod, kind: Kind, amt: f64, n: i64) -
     }
 }
 
-/// The monthly rental line (`collectRentalIncome` in `rentalIncome.ts`).
+/// The monthly rental line (`collectRentalIncome` in the retired TypeScript
+/// `src/engine/economy/rentalIncome.ts`).
 pub(crate) fn rental_message(amt: f64, n: i64) -> String {
     format!(
         "Monthly rent collected: ${} ({n} rental{}).",
@@ -259,7 +261,8 @@ mod message_tests {
 
     #[test]
     fn rent_lines_word_their_counts_as_typescript_does() {
-        // The TypeScript templates (EconomySystem.ts LEASE_MESSAGE, rentalIncome.ts).
+        // The retired TypeScript templates (`LEASE_MESSAGE` in
+        // `src/engine/EconomySystem.ts`, `src/engine/economy/rentalIncome.ts`).
         assert_eq!(
             lease_message(LeasePeriod::Quarter, Kind::Office, 1520000.0, 152),
             "Quarterly office rent collected: $1,520,000 (152 offices)."

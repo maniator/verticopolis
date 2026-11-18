@@ -1,4 +1,5 @@
-//! Port of `src/engine/Crowd.ts` and `crowd/person.ts`: the people in the
+//! Port of the retired TypeScript `src/engine/Crowd.ts` and
+//! `src/engine/crowd/person.ts`: the people in the
 //! tower. A save carries them (`save`); the conformance suite hashes them as
 //! their own channel.
 

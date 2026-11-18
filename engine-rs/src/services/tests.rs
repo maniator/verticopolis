@@ -5,7 +5,7 @@ use crate::star::TOWER_POPULATION;
 
 #[test]
 fn the_advisories_word_their_counts_as_typescript_does() {
-    // The TypeScript templates with these inputs (sim/services.ts).
+    // The retired TypeScript templates with these inputs (`src/engine/sim/services.ts`).
     assert_eq!(
         waste_nudge_message(1234.0, 1.0, 0),
         "♻️ Garbage is piling up: 1,234 population needs 1 Recycling Center (you have 0). Tenant ratings fall until it is handled, and 4★ requires demand met."

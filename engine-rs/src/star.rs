@@ -1,4 +1,4 @@
-//! Port of `sim/star.ts` and `milestones.ts`.
+//! Port of the retired TypeScript `src/engine/sim/star.ts` and `src/engine/milestones.ts`.
 
 use crate::economy::visitors::counts_daily_visitors;
 use crate::facilities::Kind;

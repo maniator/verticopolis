@@ -1,6 +1,6 @@
 //! The star ladder and the milestone checklist as the stats screen reads them
 //! (`nextStarThreshold`, `nextStarRequirements`, `milestoneProgress` in
-//! `src/engine/sim/star.ts`). Gates and milestones come back as stable ids
+//! the retired TypeScript `src/engine/sim/star.ts`). Gates and milestones come back as stable ids
 //! with a verdict; the labels and descriptions stay in TypeScript.
 
 use serde_json::{json, Value};
@@ -9,7 +9,7 @@ use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::star::{STAR_THRESHOLDS, TOWER_POPULATION};
 
-/// The milestone ids in table order (`MILESTONES` in `src/engine/milestones.ts`).
+/// The milestone ids in table order (`MILESTONES` in the retired TypeScript `src/engine/milestones.ts`).
 /// `milestone_progress` reads the saved set against this list, so it does not
 /// evaluate the eleven tests (`Simulation::milestone_tests`); a test keeps the
 /// two tables equal.

@@ -1,4 +1,4 @@
-//! Port of `crowd/landing.ts`: the landing queue slots.
+//! Port of the retired TypeScript `src/engine/crowd/landing.ts`: the landing queue slots.
 
 use super::fasthash::FastMap;
 use super::{Crowd, PState};

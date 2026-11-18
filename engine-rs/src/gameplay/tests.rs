@@ -124,10 +124,9 @@ fn gameplay_event_matches_the_catalog() {
         Some(EmergencyKind::BombThreat)
     );
     assert_eq!(EmergencyKind::parse("ransom"), None);
-    // The floor bounds are the grid's. (That the TypeScript ring holds as
-    // many events as this one is checked from the TypeScript side, in
-    // src/engine/gameplayEmission.test.ts, so this crate's tests read
-    // nothing outside engine-rs/ and conformance/.)
+    // The floor bounds are the grid's. (The TypeScript ring this one was
+    // checked against went with the TypeScript engine, #1875; this crate's
+    // tests read nothing outside engine-rs/ and conformance/.)
     let floor = &cat["events"][1]["payload"]["floor"];
     assert_eq!(
         (floor["min"].as_i64(), floor["max"].as_i64()),
@@ -271,7 +270,7 @@ fn a_new_game_founds_once_and_a_load_emits_nothing() {
 }
 
 /// A founded tower with a lobby row and a floor above, its founding
-/// drained (the twin of `tower()` in `src/engine/gameplayEmission.test.ts`).
+/// drained (the twin of `tower()` in the retired TypeScript `src/engine/gameplayEmission.test.ts`).
 fn tower() -> Simulation {
     let mut sim = Simulation::new_game(7, GameMode::Classic);
     sim.money = 1e9;
