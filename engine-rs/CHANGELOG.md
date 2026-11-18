@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.52.0 (2026-11-18)
+
+- New `queueLine(shaft, floor)` read: how far one elevator landing's waiting line reaches along its floor, from the shaft face to the rider standing farthest from it, so a host can mark one line in a bank of elevators whose lines run across each other.
+
 ## 1.51.0 (2026-11-18)
 
 - The hourly move-in pass copies each vacant room once for the move-in gate instead of twice, and the served-floor and floor-reachability lookups it and the satisfaction pass make use the engine's fast hasher, so a game day does less work (up to 6% on the bench towers) with every result unchanged.
