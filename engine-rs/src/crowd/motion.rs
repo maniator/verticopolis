@@ -9,6 +9,7 @@ use super::visits::{begin_dwell, leave_venue};
 use super::walk::{
     find_another_way, is_still_setting_out, reach_on_run, reroute, turn_back, walk_to, way_is_cut,
 };
+use super::workplace;
 use super::{
     Crowd, PState, Person, StaffResult, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT,
 };
@@ -322,12 +323,14 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
 
 fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     leave_venue(crowd, tower, i);
+    let off_work = workplace::off_work_after_outing(crowd, tower, i);
     let origin = crowd.people[i]
         .origin_unit_id
+        .filter(|_| !off_work)
         .and_then(|id| tower.get_unit(id))
         .map(|u| (u.floor, u.x));
-    // Someone whose room was bulldozed while they were out leaves the
-    // tower by the ground lobby rather than vanish at the venue.
+    // Someone whose room was bulldozed while they were out, or an office
+    // worker whose day is over, leaves by the ground lobby from the venue.
     let home_gone = origin.is_none() && crowd.people[i].origin_unit_id.is_some();
     if home_gone {
         crowd.people[i].origin_unit_id = None;

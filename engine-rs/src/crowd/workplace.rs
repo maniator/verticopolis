@@ -342,3 +342,43 @@ pub(super) fn venue_bookings_due(crowd: &super::Crowd, tower: &Tower, hour: i64)
         }
     })
 }
+
+/// Whether person `i`, out for dinner or a movie from a Modern office, is
+/// done with work when the outing ends: office hours are over, so they go
+/// home from the venue instead of back to the desk (#2481). Only an outing
+/// to a venue counts: a sales call ends back at the desk, and the evening
+/// rush takes that worker home. An office that
+/// took them back after hours kept them until its next hourly pass, and an
+/// evening movie could take them out again, so a few left after midnight.
+/// When it answers true the worker no longer counts at the office or as out
+/// from it, and the caller sends them out of the tower.
+pub(super) fn off_work_after_outing(crowd: &mut super::Crowd, tower: &mut Tower, i: usize) -> bool {
+    let p = &crowd.people[i];
+    let Some(id) = p.origin_unit_id.filter(|_| p.meal_venue_id.is_some()) else {
+        return false;
+    };
+    let after_hours = crowd.hour.is_some_and(|h| !office_hours(crowd.weekend, h));
+    let office = tower
+        .get_unit(id)
+        .is_some_and(|u| Workplace::of(u, tower.mode) == Some(Workplace::Office));
+    if !after_hours || !office {
+        return false;
+    }
+    let was_out = tower.marked_by_id(id).is_some_and(|(u, at)| {
+        let out = u.out_for_meal.unwrap_or(0);
+        if out > 0 {
+            u.set_out_for_meal(at, Some(out - 1));
+        }
+        out > 0
+    });
+    if was_out {
+        tower.bump_meal_overlay_revision();
+    }
+    if let Some(d) = crowd.desks.get_mut(&id).filter(|d| d.inside > 0) {
+        d.inside -= 1;
+        d.going = d.going.min(d.inside);
+        let inside = d.inside;
+        sync_head_count(tower, id, inside);
+    }
+    true
+}
