@@ -2,7 +2,6 @@
 
 use indexmap::IndexMap;
 
-use crate::clock::GameMode;
 use crate::crowd::fasthash::FastSet;
 use crate::demand::{compute_demand_map, origin_demand, unmet_coverage, DemandMap};
 use crate::econ::{rent_config, rent_of};
@@ -13,7 +12,10 @@ use crate::tower::Unit;
 
 mod fresh_waits;
 mod gripes;
+mod halo_floors;
 pub(crate) use gripes::feels_nightclub_halo;
+pub(crate) use halo_floors::note_halo_venue;
+use halo_floors::{halo_row, nearest_floor_dist};
 pub mod shortfall;
 mod update;
 
@@ -57,7 +59,8 @@ pub struct SatisfactionContext {
     pub global_cong: f64,
     pub served_set: FastSet<i64>,
     /// For each row of `GameMode::halos`, in order, every story a served
-    /// venue casting it fills, open or not.
+    /// venue casting it fills, open or not: sorted, each story once, so the
+    /// nearest one is a binary search away.
     pub halo_floors: Vec<Vec<i64>>,
     /// The hour this context is stepped for: a halo that follows its venue's
     /// hours (the nightclub's) is felt only while the venue is open then.
@@ -94,26 +97,6 @@ struct Placement {
     service_short: Option<ServiceShort>,
 }
 
-fn nearest_floor_dist(floors: &[i64], floor: i64) -> f64 {
-    let mut nearest = f64::INFINITY;
-    for &f in floors {
-        let d = (f - floor).abs() as f64;
-        if d < nearest {
-            nearest = d;
-        }
-    }
-    nearest
-}
-
-/// Add every story venue `c` fills to the list for the halo it casts in
-/// `mode`, if any. A venue that starts casting mid-hour (a fitness club
-/// leased this hour) is added the same way.
-pub(crate) fn note_halo_venue(halo_floors: &mut [Vec<i64>], mode: GameMode, c: &Unit) {
-    if let Some(i) = mode.halos().iter().position(|h| h.source == c.kind) {
-        halo_floors[i].extend(c.floor..c.floor + c.kind.floors());
-    }
-}
-
 /// `noiseBaseErosionFor`.
 pub fn noise_base_erosion_for(kind: Kind, ever_occupied: bool) -> f64 {
     if kind == Kind::RentalStudio {
@@ -146,8 +129,16 @@ impl Simulation {
         let mut halo_floors = vec![Vec::new(); self.mode.halos().len()];
         for c in self.tower.room_units() {
             if casts_halo(c) && served_set.contains(&c.floor) {
-                note_halo_venue(&mut halo_floors, self.mode, c);
+                if let Some(i) = halo_row(self.mode, c.kind) {
+                    halo_floors[i].extend(c.floor..c.floor + c.kind.floors());
+                }
             }
+        }
+        // Sorted with each story once, as `note_halo_venue` keeps them, for
+        // the nearest-story search in the step.
+        for floors in &mut halo_floors {
+            floors.sort_unstable();
+            floors.dedup();
         }
         SatisfactionContext {
             cong_map,

@@ -160,8 +160,7 @@ impl Simulation {
         if presence > 0.0 {
             let asleep = self
                 .tower
-                .units
-                .iter()
+                .room_units()
                 .filter(|u| u.kind.is_hotel() && u.state == UnitState::Asleep)
                 .count() as f64;
             defer_count = jsmath::round(presence * asleep);
@@ -169,7 +168,11 @@ impl Simulation {
         let mut revenue = 0.0;
         let mut deferred = 0.0;
         let in_person = self.mode.hotel_guests_arrive_in_person();
-        for (u, at) in self.tower.marked_units() {
+        // A hotel room is never a tile, so the rooms, in list order, are
+        // every room this pass can check out (#1158 A35).
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
+            let (u, at) = self.tower.marked(i);
             if !u.kind.is_hotel() {
                 continue;
             }
@@ -211,7 +214,9 @@ impl Simulation {
             return;
         }
         let in_person = self.mode.hotel_guests_arrive_in_person();
-        for (u, at) in self.tower.marked_units() {
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
+            let (u, at) = self.tower.marked(i);
             if u.kind.is_hotel() && u.state == UnitState::Asleep {
                 u.set_state(at, UnitState::Dirty);
                 if !in_person {

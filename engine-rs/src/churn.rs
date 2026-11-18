@@ -265,7 +265,10 @@ impl Simulation {
     pub fn roll_condo_relocations(&mut self) {
         let days = (VACATE_NOTICE_MINUTES / (24.0 * 60.0)).ceil();
         let scale = self.clock.calendar.maint_period_days as f64 / 30.0;
-        for i in 0..self.tower.units.len() {
+        // A condo is never a tile: the rooms, in list order, draw as every
+        // unit did (#1158 A35).
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
             let (kind, state, ever_occupied, residents, floor) = {
                 let u = &self.tower.units[i];
                 (u.kind, u.state, u.ever_occupied, u.residents, u.floor)
