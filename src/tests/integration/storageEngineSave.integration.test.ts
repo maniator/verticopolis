@@ -23,10 +23,10 @@ type Tile = { id: number; kind: string; x: number; run?: number };
 function playedSave(leg: Leg): Save {
   const draft = newSeededDraft(42);
   const x0 = Math.floor(LOT_WIDTH / 2) - 20;
-  for (let i = 0; i < 12; i++) expect(draft.tower.place("floor", 2, x0 + i).ok).toBe(true);
+  for (let i = 0; i < 13; i++) expect(draft.tower.place("floor", 2, x0 + i).ok).toBe(true);
   const shaft = draft.buildTransport("elevatorStandard", x0, 1, 2);
   expect(shaft.ok, shaft.reason).toBe(true);
-  const office = draft.build("office", 2, x0);
+  const office = draft.build("office", 2, x0 + 4); // beside the shaft, not in it
   expect(office.ok, office.reason).toBe(true);
   draft.money = 1234567;
   const sim = new PortSim(leg, draft);

@@ -105,6 +105,7 @@ mod save_versions;
 mod segment_routing;
 mod segment_routing_reachable;
 mod service_shortfall;
+mod shaft_rooms;
 mod simulation_bridge;
 mod simulation_economy;
 mod simulation_events;
@@ -275,6 +276,31 @@ pub fn strip_tower(seed: u32, mode: GameMode, width: i64, top: i64) -> Simulatio
         }
     }
     sim
+}
+
+/// Lays lobby and floor tiles up to `top` on the four columns left of `edge`,
+/// the left edge of a lobby already laid, and builds a standard elevator
+/// there: a shaft beside the rooms the suites build from that edge, since an
+/// elevator never runs through a room. Returns its id.
+pub fn side_elevator(sim: &mut Simulation, edge: i64, top: i64) -> i64 {
+    let x = edge - 4;
+    // From the lobby's edge outward, so each tile joins the tower.
+    for i in (0..4).rev() {
+        assert!(
+            sim.tower.place(Kind::Lobby, 1, x + i).ok,
+            "lobby at {}",
+            x + i
+        );
+        for floor in 2..=top {
+            assert!(
+                sim.tower.place(Kind::Floor, floor, x + i).ok,
+                "floor {floor}"
+            );
+        }
+    }
+    let built = sim.build_transport(Kind::ElevatorStandard, x, 1, top);
+    assert!(built.ok, "{:?}", built.reason);
+    sim.tower.transports.last().unwrap().id
 }
 
 /// Places a transport with `tower.place_transport` and returns its id.

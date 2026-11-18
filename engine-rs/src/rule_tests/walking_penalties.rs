@@ -109,7 +109,8 @@ fn w1_stops_once_a_shaft_comes_within_reach() {
     hours(&mut sim, 6);
     let worn = sat(&sim, far);
     assert!(worn < 1.0);
-    assert!(sim.build_transport(Kind::ElevatorStandard, 258, 1, 2).ok);
+    // Right beside the office (260 to 268), not through it.
+    assert!(sim.build_transport(Kind::ElevatorStandard, 269, 1, 2).ok);
     hours(&mut sim, 6);
     assert!(sat(&sim, far) > worn);
 }

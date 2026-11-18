@@ -196,7 +196,18 @@ often a drag runs into a rule. It carries no floor, place or reason text.
 
 | `action` | `detail` | When |
 | --- | --- | --- |
-| `drag_stopped` | `extend` or `bulldoze` | The release of an elevator's extend arrow (`extend`) or of a bulldoze drag (`bulldoze`) said why the drag stopped. For `extend` that is any stop: a floor the shaft can't serve (an unbuilt lobby, another shaft), too little money, the kind's longest span or the edge of the lot. A refusal the press already said is not said again and not counted |
+| `drag_stopped` | `extend` or `bulldoze` | The release of an elevator's extend arrow (`extend`) or of a bulldoze drag (`bulldoze`) said why the drag stopped. For `extend` that is any stop: a floor the shaft can't serve (an unbuilt lobby, another shaft, a room), too little money, the kind's longest span or the edge of the lot. A refusal the press already said is not said again and not counted |
+
+## A shaft and a room on the same tile
+
+An elevator shaft and a room never share a tile (4.x, #2454). One
+`app_action` code counts the refusals the player is told about, to show how
+often the rule gets in the way. It carries no floor, place or reason text, and
+the build ghost's warning before a click is not counted.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `shaft_room_refused` | `room` or `shaft` | A press was refused with the rule's reason. `room`: a room where a standard, service or express shaft runs. `shaft`: a shaft built, extended (the card's button or the arrow) or resized through a room. An extend drag that stops at a room also counts `drag_stopped` `extend` on its release. Matched against the engine's words in `src/game/shaftRoomRefusal.ts`, which `shaftRoomRefusal.integration.test.ts` checks against the real engine |
 
 ## The star-up message box
 

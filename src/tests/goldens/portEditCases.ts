@@ -98,6 +98,10 @@ function fourStarEdits(s: PortEditSession): void {
   s.done("run 2 cars on weekdays and 1 on weekends", "scheduleShaft", shaft, schedule);
   s.done("raise the bottom to floor 31", "extendShaft", shaft, BOTTOM, 31);
   s.done("lower the bottom back to floor 30", "extendShaft", shaft, BOTTOM, 30);
+  // An elevator shaft never runs through a room, so the rooms standing in
+  // this shaft's column on floors 46 to 49 go before it climbs there.
+  const inTheWay = [[46, 182], [46, 198], [47, 182], [47, 198], [48, 191], [49, 189], [49, 198]] as const;
+  for (const [floor, x] of inTheWay) s.done(`sell the room at floor ${floor}, x ${x} over the shaft`, "demolish", s.unitAt(floor, x), SELL);
   s.done("move the top to floor 47", "extendShaft", shaft, TOP, 47);
   // Express stops keep both ends of a shaft and every lobby between them,
   // and skip the rest. The express shaft already stops that way, so the

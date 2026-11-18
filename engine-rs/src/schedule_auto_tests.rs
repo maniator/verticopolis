@@ -304,7 +304,7 @@ fn a_save_before_the_pass_plays_it_the_same() {
 fn a_steady_tower_settles() {
     let (mut sim, id) = tower(GameMode::Modern, 8);
     for f in 2..=TOP {
-        for x in (LOT_WIDTH / 2 - 60..LOT_WIDTH / 2 - 4).step_by(9) {
+        for x in (LOT_WIDTH / 2 - 67..LOT_WIDTH / 2 - 12).step_by(9) {
             assert!(sim.build(Kind::Office, f, x).ok, "office at {f},{x}");
         }
     }

@@ -114,11 +114,11 @@ fn maids_need_a_staff_route_and_a_passenger_car_is_not_one() {
     let shaft = sim.tower.transports[0].id;
     assert!(sim.tower.resize_transport(shaft, 1, 5).ok);
     let id = room(&mut sim, Kind::HotelDouble, 5, X0, UnitState::Dirty);
-    assert!(sim.tower.place(Kind::Housekeeping, 2, X0 + 8).ok);
+    assert!(sim.tower.place(Kind::Housekeeping, 2, X0 + 4).ok);
     hours(&mut sim, 25);
     assert_eq!(state(&sim, id), UnitState::Dirty);
     assert!(logged(&sim, "Housekeeping can't reach"));
-    assert!(sim.build_transport(Kind::ElevatorService, X0 + 14, 2, 5).ok);
+    assert!(sim.build_transport(Kind::ElevatorService, X0 + 19, 2, 5).ok);
     hours(&mut sim, 20);
     assert_ne!(state(&sim, id), UnitState::Dirty);
 }

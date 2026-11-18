@@ -10,7 +10,7 @@ use crate::satisfaction::VACATE_RESCIND;
 use crate::sim::{Simulation, STARTING_MONEY};
 use crate::tower::UnitState;
 
-use super::{seeded_game, MID};
+use super::{seeded_game, side_elevator, MID};
 
 /// The seeded starter lobby's left edge.
 pub(super) const X0: i64 = MID - 20;
@@ -21,7 +21,7 @@ pub(super) fn built_tower(seed: u32) -> Simulation {
     for i in 0..40 {
         sim.tower.place(Kind::Floor, 2, X0 + i);
     }
-    assert!(sim.build_transport(Kind::ElevatorStandard, X0, 1, 2).ok);
+    side_elevator(&mut sim, X0, 2);
     sim
 }
 

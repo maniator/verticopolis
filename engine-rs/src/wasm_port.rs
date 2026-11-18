@@ -463,7 +463,7 @@ impl Engine {
             self.reason = Some(INVALID_REQUEST.into());
             return 0.0;
         };
-        let r = self.sim.tower.validate_transport(kind, x, bottom, top);
+        let r = self.sim.tower.validate_new_shaft(kind, x, bottom, top);
         if !r.ok {
             self.reason = Some(r.reason.unwrap_or_else(|| INVALID_REQUEST.into()));
         }
