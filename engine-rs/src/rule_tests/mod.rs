@@ -12,6 +12,7 @@ use crate::tower::UnitState;
 #[path = "attendance.rs"]
 mod attendance;
 mod auto_backlog;
+mod auto_basement_rush;
 mod busy_meter_riders;
 mod calendar;
 mod canon;
