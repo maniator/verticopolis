@@ -1,13 +1,12 @@
 //! The core simulation suite, transport editing: cars are clamped to one
-//! through eight for every elevator kind, a shaft resizes over bare floor
-//! but never through a room, an extend lays the floor it climbs or digs into (several
+//! through eight for every elevator kind, a shaft resizes and is placed
+//! over rooms, an extend lays the floor it climbs or digs into (several
 //! stories at once, the missing columns of a partial one) but refuses a
 //! floor that could never be supported and an unbuilt sky lobby, capacity
 //! follows the cars, and express stops unserve the floors they skip.
 use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
-use crate::tower::SHAFT_THROUGH_ROOM;
 
 use super::seeded_game;
 use super::simulation_economy::X0;
@@ -72,20 +71,18 @@ fn cars_are_added_and_clamped_to_one_through_eight_for_every_elevator_kind() {
 }
 
 #[test]
-fn a_shaft_resizes_over_bare_floor_but_never_through_a_room() {
+fn a_shaft_resizes_over_rooms_and_is_placed_over_them() {
     let mut sim = base(2);
     let id = shaft(&mut sim, Kind::ElevatorStandard, X0, 1, 6);
     assert!(sim.tower.resize_transport(id, 1, 8).ok);
     assert_eq!(span(&sim, id).1, 8);
     assert!(sim.tower.place(Kind::Office, 9, X0).ok);
-    let through = sim.tower.resize_transport(id, 1, 9);
-    assert_eq!(through.reason.as_deref(), Some(SHAFT_THROUGH_ROOM));
-    assert_eq!(span(&sim, id).1, 8);
+    assert!(sim.tower.resize_transport(id, 1, 9).ok);
+    assert_eq!(span(&sim, id).1, 9);
 
     let mut over = base(2);
     assert!(over.tower.place(Kind::Office, 3, X0).ok);
-    let built = over.build_transport(Kind::ElevatorStandard, X0, 1, 6);
-    assert_eq!(built.reason.as_deref(), Some(SHAFT_THROUGH_ROOM));
+    assert!(over.build_transport(Kind::ElevatorStandard, X0, 1, 6).ok);
 }
 
 #[test]

@@ -10,7 +10,6 @@ import { outcome, type PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
 import { quoteShaft } from "./portAccess";
 import { SKY_BRIDGE_STEP } from "./skyBridgeTool";
-import { countShaftRoomRefusal } from "./shaftRoomRefusal";
 
 /**
  * Keyboard play (F50–52): the virtual build cursor moved with arrows/WASD,
@@ -219,7 +218,6 @@ export class KeyboardPlay {
         } else {
           this.deps.audio.sfx("error");
           if (res.reason) this.deps.ui.toast(res.reason, "bad");
-          countShaftRoomRefusal(res.reason);
           this.deps.announce(res.reason ?? "Can't build there");
         }
         this.refreshCursorPreview();

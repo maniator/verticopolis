@@ -304,7 +304,7 @@ impl Tower {
         let below = (new_bottom..=(prev_bottom - 1).min(new_top)).rev();
         let mut new_floors = Vec::new();
         for fl in above.chain(below) {
-            if let Some(reason) = self.new_floor_refusal(id, kind, tx, twidth, fl) {
+            if let Some(reason) = self.new_floor_refusal(id, tx, twidth, fl) {
                 *refused_at = Some(fl);
                 return ResizeResult::fail(reason);
             }

@@ -34,8 +34,8 @@ function tower(): string {
     engine.setMoney(1e8);
     for (let x = 170; x < 192; x++) ok(engine.build("lobby", 1, x));
     for (let fl = 2; fl <= 3; fl++) for (let x = 171; x < 191; x++) ok(engine.build("floor", fl, x));
-    ok(engine.build("office", 2, 175));
-    ok(engine.build("condo", 3, 175));
+    ok(engine.build("office", 2, 172));
+    ok(engine.build("condo", 3, 172));
     ok(engine.buildTransport("elevatorStandard", 171, 1, 3));
     for (let i = 0; i < 72; i++) engine.tick(20);
     const save = JSON.parse(engine.serialize()) as { star: number };

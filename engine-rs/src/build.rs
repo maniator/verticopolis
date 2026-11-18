@@ -423,7 +423,7 @@ impl Simulation {
         if self.money < cost {
             return refuse("Not enough money.".into());
         }
-        let v = self.tower.validate_new_shaft(kind, x, bottom, top);
+        let v = self.tower.validate_transport(kind, x, bottom, top);
         if !v.ok {
             return CanBuild {
                 ok: false,
