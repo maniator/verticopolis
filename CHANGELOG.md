@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.13.3
+
+- Modern: an elevator on Auto now puts every car to work whenever anyone is waiting at one of its stops. Before, it waited until more people stood in line than its running cars could take in one trip, so in a busy tower the morning commuters from the parking floors piled up by the hundreds in the basement while the few cars on shift came by already full.
+- Modern: the morning re-tune of an elevator on Auto now counts the crowd it sees at the top of each hour toward the hour that built it. Before, the 7 AM hour was tuned from the empty lobby at 7:00, so the first commuters met one car.
+- Classic and Modern: the elevator inspector's hourly load now shows the crowd at the top of each hour under the hour that just ended, so the busiest hours appear one hour earlier than before.
+
 ## 4.13.2
 
 - The Traffic readout now follows the worst line of people waiting for an elevator right now, so "Backed up · B4" means a crowd you can find, and it no longer stays red at night with nobody waiting. Tapping it zooms in on that line and marks just its stretch of the floor and its elevator, instead of the whole floor and every elevator that stops there.
