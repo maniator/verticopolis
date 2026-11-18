@@ -238,7 +238,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   case: a measure improvised in a session and published. A readout may narrate,
   interpret, argue and recommend, all the things a dashboard is bad at, but its
   arithmetic has to come from somewhere that would catch it being wrong. The
-  governed sources are the **Verticopolis: Gameplay Analytics** dashboard, the
+  governed sources are the **Verticopolis | Gameplay Overview** dashboard, the
   `session_lengths` view, its saved insights, and the PostHog data catalog;
   check the catalog first. `scripts/posthog-report.mjs` is the worked example of
   the second clause: it computes its own HogQL, and that is fine, because it
