@@ -5,8 +5,8 @@
 > governed definition covers them yet (the data catalog has none), so they are
 > a dated readout. They do not refresh. The live row volume is the **FPS
 > reports per day** tile on the Gameplay Analytics dashboard
-> (`scripts/posthog-dashboard.mjs`). The coverage share in section 3 is
-> proposed as a metric at the end and is not published anywhere else.
+> (`scripts/posthog-dashboard.mjs`). A coverage share is
+> proposed as a metric at the end and is not computed here.
 
 ## 1. The reporting unit
 
@@ -73,14 +73,10 @@ match.
 
 ## 3. Who is missing
 
-From 2026-11-10 to 2026-11-16 (UTC), 972 sessions sent a `boot`. Of those,
-817 also sent a `session_fps` by 2026-11-17. The one-off query also split out
-the 708 sessions whose `session_end` showed at least 10 seconds of foreground
-play in some page life. Of those, 703 sent one. 189 sessions sent more than
-one row, and 213 reloaded at least once.
-
-So almost every session that played for more than a few seconds reports.
-The gap is mostly short visits that never reach 120 sampled frames. These are
+How many eligible sessions send a row has no governed definition yet, so this
+note gives no share (section 5 proposes one). What the design says: a window
+reports once it has 120 sampled frames, about two seconds of running play at
+60 fps, so the windows that send nothing are mostly short visits. These are
 never seen at all:
 
 - tabs killed before their first hide
@@ -108,7 +104,7 @@ visits.
 ## 5. Proposed metric
 
 **FPS report coverage:** of the sessions with at least 10 seconds of
-foreground play in some page life (from `session_end`), the share that sent
+foreground play (from the `session_lengths` view), the share that sent
 a `session_fps` row within a day of their first `boot`. This is the one rate
 that can be defined from today's anonymous data. If it is adopted, it belongs
 in the data catalog or in tested report code, per the governance rule in
