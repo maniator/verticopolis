@@ -41,8 +41,9 @@ const PINNED: Record<string, Nonzero> = {
   // the direct threat detonates. Slower Modern escalators and stairs moved
   // that blast into the lobby, and riders boarding only a car going their
   // way moved it to floor 42. Counting the walk to the first shaft moved it
-  // back into the lobby.
-  "scenarios/ransom-ignored-modern.json": { explosionSeq: 1, explosionX: 273, thiefFloor: 1, bombs: 1 },
+  // back into the lobby. Office workers going home from an evening dinner or
+  // movie (#2481) moved it along the lobby, from tile 273 to 281.
+  "scenarios/ransom-ignored-modern.json": { explosionSeq: 1, explosionX: 281, thiefFloor: 1, bombs: 1 },
   "scenarios/fire-rescue-ignored-modern.json": { thiefFloor: 1, vipFxSeq: 1, fires: 2, firesGutRooms: 17 },
   "scenarios/vip-review-modern.json": { thiefFloor: 1, vipFxSeq: 1 },
   "fuzz-corpus/fx-thief-uncaught.json": { thiefSeq: 3, thiefFloor: 1 },
