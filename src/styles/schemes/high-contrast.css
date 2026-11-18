@@ -136,3 +136,38 @@ html[data-scheme="high_contrast"] .splash-mute {
 html[data-scheme="high_contrast"] .menubar-brand {
   color: #000000;
 }
+/* Wells and typed-in fields (the update prompt's "What's new" log, file
+   lists, reports, version history), the in-dialog notice and the rating
+   gauge are white in the other schemes, and High Contrast turns their ink
+   white too, so their text vanished. They go black here; the yellow
+   sunken edge still marks them. */
+html[data-scheme="high_contrast"] .well,
+html[data-scheme="high_contrast"] .field,
+html[data-scheme="high_contrast"] .modal-notice,
+html[data-scheme="high_contrast"] .evalbar {
+  background: #000000;
+}
+/* The Control Panel keeps its white icon tray (its icons are drawn in black
+   and color), so its labels go black to stay readable. */
+html[data-scheme="high_contrast"] .desk-control-icon {
+  color: #000000;
+}
+/* The scheme's yellow highlight and focus ring would vanish on that white
+   tray, so a hovered or focused icon gets a black label chip and a black
+   ring instead. */
+html[data-scheme="high_contrast"] .desk-control-icon:hover span,
+html[data-scheme="high_contrast"] .desk-control-icon:focus-visible span {
+  background: #000000;
+  color: #ffffff;
+}
+html[data-scheme="high_contrast"] .desk-control-icon:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: -2px;
+}
+/* Plain links (the update prompt's "All release notes") are yellow: the
+   browser's dark blue is under 3:1 on black. Zero specificity, so a class
+   that sets its own color (a link styled as a button or a menu item) still
+   wins. */
+:where(html[data-scheme="high_contrast"] a:not(.btn, .mb-item)) {
+  color: #ffff00;
+}
