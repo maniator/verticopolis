@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.52.1 (2026-11-18)
+
+- Dispatch runs every car of a shaft whose schedule has `auto_tune` on while anyone waits at its stops, and the row's count while nobody does. `Schedule::cars_for_backlog` keeps its signature and follows the same rule; the car capacity, span and homes it takes are no longer read.
+- `sample_elevator_util` folds the riders aboard and the lines at the top of an hour into the demand ring's slot for the hour that just ended (and that hour's day type), as the origin rings fold the ended hour's boardings. Rings saved before keep their values and follow within a few game days.
+- `crowd::banks` sizes an Auto shaft's share of a bank by the cars the dispatch last ran (`closed_cars`), as the Modern router's `stand_down` does, instead of by its row. The conformance lock moves for `starter-modern`, `metro-express-modern` and `offshift-schedule-modern`, with the `smoke-modern-five-star` corpus golden; every Classic scenario keeps its hashes.
+
 ## 1.52.0 (2026-11-18)
 
 - New `queueLine(shaft, floor)` read: how far one elevator landing's waiting line reaches along its floor, from the shaft face to the rider standing farthest from it, so a host can mark one line in a bank of elevators whose lines run across each other.
