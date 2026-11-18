@@ -91,6 +91,27 @@ export function parkingDisplayLines(c: ParkingDisplay, advises: boolean): Lines 
   return result;
 }
 
+/** The tower-wide retail advice (Modern only; Rust sends none in Classic),
+ *  worded so it never argues with this venue's own verdict (#549): a slow
+ *  venue in an under-served tower is told the shoppers are not reaching it,
+ *  and a busy venue in an over-built tower is told it is the exception. */
+function retailAdviceLine(
+  advice: ServiceDiagnosticFacts["retail"]["advice"],
+  tier: ServiceDiagnosticFacts["retail"]["tier"],
+): string | undefined {
+  if (advice === "underServed") {
+    return tier === "low"
+      ? "The tower's shoppers outstrip its retail space, but few of them reach this venue; check its floor and the way to it."
+      : "The tower's shoppers outstrip its retail space; another venue would still sell.";
+  }
+  if (advice === "overBuilt") {
+    return tier === "booming"
+      ? "The tower has more retail than its shoppers fill, though this venue still draws well; hold off on new venues."
+      : "The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.";
+  }
+  return undefined;
+}
+
 /** Rust determines business tiers and tower pressure. This module only
  * formats keyed facts, never recalculating demand or patronage thresholds. */
 export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
@@ -101,11 +122,8 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
   ];
   if (c.localDemandPct !== null) {
     out.push(html`<div>Local demand: ${c.localDemandPct}% of capacity.</div>`);
-    if (c.advice === "underServed") {
-      out.push(html`<div>The tower's shoppers outstrip its retail space; another venue would still sell.</div>`);
-    } else if (c.advice === "overBuilt") {
-      out.push(html`<div>The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.</div>`);
-    }
+    const line = retailAdviceLine(c.advice, c.tier);
+    if (line) out.push(html`<div>${line}</div>`);
   }
   const verdict: Record<ServiceDiagnosticFacts["retail"]["tier"], string> = {
     notApplicable: "",

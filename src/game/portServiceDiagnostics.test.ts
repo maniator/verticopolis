@@ -120,6 +120,22 @@ describe("engine-owned keyed service diagnostic presentation", () => {
     expect(printed({ retail: { active: false, tier: "low" } })).not.toContain("Very few customers.");
   });
 
+  it("words the tower's retail advice so it agrees with this venue's verdict (#549)", () => {
+    const venue = (tier: ServiceDiagnosticFacts["retail"]["tier"], advice: ServiceDiagnosticFacts["retail"]["advice"]) =>
+      printed({ retail: { active: true, today: 10, barWidth: 10, tier, localDemandPct: 60, advice } });
+    const slowInBusyTower = venue("low", "underServed");
+    expect(slowInBusyTower).toContain("Very few customers.");
+    expect(slowInBusyTower).toContain("few of them reach this venue");
+    expect(slowInBusyTower).not.toContain("another venue would still sell");
+    expect(venue("average", "underServed")).toContain("another venue would still sell");
+    const busyInQuietTower = venue("booming", "overBuilt");
+    expect(busyInQuietTower).toContain("Business is booming.");
+    expect(busyInQuietTower).toContain("this venue still draws well");
+    expect(busyInQuietTower).not.toContain("to lift every venue");
+    expect(venue("average", "overBuilt")).toContain("to lift every venue");
+    expect(venue("low", "none")).not.toContain("The tower");
+  });
+
   it("returns no warning for unrelated units or missing service data", () => {
     expect(printed()).toBe("");
   });

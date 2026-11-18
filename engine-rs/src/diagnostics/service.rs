@@ -5,8 +5,9 @@
 use serde::Serialize;
 
 use crate::clock::GameMode;
+use crate::economy::visitors::venue_day_ends_in_the_morning;
 use crate::economy::{
-    catalog_spend_per_customer, commercial_daily_income, daily_traffic_income,
+    catalog_spend_per_customer, commercial_daily_income, daily_traffic_income, weekend_multiplier,
     COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MIN, TRAFFIC_FACTOR_SPAN,
 };
 use crate::facilities::Kind;
@@ -103,6 +104,41 @@ fn retail_tier(yesterday: Option<f64>, baseline: f64) -> RetailTier {
     } else {
         RetailTier::Average
     }
+}
+
+/// The patronage a typical day brings, scaled to the day yesterday was
+/// (#549): the hourly takings apply the weekend multiplier to every venue
+/// without an attendance cap, so a Saturday read against a weekday baseline
+/// would call a slow Saturday average and a normal one booming.
+fn yesterdays_baseline(mode: GameMode, kind: Kind, typical: f64, was_weekend: bool) -> f64 {
+    if kind.attendance_cap().is_some() {
+        typical
+    } else {
+        typical * weekend_multiplier(mode, kind, was_weekend)
+    }
+}
+
+/// The calendar day a venue's `patronage_yest` counts, as
+/// `close_venue_day` names it for the caps: the day before today for a venue
+/// whose day ends at midnight, and the day before the last 10:00 roll
+/// (`morning_venue_day`) for a shop or a fast food, so before 10:00 it is
+/// the day before yesterday. Below 0 when no day has closed yet, which reads
+/// as a weekday.
+fn closed_venue_day(kind: Kind, today: i64, morning_venue_day: i64) -> i64 {
+    if venue_day_ends_in_the_morning(kind) {
+        morning_venue_day - 1
+    } else {
+        today - 1
+    }
+}
+
+/// Local demand as a whole percent, rounded down so the number shown agrees
+/// with the advice (#549): demand at 99.6% reads 99%, not the 100% that
+/// would seem to call for the under-served line, and 49.7% reads 49%,
+/// under the 50% where the over-built line starts. The small allowance
+/// keeps a product such as 0.29 x 100 = 28.999... at 29.
+fn demand_percent(fraction: f64) -> i64 {
+    (fraction.clamp(0.0, 1.0) * 100.0 + 1e-9).floor() as i64
 }
 
 fn retail_advice(mode: GameMode, share: f64) -> RetailAdvice {
@@ -312,10 +348,15 @@ impl Simulation {
                         )
                         .clamp(0.0, 100.0) as i64,
                     );
-                    facts.retail.tier = retail_tier(retail.3, baseline);
+                    let ended =
+                        closed_venue_day(retail.0, self.clock.day(), self.morning_venue_day);
+                    let was_weekend = ended >= 0 && self.clock.is_weekend_on(ended);
+                    facts.retail.tier = retail_tier(
+                        retail.3,
+                        yesterdays_baseline(self.mode, retail.0, baseline, was_weekend),
+                    );
                     if let Some((fraction, share)) = self.inspector_retail_pressure(id) {
-                        facts.retail.local_demand_pct =
-                            Some(round(fraction.clamp(0.0, 1.0) * 100.0) as i64);
+                        facts.retail.local_demand_pct = Some(demand_percent(fraction));
                         facts.retail.advice = retail_advice(self.mode, share);
                     }
                     if retail.3.is_some() || retail.4.is_some() {
@@ -330,6 +371,10 @@ impl Simulation {
         Some(facts)
     }
 }
+
+#[cfg(test)]
+#[path = "service_retail_tests.rs"]
+mod retail_tests;
 
 #[cfg(test)]
 mod tests {
