@@ -142,6 +142,8 @@ mod wedding_hall_tests;
 // The binding's save reader (#1225): `wasm.rs` loads through it, and the
 // crate's tests check it against `load::deserialize`.
 #[cfg(any(test, feature = "wasm"))]
+mod file_refusal;
+#[cfg(any(test, feature = "wasm"))]
 mod load_stream;
 mod lot;
 mod noise;

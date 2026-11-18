@@ -64,7 +64,7 @@ export const INSTANCE_METHODS = [
   "heatCells", "crewCoverage", "unitCard", "shaftCard", "personCard",
   // PR 1d's report queries and file members.
   "statsSheet", "unitFacts", "serviceDiagnostics", "loadVctower", "exportVctower", "loadVctowerBytes", "exportVctowerBytes", "loadTdt", "tdtNote", "tdtTowerName",
-  "adoptTdt", "tdtExport", "tdtFile",
+  "adoptTdt", "tdtExport", "tdtFile", "lastRefusalCode",
   // PR 5's frame step and render queries.
   "advance", "congestion", "floorCongestion", "congestionCause", "queueLine", "queueView", "parkingSet", "parkingUsage", "recyclingFill", "positionReachable",
   // PR 5e's tile bulldoze, rent batch quote, schedule read and founder mark.

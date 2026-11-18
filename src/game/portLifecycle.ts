@@ -1,3 +1,4 @@
+import { refusalCode, type FileFailureCode } from "../analytics";
 import type { SerializedView } from "../shared/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
@@ -59,6 +60,18 @@ export function saveBytes(
   return port.saveBytes(stamp.appVersion, stamp.savedAt);
 }
 
+/** A `.vctower` export the engine refused: its sentence for the player and
+ *  its closed code for analytics (#2075). */
+export class ExportRefused extends Error {
+  override name = "ExportRefused";
+  constructor(
+    message: string,
+    readonly code: FileFailureCode,
+  ) {
+    super(message);
+  }
+}
+
 /** The binary `.vctower` file (`VCTOWER2`) of the live tower, written by the
  *  engine and stamped with this build and the time (`stamp`): the file the
  *  player downloads.
@@ -66,7 +79,7 @@ export function saveBytes(
  *  every save gives) and never writes the file itself, so a build without the
  *  engine package exports nothing rather than a file the engine did not make. */
 export function exportFile(
-  port: Pick<EnginePort, "setCamera" | "exportVctowerBytes" | "lastReason">,
+  port: Pick<EnginePort, "setCamera" | "exportVctowerBytes" | "lastReason" | "lastRefusalCode">,
   view: SerializedView | null,
   stamp: { appVersion: string; savedAt: number },
 ): Uint8Array {
@@ -81,7 +94,7 @@ export function exportFile(
     noteEngineThrow(err);
     throw err;
   }
-  if (file === undefined) throw new Error(port.lastReason() ?? "The tower could not be exported.");
+  if (file === undefined) throw new ExportRefused(port.lastReason() ?? "The tower could not be exported.", refusalCode(port.lastRefusalCode()));
   return file;
 }
 

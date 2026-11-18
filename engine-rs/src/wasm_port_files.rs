@@ -9,6 +9,7 @@
 use serde_json::Value;
 
 use crate::charges::{whole, INVALID_REQUEST};
+use crate::file_refusal;
 use crate::sim::Simulation;
 use crate::tdt::import_report::ImportCounts;
 
@@ -192,12 +193,13 @@ impl Engine {
     /// `lastReason()` as it is.
     pub(crate) fn port_load_vctower(&mut self, text: &str) -> Vec<f64> {
         self.reason = None;
+        self.refusal = None;
         match crate::vctower_import::import_vctower(text) {
             Ok(next) => {
                 self.adopt(next);
                 self.swap_record(true)
             }
-            Err(e) => self.refuse_swap(e),
+            Err(e) => self.refuse_import(e),
         }
     }
 
@@ -205,13 +207,28 @@ impl Engine {
     /// (`VCTOWER2`) is read as it is, and any other as its UTF-8 text.
     pub(crate) fn port_load_vctower_bytes(&mut self, bytes: &[u8]) -> Vec<f64> {
         self.reason = None;
+        self.refusal = None;
         match crate::vctower_import::import_vctower_bytes(bytes) {
             Ok(next) => {
                 self.adopt(next);
                 self.swap_record(true)
             }
-            Err(e) => self.refuse_swap(e),
+            Err(e) => self.refuse_import(e),
         }
+    }
+
+    /// A refused `.vctower` import: its sentence and its code.
+    fn refuse_import(&mut self, e: String) -> Vec<f64> {
+        self.refusal = Some(file_refusal::of_vctower_import(&e));
+        self.refuse_swap(e)
+    }
+
+    /// The closed code of the last refused tower file read or write
+    /// (`file_refusal.rs`); undefined when the last one worked. Only the file
+    /// members (`loadVctower`, `loadVctowerBytes`, `exportVctower`,
+    /// `exportVctowerBytes`, `loadTdt`, `tdtExport`) set or clear it.
+    pub(crate) fn port_last_refusal_code(&self) -> Option<String> {
+        self.refusal.map(str::to_string)
     }
 
     /// The current tower as a binary `.vctower` file (`VCTOWER2`), stamped as
@@ -223,10 +240,12 @@ impl Engine {
         saved_at_ms: f64,
     ) -> Option<Vec<u8>> {
         self.reason = None;
+        self.refusal = None;
         match crate::load::encode_simulation_vctower_binary(&self.sim, app_version, saved_at_ms) {
             Ok(bytes) => Some(bytes),
             Err(e) => {
                 self.reason = Some(e);
+                self.refusal = Some(file_refusal::REFUSED);
                 None
             }
         }
@@ -241,12 +260,14 @@ impl Engine {
         saved_at_ms: f64,
     ) -> Option<String> {
         self.reason = None;
+        self.refusal = None;
         let text = crate::load::encode_simulation_vctower(&self.sim, app_version, saved_at_ms)
             .map(|bytes| String::from_utf8(bytes).map_err(|e| e.to_string()));
         match text {
             Ok(Ok(text)) => Some(text),
             Ok(Err(e)) | Err(e) => {
                 self.reason = Some(e);
+                self.refusal = Some(file_refusal::REFUSED);
                 None
             }
         }
@@ -256,11 +277,13 @@ impl Engine {
     /// is untouched until `adoptTdt`; a refused file drops any staged one.
     pub(crate) fn port_load_tdt(&mut self, bytes: &[u8], filename: &str) -> Vec<f64> {
         self.reason = None;
+        self.refusal = None;
         self.staged_tdt = None;
         let parsed = match crate::tdt::parse::parse_tdt(bytes, filename) {
             Ok(p) => p,
             Err(e) => {
                 self.reason = Some(e.0);
+                self.refusal = Some(file_refusal::UNREADABLE);
                 return vec![0.0];
             }
         };
@@ -270,6 +293,7 @@ impl Engine {
             Ok(sim) => sim,
             Err(e) => {
                 self.reason = Some(format!("This SimTower save couldn't be read. ({e})"));
+                self.refusal = Some(file_refusal::REFUSED);
                 return vec![0.0];
             }
         };
@@ -326,12 +350,18 @@ impl Engine {
     /// refused with the player-readable reason.
     pub(crate) fn port_tdt_export(&mut self) -> Vec<f64> {
         self.reason = None;
+        self.refusal = None;
         self.tdt_file = None;
         let (rest, units) = self.sim.save_without_units();
         let built = match crate::tdt::export::build_tdt_streamed(&rest, units) {
             Ok(b) => b,
             Err(e) => {
                 self.reason = Some(e.0);
+                self.refusal = Some(if self.sim.mode.exports_to_1994() {
+                    file_refusal::REFUSED
+                } else {
+                    file_refusal::MODERN
+                });
                 return vec![0.0];
             }
         };

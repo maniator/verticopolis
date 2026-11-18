@@ -299,6 +299,14 @@ export class Engine {
     isFloorServed(floor: number): boolean;
     labelUnit(id: number, text: string): Float64Array;
     lastReason(): string | undefined;
+    /**
+     * The closed code of the last refused tower file read or write, one of
+     * `too_large`, `not_tower`, `damaged`, `newer_version`, `not_save`,
+     * `unreadable`, `modern` or `refused`; undefined when the last one
+     * worked. Only the file members set or clear it. Unlike `lastReason()`
+     * it never quotes the file, so a host may send it as analytics (#2075).
+     */
+    lastRefusalCode(): string | undefined;
     loadSave(text: string): Float64Array;
     loadTdt(bytes: Uint8Array, filename: string): Float64Array;
     /**

@@ -3,13 +3,13 @@ import type { CalendarKind } from "../shared/engineTypes";
 import { SaveGame } from "../storage/SaveGame";
 import { isStorageWriteError } from "../storage/saveFailureCopy";
 import { SaveFailureNotice, type SaveWarningSurface } from "./saveFailureNotice";
-import { headerNow, trackAppAction, trackAppActionOnce, trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
+import { headerNow, refusalCode, trackAppAction, trackAppActionOnce, trackFileExported, trackFileFailure, trackFileImported, trackTdtImportRead, type FileFailureCode } from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";
 import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
-import type { EnginePort } from "../simport/enginePort";
+import type { EnginePort, PortRecord } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
 import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, exportFile, loadStored, newerSaveRefused, saveBytes, saveText, stampCamera, swapDone } from "./portLifecycle";
@@ -400,14 +400,14 @@ export class SaveLoad {
       bytes = rec[0] === 1 ? port.tdtFile() : undefined;
       if (!bytes) {
         // The engine's refusal is the player's sentence (a Modern tower, a
-        // tower too deep for 1994).
-        trackAppAction("export_failed", "tdt");
+        // tower too deep for 1994); analytics gets its closed code.
+        trackFileFailure("export_failed", "tdt", refusalCode(port.lastRefusalCode()));
         this.deps.ui.sayVisibly(port.lastReason() ?? "Export failed."); // not a toast: a dialog may be up (GH #658)
         return;
       }
       report = exportReport(exportFacts(rec, this.deps.portCodes(), port.towerName()));
     } catch (err) {
-      trackAppAction("export_failed", "tdt");
+      trackFileFailure("export_failed", "tdt", "error");
       this.deps.ui.sayVisibly("Export failed: " + (err instanceof Error ? err.message : String(err)));
       return;
     }
@@ -425,42 +425,42 @@ export class SaveLoad {
 
   /** Import a `.vctower` file: a binary one as bytes, text as text (`uiImport.ts`). */
   async importGame(data: string | Uint8Array): Promise<void> {
+    let reason: FileFailureCode = "error"; // a throw before the engine answered
     try {
-      // The engine reads the file and says why it refuses one, in the
-      // player's words (`vctower_import.rs`); the page only shows it. The
-      // founder rule for a file without a build stamp is the engine's too.
+      // The engine reads the file, and words a refusal for the player with a
+      // closed code for analytics; the founder rule is the engine's too.
       const port = this.deps.enginePort();
       this.deps.beforeSwap?.("open");
       const loaded = typeof data === "string" ? port.loadVctower(data) : port.loadVctowerBytes(data);
+      if (loaded[0] !== 1) reason = refusalCode(port.lastRefusalCode());
       if (loaded[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
       this.deps.towerSwapped();
       trackFileImported("vctower", () => this.deps.reader().header);
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.swapRefused?.();
-      trackAppAction("import_failed", "save");
+      trackFileFailure("import_failed", "save", reason);
       this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
     }
   }
 
   /**
-   * Import an original 1994 SimTower save (`.TDT`). The engine reads and
-   * checks it first (the binary walker's hardening, then the trust boundary
-   * every save goes through) and stages it; the fidelity report comes from
-   * its record. Nothing is adopted or persisted until the player confirms
-   * with "Open tower". A garbage file never reaches the tower, the same
-   * contract as importGame.
-   */
+   * Import a 1994 SimTower save (`.TDT`): the engine reads, checks and stages
+   * it, and nothing is adopted until the player confirms with "Open tower"
+   * (importGame's contract). A refusal or a throw is an import_failed. */
   async importLegacy(buffer: ArrayBuffer, filename: string): Promise<void> {
     const port = this.deps.enginePort();
-    await port.prepareTdt?.();
     const bytes = new Uint8Array(buffer);
-    const rec = port.loadTdt(bytes, filename);
-    if (rec[0] !== 1) {
-      // The refusal is already player-readable: the importer's own sentence,
-      // or "This SimTower save couldn't be read." with the detail.
-      trackAppAction("import_failed", "tdt");
-      this.deps.ui.toast(port.lastReason() ?? "This SimTower save couldn't be read.", "bad");
+    let rec: PortRecord | undefined;
+    try {
+      await port.prepareTdt?.();
+      rec = port.loadTdt(bytes, filename);
+    } catch {
+      rec = undefined; // the reader threw before answering
+    }
+    if (rec?.[0] !== 1) {
+      trackFileFailure("import_failed", "tdt", rec ? refusalCode(port.lastRefusalCode()) : "error");
+      this.deps.ui.toast((rec && port.lastReason()) ?? "This SimTower save couldn't be read.", "bad");
       return;
     }
     const facts = importFacts(rec, this.deps.portCodes(), port);

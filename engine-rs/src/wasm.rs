@@ -279,6 +279,8 @@ pub struct Engine {
     mirror: SaveMirror,
     /// The text of the last port refusal (`wasm_port.rs`).
     reason: Option<String>,
+    /// The closed code of the last tower file refusal (`file_refusal.rs`).
+    refusal: Option<&'static str>,
     /// Moves on every done tower swap (`wasm_port_life.rs`).
     generation: u64,
     /// Whether the current tower is the title screen's scenery.

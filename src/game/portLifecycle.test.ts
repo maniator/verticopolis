@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SaveGame } from "../storage/SaveGame";
 import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
 import { mockPort } from "../tests/portKit/mockPort";
-import { SWAP_REFUSED, TRAPPED_SAVE_REFUSED, exportFile, loadStored, saveText, swapDone } from "./portLifecycle";
+import { ExportRefused, SWAP_REFUSED, TRAPPED_SAVE_REFUSED, exportFile, loadStored, saveText, swapDone } from "./portLifecycle";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 
 /**
@@ -70,10 +70,11 @@ describe("exportFile", () => {
   const stamp = { appVersion: "2.0.0", savedAt: 1_700_000_000_000 };
   const calls: string[] = [];
   const FILE = new TextEncoder().encode("VCTOWER2\nQQ");
-  const portWith = (file: Uint8Array | undefined, reason?: string) => ({
+  const portWith = (file: Uint8Array | undefined, reason?: string, code?: string) => ({
     setCamera: vi.fn(() => (calls.push("camera"), new Float64Array())),
     exportVctowerBytes: vi.fn(() => (calls.push("write"), file)),
     lastReason: () => reason,
+    lastRefusalCode: () => code,
   });
 
   it("stamps the camera, then asks the engine for the file with the build and time", () => {
@@ -93,6 +94,21 @@ describe("exportFile", () => {
   it("throws the engine's reason when it writes no file, or the stock line without one", () => {
     expect(() => exportFile(portWith(undefined, "too big"), null, stamp)).toThrow("too big");
     expect(() => exportFile(portWith(undefined), null, stamp)).toThrow("The tower could not be exported.");
+  });
+
+  it("carries the engine's closed code on the refusal, and `refused` for a word this build does not know (#2075)", () => {
+    const codeOf = (port: ReturnType<typeof portWith>) => {
+      try {
+        exportFile(port, null, stamp);
+      } catch (err) {
+        return err instanceof ExportRefused ? err.code : "not an ExportRefused";
+      }
+      return "no throw";
+    };
+    expect(codeOf(portWith(undefined, "too big", "refused"))).toBe("refused");
+    expect(codeOf(portWith(undefined, "too big", "too_large"))).toBe("too_large");
+    expect(codeOf(portWith(undefined, "too big", "brand_new"))).toBe("refused");
+    expect(codeOf(portWith(undefined, "too big"))).toBe("refused");
   });
 
   it("asks a trapped engine for nothing (#1422)", () => {
@@ -116,6 +132,7 @@ describe("exportFile", () => {
         throw trap;
       }),
       lastReason: () => undefined,
+      lastRefusalCode: () => undefined,
     };
     watchEngineTraps(() => {});
     try {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SaveGame } from "../storage/SaveGame";
 import { SaveLoad, type SaveLoadDeps } from "./saveLoad";
-import { trackAppAction, trackAppActionOnce } from "../analytics";
+import { trackAppAction, trackAppActionOnce, trackFileFailure } from "../analytics";
 import { NEWER_SAVE_REFUSAL } from "./portLifecycle";
 
 /**
@@ -13,7 +13,7 @@ import { NEWER_SAVE_REFUSAL } from "./portLifecycle";
 
 vi.mock("../analytics", async (importActual) => {
   const actual = await importActual<typeof import("../analytics")>();
-  return { ...actual, trackAppAction: vi.fn(), trackAppActionOnce: vi.fn() };
+  return { ...actual, trackAppAction: vi.fn(), trackAppActionOnce: vi.fn(), trackFileFailure: vi.fn() };
 });
 vi.mock("./portLifecycle", async (importActual) => {
   const actual = await importActual<typeof import("./portLifecycle")>();
@@ -31,6 +31,7 @@ function makeLoad(port: Record<string, unknown> = {}, withNotice = true) {
 beforeEach(() => {
   vi.mocked(trackAppAction).mockClear();
   vi.mocked(trackAppActionOnce).mockClear();
+  vi.mocked(trackFileFailure).mockClear();
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -160,30 +161,87 @@ describe("a failed save reports autosave_failed", () => {
   });
 });
 
-describe("a refused import reports import_failed", () => {
-  it("reports an unreadable .vctower as `save`, and a good one as nothing", async () => {
-    const bad = makeLoad({ loadVctower: () => [0], lastReason: () => "not a tower" });
+describe("a refused import reports import_failed with its closed code (#2075)", () => {
+  it("reports an unreadable .vctower as `save` with the engine's code, and a good one as nothing", async () => {
+    const loadVctower = vi.fn(() => [0]);
+    const bad = makeLoad({ loadVctower, lastReason: () => "not a tower", lastRefusalCode: () => "not_tower" });
     await bad.load.importGame("garbage");
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("import_failed", "save");
+    expect(loadVctower).toHaveBeenCalledExactlyOnceWith("garbage");
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("import_failed", "save", "not_tower");
     expect(bad.ui.sayVisibly).toHaveBeenCalledWith("Import failed: not a tower");
 
-    vi.mocked(trackAppAction).mockClear();
+    vi.mocked(trackFileFailure).mockClear();
     const good = makeLoad({ loadVctower: () => [1] });
     await good.load.importGame("fine");
+    expect(trackFileFailure).not.toHaveBeenCalled();
     expect(trackAppAction).not.toHaveBeenCalled();
     expect(good.towerSwapped).toHaveBeenCalledOnce();
   });
 
-  it("reports a refused .TDT as `tdt`", async () => {
-    const { load, ui } = makeLoad({ loadTdt: () => [0], lastReason: () => "too small" });
+  it("reads a binary file's code too, sends a word this build does not know as `refused`, and a throw as `error`", async () => {
+    const file = new Uint8Array([1]);
+    const loadVctowerBytes = vi.fn(() => [0]);
+    const bytes = makeLoad({ loadVctowerBytes, lastReason: () => "damaged", lastRefusalCode: vi.fn(() => "too_large") });
+    await bytes.load.importGame(file);
+    expect(loadVctowerBytes).toHaveBeenCalledExactlyOnceWith(file);
+    expect(trackFileFailure).toHaveBeenLastCalledWith("import_failed", "save", "too_large");
+
+    const loadVctower = vi.fn(() => [0]);
+    const unknown = makeLoad({ loadVctower, lastReason: () => "no", lastRefusalCode: vi.fn(() => "some_new_word") });
+    await unknown.load.importGame("text");
+    expect(loadVctower).toHaveBeenCalledExactlyOnceWith("text");
+    expect(trackFileFailure).toHaveBeenLastCalledWith("import_failed", "save", "refused");
+
+    const lastRefusalCode = vi.fn(() => "damaged");
+    const throwing = vi.fn(() => {
+      throw new Error("memory access out of bounds");
+    });
+    const thrown = makeLoad({ loadVctower: throwing, lastRefusalCode });
+    await thrown.load.importGame("x");
+    expect(throwing).toHaveBeenCalledExactlyOnceWith("x");
+    expect(lastRefusalCode).not.toHaveBeenCalled(); // a throw never reads a stale code
+    expect(trackFileFailure).toHaveBeenLastCalledWith("import_failed", "save", "error");
+    expect(trackFileFailure).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports a refused .TDT as `tdt` with the engine's code", async () => {
+    const loadTdt = vi.fn(() => [0]);
+    const { load, ui } = makeLoad({ loadTdt, lastReason: () => "too small", lastRefusalCode: () => "unreadable" });
     await load.importLegacy(new ArrayBuffer(4), "tiny.TDT");
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt");
+    expect(loadTdt).toHaveBeenCalledExactlyOnceWith(new Uint8Array(4), "tiny.TDT");
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt", "unreadable");
     expect(ui.toast).toHaveBeenCalledWith("too small", "bad");
+  });
+
+  it("reports a .TDT reader that throws as `tdt` `error`, with the plain toast, never a stale reason or code", async () => {
+    const loadTdt = vi.fn(() => {
+      throw new Error("unreachable");
+    });
+    const lastReason = vi.fn(() => "a stale reason from an earlier file");
+    const lastRefusalCode = vi.fn(() => "unreadable");
+    const { load, ui } = makeLoad({ prepareTdt: vi.fn(() => Promise.resolve()), loadTdt, lastReason, lastRefusalCode });
+    await load.importLegacy(new ArrayBuffer(4), "THROWS.TDT");
+    expect(loadTdt).toHaveBeenCalledExactlyOnceWith(new Uint8Array(4), "THROWS.TDT");
+    expect([lastReason.mock.calls.length, lastRefusalCode.mock.calls.length]).toEqual([0, 0]);
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt", "error");
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("This SimTower save couldn't be read.", "bad");
+    expect(ui.showImportReport).not.toHaveBeenCalled();
+  });
+
+  it("reports a .TDT reader module that fails to load as `tdt` `error`, and never calls the reader", async () => {
+    const prepareTdt = vi.fn(() => Promise.reject(new Error("chunk failed")));
+    const loadTdt = vi.fn();
+    const { load, ui } = makeLoad({ prepareTdt, loadTdt });
+    await load.importLegacy(new ArrayBuffer(4), "OFFLINE.TDT");
+    expect(prepareTdt).toHaveBeenCalledOnce();
+    expect(loadTdt).not.toHaveBeenCalled();
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt", "error");
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("This SimTower save couldn't be read.", "bad");
   });
 });
 
-describe("an export that writes no file reports export_failed (#1655)", () => {
-  it("reports an engine that throws on a .vctower export as `save`, and a good export as nothing", async () => {
+describe("an export that writes no file reports export_failed with its closed code (#1655, #2075)", () => {
+  it("reports an engine that throws on a .vctower export as `save` `error`, a refusal with its code, and a good export as nothing", async () => {
     const bad = makeLoad({
       setCamera: () => {},
       exportVctowerBytes: () => {
@@ -192,7 +250,7 @@ describe("an export that writes no file reports export_failed (#1655)", () => {
       towerName: () => "Tower",
     });
     await bad.load.exportGame();
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "save");
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "save", "error");
     expect(bad.ui.toast).toHaveBeenCalledWith("Export failed: memory access out of bounds", "bad");
 
     // The WASM binding can throw a bare string or null, not only an Error.
@@ -200,7 +258,7 @@ describe("an export that writes no file reports export_failed (#1655)", () => {
       ["trap", "Export failed: trap"],
       [null, "Export failed: null"],
     ] as const) {
-      vi.mocked(trackAppAction).mockClear();
+      vi.mocked(trackFileFailure).mockClear();
       const odd = makeLoad({
         setCamera: () => {},
         exportVctowerBytes: () => {
@@ -209,24 +267,40 @@ describe("an export that writes no file reports export_failed (#1655)", () => {
         towerName: () => "Tower",
       });
       await odd.load.exportGame();
-      expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "save");
+      expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "save", "error");
       expect(odd.ui.toast).toHaveBeenCalledWith(line, "bad");
     }
 
-    vi.mocked(trackAppAction).mockClear();
+    vi.mocked(trackFileFailure).mockClear();
+    const exportVctowerBytes = vi.fn(() => undefined);
+    const refused = makeLoad({
+      setCamera: () => {},
+      exportVctowerBytes,
+      lastReason: () => "The build name reads as before 2.0.",
+      lastRefusalCode: () => "refused",
+      towerName: () => "Tower",
+    });
+    await refused.load.exportGame();
+    expect(exportVctowerBytes).toHaveBeenCalledExactlyOnceWith(expect.any(String), expect.any(Number)); // the stamp's version and time
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "save", "refused");
+    expect(refused.ui.toast).toHaveBeenCalledWith("Export failed: The build name reads as before 2.0.", "bad");
+
+    vi.mocked(trackFileFailure).mockClear();
     const good = makeLoad({ setCamera: () => {}, exportVctowerBytes: () => new TextEncoder().encode("VCTOWER2\nabc"), towerName: () => "Tower" });
     await good.load.exportGame();
-    expect(trackAppAction).not.toHaveBeenCalled();
+    expect(trackFileFailure).not.toHaveBeenCalled();
     expect(good.ui.downloadFile).toHaveBeenCalledOnce();
   });
 
-  it("reports a refused, throwing or unloadable .TDT export as `tdt`", async () => {
-    const refused = makeLoad({ setCamera: () => {}, tdtExport: () => [0], lastReason: () => "Modern towers cannot be exported." });
+  it("reports a refused .TDT export with its code, and a throwing or unloadable one as `error`", async () => {
+    const tdtExport = vi.fn(() => [0]);
+    const refused = makeLoad({ setCamera: () => {}, tdtExport, lastReason: () => "Modern towers cannot be exported.", lastRefusalCode: () => "modern" });
     await refused.load.exportLegacy();
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt");
+    expect(tdtExport).toHaveBeenCalledExactlyOnceWith();
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt", "modern");
     expect(refused.ui.sayVisibly).toHaveBeenCalledWith("Modern towers cannot be exported.");
 
-    vi.mocked(trackAppAction).mockClear();
+    vi.mocked(trackFileFailure).mockClear();
     const thrown = makeLoad({
       setCamera: () => {},
       tdtExport: () => {
@@ -234,13 +308,13 @@ describe("an export that writes no file reports export_failed (#1655)", () => {
       },
     });
     await thrown.load.exportLegacy();
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt");
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt", "error");
     expect(thrown.ui.sayVisibly).toHaveBeenCalledWith("Export failed: out of memory");
 
-    vi.mocked(trackAppAction).mockClear();
+    vi.mocked(trackFileFailure).mockClear();
     const unloaded = makeLoad({ prepareTdt: () => Promise.reject(new Error("Failed to fetch the codec")) });
     await unloaded.load.exportLegacy();
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt");
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt", "error");
     expect(unloaded.ui.sayVisibly).toHaveBeenCalledWith("Export failed: Failed to fetch the codec");
   });
 });

@@ -26,6 +26,26 @@ export function trackAppAction(action: AppActionName, detail?: string): void {
   trackEvent("app_action", detail === undefined ? { action } : { action, detail });
 }
 
+/** The words the engine's `lastRefusalCode()` answers (`engine-rs/src/file_refusal.rs`). */
+const ENGINE_REFUSAL_CODES = ["too_large", "not_tower", "damaged", "newer_version", "not_save", "unreadable", "modern", "refused"] as const;
+
+/** Why a tower file import or export failed (#2075): one of the engine's
+ *  refusal codes, or `error` when the engine threw or another step failed.
+ *  Never the refusal's sentence, which can quote the file. */
+export type FileFailureCode = (typeof ENGINE_REFUSAL_CODES)[number] | "error";
+
+/** The code of a refusal the engine answered: its `lastRefusalCode()` when
+ *  this build knows the word, else `refused`. */
+export function refusalCode(code: string | undefined): FileFailureCode {
+  return ENGINE_REFUSAL_CODES.find((known) => known === code) ?? "refused";
+}
+
+/** An `import_failed` or `export_failed` app action: `detail` the format
+ *  (`save` or `tdt`), as before #2075, and `reason` the closed code. */
+export function trackFileFailure(action: "import_failed" | "export_failed", format: "save" | "tdt", reason: FileFailureCode): void {
+  trackEvent("app_action", { action, detail: format, reason });
+}
+
 /** Actions already emitted this session by {@link trackAppActionOnce}, so a
  *  repeatable trigger (a dragged volume slider) reports at most once. It lives
  *  for the tab's lifetime, matching the per-tab analytics session (`reset` is a

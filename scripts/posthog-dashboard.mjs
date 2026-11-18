@@ -741,6 +741,12 @@ function buildInsights(ids) {
       }),
     },
     {
+      name: "Import and export failures by reason",
+      description:
+        "import_failed and export_failed events split by reason, the closed code the engine gives a refused tower file (#2075): too_large, not_tower, damaged, newer_version, not_save, unreadable (a .TDT the reader could not walk), modern (a Modern tower cannot become a .TDT) or refused (any other refusal), or error when the engine threw or another step failed. detail still names the format (save or tdt). Production. Only builds from the release that ships it send reason, so earlier failures read as none. See docs/analytics-data-map.md.",
+      query: trends([series("app_action", "Failures")], { breakdown: "reason", display: "ActionsBar", where: [inAction(["import_failed", "export_failed"])] }),
+    },
+    {
       name: "Persistence actions by platform (cohort)",
       description: "The persistence surface split by platform, so 'who exports' reads as a cohort (web / twa / ios), production. Never a person.",
       query: trends([series("app_action", "Actions")], {

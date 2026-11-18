@@ -4,7 +4,7 @@ import { PortCodes } from "../simport/portCodes";
 import { mockPort } from "../tests/portKit/mockPort";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
-import { trackAppAction, trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
+import { trackAppAction, trackFileExported, trackFileFailure, trackFileImported, trackTdtImportRead } from "../analytics";
 import { precedenceUi } from "../ui/precedenceUi.fixture";
 import { showImportReport } from "../ui/uiDialogs";
 import { importFacts } from "../simport/tdtRecords";
@@ -18,6 +18,7 @@ vi.mock("../analytics", async (importActual) => ({
   ...(await importActual<typeof import("../analytics")>()),
   trackAppAction: vi.fn(),
   trackAppActionOnce: vi.fn(),
+  trackFileFailure: vi.fn(),
   trackFileImported: vi.fn(),
   trackFileExported: vi.fn(),
   trackTdtImportRead: vi.fn(),
@@ -370,12 +371,13 @@ describe("SaveLoad .TDT import report analytics", () => {
       prepareTdt: () => Promise.resolve(),
       loadTdt: () => Float64Array.of(0, 0),
       lastReason: () => "Not a SimTower save.",
+      lastRefusalCode: () => "unreadable",
     });
     await saves.importLegacy(new ArrayBuffer(4), "BAD.TDT");
     expect(deps.ui.showImportReport).not.toHaveBeenCalled();
     expect(trackTdtImportRead).not.toHaveBeenCalled();
     expect(importFacts).not.toHaveBeenCalled();
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt");
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt", "unreadable");
     expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("Not a SimTower save.", "bad");
   });
 

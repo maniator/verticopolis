@@ -292,4 +292,13 @@ impl Engine {
     pub fn export_vctower_bytes(&mut self, app_version: &str, saved_at_ms: f64) -> Option<Vec<u8>> {
         self.port_export_vctower_bytes(app_version, saved_at_ms)
     }
+    /// The closed code of the last refused tower file read or write, one of
+    /// `too_large`, `not_tower`, `damaged`, `newer_version`, `not_save`,
+    /// `unreadable`, `modern` or `refused`; undefined when the last one
+    /// worked. Only the file members set or clear it. Unlike `lastReason()`
+    /// it never quotes the file, so a host may send it as analytics (#2075).
+    #[wasm_bindgen(js_name = lastRefusalCode)]
+    pub fn last_refusal_code(&self) -> Option<String> {
+        self.port_last_refusal_code()
+    }
 }
