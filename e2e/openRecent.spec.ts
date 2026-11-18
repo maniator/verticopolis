@@ -59,6 +59,9 @@ async function recentLines(page: Page): Promise<string[]> {
 
 const generation = (page: Page) => page.evaluate(() => (window as any).game.enginePort.generation() as number);
 
+/** How long the keep of the tower left may take to head Open Recent. */
+const KEEP_NOTED_MS = 20_000;
+
 async function waitForNewTower(page: Page, before: number): Promise<void> {
   await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, { timeout: 10_000 });
 }
@@ -80,7 +83,11 @@ test("lists the towers saved last, newest first, opens one by mouse or by its nu
   await page.locator("#mb-recent-2").click();
   await waitForNewTower(page, before);
   await expect(page.locator("#mb-file-menu")).toBeHidden();
-  await expect.poll(() => recentLines(page)).toEqual(["1Beta", "2Alpha"]);
+  // The keep of the tower left packs it off the main thread and notes it when
+  // its write lands, a few seconds on a loaded runner, and one read of the
+  // menu takes seconds there too. A read that opened the menu before the note
+  // shows the old order, so the poll allows several reads (#2476).
+  await expect.poll(() => recentLines(page), { timeout: KEEP_NOTED_MS }).toEqual(["1Beta", "2Alpha"]);
 
   await page.reload();
   await boot(page);
@@ -99,7 +106,7 @@ test("lists the towers saved last, newest first, opens one by mouse or by its nu
   await waitForNewTower(page, before);
   // The exact list pins that the numbered pick opened Beta and the departing
   // tower was written into its own file, Alpha, on top.
-  await expect.poll(() => recentLines(page)).toEqual(["1Alpha", "2Beta"]);
+  await expect.poll(() => recentLines(page), { timeout: KEEP_NOTED_MS }).toEqual(["1Alpha", "2Beta"]);
 });
 
 test("a tower deleted from My Towers drops off the list, and the other towers stay", async () => {
