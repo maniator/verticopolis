@@ -103,6 +103,9 @@ struct Shaft {
     /// The most cars the shaft can hold, which the bound counts as running
     /// so adding or taking away a car keeps it (`least_cost`).
     most_cars: i64,
+    /// Whether the shaft runs on Auto, which sends out every car once anyone
+    /// waits at its stops (`Schedule::cars_while_anyone_waits`).
+    auto: bool,
 }
 
 /// The transit graph for one tower revision, and the lines and the cars in
@@ -231,6 +234,7 @@ fn build(tower: &Tower) -> Router {
             capacity: t.kind.car_capacity().max(1.0),
             cars: t.cars,
             most_cars: t.kind.max_cars(),
+            auto: t.schedule.as_ref().is_some_and(|s| s.auto_tune) && tower.mode.schedule_assist(),
         };
         shafts.insert(t.id, shaft);
         // Each hop to the next stop carries a share of a dwell, which a ride
@@ -338,7 +342,10 @@ fn fresh<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a mut Router {
 /// Sets each shaft's cars in service from the cars the schedule stood down
 /// (`closed_cars`, ascending by shaft). A shaft with every car stood down
 /// still counts one, as the fewest-rides search would still send riders to
-/// it.
+/// it. A shaft on Auto keeps its whole fleet: the cars it parks while its
+/// stops are empty all come out for the first rider in line, so pricing it
+/// by its parked row kept riders away from it, and with nobody in line its
+/// cars never came out (an express on one car beside three full twins).
 fn stand_down(router: &mut Router, closed: &[(i64, i64)]) {
     router.step_costs.all_changed();
     router.running.clear();
@@ -347,7 +354,7 @@ fn stand_down(router: &mut Router, closed: &[(i64, i64)]) {
         let shaft = closed[at].0;
         let run = closed[at..].iter().take_while(|c| c.0 == shaft).count();
         at += run;
-        if let Some(s) = router.shafts.get(&shaft) {
+        if let Some(s) = router.shafts.get(&shaft).filter(|s| !s.auto) {
             let running = (s.cars - run as i64).max(1) as f64;
             router.running.insert(shaft, running);
         }

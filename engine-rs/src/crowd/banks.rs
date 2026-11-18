@@ -89,13 +89,12 @@ fn shaft_banks<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a Banks {
 /// The cars `id` runs this step: every car, or the ones its schedule keeps
 /// on shift at the crowd's hour. Stairs and escalators count as one.
 ///
-/// A shaft on Auto counts the cars the dispatch last ran, since Modern
-/// runs every one of them while anyone waits
-/// (`Schedule::cars_while_anyone_waits`): read from its row, a shaft tuned
-/// to two cars beside an eight-car twin would get a two-car share while
-/// running eight. A shaft with every car stood down still counts one, as
-/// the router's `stand_down` does, so riders keep coming and its cars come
-/// back.
+/// A shaft on Auto counts its whole fleet, as the Modern router's
+/// `stand_down` does: it runs every car once anyone waits at its stops
+/// (`Schedule::cars_while_anyone_waits`), so the cars it parks while its
+/// stops are empty come out for the riders this draw sends. Shared by its
+/// row, or by the cars it parked, an Auto shaft beside a busy twin took a
+/// one-car share, nobody stood at its stops, and its cars stayed parked.
 fn on_shift_cars(crowd: &Crowd, tower: &Tower, id: i64) -> i64 {
     let Some(t) = tower.get_transport(id) else {
         return 0;
@@ -104,20 +103,12 @@ fn on_shift_cars(crowd: &Crowd, tower: &Tower, id: i64) -> i64 {
         return 1;
     }
     if t.schedule.as_ref().is_some_and(|s| s.auto_tune) {
-        return (t.cars - stood_down_cars(&crowd.closed_cars, id)).max(1);
+        return t.cars;
     }
     match crowd.hour {
         Some(hour) => Schedule::active_car_count(t.schedule.as_ref(), crowd.weekend, hour, t.cars),
         None => t.cars,
     }
-}
-
-/// How many of shaft `id`'s cars the dispatch stood down, from `closed`
-/// (ascending by shaft): two binary searches, no scan.
-fn stood_down_cars(closed: &[(i64, i64)], id: i64) -> i64 {
-    let from = closed.partition_point(|c| c.0 < id);
-    let to = closed.partition_point(|c| c.0 <= id);
-    (to - from) as i64
 }
 
 /// The index into `bank` one draw picks, each shaft as likely as the cars

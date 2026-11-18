@@ -9,6 +9,16 @@ use crate::sim::Simulation;
 
 const WIDTH: i64 = 40;
 
+/// Unchecks Auto on shaft `id`, which a new Modern elevator starts with,
+/// so its schedule stands cars down by hand.
+fn by_hand(sim: &mut Simulation, id: i64) {
+    let t = sim.tower.get_transport_mut(id).expect("the shaft");
+    if let Some(s) = t.schedule.as_mut() {
+        s.auto_tune = false;
+    }
+    sim.tower.revision += 1;
+}
+
 /// A lobby on floors 1 and 15, plain floors between and up to `top`, over
 /// 40 columns.
 pub(super) fn tower(mode: GameMode, top: i64) -> Simulation {
@@ -99,6 +109,8 @@ fn twin_shafts_share_the_riders_and_skip_the_one_standing_down() {
     let b = shaft(&mut sim, Kind::ElevatorStandard, 20, 1, 12);
     assert!(sim.tower.set_cars(a, 8));
     assert!(sim.tower.set_cars(b, 8));
+    by_hand(&mut sim, a);
+    by_hand(&mut sim, b);
     sim.crowd.begin_step();
     let picks: Vec<i64> = (0..40).map(|_| first_shaft(&mut sim, 12)).collect();
     let to_a = picks.iter().filter(|&&s| s == a).count();
@@ -306,6 +318,8 @@ fn cars_the_schedule_stands_down_lengthen_the_wait() {
     let b = shaft(&mut sim, Kind::ElevatorExpress, 20, 1, 15);
     assert!(sim.tower.set_cars(a, 8));
     assert!(sim.tower.set_cars(b, 8));
+    by_hand(&mut sim, a);
+    by_hand(&mut sim, b);
     // Seven of one shaft's eight cars stood down: a car comes by an eighth
     // as often, and its twin is quicker, whichever one it is.
     for (down, up) in [(a, b), (b, a)] {
@@ -313,6 +327,30 @@ fn cars_the_schedule_stands_down_lengthen_the_wait() {
         sim.crowd.begin_step();
         assert_eq!(first_shaft(&mut sim, 15), up);
     }
+}
+
+#[test]
+fn an_auto_shaft_with_parked_cars_still_gets_its_share() {
+    // Twin elevators on Auto, as a new Modern elevator starts.
+    let mut sim = tower(GameMode::Modern, 12);
+    let a = shaft(&mut sim, Kind::ElevatorStandard, 4, 1, 12);
+    let b = shaft(&mut sim, Kind::ElevatorStandard, 20, 1, 12);
+    assert!(sim.tower.set_cars(a, 8));
+    assert!(sim.tower.set_cars(b, 8));
+    for id in [a, b] {
+        let t = sim.tower.get_transport(id).expect("the shaft");
+        assert!(t.schedule.as_ref().is_some_and(|s| s.auto_tune));
+    }
+    // Seven of the first twin's cars parked while nobody waited: they all
+    // come out for the first rider in line, so the riders still split.
+    sim.crowd.closed_cars = (1..8).map(|car| (a, car)).collect();
+    sim.crowd.begin_step();
+    let picks: Vec<i64> = (0..40).map(|_| first_shaft(&mut sim, 12)).collect();
+    let to_a = picks.iter().filter(|&&s| s == a).count();
+    assert!(
+        (18..=22).contains(&to_a),
+        "{to_a} of 40 took the parked twin"
+    );
 }
 
 #[test]
