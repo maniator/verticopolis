@@ -19,7 +19,7 @@ name: Analytics Report
 #   POSTHOG_HOST              (var, optional)  defaults to https://us.posthog.com.
 
 # Manual runs only. The Tuesday and Friday schedule stopped on 2026-11-12
-# (#959): nobody read the scheduled output, and the Gameplay Analytics
+# (#959): nobody read the scheduled output, and the Gameplay Overview
 # dashboard is the live number. Run this when writing a readout.
 on:
   workflow_dispatch:

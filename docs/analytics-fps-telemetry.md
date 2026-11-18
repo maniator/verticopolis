@@ -4,7 +4,7 @@
 > come from one-off HogQL queries run on 2026-11-18 for issue #2391. No
 > governed definition covers them yet (the data catalog has none), so they are
 > a dated readout. They do not refresh. The live row volume is the **FPS
-> reports per day** tile on the Gameplay Analytics dashboard
+> reports per day** tile on the Gameplay Overview dashboard
 > (`scripts/posthog-dashboard.mjs`). A coverage share is
 > proposed as a metric at the end and is not computed here.
 

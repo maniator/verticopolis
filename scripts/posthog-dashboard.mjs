@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Provision the Verticopolis "Gameplay Analytics" PostHog dashboard from code, so
+ * Provision the "Verticopolis | Gameplay Overview" PostHog dashboard from code, so
  * the dashboard the game reports into is reproducible and reviewable rather than
  * a pile of hand-clicked insights. Idempotent: it finds the dashboard and each
  * insight by name and creates or updates in place, so re-running it converges the
@@ -37,7 +37,10 @@ const PROJECT_ID = process.env.POSTHOG_PROJECT_ID || "524085";
 const KEY = process.env.POSTHOG_PERSONAL_API_KEY;
 const DRY_RUN = process.argv.includes("--dry-run");
 
-const DASHBOARD_NAME = "Verticopolis: Gameplay Analytics";
+/** The live dashboard's name. The owner renamed it from "Verticopolis: Gameplay
+ *  Analytics" in PostHog, and the run finds the dashboard by this name, so it
+ *  has to match or the run creates a second dashboard. */
+const DASHBOARD_NAME = "Verticopolis | Gameplay Overview";
 const TAG = "analytics-migration";
 /** The one filter every insight carries: production only. */
 const PROD_ONLY = [{ key: "environment", operator: "exact", type: "event", value: ["production"] }];
