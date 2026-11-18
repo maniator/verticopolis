@@ -70,14 +70,6 @@ export function runFrame(app: GameApp, dtMs: number): void {
     app.accMinutes = 0;
     return;
   }
-  // Sample the rendered frame-rate for the session_fps signal (#538). noteFrame
-  // reads its OWN wall-clock delta (not the `dtMs` the engine passes: that value
-  // is spike-clamped to 1ms for any frame over 200ms, which would hide the very
-  // hitches this metric exists to catch). Foreground-gated and best-effort
-  // inside; done first so it captures every rendered frame, including the ones a
-  // modal freeze returns early on below (fps is a render metric, not a sim-tick
-  // one).
-  gameplaySession.noteFrame();
   // A followed person keeps the camera on them, paused or not (#2092), on
   // the page's clock (a slow frame's dtMs arrives clamped to 1 ms).
   stepFollow(app.engine, performance.now());
@@ -92,6 +84,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // player lose game-hours at high speed while it waits for their answer.
   if (hasBlockingModal(app)) {
     app.accMinutes = 0;
+    // A frozen frame is not sampled for session_fps (#603), and the sampler
+    // re-anchors so the freeze is not counted as one slow frame afterward.
+    gameplaySession.noteIdleFrame();
     // Time stands still, but the camera can still move: the view follows it,
     // so people stand where the player pans to.
     readView(app);
@@ -105,12 +100,22 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // choice opens on the first frame after that dialog closes.
   if (app.reader.header.pendingChoice && dialogHoldsWork(app)) {
     app.accMinutes = 0;
+    gameplaySession.noteIdleFrame();
     // Asked every frozen frame, so a dialog that replaces itself (a pricing
     // rung opening from the pricing table) still carries the line.
     app.ui.sayVisibly(CHOICE_WAITING_NOTICE, "info", false);
     return;
   }
   const minutesPerSecond = SPEEDS[app.speed] ?? 0;
+  // Sample the frame rate for session_fps (#538) only while the simulation
+  // runs (#603): a paused frame skips the step, so on a big tower it renders
+  // faster than play does and would pull the figure toward the display's cap.
+  // noteFrame reads its OWN wall-clock delta, never `dtMs`, which arrives
+  // clamped to 1 ms for any frame over 200 ms and would hide the hitches the
+  // metric is for; a paused frame re-anchors it, so a pause is never counted
+  // as one slow frame when play resumes.
+  if (minutesPerSecond > 0) gameplaySession.noteFrame();
+  else gameplaySession.noteIdleFrame();
   // The 1994 "breathing clock": scale how fast REAL time feeds sim-minutes by
   // the canon pacing curve (lunch dilates ~10x, night sprints) unless the
   // player opted out. Presentation-only: the sim still ticks uniform minutes,
@@ -132,7 +137,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // The view follows every frame, so the header, the HUD and the painters
   // read this frame's tower.
   readView(app);
-  gameplaySession.noteSimStep(stepMs, app.reader.header.minutes, minutesPerSecond, app.reader.header.population);
+  gameplaySession.noteSimStep(stepMs, app.reader.header.minutes, minutesPerSecond, app.reader.header.population, app.reader.generation);
 
   // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
   // tower never makes panning feel sluggish.

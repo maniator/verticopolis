@@ -120,6 +120,20 @@ describe("session frame-rate (session_fps)", () => {
     expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
   });
 
+  it("leaves paused frames out and re-anchors after them (#603)", () => {
+    gameplaySession.begin();
+    frame(MS60); // anchor
+    for (let i = 0; i < 60; i++) frame(MS60); // 60 running samples
+    for (let i = 0; i < 300; i++) {
+      clock += MS10; // paused frames: not sampled, whatever their rate
+      gameplaySession.noteIdleFrame();
+    }
+    frame(MS30); // first running frame back: anchor only, the pause is not a sample
+    for (let i = 0; i < 60; i++) frame(MS60); // 60 more -> 120
+    gameplaySession.end();
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
+  });
+
   it("re-anchors within a session across a hide/resume, so the gap is not sampled", () => {
     gameplaySession.begin();
     steady(100, MS60); // 100 samples, below the 120 gate: no report yet
@@ -141,6 +155,31 @@ describe("session frame-rate (session_fps)", () => {
     // All frames are 60fps, so the reservoir-replacement path is deterministic
     // here: p50/low stay 60 while `samples` reflects every frame seen.
     expect(call?.[1]).toEqual({ p50: 60, low: 60, samples: 500, population: 0, speed: 0 });
+  });
+
+  /** A long window of `frames` frames where every `every`-th one is a 50 ms
+   *  (20 fps) hitch and the rest run at 60 fps, through the reservoir with a
+   *  seeded random, so the estimate is the same on every run. */
+  function longWindow(frames: number, every: number): Record<string, unknown> | undefined {
+    let seed = 12345;
+    const random = vi.spyOn(Math, "random").mockImplementation(() => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    });
+    gameplaySession.begin();
+    frame(MS60); // anchor
+    for (let i = 1; i <= frames; i++) frame(i % every === 0 ? 50 : MS60);
+    gameplaySession.end();
+    random.mockRestore();
+    return vi.mocked(sendToRelay).mock.calls.find(([name]) => name === "session_fps")?.[1] as Record<string, unknown> | undefined;
+  }
+
+  it("reads hitches in one frame in ten as the 5th-percentile low over a long window (#2391)", () => {
+    expect(longWindow(20_000, 10)).toMatchObject({ p50: 60, low: 20, samples: 20_000 });
+  });
+
+  it("leaves hitches in one frame in a hundred out of low: it is not the worst frame (#2391)", () => {
+    expect(longWindow(20_000, 100)).toMatchObject({ p50: 60, low: 60, samples: 20_000 });
   });
 
   it("emits session_fps at most once per session", () => {

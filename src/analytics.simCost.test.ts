@@ -30,12 +30,12 @@ describe("session engine cost (session_sim_cost)", () => {
    *  rendered frame per step, starting from game minute 600. */
   function play(hours: number, ms: number, speed: number, population: number): void {
     let minutes = 600;
-    gameplaySession.noteSimStep(ms, minutes, speed, population); // anchor
+    gameplaySession.noteSimStep(ms, minutes, speed, population, 1); // anchor
     for (let i = 0; i < hours * 4; i++) {
       minutes += 15;
       clock += 1000 / 60;
       gameplaySession.noteFrame();
-      gameplaySession.noteSimStep(ms, minutes, speed, population);
+      gameplaySession.noteSimStep(ms, minutes, speed, population, 1);
     }
   }
 

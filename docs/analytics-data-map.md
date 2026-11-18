@@ -44,6 +44,14 @@ under this posture, is in
   `engine_status` per page life as its section below sets out, and
   `economy_action`'s `demolish` at 40 a minute (its `price_tune` and
   `capacity_tune` are latched once a session).
+- **Session summaries go once per reporting window.** `session_builds`,
+  `session_peak_floors`, `tool_session_uses`, `session_fps`,
+  `session_sim_cost` and `session_emergencies` are each sent at most once per
+  window. A window is a page life, or, from the release after 4.13.0, the
+  stretch of play after the page comes back from the browser's back/forward
+  cache (#621): its `pagehide` already sent the first window's summaries, so
+  the restored stretch starts from zero and reports its own, and nothing is
+  counted twice or lost.
 
 ## Fields on every event
 
@@ -79,8 +87,8 @@ an event sent before boot carries `version` only.
 | `tool_session_uses` | `tool`, `uses` | Session end, per tool used | Per-tool depth |
 | `session_builds` | `builds` | Session end | Build volume |
 | `session_peak_floors` | `floors` | Session end | Height reached |
-| `session_fps` | `p50`, `low`, `samples`, `population`, `speed` | Session end | Frame rate. `population` (the session's peak population) and `speed` (the game speed it ran at most, in game minutes per real second: 0 paused, 3, 15 or 50) arrive from the release after 4.13.0, so a read can compare towers of the same size and speed |
-| `session_sim_cost` | `ms_per_game_hour`, `game_hours`, `population`, `speed` | Session end, once the visible tab has moved the clock at least 2 game hours (from the release after 4.13.0) | Engine cost: the real milliseconds the engine step took per game hour, measured around the step in the frame loop, with the peak population and the running speed it ran at most. Read by version to see whether an engine change made the simulation cheaper or dearer, since the frame rate stays capped at the display rate |
+| `session_fps` | `p50`, `low`, `samples`, `population`, `speed` | Session end, once per reporting window | Frame rate. `low` is the 5th-percentile fps of the window's sampled frames, a hitch signal, not its single worst frame. From the release after 4.13.0 only frames where the simulation runs are sampled (#603), and `population` (the window's peak population) and `speed` (the running game speed most sampled frames used, in game minutes per real second: 3, 15 or 50) arrive, so a read can compare towers of the same size and speed. See [the FPS telemetry note](./analytics-fps-telemetry.md) |
+| `session_sim_cost` | `ms_per_game_hour`, `game_hours`, `population`, `speed` | Session end, once per reporting window that moved the clock at least 2 game hours at one tower size and speed in a visible tab (from the release after 4.13.0) | Engine cost: the real milliseconds the engine step took per game hour, measured around the step in the frame loop. Time is kept apart per population band (the dashboard's: under 1,000, to 4,999, to 9,999, 10,000 or more) and speed, and the row reports the band and speed the window stepped the most game time at, with that band's peak `population`, so a small tower played for hours and a big one opened at the end are never blended. Opening, founding, undoing or redoing a tower re-anchors the clock, so its jump is never a step. Read by version within one population band and speed (a faster speed takes bigger steps) to see whether an engine change made the simulation cheaper or dearer, since the frame rate stays capped at the display rate |
 | `app_action` | `action`, `detail` | An app-chrome action | Which saves, dialogs and settings get used, and whether saves, loads and imports fail (see below) |
 | `economy_action` | `action`, `detail` | Demolish, price or capacity tuning, or a Modern exterminator booking (`exterminator`, `detail` `menu` or `stats`, since 4.3) | The removal and tuning side of play, and which surface books the exterminator |
 | `menu_open` | `menu`, `via`, `screen` | A trip into the menu bar begins (owner, 2026-11-14) | Which menus players open, and how (see below) |

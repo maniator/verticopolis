@@ -178,18 +178,21 @@ export interface GameplayEvents {
    *  many foreground frames fed the estimate. The two fps numbers are computed
    *  over a bounded per-session reservoir, so they are session ESTIMATES; PostHog
    *  computes the exact CROSS-session fps percentiles from them (issue #538).
-   *  Emitted once per session, above a minimum sample count. `population` is the
-   *  tower's peak population so far and `speed` the game speed (game minutes per
-   *  real second, 0 for paused) most frames ran at, so a frame rate can be read
-   *  against the tower it drew (added in the release after 4.13.0). */
+   *  Emitted once per reporting window (a page life, or the stretch after a
+   *  back/forward-cache restore, #621), above a minimum sample count. From the
+   *  release after 4.13.0 only frames where the simulation runs are sampled
+   *  (#603), `population` is the tower's peak population so far and `speed` the
+   *  running game speed (game minutes per real second) most frames ran at, so a
+   *  frame rate can be read against the tower it drew. */
   session_fps: { p50: number; low: number; samples: number; population: number; speed: number };
-  /** The engine's cost for the session: `ms_per_game_hour` is how long the
+  /** The engine's cost for the window: `ms_per_game_hour` is how long the
    *  engine's steps took per game hour stepped (the `advance` call the frame
    *  loop times, so it covers the simulation and nothing drawn), over
-   *  `game_hours` of play; `population` is the tower's peak population and
-   *  `speed` the running game speed (game minutes per real second) most frames
-   *  used. Emitted once per session after two game hours have stepped, while
-   *  the tab is visible. Compare versions within a population band. */
+   *  `game_hours` of play, for the population band and running `speed` (game
+   *  minutes per real second) the window stepped the most game time at;
+   *  `population` is that band's peak. Emitted once per reporting window after
+   *  two game hours have stepped at one band and speed, while the tab is
+   *  visible. Compare versions within a population band and speed. */
   session_sim_cost: { ms_per_game_hour: number; game_hours: number; population: number; speed: number };
   /** A discrete app-chrome action the player took OUTSIDE the core build loop:
    *  a save/export/import, a settings or dialog open, a preference toggle, a

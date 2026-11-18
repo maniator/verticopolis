@@ -563,7 +563,7 @@ function demoModel() {
       { label: "Builds per page life", unit: "page lives", row: depth(2600, 6, 31, 58, 210) },
       { label: "Peak floor reached (per page life)", unit: "page lives", row: depth(2600, 9, 34, 51, 92) },
       { label: "Fps p50 (per page life)", unit: "page lives", row: depth(2100, 58, 41, 33, 60) },
-      { label: "Fps worst-frame low (per page life)", unit: "page lives", row: depth(2100, 42, 22, 15, 60) },
+      { label: "Fps 5th-percentile low (per page life)", unit: "page lives", row: depth(2100, 42, 22, 15, 60) },
     ],
     sections: [
       { title: "Tool mix", tables: [{ ok: true, header: "Tool", ...rows([["office", 820, 410], ["fast food", 560, 300], ["floor", 540, 295]]) }] },
@@ -645,7 +645,7 @@ async function main() {
     { label: "Builds per page life", event: "session_builds", prop: "builds" },
     { label: "Peak floor reached (per page life)", event: "session_peak_floors", prop: "floors" },
     { label: "Fps p50 (per page life)", event: "session_fps", prop: "p50" },
-    { label: "Fps worst-frame low (per page life)", event: "session_fps", prop: "low" },
+    { label: "Fps 5th-percentile low (per page life)", event: "session_fps", prop: "low" },
     // From the release after 4.13.0; mixes machines and tower sizes, so read it by version, not alone.
     { label: "Engine ms per game hour (per page life)", event: "session_sim_cost", prop: "ms_per_game_hour" },
   ];
