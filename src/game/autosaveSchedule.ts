@@ -15,9 +15,9 @@ export const AUTOSAVE_INTERVAL_MS = 30000;
  *  engine: the tower is no longer the engine's, and the save the message points
  *  back to must stay. The timer, the tab-hide save and every tower swap share
  *  these guards. */
-export function autosaveIfLive(saveLoad: Pick<SaveLoad, "autosave">): boolean {
+export function autosaveIfLive(saveLoad: Pick<SaveLoad, "autosave">, source: "timer" | "swap" = "timer"): boolean {
   if (!autosaveLive()) return false;
-  void saveLoad.autosave();
+  void saveLoad.autosave(source);
   return true;
 }
 

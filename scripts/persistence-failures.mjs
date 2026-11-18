@@ -80,7 +80,7 @@ export const ACTIONS = ["import_save", "import_tdt", "import_failed", "load_slot
 
 /** The `detail` values the game sends for each action that carries one. A row
  *  with another detail is left out, so a forged value is never counted. */
-export const DETAILS = { import_failed: ["save", "tdt"], autosave_failed: ["timer", "manual"], export_failed: ["save", "tdt"] };
+export const DETAILS = { import_failed: ["save", "tdt"], autosave_failed: ["timer", "swap", "manual", "file"], export_failed: ["save", "tdt"] };
 
 /** Every `app_action` this report reads from builds at or above
  *  `EXPORT_FAILURE_SINCE`: the export failure code and the export attempts. */

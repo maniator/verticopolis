@@ -100,6 +100,7 @@ const GL_LOSS_STAMP_KEY = "vc-gl-lost-reload";
 export class SaveLoad {
   private autosaveRun: Promise<void> | null = null;
   private autosaveQueued = false;
+  private autosaveNext: "timer" | "swap" = "timer"; // the next save's source (#1631)
   /** What the player hears about failed saves; public so the slot saves use it too. */
   readonly notice = new SaveFailureNotice(() => this.deps);
   /** In-memory shadow of {@link GL_LOSS_STAMP_KEY}, so the repeat guard still
@@ -139,16 +140,13 @@ export class SaveLoad {
       const { savedAt } = SaveGame.save(this.saveText());
       this.wroteCrashCopy(() => this.deps.enginePort().generation(), savedAt, null);
     } catch (err) {
-      // Silent callers rely on the THROW: saveBeforeUpdate's caller must not
-      // reload on a failed write, recoverFromContextLoss words the failure on
-      // the crash screen, and the autosave drain treats it as best-effort.
-      // Each owns its own failure surface, so the silent path never toasts.
+      // Silent callers rely on the THROW and own their failure surface (no
+      // reload on a failed write before an update, the crash screen's words,
+      // a best-effort flush), so the silent path never toasts.
       if (silent) {
-        // Still a failed save the player never hears about from this path, so it
-        // is reported with the background `timer` detail (the pre-update flush,
-        // the context-loss flush and the TDT adoption flush all land here).
-        // Telemetry must never replace the save error: callers branch on it
-        // (recoverFromContextLoss reads whether it was a storage error).
+        // Reported as a background `timer` failure (the pre-update, context-loss
+        // and TDT adoption flushes land here). Telemetry must never replace the
+        // save error: recoverFromContextLoss reads whether it was storage's.
         try {
           trackAppActionOnce("autosave_failed", "timer");
         } catch {
@@ -163,30 +161,33 @@ export class SaveLoad {
     }
     this.notice.worked();
     if (silent) return;
-    // Confirm the manual save landed, and when: a checkmark plus the
-    // wall-clock time it was written (real time, not the in-sim clock), so a
-    // deliberate or accidental Quick Save is always visibly acknowledged.
+    // Acknowledge every Quick Save with the real wall-clock time it landed.
     const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     this.deps.ui.toast(`Saved ✓ · ${at}`, "good");
   }
 
-  autosave(): Promise<void> {
+  /** Autosave in the background; `swap` is the save right after a tower swap. */
+  autosave(source: "timer" | "swap" = "timer"): Promise<void> {
+    if (source === "swap") this.autosaveNext = "swap";
     if (this.autosaveRun) {
       this.autosaveQueued = true;
       return this.autosaveRun;
     }
     this.autosaveRun = this.drainAutosaves().finally(() => {
       this.autosaveRun = null;
+      this.autosaveNext = "timer"; // a request a failed drain dropped
     });
     return this.autosaveRun;
   }
 
   private async drainAutosaves(): Promise<void> {
+    let source: "timer" | "swap" = "timer"; // the save in flight's own source
     try {
       do {
         this.autosaveQueued = false;
-        // Re-stamp per iteration: the camera may have moved while the previous
-        // async compression was in flight. The engine hands over stamped bytes.
+        source = this.autosaveNext;
+        this.autosaveNext = "timer";
+        // Re-stamp per save: the camera may have moved during the last one.
         let made = { generation: 0, savedAt: 0 };
         const packed = await SaveGame.saveAsync(() => {
           const port = this.deps.enginePort();
@@ -198,7 +199,7 @@ export class SaveLoad {
       } while (this.autosaveQueued);
       this.notice.worked();
     } catch (err) {
-      trackAppActionOnce("autosave_failed", "timer");
+      trackAppActionOnce("autosave_failed", source);
       this.notice.backgroundFailed(err);
     }
   }
