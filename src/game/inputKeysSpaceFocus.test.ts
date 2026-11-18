@@ -4,8 +4,8 @@ import { makeApp, pointer, press, release, tap } from "./inputKeys.fixture";
 /**
  * Where focus goes during a Space press, two of the places the game tells
  * Space apart from other keys (the palette's is in `uiPalette.test.ts`), the
- * order of the context-menu ender, and the record of other keys held with
- * nothing covering the world. The rest of the Space hold is in
+ * order of the context-menu ender, the record of other keys held with
+ * nothing covering the world, and where a held Enter's repeats go. The rest of the Space hold is in
  * `inputKeysSpace.test.ts` and `inputKeysSpaceHold.test.ts`.
  */
 
@@ -238,5 +238,60 @@ describe("focus and Space", () => {
     openDialog();
     press("Backspace"); // pressed again, on the cover
     expect(repeatIsCanceled("Backspace"), "pressed again under the cover").toBe(false);
+  });
+});
+
+describe("focus and a held Enter (#1842)", () => {
+  it("a dialog that closes on Enter hands focus back, and the opener gets none of the repeats", () => {
+    const app = makeApp();
+    const opener = document.body.appendChild(document.createElement("button"));
+    openDialog();
+    const close = document.getElementById("modal")!.appendChild(document.createElement("button"));
+    close.focus();
+    close.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    document.getElementById("modal")!.remove();
+    opener.focus(); // the dialog hands focus back to what opened it
+    const heard = vi.fn();
+    opener.addEventListener("keydown", heard);
+    expect(repeatIsCanceled("Enter", opener), "a repeat does not press the opener").toBe(true);
+    expect(heard, "nor reaches the opener's own listeners").not.toHaveBeenCalled();
+    expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
+  });
+
+  it("the control that got the press keeps its repeats", () => {
+    makeApp();
+    const button = document.body.appendChild(document.createElement("button"));
+    button.focus();
+    button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    const heard = vi.fn();
+    button.addEventListener("keydown", heard);
+    expect(repeatIsCanceled("Enter", button), "its repeat").toBe(false);
+    expect(heard, "reaches it").toHaveBeenCalledTimes(1);
+  });
+
+  it("a new press, a release or the page losing focus starts the record over", () => {
+    makeApp();
+    const first = document.body.appendChild(document.createElement("button"));
+    const second = document.body.appendChild(document.createElement("button"));
+    first.focus();
+    press("Enter");
+    second.focus();
+    press("Enter"); // pressed again, on the second button
+    expect(repeatIsCanceled("Enter", second), "a fresh press on the newly focused button").toBe(false);
+    release("Enter");
+    first.focus();
+    expect(repeatIsCanceled("Enter", first), "after the release, a repeat with no press is left alone").toBe(false);
+    press("Enter");
+    window.dispatchEvent(new Event("blur"));
+    second.focus();
+    expect(repeatIsCanceled("Enter", second), "after the page lost focus").toBe(false);
+  });
+
+  it("other keys' repeats still reach a control focused since their press", () => {
+    makeApp();
+    press("Tab"); // a key the game leaves alone
+    const button = document.body.appendChild(document.createElement("button"));
+    button.focus();
+    expect(repeatIsCanceled("Tab", button)).toBe(false);
   });
 });

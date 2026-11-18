@@ -116,8 +116,9 @@ pressed before Space comes up, or one held since before it, builds the tap
 first, where Space went down; Shift, the lock keys and Fn leave the tap alone,
 and any other key (Ctrl, Cmd and Alt included) drops it. The palette lets
 Space through and, like a native button, acts on the release. At the keyboard
-cursor, a held Enter, Delete, Backspace or X acts once; Enter's repeats can
-still press a button that got focus since its press (#1842). See `e2e/spacePan.spec.ts`,
+cursor, a held Enter, Delete, Backspace or X acts once, and Enter's repeats
+reach only the element that had focus at its press, so a dialog that closes on
+Enter does not reopen from its opener (#1842). See `e2e/spacePan.spec.ts`,
 `src/game/inputKeys.test.ts`, `src/game/inputKeysSpace.test.ts`,
 `src/game/inputKeysSpaceHold.test.ts`, `src/game/inputKeysSpaceFocus.test.ts`,
 `src/game/inputKeysPointers.test.ts`, `src/game/engineWiring.test.ts`,

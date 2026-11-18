@@ -4,6 +4,7 @@ import { flushPrefsSave } from "./audioPrefs";
 import { isPrimaryPress, noButtonHeld } from "../ui/overviewMapInput";
 import { keyId } from "../ui/overviewMapKeys";
 import { isSpaceKey, wheelZoomDelta } from "../shared/inputEvents";
+import { heldEnter } from "./heldEnter";
 
 /**
  * Keyboard play + audio-kick + pagehide wiring, split out of the `GameApp`
@@ -239,6 +240,7 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   // while one is still held (an emergency choice, its button focused) gets none
   // of its repeats, so a held Enter does not press the cover's button.
   const heldUncovered = new Set<string>();
+  const enter = heldEnter(); // a held Enter's repeats reach only what got its press
   // A repeat of a key the focused control did not get the press of (a cover
   // that came up mid-press, or a control focused since): neither its default
   // action nor any listener below the window sees it.
@@ -252,6 +254,7 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
     // A key on a focused dropdown can open its popup, fresh or repeating, which
     // can take the Space release unseen, as a press on it can.
     if (space !== "up" && opensPopup(document.activeElement) && (KEYS_THAT_OPEN_A_DROPDOWN.has(e.key) || (e.repeat && isSpaceKey(e)))) dropSpaceHold();
+    if (enter.withholds(e)) withholdRepeat(e);
     if (!isSpaceKey(e)) {
       if (!e.repeat) {
         if (worldCovered()) heldUncovered.delete(keyId(e));
@@ -382,6 +385,7 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
     // ends the hold; a Space still down starts a new one at its next press or
     // at a repeat the game follows.
     heldUncovered.delete(keyId(e));
+    enter.keyUp(e);
     if (e.key === "Meta") dropSpaceHold();
     if (!isSpaceKey(e)) return;
     const hold = panReleaseOwed ? "pan" : space;
@@ -475,6 +479,7 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   window.addEventListener("blur", () => {
     pointersDown.clear();
     heldUncovered.clear();
+    enter.forget();
     endSpaceHold();
   }, { signal });
   // First interaction starts audio (browser autoplay policy). Gated on the
