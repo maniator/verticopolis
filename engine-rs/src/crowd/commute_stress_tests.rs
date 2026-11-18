@@ -11,11 +11,13 @@ fn commute_stress_lists_each_floor_in_order() {
     crowd.record_commute(3, 65.0);
     crowd.record_commute(7, 80.0);
     assert_eq!(crowd.commute_revision, 3);
-    // The first sample seeds the average; the second moves it by the alpha.
-    let seventh = 40.0 + (80.0 - 40.0) * COMMUTE_STRESS_ALPHA;
+    // The first sample moves the average from no wait by the alpha; the
+    // second moves it on by the alpha again.
+    let first = |w: f64| COMMUTE_STRESS_PRIOR + (w - COMMUTE_STRESS_PRIOR) * COMMUTE_STRESS_ALPHA;
+    let seventh = first(40.0) + (80.0 - first(40.0)) * COMMUTE_STRESS_ALPHA;
     assert_eq!(
         crowd.commute_stress_json(),
-        json!([[3, 65.0], [7, seventh]])
+        json!([[3, first(65.0)], [7, seventh]])
     );
 }
 

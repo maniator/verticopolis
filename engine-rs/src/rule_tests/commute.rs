@@ -7,7 +7,7 @@
 use crate::clock::GameMode;
 use crate::crowd::motion::{advance, finish};
 use crate::crowd::spawn::add;
-use crate::crowd::{PState, GIVE_UP};
+use crate::crowd::{PState, COMMUTE_STRESS_ALPHA, COMMUTE_STRESS_PRIOR, GIVE_UP};
 use crate::facilities::Kind;
 use crate::load::deserialize;
 use crate::rules::{CLASSIC_WAIT_LIMIT, MODERN_WAIT_LIMIT};
@@ -44,6 +44,12 @@ fn commuter_tower_in(seed: u32, mode: GameMode) -> Simulation {
     sim
 }
 
+/// What one trip of `wait` seconds leaves on a floor with no average yet:
+/// the average moves from no wait by the alpha (#2435).
+fn lone(wait: f64) -> f64 {
+    COMMUTE_STRESS_PRIOR + (wait - COMMUTE_STRESS_PRIOR) * COMMUTE_STRESS_ALPHA
+}
+
 fn stress(sim: &Simulation, floor: i64) -> f64 {
     sim.crowd
         .commute_wait_by_floor
@@ -68,16 +74,16 @@ fn a_finished_trip_folds_its_whole_wait_onto_its_origin_floor_only() {
     let mut sim = commuter_tower(1);
     assert_eq!(stress(&sim, 4), 0.0);
     sim.crowd.record_commute(4, 40.0);
-    assert_eq!(stress(&sim, 4), 40.0, "the first sample seeds the average");
+    assert_eq!(stress(&sim, 4), lone(40.0));
     // A return leg starts on the venue floor (3) but its home is 50.
     finished(&mut sim, 50, 80.0, 0.0, false);
     assert_eq!(
         (stress(&sim, 50), stress(&sim, 3), stress(&sim, 6)),
-        (80.0, 0.0, 0.0)
+        (lone(80.0), 0.0, 0.0)
     );
     // A give-up while queued counts the trailing wait too.
     finished(&mut sim, 2, 10.0, 50.0, false);
-    assert_eq!(stress(&sim, 2), 60.0);
+    assert_eq!(stress(&sim, 2), lone(60.0));
 }
 
 #[test]
@@ -119,7 +125,7 @@ fn a_trip_from_the_lobby_counts_on_the_tenant_floor_it_serves() {
     let i = add(&mut sim.crowd, &sim.tower, 1, 5, None, None).unwrap();
     (sim.crowd.people[i].trip_wait, sim.crowd.people[i].wait) = (30.0, 0.0);
     finish(&mut sim.crowd, i, &mut sim.tower);
-    assert_eq!((stress(&sim, 5), stress(&sim, 1)), (30.0, 0.0));
+    assert_eq!((stress(&sim, 5), stress(&sim, 1)), (lone(30.0), 0.0));
 }
 
 #[test]
@@ -135,7 +141,7 @@ fn a_trip_off_the_metro_counts_on_the_tenant_floor_it_serves() {
         finish(&mut sim.crowd, i, &mut sim.tower);
         assert_eq!(
             (stress(&sim, 5), stress(&sim, 3)),
-            (office_wait, platform_wait)
+            (lone(office_wait), lone(platform_wait))
         );
     }
 }
@@ -144,11 +150,16 @@ fn a_trip_off_the_metro_counts_on_the_tenant_floor_it_serves() {
 /// patience at the elevator, standing `back` tiles from where they set out.
 fn stranded_commuter(mode: GameMode, back: i64) -> Simulation {
     let mut sim = commuter_tower_in(3, mode);
+    strand_one(&mut sim, back);
+    sim
+}
+
+/// Adds one more such stranded rider to `sim`.
+fn strand_one(sim: &mut Simulation, back: i64) {
     let i = add(&mut sim.crowd, &sim.tower, 1, 5, Some(C + 2), None).unwrap();
     let p = &mut sim.crowd.people[i];
     p.x = (C + 2 + back) as f64;
     p.age = 10.0 * GIVE_UP;
-    sim
 }
 
 /// Moves the crowd alone (no new trips) until nobody is left.
@@ -178,19 +189,37 @@ fn a_trip_that_gives_up_counts_as_an_over_limit_wait_in_each_mode() {
             let p = &mut sim.crowd.people[i];
             (p.gave_up, p.trip_wait, p.wait) = (gave_up, waited, 0.0);
             finish(&mut sim.crowd, i, &mut sim.tower);
-            assert_eq!(stress(&sim, 5), recorded, "{mode:?} {gave_up} {waited}");
+            assert_eq!(
+                stress(&sim, 5),
+                lone(recorded),
+                "{mode:?} {gave_up} {waited}"
+            );
         }
     }
 }
 
 /// #2019's rule: a floor whose commuters give up drains in both modes, where
-/// before a turned-back rider counted no wait at all.
+/// before a turned-back rider counted no wait at all. One give-up alone
+/// moves the floor only part way (#2435); a run of them is a jam.
 #[test]
 fn a_floor_whose_commuters_give_up_drains_in_both_modes() {
     for mode in [GameMode::Classic, GameMode::Modern] {
         let mut sim = stranded_commuter(mode, 18);
         until_everyone_is_done(&mut sim);
-        assert_eq!(stress(&sim, 5), mode.given_up_commute_wait(), "{mode:?}");
+        assert_eq!(
+            stress(&sim, 5),
+            lone(mode.given_up_commute_wait()),
+            "{mode:?}"
+        );
+        assert!(
+            sim.commute_wait_congestion(5) < 1.0,
+            "{mode:?}: one is no jam"
+        );
+        for _ in 0..4 {
+            strand_one(&mut sim, 18);
+            until_everyone_is_done(&mut sim);
+        }
+        assert!(sim.commute_wait_congestion(5) > 1.0, "{mode:?}: five are");
         let id = sim.tower.units_of_kind(Kind::Office).next().unwrap().id;
         sim.tower.get_unit_mut(id).unwrap().satisfaction = 0.6;
         for _ in 0..4 {
@@ -234,7 +263,7 @@ fn a_save_keeps_a_give_up_that_is_still_walking_back() {
     until_everyone_is_done(&mut loaded);
     assert_eq!(
         stress(&loaded, 5),
-        GameMode::Classic.given_up_commute_wait()
+        lone(GameMode::Classic.given_up_commute_wait())
     );
 }
 
@@ -360,7 +389,7 @@ fn a_lone_far_tenant_carries_the_wait_of_every_landing_it_changes_at() {
     let summed: f64 = leg_waits.iter().sum();
     let recorded = stress(&sim, 24);
     assert!(
-        recorded >= summed && recorded > leg_waits[0].max(leg_waits[1]),
+        recorded >= lone(summed) && recorded > lone(leg_waits[0].max(leg_waits[1])),
         "the far floor carries both landings: {recorded} vs {leg_waits:?}"
     );
     assert_eq!(stress(&sim, 12), 0.0, "the transfer floor is no one's home");

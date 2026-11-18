@@ -2,6 +2,8 @@
 //! the people who waited it, so new tenants on an emptied floor start from
 //! no wait, and a saved tower keeps and forgets the same averages.
 use crate::clock::GameMode;
+use crate::crowd::motion::finish;
+use crate::crowd::spawn::add;
 use crate::facilities::Kind;
 use crate::load::deserialize;
 use crate::sim::Simulation;
@@ -139,4 +141,45 @@ fn a_shop_beside_an_office_leaves_the_office_floor_its_waits() {
     sim.tower.get_unit_mut(shop).unwrap().state = UnitState::Occupied;
     sim.update_satisfaction();
     assert_eq!(average(&sim, OFFICE_FLOOR), Some(JAM));
+}
+
+/// Finishes a customer's trip home from `SHOP_FLOOR` that ran out of
+/// patience after `waited` seconds, the way `motion::finish` records it.
+fn gave_up_leaving_the_shops(sim: &mut Simulation, waited: f64) {
+    let i = add(&mut sim.crowd, &sim.tower, SHOP_FLOOR, 6, None, None).unwrap();
+    let p = &mut sim.crowd.people[i];
+    (p.origin_floor, p.trip_wait, p.wait, p.gave_up) = (SHOP_FLOOR, waited, 0.0, true);
+    finish(&mut sim.crowd, i, &mut sim.tower);
+}
+
+fn congestion_after(sim: &mut Simulation, give_ups: usize) -> f64 {
+    for _ in 0..give_ups {
+        gave_up_leaving_the_shops(sim, 1.0);
+    }
+    sim.commute_wait_congestion(SHOP_FLOOR)
+}
+
+#[test]
+fn one_give_up_does_not_jam_a_quiet_floor_of_shops() {
+    let (mut sim, id) = tower_with_a_shop_floor_jam();
+    sim.update_satisfaction();
+    assert_eq!(average(&sim, SHOP_FLOOR), None, "a fresh hour on the shops");
+    let rating = |sim: &Simulation| sim.tower.get_unit(id).unwrap().satisfaction;
+
+    // One rider who gave up counts as twice the limit (#2019), but the
+    // floor's average starts from no wait, so it moves only part way (#2435).
+    let one = congestion_after(&mut sim, 1);
+    assert!(one > 0.0, "the give-up still counts");
+    assert!(one < 1.0, "one give-up is not a jam: {one}");
+    let before = rating(&sim);
+    sim.update_satisfaction();
+    assert!(rating(&sim) >= before, "and drains nothing");
+
+    // A run of them in one hour is a jam, and still drains the shop.
+    assert_eq!(average(&sim, SHOP_FLOOR), None);
+    let run = congestion_after(&mut sim, 5);
+    assert!(run > 1.0, "five give-ups in an hour read as jammed: {run}");
+    let before = rating(&sim);
+    sim.update_satisfaction();
+    assert!(rating(&sim) < before, "and drain the shop");
 }

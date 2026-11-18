@@ -295,7 +295,9 @@ export function buildOverlayTower(): void {
   s.tower.placeTransport("elevatorExpress", cx, 1, 28);
   s.tower.placeTransport("elevatorStandard", left + 8, 15, 28);
   const upper = s.tower.transports.find((t: any) => t.bottom === 15 && t.top === 28);
-  if (upper) s.tower.setCars(upper.id, 2);
+  // One car: a floor's wait average starts from no wait (#2435), so the rush
+  // has to strand a run of riders before the upper floors read jammed.
+  if (upper) s.tower.setCars(upper.id, 1);
   // Occupy a VARIED pattern: most floors full, two vacant bands for the occupancy
   // overlay, and the far-right columns left unoccupied so they sit far from a
   // shaft (satisfaction overlay).
