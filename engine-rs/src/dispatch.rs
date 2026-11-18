@@ -211,11 +211,8 @@ impl ElevatorDispatch {
                     set_bit(call_bits, k);
                 }
             }
-            let unset_home = |i| idle_home(rules.spread_homes, &stops, idle_floor, i, cars);
-            let fleet = (&t.car_positions[..], &t.car_dir[..], (t.bottom, t.top));
             let auto = sched.filter(|_| rules.auto_backlog);
-            active_count =
-                Schedule::cars_for_backlog(auto, active_count, (waiting, cap), fleet, unset_home);
+            active_count = Schedule::cars_while_anyone_waits(auto, active_count, cars, waiting);
             let stop_index = |floor: i64| stops.binary_search(&floor).ok();
             if rules.best_car {
                 // The on-shift cars as they begin the step; each called

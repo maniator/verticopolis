@@ -3,9 +3,12 @@
 //! a shaft cut to one car carries no more than one car holds, so its reading
 //! could never win the cars back. In 4.12.0 the owner's split tower had its
 //! floor 1 to 15 shaft on one car every hour, with about 190 people waiting
-//! at its two stops. Now an Auto shaft runs every car while more people wait
-//! than its cars on shift could take in one trip, and a schedule the player
-//! wrote (Auto off) keeps its row.
+//! at its two stops. 4.13.0 ran every car once more people waited than the
+//! cars on shift could take in one trip, and split-tower 31 still stood
+//! hundreds in its basement lines every weekday morning, since a line short
+//! of a trip at a long express waits out a full round trip for each car. Now
+//! an Auto shaft runs every car while anyone waits at its stops, and a
+//! schedule the player wrote (Auto off) keeps its row.
 use crate::clock::GameMode;
 use crate::crowd::{ElevatorCalls, PState};
 use crate::dispatch::ElevatorDispatch;
@@ -76,18 +79,22 @@ fn car_capacity(tower: &Tower) -> f64 {
 }
 
 #[test]
-fn an_auto_shaft_runs_every_car_while_more_wait_than_its_cars_take() {
+fn an_auto_shaft_runs_every_car_while_anyone_waits() {
     let (mut tower, id) = one_car_shaft(true);
+    assert_eq!(stood_down_after_a_step(&mut tower, id, 1.0), 0, "one rider");
     let more_than_a_car = car_capacity(&tower) + 1.0;
     assert_eq!(stood_down_after_a_step(&mut tower, id, more_than_a_car), 0);
 }
 
 #[test]
-fn an_auto_shaft_keeps_its_tuned_count_while_one_car_takes_the_line() {
+fn a_quiet_auto_shaft_keeps_its_tuned_count() {
     let (mut tower, id) = one_car_shaft(true);
-    let a_carload = car_capacity(&tower);
-    let closed = stood_down_after_a_step(&mut tower, id, a_carload);
-    assert_eq!(closed, (CARS - 1) as usize, "the row's one car takes them");
+    let closed = stood_down_after_a_step(&mut tower, id, 0.0);
+    assert_eq!(
+        closed,
+        (CARS - 1) as usize,
+        "nobody waits: the row's one car"
+    );
 }
 
 #[test]
@@ -123,15 +130,14 @@ fn the_fleet_follows_the_line_as_it_appears_clears_and_comes_back() {
         d.closed_cars().iter().filter(|&&(s, _)| s == id).count()
     };
     let tuned = (CARS - 1) as usize;
-    assert_eq!(stood_down(&mut tower, &[(1, 1.0)]), tuned, "a few: the row");
-    // A line at the lobby and a crowd up the shaft: every car sets out.
+    assert_eq!(stood_down(&mut tower, &[]), tuned, "quiet: the row");
+    assert_eq!(
+        stood_down(&mut tower, &[(TOP, 1.0)]),
+        0,
+        "one rider: every car"
+    );
     let rush = [(1, cap + 1.0), (8, cap), (TOP, cap)];
     assert_eq!(stood_down(&mut tower, &rush), 0, "a line: every car");
-    // Down to under a trip but over half of one: the cars are out, so they
-    // stay out rather than stand down and come back as the line wavers.
-    let most_of_a_trip = [(1, cap * 0.75)];
-    assert_eq!(stood_down(&mut tower, &most_of_a_trip), 0, "the hold");
-    assert_eq!(stood_down(&mut tower, &[(1, 1.0)]), tuned, "a few: the row");
     assert_eq!(stood_down(&mut tower, &[]), tuned, "cleared: the row");
     assert_eq!(
         stood_down(&mut tower, &rush),
@@ -141,9 +147,21 @@ fn the_fleet_follows_the_line_as_it_appears_clears_and_comes_back() {
 }
 
 #[test]
-fn a_step_down_keeps_parked_cars_parked() {
-    // The row drops from four cars to one: cars 0 to 3 are still out with
-    // the last hour's riders, cars 4 to 7 sit parked at their homes.
+fn the_backlog_rule_reads_only_auto_and_whether_anyone_waits() {
+    let auto = Schedule::auto_only();
+    let mine = Schedule::default();
+    let run = |s: Option<&Schedule>, active: usize, waiting: f64| {
+        Schedule::cars_while_anyone_waits(s, active, CARS as usize, waiting)
+    };
+    assert_eq!(run(Some(&auto), 1, 1.0), 8, "one rider: every car");
+    assert_eq!(run(Some(&auto), 3, 0.0), 3, "nobody: the row");
+    assert_eq!(run(Some(&mine), 1, 500.0), 1, "Auto off: the row");
+    assert_eq!(run(None, 2, 500.0), 2, "no schedule: as given");
+}
+
+#[test]
+fn the_shipped_signature_follows_the_same_rule() {
+    // A step down from four cars to one: the old rule kept the cars out.
     let auto = Schedule::auto_only();
     let ways = [1, -1, 1, -1, 0, 0, 0, 0];
     let positions = [3.0, 9.0, 12.0, 6.0, 1.0, 1.0, 1.0, 1.0];
@@ -151,36 +169,9 @@ fn a_step_down_keeps_parked_cars_parked() {
     let cap = Kind::ElevatorStandard.car_capacity();
     let run =
         |waiting: f64| Schedule::cars_for_backlog(Some(&auto), 1, (waiting, cap), fleet, |_| 1);
-    assert_eq!(run(1.0), 1, "one rider: the row, the out cars finish");
-    assert_eq!(run(cap * 0.75), 4, "most of a trip: the out cars stay");
+    assert_eq!(run(0.0), 1, "nobody: the row");
+    assert_eq!(run(1.0), 8, "one rider: every car");
     assert_eq!(run(cap + 1.0), 8, "more than a trip: every car");
-}
-
-#[test]
-fn a_trickle_after_a_rush_lets_the_shaft_fall_back_to_its_row() {
-    let (mut tower, id) = one_car_shaft(true);
-    let (cap, mut d) = (car_capacity(&tower), ElevatorDispatch::new());
-    let mut stood_down = |tower: &mut Tower, at: &[(i64, f64)]| {
-        let mut calls = ElevatorCalls::default();
-        calls
-            .hall
-            .insert(id, at.iter().map(|&(f, n)| (f, n.into())).collect());
-        d.move_cars(tower, 1.0, &calls, NOON, false);
-        d.closed_cars().iter().filter(|&&(s, _)| s == id).count()
-    };
-    let rush = [(1, cap + 1.0), (8, cap), (TOP, cap)];
-    assert_eq!(stood_down(&mut tower, &rush), 0);
-    // One rider a minute at a rotating floor: never more than the row's car
-    // takes, so the shaft runs its row every step.
-    let tuned = (CARS - 1) as usize;
-    for step in 0..120 {
-        let floor = 1 + step % TOP;
-        assert_eq!(
-            stood_down(&mut tower, &[(floor, 1.0)]),
-            tuned,
-            "step {step}"
-        );
-    }
 }
 
 #[test]
