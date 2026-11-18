@@ -1,7 +1,20 @@
-import { describe, it, expect } from "vitest";
-import { trafficTier, TRAFFIC_LABELS, trafficLevel } from "../../presentation/traffic";
+import { it, expect } from "vitest";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
+
+/**
+ * The engine's per-floor congestion reading (`hotspot`, `floorCongestion`,
+ * `congestionCause`): what the ratings, the Map's Traffic view and the
+ * morning complaint read. The HUD's Traffic readout follows the live waiting
+ * lines instead (owner, 2026-11-17); its rules are
+ * `src/presentation/trafficLine.test.ts` and `trafficHud.integration.test.ts`.
+ */
+
+/** The reading where a floor's tenants start to leave (the Map's Jammed
+ *  line, `CONGESTION_CHURN` in `engine-rs/src/panels/heatmap.rs`). */
+const CHURN = 1.0;
+/** A healthy tower's peak stays under this. */
+const HEALTHY_PEAK = 0.4;
 
 const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
@@ -20,29 +33,7 @@ function fillFloor(sim: Draft, floor: number, count: number): void {
   }
 }
 
-describe("Traffic tier (color-blind cue)", () => {
-  it("maps PEAK congestion to the 4-tier ladder at the calibrated boundaries", () => {
-    // Boundaries derived from measured towers: well-built peaks ~0.2–0.3 (Smooth),
-    // a tightening tower 0.4–0.8 (Busy), an overloaded floor 0.8–1.5 (Backed up),
-    // a real jam 1.5+ (Gridlock).
-    expect(trafficTier(0)).toBe(0); // Smooth
-    expect(trafficTier(0.29)).toBe(0); // a healthy real tower's peak
-    expect(trafficTier(0.39)).toBe(0);
-    expect(trafficTier(0.4)).toBe(1); // Busy at exactly 0.4
-    expect(trafficTier(0.8)).toBe(1); // still Busy AT the boundary
-    expect(trafficTier(0.81)).toBe(2); // Backed up
-    expect(trafficTier(1.5)).toBe(2); // Backed up AT the boundary
-    expect(trafficTier(1.51)).toBe(3); // Gridlock
-    expect(trafficTier(3.1)).toBe(3); // a severe jam
-  });
-  it("names the meter level the stylesheet fills to (four bars at Gridlock)", () => {
-    expect(trafficLevel(0)).toBe("smooth");
-    expect(trafficLevel(3)).toBe("gridlock");
-    expect(TRAFFIC_LABELS[trafficTier(2.0)]).toBe("Gridlock");
-  });
-});
-
-describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg: Leg) => {
+describeEngines("The congestion reading is peak-driven and points at the hotspot", (leg: Leg) => {
   /** A tower with 8 lightly-loaded floors served by a strong shaft (zone A) plus
    *  3 floors packed onto a single weak shaft (zone B), transferring at floor 10.
    *  Zone B is a real jam; zone A dilutes the average but not the peak. The
@@ -66,9 +57,8 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
     const avg = sim.congestion();
     const peak = sim.hotspot().ratio;
     expect(peak).toBeGreaterThan(avg); // the jam is hidden in the mean
-    // The chip (peak) flags the jam; feeding the average would report a lower tier.
-    expect(trafficTier(peak)).toBeGreaterThanOrEqual(2); // Backed up or Gridlock
-    expect(trafficTier(peak)).toBeGreaterThan(trafficTier(avg));
+    // The peak flags the jam past the churn line, well above the mean.
+    expect(peak).toBeGreaterThan(CHURN);
   });
 
   it("names the busiest floor: the argmax of the per-floor congestion map", () => {
@@ -98,13 +88,13 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
     // The lobby's reading is the true per-floor max, and it carries the boarding
     // pressure the office floors above share, not a signal of its own residents.
     expect(sim.floorCongestion(1)).toBeCloseTo(ratio, 10);
-    expect(trafficTier(ratio)).toBeGreaterThanOrEqual(2);
-    // Tapping the readout points at that one weak shaft.
+    expect(ratio).toBeGreaterThan(CHURN);
+    // The cause of the reading is that one weak shaft.
     expect(sim.congestionCause(1)).toEqual([draft.tower.transports[0].id]);
     expect(sim.congestionCause(1.5)).toEqual([]);
   });
 
-  it("a well-built tower stays Smooth and names no floor (peak below the first boundary)", () => {
+  it("a well-built tower's peak stays low", () => {
     const draft = draftTower(2);
     draft.money = 1e12;
     lay(draft, "lobby", 1);
@@ -114,7 +104,7 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
       if (r.ok) draft.tower.setCars(draft.tower.transports[i].id, 8);
     }
     for (let f = 2; f <= 12; f++) fillFloor(draft, f, 12);
-    expect(trafficTier(new PortSim(leg, draft).hotspot().ratio)).toBe(0); // Smooth
+    expect(new PortSim(leg, draft).hotspot().ratio).toBeLessThan(HEALTHY_PEAK);
   });
 
   it("the hotspot names no floor (not 0, a real floor) when nothing is congested", () => {
@@ -126,10 +116,9 @@ describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg:
     expect(floor).toBeUndefined(); // no floor, so it never collides with floor 0 (B1)
   });
 
-  it("chip and overlay legend read the same signal: the hotspot ratio is the true per-floor max", () => {
-    // Both consumers read the hotspot ratio: the HUD chip tiers on it, the
-    // congestion overlay legend reports it. It must equal the worst floor's
-    // congestion and dominate every other floor, the one value both surface.
+  it("the hotspot ratio is the true per-floor max", () => {
+    // The overlay's peak reads the hotspot ratio: it must equal the worst
+    // floor's congestion and dominate every other floor.
     const sim = hotspotTower();
     const { ratio, floor } = sim.hotspot();
     expect(ratio).toBeCloseTo(sim.floorCongestion(floor!), 10);

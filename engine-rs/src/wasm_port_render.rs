@@ -89,6 +89,18 @@ impl Engine {
         })
     }
 
+    /// `queueLine`: the stretch of floor one landing's waiting line covers,
+    /// `[from, to]` in tiles with `from <= to` (`crowd::landing::queue_line`),
+    /// empty when nobody waits there, the shaft is not an elevator or the
+    /// floor is not a whole number. One pass over the crowd, for a tap.
+    pub(crate) fn port_queue_line(&self, shaft: f64, floor: f64) -> Vec<f64> {
+        let (Some(shaft), Some(floor)) = (whole(shaft), whole(floor)) else {
+            return Vec::new();
+        };
+        crate::crowd::landing::queue_line(&self.sim.crowd, &self.sim.tower, shaft, floor)
+            .map_or_else(Vec::new, |(from, to)| vec![from, to])
+    }
+
     /// What the congestion answers read: the tower, the crowd step, the
     /// revision, the clock's minutes and the mark log's position.
     fn congestion_key(&self) -> CongestionKey {

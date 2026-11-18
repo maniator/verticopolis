@@ -1,28 +1,27 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { refreshTraffic } from "./trafficHud";
 import { TRAFFIC_LABELS } from "../presentation/traffic";
-import { mockPort } from "../tests/portKit/mockPort";
-import { PortCodes } from "../simport/portCodes";
 import type { GameApp } from "../main";
 
 /**
  * Unit coverage for the color-blind-safe traffic HUD. `refreshTraffic` (the
  * refresh `updateTraffic` wraps, minus its catch, so a failed draw fails the
- * test) asks the engine port for the tower's peak hotspot, then draws it with the
- * app's smoothed tier into four DOM cells. We drive it with a hand-built fake
- * app: a fake engine port whose `hotspot()` answers a fixed
- * `{ratio, floor}` record, and
+ * test) reads the renderer's queue projection (the engine's `queueView`),
+ * then draws the worst line with the app's smoothed tier into four DOM cells.
+ * The fake app's `queueView` is a spy answering one landing, and
  * `lastTrafficTier` is read and written in place so we can assert the
  * hysteresis gate from both directions. The ordering and failure cases are in
  * `trafficHudPort.test.ts`.
  */
 
-/** Build the minimal fake `GameApp` the HUD touches: the engine port over a
- *  stubbed hotspot record, the mutable smoothed-tier field and the frame error log. */
-function fakeApp(cong: number, hotspotFloor: number, lastTier: number): GameApp {
+/** Build the minimal fake `GameApp` the HUD touches: a queue projection with
+ *  one line of `count` riders at `lineFloor`, all fed up (tier 2) unless
+ *  `waitTier` says otherwise, the mutable smoothed-tier field and the frame
+ *  error log. */
+function fakeApp(count: number, lineFloor: number, lastTier: number, waitTier: 0 | 1 | 2 = 2): GameApp {
+  const landings = new Map([[7, new Map([[lineFloor, { count, tier: waitTier }]])]]);
   const app = {
-    enginePort: { hotspot: () => Float64Array.of(cong, hotspotFloor) },
-    portCodes: new PortCodes(mockPort()),
+    engine: { sim: { tower: {}, crowd: { queueView: () => ({ landings, boarded: new Map() }) } } },
     lastTrafficTier: lastTier,
     frameErrors: [],
   };
@@ -44,113 +43,115 @@ const floor = () => document.getElementById("traffic-floor")!.textContent;
 const wrap = () => document.getElementById("traffic")!;
 
 describe("refreshTraffic", () => {
-  it("renders Smooth with no floor suffix, no aria hotspot, and no warn class", () => {
-    const app = fakeApp(0.2, 42, 0);
+  it("renders Smooth with no floor suffix, no aria floor, and no warn class", () => {
+    const app = fakeApp(4, 42, 0);
     refreshTraffic(app);
 
     expect(app.lastTrafficTier).toBe(0);
     expect(label()).toBe("Smooth");
     expect(label()).toBe(TRAFFIC_LABELS[0]);
     expect(level()).toBe("smooth"); // the stylesheet fills one bar
-    // Below Smooth's tier the hotspot floor is suppressed entirely.
+    // At Smooth the line's floor is suppressed entirely.
     expect(floor()).toBe("");
     expect(wrap().getAttribute("aria-label")).toBe("Traffic: Smooth");
     expect(wrap().classList.contains("traffic-warn")).toBe(false);
   });
 
-  it("shows the floor suffix, hotspot aria, and warn class at a raised tier (>=2)", () => {
-    // cong 0.9 -> raw tier 2 (Backed up), and 0.9 >= B[0] + 0.03, so it flips up.
-    const app = fakeApp(0.9, 42, 0);
+  it("shows the line's floor, its aria, and the warn class at a raised tier (>=2)", () => {
+    // 25 fed-up riders -> Backed up (20 up), straight from Smooth.
+    const app = fakeApp(25, 42, 0);
     refreshTraffic(app);
 
     expect(app.lastTrafficTier).toBe(2);
     expect(label()).toBe("Backed up");
     expect(level()).toBe("backed-up"); // the stylesheet fills three bars
     expect(floor()).toBe(" · 42F");
-    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst on floor 42");
+    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst line on floor 42");
     expect(wrap().classList.contains("traffic-warn")).toBe(true);
   });
 
-  it("names the ground lobby as 1F (the boarding-jam case the fix targets)", () => {
-    const app = fakeApp(0.9, 1, 0);
+  it("names the ground lobby as 1F (the boarding-jam case)", () => {
+    const app = fakeApp(25, 1, 0);
     refreshTraffic(app);
 
     expect(label()).toBe("Backed up");
     expect(floor()).toBe(" · 1F");
-    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst on floor 1");
+    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst line on floor 1");
   });
 
-  it("formats a basement hotspot with the B-grammar, never 0F/-1F", () => {
-    // A jammed basement food hall: floor 0 is B1, floor -1 is B2. The visible tag
-    // and the spoken aria both use the basement grammar, matching the ruler.
-    const b1 = fakeApp(0.9, 0, 0);
+  it("formats a basement line with the B-grammar, never 0F/-1F", () => {
+    // A line at a basement landing: floor 0 is B1, floor -1 is B2. The visible
+    // tag and the spoken aria both use the basement grammar, matching the ruler.
+    const b1 = fakeApp(25, 0, 0);
     refreshTraffic(b1);
     expect(floor()).toBe(" · B1");
-    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst on floor B1");
+    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst line on floor B1");
 
     document.getElementById("traffic-floor")!.textContent = "";
-    const b2 = fakeApp(0.9, -1, 2);
+    const b2 = fakeApp(25, -1, 2);
     refreshTraffic(b2);
     expect(floor()).toBe(" · B2");
-    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst on floor B2");
+    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst line on floor B2");
   });
 
   it("shows the floor at tier 1 (Busy) but does NOT set the warn class (tier < 2)", () => {
-    // 0.5 -> raw 1, and 0.5 >= B[0] + 0.03 = 0.43, so it flips to Busy.
-    const app = fakeApp(0.5, 7, 0);
+    // 8 fed-up riders -> Busy (5 up).
+    const app = fakeApp(8, 7, 0);
     refreshTraffic(app);
 
     expect(app.lastTrafficTier).toBe(1);
     expect(label()).toBe("Busy");
     expect(floor()).toBe(" · 7F");
-    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Busy, worst on floor 7");
+    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Busy, worst line on floor 7");
     expect(wrap().classList.contains("traffic-warn")).toBe(false);
   });
 
   describe("hysteresis", () => {
-    it("does not flip UP for a raw tier just over a boundary (needs +0.03 past)", () => {
-      // 0.41 -> raw tier 1, but 0.41 < B[0] + 0.03 = 0.43, so the smoothed tier
-      // holds at Smooth.
-      const app = fakeApp(0.41, 12, 0);
-      refreshTraffic(app);
-
-      expect(app.lastTrafficTier).toBe(0);
+    it("reads a car's worth of fresh riders as Smooth and a fresh crowd of 300 as Busy", () => {
+      const car = fakeApp(21, 12, 0, 0);
+      refreshTraffic(car);
+      expect(car.lastTrafficTier).toBe(0);
       expect(label()).toBe("Smooth");
       expect(floor()).toBe("");
+
+      const crowd = fakeApp(300, 12, 0, 0);
+      refreshTraffic(crowd);
+      expect(crowd.lastTrafficTier).toBe(1);
+      expect(label()).toBe("Busy");
+      expect(floor()).toBe(" · 12F");
     });
 
-    it("flips UP once the reading clears the boundary + 0.03", () => {
-      const app = fakeApp(0.44, 12, 0);
-      refreshTraffic(app);
-
-      expect(app.lastTrafficTier).toBe(1);
-      expect(label()).toBe("Busy");
+    it("counts an impatient line at a quarter: 40 riders read Busy, 80 Backed up", () => {
+      const busy = fakeApp(40, 12, 0, 1);
+      refreshTraffic(busy);
+      expect(busy.lastTrafficTier).toBe(1);
+      const backed = fakeApp(80, 12, 0, 1);
+      refreshTraffic(backed);
+      expect(backed.lastTrafficTier).toBe(2);
     });
 
-    it("does not flip DOWN until the reading drops boundary - 0.03 below", () => {
-      // Currently Busy (tier 1). 0.39 -> raw tier 0, but 0.39 > B[0] - 0.03 = 0.37,
-      // so it holds at Busy.
-      const app = fakeApp(0.39, 5, 1);
+    it("does not flip DOWN while the line is at three quarters of the edge or more", () => {
+      // Backed up (tier 2), and 15 is three quarters of its edge (20): it holds.
+      const app = fakeApp(15, 5, 2);
       refreshTraffic(app);
 
-      expect(app.lastTrafficTier).toBe(1);
-      expect(label()).toBe("Busy");
-      // Still tier 1, so the hotspot floor keeps showing.
+      expect(app.lastTrafficTier).toBe(2);
+      expect(label()).toBe("Backed up");
+      // Still raised, so the line's floor keeps showing.
       expect(floor()).toBe(" · 5F");
     });
 
-    it("flips DOWN once the reading falls below boundary - 0.03", () => {
-      const app = fakeApp(0.36, 5, 1);
+    it("flips DOWN once the line falls below three quarters of the edge", () => {
+      const app = fakeApp(14, 5, 2);
       refreshTraffic(app);
 
-      expect(app.lastTrafficTier).toBe(0);
-      expect(label()).toBe("Smooth");
-      expect(floor()).toBe("");
+      expect(app.lastTrafficTier).toBe(1);
+      expect(label()).toBe("Busy");
     });
   });
 
   it("is a no-op on a second identical pass (does not rewrite unchanged cells)", () => {
-    const app = fakeApp(0.9, 42, 2);
+    const app = fakeApp(25, 42, 2);
     refreshTraffic(app);
     // Prove the guarded write branches take their "unchanged" path: clear the
     // aria/warn side effects, run again with the same reading, and confirm they
@@ -169,7 +170,7 @@ describe("refreshTraffic", () => {
 
   it("tolerates missing DOM cells without throwing", () => {
     document.body.innerHTML = "";
-    const app = fakeApp(0.9, 42, 0);
+    const app = fakeApp(25, 42, 0);
     // The rejecting refresh: a throw in the draw would surface here.
     expect(() => refreshTraffic(app)).not.toThrow();
     // The smoothed tier still advances even with no elements to paint.

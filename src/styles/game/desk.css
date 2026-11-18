@@ -187,6 +187,54 @@ body.desk #speed {
   flex: none;
   flex-wrap: nowrap;
 }
+/* The meters whose values change in play (the traffic tier and floor, the
+   time, the date, the funds and the population) each keep a fixed width,
+   as the phone's landscape strip does, so a new value can never rewrap
+   Info. The desk lays the tower out under Info's height when it opens; a
+   later rewrap (a named floor, a longer date, a bigger fund) dropped the
+   speed buttons to a second row under the tower's title bar. Now the row
+   count depends only on Info's width: one row on a wide desk, the buttons
+   on a second row on a narrow one from the start. The widths are the
+   landscape strip's, which fit each meter's longest value ("Backed up ·
+   100F", "WD2 00:00", "2nd WD/4Q/122nd Year", "$-1,000,000,000",
+   "100,000"); only a still longer value trims with an ellipsis. */
+body.desk #stat-time,
+body.desk #stat-date,
+body.desk #stat-money,
+body.desk #stat-pop {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.desk #stat-time { width: 6.2em; }
+body.desk #stat-date { width: 13.1em; }
+body.desk #stat-money { width: 9.5em; }
+body.desk #stat-pop { width: 4.8em; }
+/* Traffic trims the tier word first and keeps the meter and the floor, the
+   fact the readout is there to give. */
+body.desk #traffic {
+  display: flex;
+  align-items: baseline;
+  overflow: hidden;
+  width: 10.8em;
+}
+body.desk #traffic-glyph {
+  margin-inline-end: 0.3em;
+}
+body.desk #traffic-glyph,
+body.desk #traffic-floor {
+  flex: none;
+}
+body.desk #traffic-floor {
+  white-space: pre;
+}
+body.desk #traffic-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* The tray's speaker has the sound and File > Save saves, so Info keeps to
    the clock's six buttons on one row and ends right under them. */
 body.desk #speed > #audio-toggle,

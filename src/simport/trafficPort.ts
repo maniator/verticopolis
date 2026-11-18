@@ -1,7 +1,8 @@
-// The engine port's per-floor traffic reads (`engine-rs/src/wasm_port_render.rs`):
-// what one floor's congestion is and which transports set it. Each builds the
-// spatial reading, a pass over the rooms, so neither is a per-frame read. Part
-// of `EnginePort` (`enginePort.ts`).
+// The engine port's traffic reads for a tap (`engine-rs/src/wasm_port_render.rs`):
+// what one floor's congestion is, which transports set it, and how far one
+// landing's waiting line runs. The first two build the spatial reading, a pass
+// over the rooms, and the third walks the crowd once, so none is a per-frame
+// read. Part of `EnginePort` (`enginePort.ts`).
 import type { PortRecord } from "./enginePort";
 
 /** One floor's congestion reading and its cause. */
@@ -18,4 +19,10 @@ export interface EnginePortTraffic {
    *  reading or one that is not a whole number. Read when the player taps
    *  the Traffic readout. */
   congestionCause(floor: number): PortRecord;
+  /** The stretch of floor the waiting line at elevator `shaft` on `floor`
+   *  covers, `[from, to]` in tiles with `from <= to`: from the shaft face to
+   *  the rider standing farthest from it. A line runs across any shaft beside its
+   *  own, so this is how the Traffic readout's tap tells which riders stand
+   *  in which line. Empty when nobody waits there. Read on a tap. */
+  queueLine(shaft: number, floor: number): PortRecord;
 }

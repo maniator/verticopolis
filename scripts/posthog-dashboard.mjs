@@ -677,7 +677,7 @@ function buildInsights(ids) {
     {
       name: "Traffic readout taps",
       description:
-        "Taps, clicks, Enter or Space on the HUD's Traffic readout while it names a floor (app_action traffic_jump), production: the view zoomed in on that floor. detail is shafts when the transports behind the reading were outlined, none when the engine named none. Only builds from the release after 4.12.0 send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, traffic_jump.",
+        "Taps, clicks, Enter or Space on the HUD's Traffic readout while it names a floor (app_action traffic_jump), production: the view zoomed in on the worst waiting line it names. detail is the readout's level at the tap (busy, backed-up or gridlock); builds through 4.13.1 sent shafts or none instead. Only builds from the release after 4.12.0 send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, traffic_jump.",
       query: trends([series("app_action", "Taps")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["traffic_jump"])] }),
     },
     {

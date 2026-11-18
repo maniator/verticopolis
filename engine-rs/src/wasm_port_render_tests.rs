@@ -336,3 +336,32 @@ fn a_floors_congestion_cause_is_the_engines_answer() {
         assert!(e.port_congestion_cause(floor).is_empty(), "{floor}");
     }
 }
+
+/// `queueLine` hands the port the engine's stretch of one landing's line as
+/// `[from, to]`, and nothing for an empty landing, stairs or a floor or shaft
+/// that is not a whole number.
+#[test]
+fn a_landings_queue_line_is_the_engines_answer() {
+    let mut e = built();
+    let lift = shaft(&e, Kind::ElevatorStandard);
+    let stairs = shaft(&e, Kind::Stairs);
+    e.sim.crowd.people = vec![
+        waiter(1, lift, 2, 5.0, false),
+        waiter(2, lift, 2, 9.0, false),
+        waiter(3, stairs, 1, 0.0, false),
+    ];
+    let (from, to) = crate::crowd::landing::queue_line(&e.sim.crowd, &e.sim.tower, lift, 2)
+        .expect("two riders wait");
+    assert!(from < to);
+    assert_eq!(e.port_queue_line(lift as f64, 2.0), vec![from, to]);
+    for (s, floor) in [
+        (lift as f64, 4.0),
+        (stairs as f64, 1.0),
+        (lift as f64, 2.5),
+        (lift as f64 + 0.5, 2.0),
+        (9999.0, 2.0),
+        (f64::NAN, 2.0),
+    ] {
+        assert!(e.port_queue_line(s, floor).is_empty(), "{s} {floor}");
+    }
+}
