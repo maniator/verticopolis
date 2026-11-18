@@ -48,6 +48,13 @@ pub struct Memo {
     /// Raised each time a station registers or unregisters, so placing any
     /// other unit leaves `metro_floor` standing.
     pub metro_changes: u64,
+    /// Each lobby floor with the top story of its tallest hall, in floor
+    /// order (`Tower::nearest_lobby_floor_distance`), keyed on
+    /// `lobby_changes` when it was read.
+    pub lobby_reach: Option<(u64, std::sync::Arc<[(i64, i64)]>)>,
+    /// Raised each time a lobby registers or unregisters, so placing any
+    /// other unit leaves `lobby_reach` standing.
+    pub lobby_changes: u64,
     /// Whether a floor tile sits above the lobby, per revision (#1237).
     pub floor_above_lobby: Option<(crate::tower_index::IndexKey, bool)>,
     pub rooms: Option<(crate::tower_index::IndexKey, std::sync::Arc<[usize]>)>,
