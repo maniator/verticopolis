@@ -24,6 +24,23 @@ impl Engine {
         self.port_quote_skybridge(floor, x).to_vec()
     }
 
+    /// `buildRoomRow(kind, floor, from, to)` (Modern): places a row of
+    /// rooms of `kind` along `floor`, from the room at `from` toward the
+    /// room at `to` (left tiles), as many as fit, or none.
+    /// `[status, delta, placed]`.
+    #[wasm_bindgen(js_name = buildRoomRow)]
+    pub fn build_room_row(&mut self, kind: f64, floor: f64, from: f64, to: f64) -> Vec<f64> {
+        self.port_build_room_row(kind, floor, from, to)
+    }
+
+    /// `quoteRoomRow(kind, floor, from, to)` (Modern): `[ok, cost, rooms]`,
+    /// then each room's left tile, the rooms a drag would place and their
+    /// full price, for the row's ghost; a refusal's text is `lastReason()`.
+    #[wasm_bindgen(js_name = quoteRoomRow)]
+    pub fn quote_room_row(&mut self, kind: f64, floor: f64, from: f64, to: f64) -> Vec<f64> {
+        self.port_quote_room_row(kind, floor, from, to)
+    }
+
     /// `previewRentBatch(kind, target, onlyDefaultPriced)` with the target as
     /// JSON text, as for `applyRentBatch`: the counters that call would
     /// report, as JSON, with nothing written; null where it would not apply.

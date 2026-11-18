@@ -188,6 +188,16 @@ towers' sky lobbies in one click, at 3 stars and up (party, 2026-11-16). One
 | --- | --- | --- |
 | `sky_bridge` | `new` or `finish` | The tool laid a bridge. `finish` means it completed a half bridge from a save made before the tool (a bridge tile already stood beside the gap), `new` any other bridge |
 
+## Rows of rooms (Modern)
+
+A drag along a floor with a room tool places a row of the same room in one
+action (#646). One `app_action` code counts the rows of two or more rooms. It
+carries no floor, place, kind or price, only the row's length in bands.
+
+| `action` | `detail` | When |
+| --- | --- | --- |
+| `room_row` | `2-4`, `5-9` or `10+` | A drag placed a row of two or more rooms (Modern, #646). The detail is the row's length band; a single room sends nothing |
+
 ## Drags that stop
 
 A drag keeps its refusals quiet while it moves and says the last one when it is

@@ -2443,6 +2443,7 @@
     "officesShareOneParkingSpace": false,
     "previewNamesRefusal": true,
     "quotesLobbyDistance": true,
+    "roomRows": true,
     "scheduleAssist": true,
     "shadedLook": true,
     "skyBridge": {
@@ -2488,7 +2489,7 @@
     "variantHouseholds": true,
     "venueFlights": true
   },
-  "version": 24,
+  "version": 25,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

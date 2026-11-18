@@ -74,6 +74,13 @@ export class Engine {
     bombThreat(): void;
     bookExterminator(): Float64Array;
     buildAt(kind: number, floor: number, x: number): Float64Array;
+    /**
+     * `buildRoomRow(kind, floor, from, to)` (Modern): places a row of
+     * rooms of `kind` along `floor`, from the room at `from` toward the
+     * room at `to` (left tiles), as many as fit, or none.
+     * `[status, delta, placed]`.
+     */
+    buildRoomRow(kind: number, floor: number, from: number, to: number): Float64Array;
     buildShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
     /**
      * `buildSkyBridge(floor, x)` (Modern): lays the whole sky bridge a
@@ -412,6 +419,12 @@ export class Engine {
     queueView(): Float64Array;
     quoteBuild(kind: number, floor: number, x: number): Float64Array;
     quoteRentBatch(kind: number, target: number, only_default: boolean): Float64Array;
+    /**
+     * `quoteRoomRow(kind, floor, from, to)` (Modern): `[ok, cost, rooms]`,
+     * then each room's left tile, the rooms a drag would place and their
+     * full price, for the row's ghost; a refusal's text is `lastReason()`.
+     */
+    quoteRoomRow(kind: number, floor: number, from: number, to: number): Float64Array;
     quoteShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
     /**
      * `quoteSkyBridge(floor, x)` (Modern): `[ok, cost, from, to]`, the

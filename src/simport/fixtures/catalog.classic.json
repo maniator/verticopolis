@@ -2080,6 +2080,7 @@
     "officesShareOneParkingSpace": true,
     "previewNamesRefusal": false,
     "quotesLobbyDistance": false,
+    "roomRows": false,
     "scheduleAssist": false,
     "shadedLook": false,
     "skyBridge": null,
@@ -2117,7 +2118,7 @@
     "variantHouseholds": false,
     "venueFlights": false
   },
-  "version": 24,
+  "version": 25,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

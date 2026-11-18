@@ -62,10 +62,11 @@ pub(crate) const ONBOARDING_FLAGS: [u8; 5] = [
 ];
 
 /// Each command's own slots after [`DELTA`], for the view layout.
-pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 31] = [
+pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 32] = [
     ("buildAt", &[]),
     ("paintTiles", &["placed"]),
     ("buildSkyBridge", &["tiles"]),
+    ("buildRoomRow", &["placed"]),
     ("buildShaft", &[]),
     ("demolish", &[]),
     ("demolishTile", &[]),
@@ -97,10 +98,12 @@ pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 31] = [
 ];
 
 /// Each query record's slots, for the view layout.
-const QUERY_RECORDS: [(&str, &[&str]); 12] = [
+const QUERY_RECORDS: [(&str, &[&str]); 13] = [
     ("quoteBuild", &["ok", "cost"]),
     ("quoteShaft", &["ok"]),
     ("quoteSkyBridge", &["ok", "cost", "from", "to"]),
+    // A header, then each room's left tile.
+    ("quoteRoomRow", &["ok", "cost", "rooms"]),
     ("quoteRentBatch", &QUOTE_BATCH_SLOTS),
     ("hotspot", &["ratio", "floor"]),
     ("loadSave", &["status", "generation"]),

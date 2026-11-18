@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { arrivalLine } from "./arrivalLine";
-import { dropSeveredGesture } from "./engineWiring";
+import { dropSeveredGesture } from "./severedGesture";
 import { noteTowerSwap } from "./engineFault";
 import { hudSource } from "./hudSource";
 import { showTower } from "../ui/uiStatus";

@@ -12,6 +12,7 @@ import { groupDigits } from "../ui/format";
 import { quoteShaft } from "./portAccess";
 import { lobbyHeightFor } from "./lobbyHeight";
 import { finishesHalfBridge, quoteSkyBridge } from "./skyBridgeTool";
+import { roomRowBand } from "./roomRowTool";
 import { trackAppAction } from "../analyticsActions";
 import { countShaftRoomRefusal } from "./shaftRoomRefusal";
 
@@ -101,6 +102,25 @@ export class BuildActions {
     }
     trackAppAction("sky_bridge", finishing ? "finish" : "new");
     return { ok: true, tiles: codes.slot(rec, "buildSkyBridge", "tiles") };
+  }
+
+  /** Place the row of rooms a drag along `floor` names (Modern, #646), from
+   *  the room at `from` toward the room at `to`, with the usual build/error
+   *  feedback; nothing is placed on a refusal. A row of two or more reports
+   *  the `room_row` action with its length band. */
+  buildRoomRow(kind: FacilityKind, floor: number, from: number, to: number): { ok: boolean; placed: number; reason?: string } {
+    const port = this.deps.enginePort();
+    const codes = this.deps.portCodes();
+    const rec = port.buildRoomRow(codes.kind(kind), floor, from, to);
+    const res = outcome(port, rec);
+    this.deps.audio.sfx(res.ok ? "build" : "error");
+    if (!res.ok) {
+      if (res.reason) this.deps.ui.toast(res.reason, "bad");
+      return { ok: false, placed: 0, reason: res.reason };
+    }
+    const placed = codes.slot(rec, "buildRoomRow", "placed");
+    if (placed > 1) trackAppAction("room_row", roomRowBand(placed));
+    return { ok: true, placed };
   }
 
   /** Place a transport span with the usual build/error feedback. On a refusal

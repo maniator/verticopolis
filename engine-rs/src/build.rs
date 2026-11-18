@@ -137,6 +137,11 @@ impl Simulation {
     /// assert!(quote.cost > 0.0);
     /// ```
     pub fn can_build(&self, kind: Kind, floor: i64, x: i64) -> CanBuild {
+        self.can_build_with(kind, floor, x, self.money)
+    }
+
+    /// [`can_build`](Simulation::can_build) as if `money` were in hand.
+    pub(crate) fn can_build_with(&self, kind: Kind, floor: i64, x: i64, money: f64) -> CanBuild {
         let kind = ground_floor_structure_kind(kind, floor);
         let f = kind.facility();
         if let Some(reason) = self.edit_refusal() {
@@ -159,12 +164,8 @@ impl Simulation {
             };
         }
         let money_check = |cost: f64| CanBuild {
-            ok: self.money >= cost,
-            reason: if self.money >= cost {
-                None
-            } else {
-                Some("Not enough money.".into())
-            },
+            ok: money >= cost,
+            reason: (money < cost).then(|| "Not enough money.".into()),
             cost,
         };
         // `!isRoomKind(kind)`: floor, lobby and every transport kind take the

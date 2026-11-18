@@ -657,6 +657,12 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Taps")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["traffic_jump"])] }),
     },
     {
+      name: "Rows of rooms placed (Modern)",
+      description:
+        "Rows of two or more rooms one drag placed (app_action room_row, #646), production, split by the row's length band: 2-4, 5-9 or 10+. A single room placed with the room tools sends nothing. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Rows of rooms (Modern).",
+      query: trends([series("app_action", "Rows")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["room_row"])] }),
+    },
+    {
       name: "Drags stopped by a rule",
       description:
         "Releases of a drag that said why it stopped (app_action drag_stopped, #1847 and #2046), split by detail: extend (an elevator's arrow drag that stopped for any reason: a floor it can't serve, such as an unbuilt lobby, another shaft or a room, too little money, the kind's longest span or the edge of the lot) or bulldoze (a bulldoze drag that left tiles), production. A refusal the press already said is not counted. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Drags that stop.",

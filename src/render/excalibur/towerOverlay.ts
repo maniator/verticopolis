@@ -350,16 +350,19 @@ function drawPreview(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
     const hgt = p.stories ?? f.floors; // a tall lobby's ghost covers every story (#308)
     if (f.halo) drawHaloRings(ctx, f.halo, p.floor, hgt, catalog.world, engine);
     // Floor/lobby tools lay a multi-tile brush strip; `span` (when set) is the
-    // real footprint so the shadow matches what a click actually places.
-    const w = p.span ?? f.width;
+    // real footprint so the shadow matches what a click actually places. A
+    // row of rooms (#646) spans from its leftmost room's left edge to its
+    // rightmost room's right edge, with a ghost per room.
+    const rooms = p.rooms ?? [p.x];
+    const right = Math.max(rooms[0], rooms[rooms.length - 1]);
+    const w = p.span ?? right + f.width - p.x;
     // And how far its noise carries along its floor, or how far it hears.
     drawNoiseReach(ctx, f.noise, { floor: p.floor, floors: hgt, x: p.x, width: w }, engine.sim.tower, engine);
-    const sx = engine.worldToScreenX(p.x);
     const sy = engine.worldToScreenY(p.floor + hgt - 1);
-    const sw = w * TILE * engine.cam.zoom;
     const sh = hgt * FLOOR * engine.cam.zoom;
-    drawGhostRect(ctx, sx, sy, sw, sh, p.valid);
-    if (p.label) drawGhostLabel(ctx, sx + sw / 2, sy, p.label, p.valid);
+    const roomW = (p.span ?? f.width) * TILE * engine.cam.zoom;
+    for (const x of rooms) drawGhostRect(ctx, engine.worldToScreenX(x), sy, roomW, sh, p.valid);
+    if (p.label) drawGhostLabel(ctx, engine.worldToScreenX(p.x) + (w * TILE * engine.cam.zoom) / 2, sy, p.label, p.valid);
   }
   if (engine.transportPreview) {
     const p = engine.transportPreview;

@@ -233,13 +233,20 @@ impl Tower {
         self.lobby_tiles.keys().copied().collect()
     }
 
+    /// How many of `kind` the tower holds. Only a transport kind walks the
+    /// transports: a room's count is the census's, so a capped room's check
+    /// (`cap_reason`, run for every spot a build preview or a row of rooms
+    /// tries) costs the same on any tower.
     pub fn count_kind(&self, kind: Kind) -> i64 {
-        let placed = if kind.is_structural() {
+        if kind.is_transport() {
+            return self.census().kinds[kind as usize]
+                + self.transports.iter().filter(|t| t.kind == kind).count() as i64;
+        }
+        if kind.is_structural() {
             self.units.iter().filter(|u| u.kind == kind).count() as i64
         } else {
             self.census().kinds[kind as usize]
-        };
-        placed + self.transports.iter().filter(|t| t.kind == kind).count() as i64
+        }
     }
 
     fn span_every(
@@ -422,6 +429,23 @@ impl Tower {
             }
         }
         None
+    }
+
+    /// How many more of `kind` the caps [`cap_reason`](Tower::cap_reason)
+    /// enforces let in, `i64::MAX` when none applies: 0 exactly when it
+    /// refuses. A row of rooms stops there (`sim_room_row.rs`).
+    pub(crate) fn cap_headroom(&self, kind: Kind) -> i64 {
+        let mut left = i64::MAX;
+        if let Some(single) = build_cap_in(self.mode, kind) {
+            left = left.min(single - self.count_kind(kind));
+        }
+        for pool in pools_for(self.mode) {
+            if pool.kinds.contains(&kind) {
+                let total: i64 = pool.kinds.iter().map(|&k| self.count_kind(k)).sum();
+                left = left.min(pool.cap - total);
+            }
+        }
+        left.max(0)
     }
 }
 

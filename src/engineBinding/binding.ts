@@ -60,6 +60,8 @@ export const INSTANCE_METHODS = [
   "scheduleShaft",
   // The Sky Bridge tool (Modern, 2026-11-16).
   "buildSkyBridge", "quoteSkyBridge",
+  // The row of rooms (Modern, #646).
+  "buildRoomRow", "quoteRoomRow",
   // PR 1c's panel queries.
   "heatCells", "crewCoverage", "unitCard", "shaftCard", "personCard",
   // PR 1d's report queries and file members.
