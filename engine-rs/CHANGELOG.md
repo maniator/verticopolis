@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.55.0 (2026-11-18)
+
+- `lastRefusalCode()` names why the last tower file read or write was refused with one closed word (`too_large`, `not_tower`, `damaged`, `newer_version`, `not_save`, `unreadable`, `modern` or `refused`), so a host can count refusals without sending the player's sentence, which can quote the file. `loadVctower`, `loadVctowerBytes`, `loadTdt`, `exportVctower`, `exportVctowerBytes` and `tdtExport` set it on a refusal and clear it when they work (#2075).
+
 ## 1.54.0 (2026-11-18)
 
 - The satisfaction pass and the move-in check find each room's nearest amenity with a binary search over a sorted list of venue floors, where they used to walk every venue's floors, and the hotel and condo passes walk the rooms rather than every tile. That is up to 3% fewer instructions per step on large Modern towers, with identical results.

@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.13.6
+
+- Opening a SimTower `.TDT` file whose reader fails to load (offline, say) now says the save couldn't be read, where before nothing happened.
+
 ## 4.13.5
 
 - Modern: office workers who go out for dinner or a movie after office hours now go home from the restaurant or cinema. Before, they rode back to the office first, and a few were still leaving after midnight (#2481).
