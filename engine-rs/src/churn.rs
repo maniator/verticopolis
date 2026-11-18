@@ -61,20 +61,7 @@ impl Simulation {
     /// passenger kinds with a shaft stopping at the floor; staff-only
     /// service elevators never count.
     pub fn serving_transport_kinds_at(&self, floor: i64) -> (bool, bool, bool) {
-        let mut kinds = (false, false, false);
-        for t in &self.tower.transports {
-            if t.kind.is_staff_only_transport() || !t.stops_at(floor) {
-                continue;
-            }
-            if t.kind.is_elevator() {
-                kinds.0 = true;
-            } else if t.kind == Kind::Stairs {
-                kinds.1 = true;
-            } else if t.kind == Kind::Escalator {
-                kinds.2 = true;
-            }
-        }
-        kinds
+        self.tower.serving_transport_kinds_at(floor)
     }
 
     /// `bindingTransportClassAt(floor)`: the class that binds the floor's

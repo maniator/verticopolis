@@ -228,14 +228,16 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut 
         PState::Riding => {
             let p = &crowd.people[i];
             let dest = p.floors[p.leg + 1];
-            let ridden = p.shaft_id.and_then(|id| tower.get_transport(id));
+            let ridden = p.shaft_id.and_then(|id| tower.transport_index(id));
             // A rider whose car or shaft went steps out of the trip (3.7.3);
             // one whose floor stopped being a stop rides on to the nearest
             // stop, gets off there and finds a new way on (#2324).
-            let (Some(shaft), Some(ci)) = (ridden, p.car_index) else {
+            let (Some(si), Some(ci)) = (ridden, p.car_index) else {
                 return give_up(crowd, i, tower);
             };
-            if ci as usize >= shaft.car_positions.len() || !shaft.stops_at(dest) {
+            let shaft = &tower.transports[si];
+            let stops = tower.stop_bits();
+            if ci as usize >= shaft.car_positions.len() || !tower.stops_at_index(&stops, si, dest) {
                 return super::walk::ride_on_or_step_out(crowd, i, tower);
             }
             let pos = shaft.car_positions[ci as usize];

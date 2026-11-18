@@ -112,17 +112,19 @@ impl Crowd {
     fn build_queue_view(&self, tower: &Tower) -> QueueView {
         let mut landings: FastIndexMap<i64, FastIndexMap<i64, QueueLanding>> =
             FastIndexMap::default();
+        let stops = tower.stop_bits();
         for p in &self.people {
             let Some(shaft_id) = p.shaft_id else { continue };
             if p.state != PState::Waiting {
                 continue;
             }
-            let Some(shaft) = tower.get_transport(shaft_id) else {
+            let Some(index) = tower.transport_index(shaft_id) else {
                 continue;
             };
+            let shaft = &tower.transports[index];
             if !shaft.kind.is_elevator()
                 || (shaft.kind.is_staff_only_transport() && !p.staff)
-                || !shaft.stops_at(p.floor)
+                || !tower.stops_at_index(&stops, index, p.floor)
             {
                 continue;
             }

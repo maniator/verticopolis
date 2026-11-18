@@ -75,6 +75,12 @@ pub struct Memo {
     /// Each served floor's passenger transports for the congestion reading
     /// (`Simulation::congestion_shafts`), per revision.
     pub congestion_shafts: Option<(i64, std::sync::Arc<crate::presence::ShaftsByFloor>)>,
+    /// Each transport's stops as a floor set, in list order
+    /// (`Tower::stop_bits`), per edit (#1984).
+    pub stop_bits: Option<(
+        crate::tower_index::IndexKey,
+        crate::tower_stop_bits::StopBits,
+    )>,
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------
