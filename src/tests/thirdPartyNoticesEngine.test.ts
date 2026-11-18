@@ -16,6 +16,8 @@ afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })))
 
 const crate = { name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", hasLicenseFile: true, kind: "crate" };
 const std = { name: "Rust standard library", version: "1.97.0", license: "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib", licenseText: "std text", hasLicenseFile: true, kind: "crate" };
+// The engine ports fflate's deflate (engine-rs/src/fflate.rs), so its record carries fflate's notice (#1356).
+const port = { name: "fflate", version: "0.8.3", license: "MIT", licenseText: "fflate MIT text", hasLicenseFile: true, kind: "port" };
 
 /** A built tree: one bundle of the game's own code, plus the engine package as given. */
 function build(engine: Record<string, string | object> | null, sources = [join(ROOT, "src/main.ts")]): string {
@@ -53,27 +55,29 @@ const engineFiles = (record: string | object | null, sources = "abc", wasm = WAS
 
 describe("the notices generator on a build that ships the WASM engine (#955)", () => {
   it("lists the engine's crates and the Rust standard library from a matching record", () => {
-    const r = run(build(engineFiles({ sources: "abc", crates: [crate, std] })));
+    const r = run(build(engineFiles({ sources: "abc", crates: [crate, std, port] })));
     expect(r.stderr).not.toMatch(/gen-third-party-notices:/);
     expect(r.status).toBe(0);
     expect(r.notices).toContain("serde@1.0.229 (Rust engine crate)");
     expect(r.notices).toContain("Rust standard library@1.97.0 (Rust engine crate)");
+    expect(r.notices).toContain("fflate@0.8.3 (ported into the Rust engine)");
   });
 
   it("fails closed on a missing, stale, malformed or incomplete record", () => {
     const cases: [string, Record<string, string | object>, RegExp][] = [
       ["no record", (({ "THIRD-PARTY.json": _, ...rest }) => rest)(engineFiles(null)), /THIRD-PARTY\.json is missing or not valid JSON/],
-      ["no BUILD.json", (({ "BUILD.json": _, ...rest }) => rest)(engineFiles({ sources: "abc", crates: [crate, std] })), /BUILD\.json is missing or not valid JSON/],
-      ["record from another build", engineFiles({ sources: "old", crates: [crate, std] }), /source hash differs from BUILD\.json/],
-      ["a .wasm from another build", engineFiles({ sources: "abc", crates: [crate, std] }, "abc", "\0asm-other"), /SHA-256 differs/],
+      ["no BUILD.json", (({ "BUILD.json": _, ...rest }) => rest)(engineFiles({ sources: "abc", crates: [crate, std, port] })), /BUILD\.json is missing or not valid JSON/],
+      ["record from another build", engineFiles({ sources: "old", crates: [crate, std, port] }), /source hash differs from BUILD\.json/],
+      ["a .wasm from another build", engineFiles({ sources: "abc", crates: [crate, std, port] }, "abc", "\0asm-other"), /SHA-256 differs/],
       ["invalid JSON", engineFiles("{ not json"), /THIRD-PARTY\.json is missing or not valid JSON/],
-      ["no standard library", engineFiles({ sources: "abc", crates: [crate] }), /does not list the Rust standard library/],
-      ["standard library alone", engineFiles({ sources: "abc", crates: [std] }), /no crate besides the Rust standard library/],
-      ["standard library with another license", engineFiles({ sources: "abc", crates: [crate, { ...std, license: "MIT" }] }), /declares MIT, not/],
-      ["standard library twice", engineFiles({ sources: "abc", crates: [crate, std, std] }), /more than once/],
-      ["a license off the allowlist", engineFiles({ sources: "abc", crates: [{ ...crate, license: "GPL-3.0-only" }, std] }), /not on the allowlist/],
-      ["another file beside the package", { ...engineFiles({ sources: "abc", crates: [crate, std] }), "other.wasm": "\0asm" }, /ships other\.wasm/],
-      ["blank license text", engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std] }), /no license file/],
+      ["no standard library", engineFiles({ sources: "abc", crates: [crate, port] }), /does not list the Rust standard library/],
+      ["standard library alone", engineFiles({ sources: "abc", crates: [std, port] }), /no crate besides the Rust standard library/],
+      ["standard library with another license", engineFiles({ sources: "abc", crates: [crate, { ...std, license: "MIT" }, port] }), /declares MIT, not/],
+      ["standard library twice", engineFiles({ sources: "abc", crates: [crate, std, std, port] }), /more than once/],
+      ["a license off the allowlist", engineFiles({ sources: "abc", crates: [{ ...crate, license: "GPL-3.0-only" }, std, port] }), /not on the allowlist/],
+      ["another file beside the package", { ...engineFiles({ sources: "abc", crates: [crate, std, port] }), "other.wasm": "\0asm" }, /ships other\.wasm/],
+      ["no notice for the fflate port", engineFiles({ sources: "abc", crates: [crate, std] }), /does not list fflate, whose code the engine ports/],
+      ["blank license text", engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std, port] }), /no license file/],
     ];
     for (const [name, files, message] of cases) {
       const r = run(build(files));

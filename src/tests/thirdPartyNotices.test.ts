@@ -17,7 +17,7 @@ import {
   sourceToPath,
   type NoticePackage,
 } from "../build/thirdPartyNotices";
-import { cargoTreePackages, engineRecordPackages, htmlText, shippedCrates, stdLicenseProblems, type CargoMetadata } from "../build/rustNotices";
+import { cargoTreePackages, engineRecordPackages, htmlText, portEntry, portVersionProblems, shippedCrates, stdLicenseProblems, type CargoMetadata } from "../build/rustNotices";
 import { helpAboutBody } from "../ui/templates/helpContent";
 
 /** The header a generated file opens with: the script that wrote it and the package it copies. */
@@ -379,6 +379,52 @@ describe("third-party notices (#951)", () => {
     expect(check({ hasLicenseFile: false })).toMatch(/no license file/);
     expect(check({ licenseText: " " })).toMatch(/no license file/);
     expect(check({ version: undefined })).toMatch(/no version/);
-    expect(check({ kind: "npm" })).toMatch(/not marked as a crate/);
+    expect(check({ kind: "npm" })).toMatch(/not marked as a crate or a port/);
+  });
+
+  it("requires a notice for each npm package the engine ports, and labels it (#1356)", () => {
+    const good = { name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", hasLicenseFile: true, kind: "crate" };
+    const std = { name: "Rust standard library", version: "1.97.0", license: "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib", licenseText: "std text", hasLicenseFile: true, kind: "crate" };
+    const port = { name: "fflate", version: "0.8.3", license: "MIT", licenseText: "fflate MIT text", hasLicenseFile: true, kind: "port" };
+    const shipped = { sources: "abc", wasm: "w", ports: ["fflate"] };
+    const ok = engineRecordPackages({ sources: "abc", wasm: "w", crates: [good, std, port] }, shipped);
+    expect(ok.problems).toEqual([]);
+    expect(ok.packages[2]).toEqual({ name: "fflate", version: "0.8.3", license: "MIT", licenseText: "fflate MIT text", kind: "port" });
+    expect(engineRecordPackages({ sources: "abc", wasm: "w", crates: [good, std] }, shipped).problems).toEqual(["the record does not list fflate, whose code the engine ports"]);
+    // An fflate entry marked as a crate is not the port's notice, and a port alone is not a crate.
+    expect(engineRecordPackages({ sources: "abc", wasm: "w", crates: [good, std, { ...port, kind: "crate" }] }, shipped).problems.join()).toMatch(/does not list fflate/);
+    expect(engineRecordPackages({ sources: "abc", wasm: "w", crates: [std, port] }, shipped).problems.join()).toMatch(/no crate besides/);
+    // The port is held to the same notice checks.
+    expect(engineRecordPackages({ sources: "abc", wasm: "w", crates: [good, std, { ...port, license: "GPL-3.0-only" }] }, shipped).problems.join()).toMatch(/not on the allowlist/);
+    const out = renderNotices([{ name: "fflate", version: "0.8.3", license: "MIT", licenseText: "a", kind: "port" }, { name: "fflate", version: "0.8.3", license: "MIT", licenseText: "a" }]);
+    expect(out).toContain("fflate@0.8.3 (ported into the Rust engine)");
+    expect(out).toMatch(/^fflate@0\.8\.3$/m);
+  });
+
+  it("builds a port's entry from the license vendored beside it, with no node_modules (#1356)", () => {
+    const port = { name: "fflate", version: "0.8.3", license: "MIT", source: "src/fflate.rs", notice: "src/fflate" };
+    const problems: string[] = [];
+    expect(portEntry(port, { licenseText: "", hasLicenseFile: false, problems: [] }, problems)).toBeNull();
+    expect(problems.join()).toMatch(/vendor its license in src\/fflate\//);
+    const unreadable: string[] = [];
+    expect(portEntry(port, { licenseText: "MIT text", hasLicenseFile: true, problems: [{ file: "LICENSE", reason: "is not UTF-8" }] }, unreadable)).not.toBeNull();
+    expect(unreadable).toEqual(["fflate: LICENSE is not UTF-8"]);
+    const found: string[] = [];
+    expect(portEntry(port, { licenseText: "MIT License, Arjun Barrett", hasLicenseFile: true, problems: [] }, found)).toEqual({
+      name: "fflate",
+      version: "0.8.3",
+      license: "MIT",
+      licenseText: "MIT License, Arjun Barrett",
+      hasLicenseFile: true,
+      kind: "port",
+    });
+    expect(found).toEqual([]);
+  });
+
+  it("refuses an installed copy of a ported package at another version (#1356)", () => {
+    const ports = [{ name: "fflate", version: "0.8.3", license: "MIT", source: "src/fflate.rs", notice: "src/fflate" }];
+    expect(portVersionProblems(ports, () => "0.8.3")).toEqual([]);
+    expect(portVersionProblems(ports, () => "0.8.4")).toEqual(["the engine ports fflate 0.8.3, and npm installs 0.8.4: port that version or update ENGINE_PORTS"]);
+    expect(portVersionProblems(ports, () => null)[0]).toMatch(/npm installs no copy/);
   });
 });

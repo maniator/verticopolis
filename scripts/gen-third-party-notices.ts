@@ -49,7 +49,7 @@ import {
 } from "../src/build/thirdPartyNotices.ts";
 import { installedLinkProblems } from "../src/build/installedLinks.ts";
 import { MAPLESS_PUBLIC_SCRIPTS } from "../src/build/publicFiles.ts";
-import { ENGINE_THIRD_PARTY, engineRecordPackages } from "../src/build/rustNotices.ts";
+import { ENGINE_PORTS, ENGINE_THIRD_PARTY, engineRecordPackages, portVersionProblems } from "../src/build/rustNotices.ts";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames.ts";
 import { readLicenseFiles } from "./license-files.ts";
 
@@ -267,6 +267,16 @@ for (const [dir, origin] of dirs) {
 // every engine build writes beside the package. The engine never ships
 // without one: any file under dist/engine/ (the glue, the .wasm, or both)
 // requires it.
+/** The version `npm ci` installed for package `name`, or null. */
+function installedVersion(name: string): string | null {
+  try {
+    const v = (JSON.parse(readFileSync(join(nodeModules, name, "package.json"), "utf8")) as { version?: unknown }).version;
+    return typeof v === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 const engineDir = join(DIST, "engine");
 const ENGINE_FILES = new Set([ENGINE_GLUE, ENGINE_WASM, ENGINE_BUILD_RECORD, ENGINE_THIRD_PARTY]);
 if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(engineDir).length > 0)) {
@@ -291,7 +301,9 @@ if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(
   // The record describes this package and nothing else, so another file here would ship unattributed.
   const extra = statSync(engineDir).isDirectory() ? readdirSync(engineDir).filter((f) => !ENGINE_FILES.has(f)) : [];
   if (extra.length > 0) problems.push(`dist/engine/ ships ${extra.join(", ")}, which the engine's record does not describe`);
-  const engine = engineRecordPackages(read(recordPath), { sources: build?.sources, wasm });
+  const ports = ENGINE_PORTS.filter((p) => existsSync(join(ROOT, "engine-rs", p.source)));
+  problems.push(...portVersionProblems(ports, installedVersion));
+  const engine = engineRecordPackages(read(recordPath), { sources: build?.sources, wasm, ports: ports.map((p) => p.name) });
   problems.push(...engine.problems.map((p) => `${relative(ROOT, recordPath)}: ${p}`));
   packages.push(...engine.packages);
 }
