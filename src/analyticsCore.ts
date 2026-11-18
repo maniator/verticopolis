@@ -248,11 +248,13 @@ export interface GameplayEvents {
    *  `rescue` (the paid helicopter landed on it) or `burnedOut` (nobody
    *  reached it). */
   fire_outcome: { outcome: FireOutcome };
-  /** Per-session summary of the SIMULATION-fired emergency activity: how many fire
+  /** Per-window summary of the SIMULATION-fired emergency activity: how many fire
    *  outbreaks ignited, how many rooms they gutted, and how many bombs detonated.
-   *  Emitted once at session end like `session_builds`, and emitted EVEN WHEN ALL
-   *  ZERO so "fraction of sessions that had a fire" has its denominator. Counts
-   *  only, never a currency figure. */
+   *  Emitted once at the end of each reporting window (a page life, or a stretch
+   *  restored from the back/forward cache), and EVEN WHEN ALL ZERO so "fraction
+   *  of sessions that had a fire" has its denominator. One session can send
+   *  several rows, so read it per `distinct_id`. Counts only, never a currency
+   *  figure. */
   session_emergencies: { fires: number; firesGutRooms: number; bombs: number };
   /** How many crash screens this page life showed, counted before the `crash`
    *  event's cap and dedup so a loop's size survives (#841). Sent once, at the

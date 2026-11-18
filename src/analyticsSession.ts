@@ -107,7 +107,7 @@ class GameplaySession {
    *  the old counter sampler sat), i.e. the game actually ran. Gates `session_emergencies` so a no-play prerender/hide (the
    *  frame loop never ran) does not emit a spurious zero into the denominator. */
   private played = false;
-  /** `session_emergencies` fires at most once per session (like the depth events). */
+  /** `session_emergencies` fires at most once per reporting window. */
   private emergReported = false;
   /** See {@link setEngineFlush}. */
   private engineFlush: ((closing: boolean) => void) | null = null;
@@ -358,7 +358,7 @@ class GameplaySession {
         speed: cost.speed,
       });
     }
-    // Per-session emergency summary, emitted once per session that actually
+    // Emergency summary, emitted once per reporting window that actually
     // played (the frame loop ran). Unlike the depth/fps events it is NOT gated
     // on any count being nonzero: "fraction of sessions with a fire" needs the
     // zero-emergency sessions in the denominator. The total sums every tower the

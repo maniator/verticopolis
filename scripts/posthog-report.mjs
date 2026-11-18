@@ -676,9 +676,9 @@ async function main() {
   const economyByAction = await bd("economy_action_by_action", "economy_action", "action");
   const emergencyByKind = await bd("emergency_choice_by_kind", "emergency_choice", "kind");
   const emergencyByDecision = await bd("emergency_choice_by_decision", "emergency_choice", "decision");
-  // Fire rate: the session_emergencies rows with at least one fire, over all
-  // session_emergencies (emitted once per played session), gives "% of sessions
-  // with a fire". `fires` is a server-trusted integer prop, not user input.
+  // Fire rate: the sessions (distinct_id) with a session_emergencies row that
+  // saw a fire, over the sessions that sent any. Rows come once per played
+  // reporting window, so a session can send several; the rate reads sessions. `fires` is a server-trusted integer prop, not user input.
   const firesRes = await q("session_emergencies_with_fire", buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", WINDOW.hours));
   const firesWithFire = countRow(firesRes);
 
@@ -805,7 +805,7 @@ async function main() {
             // query failed while totals succeeded; carries the hint like the rest.
             ok: firesRes.ok,
             hint: firesRes.hint,
-            caption: "Fire occurrence (session_emergencies emits once per played session)",
+            caption: "Fire occurrence (one session_emergencies row per played window; read the sessions column)",
             header: "Metric",
             rows: [
               { key: "Sessions with a fire", events: firesWithFire.events, sessions: firesWithFire.sessions },

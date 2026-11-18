@@ -55,6 +55,16 @@ describe("SimCostTally", () => {
     expect(t.peakPopulation).toBe(12_000); // the fps label still names the biggest tower drawn
   });
 
+  it("labels the fps with the population of running frames, never a big tower only seen paused", () => {
+    const t = new SimCostTally();
+    let clock = 0;
+    t.note(0, clock, 15, 300, TOWER);
+    for (let i = 0; i < 120; i++) t.note(1, (clock += 1), 15, 300, TOWER); // played at 300 people
+    for (let i = 0; i < 120; i++) t.note(0, 0, 0, 12_000, TOWER + 1); // opened a big tower and left it paused
+    expect(t.peakPopulation).toBe(300);
+    expect(t.mainSpeed()).toBe(15);
+  });
+
   it("names the speed by game time stepped for the cost, and by running frames for the fps", () => {
     const t = new SimCostTally();
     let clock = 0;

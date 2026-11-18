@@ -72,13 +72,6 @@ function inAction(values) {
   return { key: "action", operator: "exact", type: "event", value: values };
 }
 
-/** A `where` clause keeping only events whose numeric `prop` exceeds `n`
- *  (e.g. session_emergencies with at least one fire, for the "% of sessions with
- *  a fire" numerator). */
-function whereGt(prop, n) {
-  return { key: prop, operator: "gt", type: "event", value: n };
-}
-
 /** One event series node. `math` may be a count math ("total"/"dau") or a
  *  property percentile ("median"/"p90"/"p95") paired with `prop`. */
 function series(event, name, math = "total", prop) {
@@ -876,20 +869,44 @@ function buildInsights(ids) {
     },
     {
       name: "Per-session emergency severity (avg)",
-      description: "session_emergencies averaged per session: mean fire outbreaks, rooms gutted by fire, and bomb detonations, production. Emitted every session (zeros included), so this is a true per-session mean.",
-      query: trends(
+      description:
+        "Mean fire outbreaks, rooms gutted by fire and bomb detonations per session (distinct per-tab session id), production, 30d. A session's rows are summed first: it sends one session_emergencies row per page life, and from the release after 4.13.1 one more for the play after a back/forward-cache restore (#621), and each fire lands in exactly one row, so the sum is the session's total. Zeros included, so it is a true per-session mean. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+      query: hogql(
         [
-          series("session_emergencies", "Avg fires", "avg", "fires"),
-          series("session_emergencies", "Avg rooms gutted", "avg", "firesGutRooms"),
-          series("session_emergencies", "Avg bombs", "avg", "bombs"),
-        ],
-        { display: "ActionsBar" },
+          "SELECT",
+          "    round(avg(fires), 3) AS avg_fires,",
+          "    round(avg(gutted), 3) AS avg_rooms_gutted,",
+          "    round(avg(bombs), 3) AS avg_bombs,",
+          "    count() AS sessions",
+          "FROM (",
+          "    SELECT",
+          "        distinct_id,",
+          "        sum(toFloat(properties.fires)) AS fires,",
+          "        sum(toFloat(properties.firesGutRooms)) AS gutted,",
+          "        sum(toFloat(properties.bombs)) AS bombs",
+          "    FROM events",
+          "    WHERE event = 'session_emergencies'",
+          "      AND properties.environment = 'production'",
+          "      AND timestamp >= now() - INTERVAL 30 DAY",
+          "    GROUP BY distinct_id",
+          ")",
+        ].join("\n"),
       ),
     },
     {
       name: "Sessions with a fire (30d)",
-      description: "session_emergencies with at least one fire, production, 30d. The numerator for 'fraction of sessions that had a fire' (divide by total session_emergencies, which is emitted once per played session).",
-      query: trends([series("session_emergencies", "Sessions with a fire")], { display: "BoldNumber", where: [whereGt("fires", 0)] }),
+      description:
+        "Sessions (distinct per-tab session ids) with a session_emergencies row showing at least one fire, production, 30d. The numerator for 'fraction of sessions that had a fire'; the denominator is the 'Sessions reporting emergencies' tile. Counted per session, so a session that reloads, or plays on after a back/forward-cache restore (#621), still counts once. Its 30-day window is fixed in the SQL.",
+      query: hogql(
+        [
+          "SELECT uniqIf(distinct_id, toFloat(properties.fires) > 0) AS sessions_with_a_fire",
+          "FROM events",
+          "WHERE event = 'session_emergencies'",
+          "  AND properties.environment = 'production'",
+          "  AND timestamp >= now() - INTERVAL 30 DAY",
+        ].join("\n"),
+        { display: "BoldNumber" },
+      ),
     },
     {
       name: "How fires end",
@@ -898,8 +915,18 @@ function buildInsights(ids) {
     },
     {
       name: "Sessions reporting emergencies (30d)",
-      description: "Total session_emergencies, production, 30d. Emitted once per played session (zeros included), so it is the denominator for the fire / bomb rates.",
-      query: trends([series("session_emergencies", "Sessions")], { display: "BoldNumber" }),
+      description:
+        "Sessions (distinct per-tab session ids) that sent a session_emergencies row, production, 30d. Every played page life sends one (zeros included), so this is the denominator for the fire and bomb rates. Counted per session, so reloads and back/forward-cache restores (#621) do not inflate it. Its 30-day window is fixed in the SQL.",
+      query: hogql(
+        [
+          "SELECT uniq(distinct_id) AS sessions",
+          "FROM events",
+          "WHERE event = 'session_emergencies'",
+          "  AND properties.environment = 'production'",
+          "  AND timestamp >= now() - INTERVAL 30 DAY",
+        ].join("\n"),
+        { display: "BoldNumber" },
+      ),
     },
   ];
 }

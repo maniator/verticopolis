@@ -97,7 +97,7 @@ an event sent before boot carries `version` only.
 | `emergency_choice` | `kind`, `decision` | An answered emergency prompt | Accept and decline split |
 | `bomb_outcome` | `outcome` | A bomb threat ends: `paid`, `found` or `exploded` | How bomb threats end, and whether Security wins the race |
 | `fire_outcome` | `outcome` | A fire ends: `security` (guards reached it by the stairs), `rescue` (the paid helicopter landed) or `burnedOut` (nobody reached it), since #1889 | How fires end, and whether Security or the helicopter does the work |
-| `session_emergencies` | `fires`, `firesGutRooms`, `bombs` | Session end | How often emergencies happen |
+| `session_emergencies` | `fires`, `firesGutRooms`, `bombs` | End of each played reporting window | How often emergencies happen, read per session (`distinct_id`) |
 | `session_crashes` | `crashes` | Terminal page hide, only when a crash screen showed (approved 2026-11-03, #841) | How many crash screens a page life showed, which the capped `crash` rows cannot say |
 | `file_imported` | `format`, `mode`, `star`, `population` | A `.vctower` or `.TDT` import finished and its tower is open (approved 2026-11-13) | Whether imports succeed, per format; `import_failed` (below) counts the refusals |
 | `file_exported` | `format`, `mode`, `star`, `population` | A `.vctower` or `.TDT` download was handed to the browser (approved 2026-11-13) | Whether exports succeed, per format; `export_failed` (below) counts the refusals |

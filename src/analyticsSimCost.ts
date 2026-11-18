@@ -69,9 +69,11 @@ export class SimCostTally {
    *  minutes after it, `speed` the minutes per second it ran at, the tower's
    *  population, and `tower` the engine generation the frame read. */
   note(ms: number, clock: number, speed: number, population: number, tower: number): void {
-    if (Number.isFinite(population) && population > this.peak) this.peak = population;
     const running = Number.isFinite(speed) && speed > 0;
-    if (running) this.framesBySpeed.set(speed, (this.framesBySpeed.get(speed) ?? 0) + 1);
+    if (running) {
+      this.framesBySpeed.set(speed, (this.framesBySpeed.get(speed) ?? 0) + 1);
+      if (Number.isFinite(population) && population > this.peak) this.peak = population;
+    }
     const prev = this.lastClock;
     const sameTower = tower === this.lastTower;
     this.lastClock = Number.isFinite(clock) ? clock : null;
@@ -91,7 +93,8 @@ export class SimCostTally {
     this.lastClock = null;
   }
 
-  /** The highest population seen this window. */
+  /** The highest population on a running frame this window, so it labels the
+   *  same frames the fps samples. A tower only opened or paused never counts. */
   get peakPopulation(): number {
     return this.peak;
   }
