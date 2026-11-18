@@ -126,13 +126,11 @@ pub fn fold_origins(
 
 #[doc(hidden)]
 impl Simulation {
-    /// `sampleElevatorUtil`: fold this hour's car occupancy into each
-    /// elevator's demand ring and (passenger shafts only) its utilization
-    /// average, fold the ended hour's boardings into its origin rings, and
-    /// forget shafts that have been removed.
+    /// `sampleElevatorUtil`: fold the car occupancy and lines at the top of
+    /// the hour into each elevator's demand ring and (passenger shafts only)
+    /// its utilization average, fold the ended hour's boardings into its
+    /// origin rings, and forget shafts that have been removed.
     pub fn sample_elevator_util(&mut self) {
-        let hour = self.clock.hour().rem_euclid(24) as usize;
-        let weekend = self.clock.is_weekend();
         let mut boardings = self.elevators.drain_boardings();
         // The crowd's riders are outside the dispatch's estimate, so their
         // boardings join the estimate's here (#477): a cinema's evening
@@ -150,6 +148,9 @@ impl Simulation {
         let cal = &self.clock.calendar;
         let prev_dow = ((prev_minutes / 1440.0).floor().max(0.0) as i64) % cal.week_days;
         let origin_weekend = prev_dow >= cal.week_days - cal.weekend_days;
+        // The riders and lines at H:00 built up in the hour that ended, so
+        // they count there, as its boardings do: 7 AM reads the 8:00 crowd.
+        let (hour, weekend) = (origin_hour as usize, origin_weekend);
         let tel = &mut self.telemetry;
         let mut alive_util: Vec<i64> = Vec::new();
         let mut alive_hourly: Vec<i64> = Vec::new();

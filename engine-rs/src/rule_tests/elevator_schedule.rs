@@ -218,13 +218,15 @@ fn each_day_type_samples_into_its_own_ring_both_ways() {
     let mut sim = tower_with_elevator();
     let id = shaft(&sim).id;
     sim.tower.transports[0].car_load = Some(vec![5.0, 5.0]);
-    sim.clock.minutes = 8.0 * HOUR; // day 0, a weekday
+    // The sample at 9:00 is the 8 AM hour's: day 0, a weekday.
+    sim.clock.minutes = 9.0 * HOUR;
     sim.sample_elevator_util();
     let (weekday, weekend) = hourly(&sim, id);
     assert!(weekday[8] > 0.0);
+    assert_eq!(weekday[9], 0.0, "not the hour just starting");
     assert_eq!(weekend[8], 0.0);
     sim.tower.transports[0].car_load = Some(vec![1.0, 1.0]);
-    sim.clock.minutes = 5.0 * DAY + 8.0 * HOUR; // day 5, Saturday
+    sim.clock.minutes = 5.0 * DAY + 9.0 * HOUR; // day 5, Saturday
     sim.sample_elevator_util();
     let (weekday_after, weekend) = hourly(&sim, id);
     assert!(weekend[8] > 0.0);
@@ -232,6 +234,20 @@ fn each_day_type_samples_into_its_own_ring_both_ways() {
         weekday_after[8], weekday[8],
         "the weekday ring is untouched"
     );
+}
+
+#[test]
+fn the_sample_at_midnight_is_the_last_hour_of_the_day_before() {
+    let mut sim = tower_with_elevator();
+    let id = shaft(&sim).id;
+    sim.tower.transports[0].car_load = Some(vec![5.0, 5.0]);
+    // Saturday's midnight closes Friday (day 4, a weekday) at 11 PM.
+    sim.clock.minutes = 5.0 * DAY;
+    assert!(sim.clock.is_weekend());
+    sim.sample_elevator_util();
+    let (weekday, weekend) = hourly(&sim, id);
+    assert!(weekday[23] > 0.0, "{weekday:?}");
+    assert!(weekend.iter().all(|&v| v == 0.0), "{weekend:?}");
 }
 
 #[test]
@@ -248,7 +264,8 @@ fn the_canon_calendar_splits_its_weekend_day_too() {
     );
     let id = shaft(&sim).id;
     sim.tower.transports[0].car_load = Some(vec![4.0, 4.0]);
-    sim.clock.minutes = 2.0 * DAY + 9.0 * HOUR; // the canon weekend day
+    // The sample at 10:00 on the canon weekend day is its 9 AM hour's.
+    sim.clock.minutes = 2.0 * DAY + 10.0 * HOUR;
     assert!(sim.clock.is_weekend());
     sim.sample_elevator_util();
     let (weekday, weekend) = hourly(&sim, id);

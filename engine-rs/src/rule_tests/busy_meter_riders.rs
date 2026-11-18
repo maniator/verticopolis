@@ -54,7 +54,8 @@ fn a_venue_crowd_that_fills_a_car_reads_as_a_full_shaft() {
         .iter()
         .filter(|p| p.state == PState::Riding);
     assert_eq!(riding.count(), seats, "the car took the whole crowd");
-    sim.clock.minutes = EVENING as f64 * 60.0;
+    // The top of the next hour closes the evening hour the car filled in.
+    sim.clock.minutes = (EVENING + 1) as f64 * 60.0;
     sim.sample_elevator_util();
     assert_eq!(sim.telemetry.hourly[&id].weekday[EVENING], 1.0);
     assert_eq!(sim.telemetry.util[&id], 1.0);
