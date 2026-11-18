@@ -152,12 +152,13 @@ fn twin_shafts_running_alike_draw_as_before() {
     }
 }
 
-/// A shaft on Auto takes the share of the cars the dispatch ran, not of its
-/// row: Modern runs every car while anyone waits, so a row of one car beside
-/// an eight-car twin still splits the riders evenly once all eight run, and
-/// takes a one-car share again when the dispatch stands seven down.
+/// A shaft on Auto takes its whole fleet's share, whatever its row or the
+/// cars the dispatch parked: Modern sends every car out once anyone waits,
+/// so a row of one car beside an eight-car twin splits the riders evenly.
+/// Sized by its parked cars, it took a one-car share, nobody waited at its
+/// stops, and its cars never came out (split-tower 32).
 #[test]
-fn an_auto_shaft_shares_riders_by_the_cars_the_dispatch_ran() {
+fn an_auto_shaft_shares_riders_by_its_whole_fleet() {
     let (mut sim, ids) = one_shaft_cut_to_one_car();
     if let Some(s) = sim.tower.transports.iter_mut().find(|t| t.id == ids[0]) {
         s.schedule.as_mut().expect("the row set above").auto_tune = true;
@@ -166,30 +167,13 @@ fn an_auto_shaft_shares_riders_by_the_cars_the_dispatch_ran() {
     crowd.hour = Some(12);
     crowd.weekend = false;
     let n = 1800;
-    // Every car ran last chunk: nothing stood down.
     let all = rides_on(&mut crowd, &sim, ids[0], n) as f64 / n as f64;
     assert!((all - 0.5).abs() < 0.05, "the Auto shaft took {all:.3}");
-    // Seven of its cars stood down.
-    crowd.closed_cars = (1..8).map(|car| (ids[0], car)).collect();
-    let one = rides_on(&mut crowd, &sim, ids[0], n) as f64 / n as f64;
-    assert!(
-        (one - 1.0 / 9.0).abs() < 0.03,
-        "the Auto shaft took {one:.3}"
-    );
-    // Every car stood down still counts one, so riders keep coming.
+    // Every car parked: the shaft still takes an even share.
     crowd.closed_cars = (0..8).map(|car| (ids[0], car)).collect();
-    let none = rides_on(&mut crowd, &sim, ids[0], n) as f64 / n as f64;
+    let parked = rides_on(&mut crowd, &sim, ids[0], n) as f64 / n as f64;
     assert!(
-        (none - 1.0 / 9.0).abs() < 0.03,
-        "the Auto shaft took {none:.3}"
+        (parked - 0.5).abs() < 0.05,
+        "the parked Auto shaft took {parked:.3}"
     );
-}
-
-#[test]
-fn stood_down_cars_counts_one_shafts_rows() {
-    let closed = [(2, 0), (2, 5), (4, 1), (4, 2), (4, 7), (9, 3)];
-    assert_eq!(super::stood_down_cars(&closed, 4), 3);
-    assert_eq!(super::stood_down_cars(&closed, 2), 2);
-    assert_eq!(super::stood_down_cars(&closed, 3), 0);
-    assert_eq!(super::stood_down_cars(&[], 4), 0);
 }
