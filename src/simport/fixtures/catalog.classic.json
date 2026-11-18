@@ -2069,6 +2069,7 @@
     }
   ],
   "rules": {
+    "advisesFixes": false,
     "announcesStarDuties": false,
     "buildsWhilePaused": false,
     "decorativePassersBy": false,
@@ -2117,7 +2118,7 @@
     "variantHouseholds": false,
     "venueFlights": false
   },
-  "version": 24,
+  "version": 25,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

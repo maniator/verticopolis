@@ -40,7 +40,7 @@ export interface CatalogTicketPrice {
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 24;
+export const CATALOG_VERSION = 25;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -157,21 +157,21 @@ export interface CatalogRules extends CatalogStarDutyRules, CatalogSkyBridgeRule
   /** Whether the build preview names the engine's refusal before the click.
    *  When false the refusal shows only once a click is refused. */
   readonly previewNamesRefusal: boolean;
-  /** Whether the elevator schedule's assisted tools answer: the intent
-   *  presets, auto-tune and the staffing advice. When false the schedule is
-   *  the manual grid only and each assisted query is refused. */
+  /** Whether the elevator schedule's assisted tools answer: the intent presets, auto-tune and the
+   *  staffing advice. When false the schedule is the manual grid only and each assisted query is refused. */
   readonly scheduleAssist: boolean;
-  /** Whether the player may place new construction while the game is
-   *  paused. When false a placement at speed 0 is refused with a note to
-   *  unpause; the engine itself has no paused state. */
+  /** Whether the player may place new construction while the game is paused. When false a placement
+   *  at speed 0 is refused with a note to unpause; the engine itself has no paused state. */
   readonly buildsWhilePaused: boolean;
-  /** Whether the tower can be exported for SimTower (1994) as a `.TDT`.
-   *  When false the export dialog disables that choice with the reason, and
-   *  the engine's `.TDT` export refuses the tower. */
+  /** Whether the tower can be exported for SimTower (1994) as a `.TDT`. When false the export dialog
+   *  disables that choice with the reason, and the engine's `.TDT` export refuses the tower. */
   readonly exportsTo1994: boolean;
   /** Whether the tenant card's lobby warning quotes the floors to the
    *  nearest lobby. When false it names the problem without the number. */
   readonly quotesLobbyDistance: boolean;
+  /** Whether a card or notice that names a problem also says what to do about it (#549). When
+   *  false it states the cause only, as the 1994 game's inspector did. */
+  readonly advisesFixes: boolean;
   /** Whether a sky lobby may rise more than one story (#308). The ground lobby always may,
    *  up to `maxLobbyHeight`; when false it is the only one that can. */
   readonly tallSkyLobbies: boolean;

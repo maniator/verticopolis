@@ -44,7 +44,7 @@ function unitEditor(u: UnitDetail, opts: { mode?: GameMode; mobile?: boolean; ho
 }
 
 function transportEditor(t: TransportDetail, mobile = false): TemplateResult {
-  return transportEditorTemplate(t, catalogFor("classic"), mobile ? transportLoadLines(t.utilization ?? undefined, t.nearCapacity) : []);
+  return transportEditorTemplate(t, catalogFor("classic"), mobile ? transportLoadLines(t.utilization ?? undefined, t.nearCapacity, false) : []);
 }
 
 const maxCars = (kind: FacilityKind) => catalogFacility(catalogFor("classic"), kind).maxCars!;

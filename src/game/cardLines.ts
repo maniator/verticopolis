@@ -39,10 +39,13 @@ export function occupantsText(occupants: number, full: number, workersComing: nu
 
 /** Format a measured passenger-elevator load for the hover card and mobile
  * editor. The engine supplies the load and its near-capacity verdict; the frontend only words them.
- * Staff-only service elevators, stairs and escalators provide no load reading. */
-export function transportLoadLines(util: number | null | undefined, near: boolean): TemplateResult[] {
+ * Staff-only service elevators, stairs and escalators provide no load reading.
+ * `advises` is the catalog's `rules.advisesFixes`. */
+export function transportLoadLines(util: number | null | undefined, near: boolean, advises: boolean): TemplateResult[] {
   if (util === undefined || util === null || !Number.isFinite(util)) return [];
+  // The catalog's `rules.advisesFixes` (#549): Classic names the cause only.
+  const fix = advises ? "; consider more cars or a parallel shaft" : "";
   return [
-    html`<div style="color:${near ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${near ? ". Near capacity; consider more cars or a parallel shaft." : ""}</div>`,
+    html`<div style="color:${near ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${near ? `. Near capacity${fix}.` : ""}</div>`,
   ];
 }

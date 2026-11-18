@@ -115,14 +115,17 @@ test.describe("Rust service diagnostics in the real browser", () => {
       (window as any).game.inspector.inspectPicked({ type: "transport", id, kind });
     }, { id: fixture.id, kind: fixture.kind });
     await expect(page.locator("#inspector")).toContainText(`Avg load: ${readout.pct}% full`);
-    await expect(page.locator("#inspector")).toContainText("Near capacity; consider more cars or a parallel shaft.");
+    // A Classic tower names the problem without the fix (#549).
+    await expect(page.locator("#inspector")).toContainText("Near capacity.");
+    await expect(page.locator("#inspector")).not.toContainText("consider more cars");
 
     await page.setViewportSize({ width: 390, height: 700 });
     await page.evaluate(({ id, kind }) => {
       (window as any).game.selectPicked({ type: "transport", id, kind });
     }, { id: fixture.id, kind: fixture.kind });
     await expect(page.locator("#editor .ed-diagnostics")).toContainText(`Avg load: ${readout.pct}% full`);
-    await expect(page.locator("#editor .ed-diagnostics")).toContainText("Near capacity; consider more cars or a parallel shaft.");
+    await expect(page.locator("#editor .ed-diagnostics")).toContainText("Near capacity.");
+    await expect(page.locator("#editor .ed-diagnostics")).not.toContainText("consider more cars");
   });
 
   test("desktop inspector renders Rust hotel and connected/disconnected garage verdicts", async ({ page }) => {

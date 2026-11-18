@@ -24,7 +24,7 @@
     {"id":10020,"kind":"daycare","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
     {"id":10021,"kind":"security","floor":7,"lines":[]},
     {"id":10022,"kind":"medical","floor":7,"lines":[]},
-    {"id":10023,"kind":"housekeeping","floor":7,"lines":["Fields 6 maids, each cleaning up to ~19 rooms a day when travel is short. Tower: 1 crew (6 maids) for 3 hotel room(s).","3 room(s) are out of staff reach and can never be cleaned. Extend a service elevator or stairs to their floors."]},
+    {"id":10023,"kind":"housekeeping","floor":7,"lines":["Fields 6 maids, each cleaning up to ~19 rooms a day when travel is short. Tower: 1 crew (6 maids) for 3 hotel room(s).","3 room(s) are out of staff reach and can never be cleaned."]},
     {"id":10024,"kind":"rentalStudio","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
     {"id":10025,"kind":"rentalApartment","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor."]}
   ],

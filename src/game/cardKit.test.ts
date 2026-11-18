@@ -58,7 +58,7 @@ const facts = (id: number, over: Record<string, number> = {}) =>
 
 /** A tower with a recycling center in the basement and an occupied office on
  *  floor 2 that no elevator reaches; each answer can be changed by the test. */
-function tower() {
+function tower(mode: "classic" | "modern" = "classic") {
   const state = {
     center: card(CENTER, "recycling", -1),
     office: card(OFFICE, "office", 2, { served: 0, reachable: 0 }),
@@ -106,7 +106,7 @@ function tower() {
       weekendDays: 2,
       population: 40,
       star: 2,
-      mode: "classic",
+      mode,
     },
     tower: { revision: 1 },
   } as unknown as ViewReader & {
@@ -148,7 +148,10 @@ describe("the card kit's unit and shaft lines over the port", () => {
   it("shows the shaft's average load warning from its port record, with the engine's verdict", () => {
     const { state, kit } = tower();
     const copy = (id: number) => text(kit.diagnostics.transport(id));
-    expect(copy(SHAFT)).toContain(
+    // A Classic card names the load only; Modern's adds the fix (#549).
+    expect(copy(SHAFT)).toContain("Avg load: 91% full. Near capacity.");
+    expect(copy(SHAFT)).not.toContain("consider more cars");
+    expect(text(tower("modern").kit.diagnostics.transport(SHAFT))).toContain(
       "Avg load: 91% full. Near capacity; consider more cars or a parallel shaft.",
     );
     expect(copy(SHAFT)).toContain("var(--bad)");
@@ -206,8 +209,8 @@ describe("the card kit's unit and shaft lines over the port", () => {
       gripeCause: code("vacateReasons", "rent"),
     };
     const unit = kit.cards.unit(OFFICE)!;
-    const copy =
-      "Main gripe: the rent is above the going rate. Lower it to keep them.";
+    // The kit's tower is Classic, whose card names the cause only (#549).
+    const copy = "Main gripe: the rent is above the going rate.";
     const mobile = renderToFragment(
       unitEditorTemplate(
         unit,
@@ -229,6 +232,7 @@ describe("the card kit's unit and shaft lines over the port", () => {
       copy,
     );
     expect(desktop.textContent).toContain(copy);
+    expect(desktop.textContent).not.toContain("Lower it");
   });
 
   it("does not recalculate the engine's grievance facts on every 160ms editor refresh", () => {

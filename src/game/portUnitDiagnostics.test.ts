@@ -25,7 +25,7 @@ function text(lines: TemplateResult[]): string {
   return lines.map(({ strings, values }) => strings.map((part, i) => part + (i < values.length ? String(values[i]) : "")).join("")).join("\n");
 }
 /** The catalog rules a card reads; Modern's answer unless a test says otherwise. */
-const MODERN_RULES = () => ({ quotesLobbyDistance: true });
+const MODERN_RULES = () => ({ quotesLobbyDistance: true, advisesFixes: true });
 function render(record: Float64Array, id = 73, supplemental?: () => SupplementalLines, rules = MODERN_RULES): string {
   const diag = createPortUnitDiagnostics({
     viewLayout: () => LAYOUT_TEXT,
@@ -149,18 +149,18 @@ describe("Rust port tenant explanations", () => {
 
   it("quotes the lobby distance only where the catalog's rules say to", () => {
     const record = facts({ lobby: 1, sinking: 1, lobbyDistance: 13 });
-    const quoting = vi.fn(() => ({ quotesLobbyDistance: true }));
-    const silent = vi.fn(() => ({ quotesLobbyDistance: false }));
+    const quoting = vi.fn(() => ({ quotesLobbyDistance: true, advisesFixes: true }));
+    const silent = vi.fn(() => ({ quotesLobbyDistance: false, advisesFixes: true }));
     expect(render(record, 73, undefined, quoting)).toContain("Too far from any lobby: 13 floors.");
     const unquoted = render(record, 73, undefined, silent);
     expect(unquoted).toContain("Too far from any lobby. ");
     expect(unquoted).not.toContain("13 floors");
-    expect(quoting).toHaveBeenCalled();
     expect(silent).toHaveBeenCalled();
-    // A card with no lobby warning never asks.
+    // A card reads the rules once, lobby warning or not.
+    expect(quoting).toHaveBeenCalledTimes(1);
     const asked = vi.fn(MODERN_RULES);
     render(facts({ access: code("accessLines", "reachable") }), 73, undefined, asked);
-    expect(asked).not.toHaveBeenCalled();
+    expect(asked).toHaveBeenCalledTimes(1);
   });
 
   it("distinguishes an empty unit held by the move-in gate from an on-notice tenant", () => {

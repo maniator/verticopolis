@@ -53,6 +53,7 @@ pub fn catalog(mode: GameMode) -> Catalog {
             builds_while_paused: mode.builds_while_paused(),
             exports_to_1994: mode.exports_to_1994(),
             quotes_lobby_distance: mode.quotes_lobby_distance(),
+            advises_fixes: mode.advises_fixes(),
             tall_sky_lobbies: mode.raises_sky_lobbies(),
             decorative_passers_by: mode.shows_passers_by(),
             shaded_look: mode.shaded_look(),

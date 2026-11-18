@@ -40,7 +40,7 @@ const HOUSEKEEPING: ServiceDiagnosticFacts = {
 const SHOP: ServiceDiagnosticFacts = { ...NONE, retail: { active: true, today: 3, barWidth: 1, tier: "low", localDemandPct: null, advice: "none", profitYest: 100, rainy: false } };
 
 /** A kit whose port answers one occupied unit of `kind` with `facts`. */
-function kitFor(kind: string, facts: ServiceDiagnosticFacts | undefined) {
+function kitFor(kind: string, facts: ServiceDiagnosticFacts | undefined, mode: "classic" | "modern" = "classic") {
   const port = mockPort({
     unitCard: () => record("unitCard", { id: ID, kindCode: code("kinds", kind), floor: 2, x: 170, width: 9, stateCode: code("unitStates", "occupied"), rent: NaN, price: 0, vacateReason: NaN, filmPolicy: NaN, blockbuster: NaN, served: 1, reachable: 1, floorHasLobby: 1 }),
     unitLabel: () => undefined,
@@ -49,7 +49,7 @@ function kitFor(kind: string, facts: ServiceDiagnosticFacts | undefined) {
     serviceDiagnostics: () => facts,
     generation: () => 1,
   });
-  const header = { revision: 1, minutes: 600, minuteOfDay: 600, population: 100, star: 4, mode: "classic" };
+  const header = { revision: 1, minutes: 600, minuteOfDay: 600, population: 100, star: 4, mode };
   const reader = { header, tower: { revision: 1 } } as unknown as ViewReader;
   const kit = createCardKit({ enginePort: port, reader });
   const copy = (fresh = true) => renderToFragment(html`${kit.diagnostics.unit(ID, fresh)}`).textContent ?? "";
@@ -68,9 +68,13 @@ describe("service sections on a unit's card", () => {
       expect(target).toContain("Left dirty for 3 days");
     }
     expect(copy()).toContain("Left dirty for 3 days");
-    const infested = kitFor("hotelSingle", INFESTED_HOTEL).copy();
+    // Only a Modern card says what to do about it (#549).
+    const infested = kitFor("hotelSingle", INFESTED_HOTEL, "modern").copy();
     expect(infested).toContain("Cockroach infested");
     expect(infested).toContain("Call an exterminator");
+    const classic = kitFor("hotelSingle", INFESTED_HOTEL).copy();
+    expect(classic).toContain("Cockroach infested: neglected too long. It can't be cleaned.");
+    expect(classic).not.toContain("Call an exterminator");
   });
 
   it("reads the engine's facts once until it is told the tower moved, and never repeats a line", () => {
