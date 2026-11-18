@@ -50,8 +50,10 @@ const JSON_BYTES: &[u8] = b"{}[],:\"0-.e\\ ";
 /// (`elevatorLoad`) on top of main's newer saves. No reader disagreement
 /// came with it. 154 became 160 when the cars' timers started carrying
 /// the estimate's seats in each car (`estimateSeats`, #2397), for that
-/// reason again.
-const STREAMED: usize = 160;
+/// reason again. 160 became 148 when an Auto shaft's load rings started
+/// carrying the demand at the top of the hour (`hourStart`, #2466), for
+/// that reason again.
+const STREAMED: usize = 148;
 
 /// Seeded edits of engine saves, a few bytes each: dropped, inserted,
 /// changed or copied, or the text cut short. Whatever comes out, both

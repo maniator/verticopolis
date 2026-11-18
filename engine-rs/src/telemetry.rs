@@ -11,56 +11,16 @@ use serde_json::{json, Value};
 
 use crate::sim::Simulation;
 
+#[path = "telemetry_hourly.rs"]
+mod hourly;
+pub use hourly::HourlyByDay;
+
 pub const ORIGIN_HOURS: usize = 24;
 /// `PRUNE_BELOW`: a floor whose EMA'd boarding count decays below this leaves
 /// the slot.
 const PRUNE_BELOW: f64 = 0.05;
 /// `Number.MAX_SAFE_INTEGER`: the largest id a seed may carry.
 const MAX_SAFE_INTEGER: f64 = 9007199254740991.0;
-
-/// `HourlyByDay`: one shaft's demand curve per day type, a 24-slot ring each,
-/// with the hours each ring has sampled. A sampled hour can hold a measured
-/// zero (a dead weekend), which a slot's value alone cannot tell from an hour
-/// not yet sampled (#474).
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct HourlyByDay {
-    pub weekday: Vec<f64>,
-    pub weekend: Vec<f64>,
-    pub weekday_sampled: Vec<bool>,
-    pub weekend_sampled: Vec<bool>,
-}
-
-impl HourlyByDay {
-    fn empty() -> HourlyByDay {
-        HourlyByDay {
-            weekday: vec![0.0; 24],
-            weekend: vec![0.0; 24],
-            weekday_sampled: vec![false; 24],
-            weekend_sampled: vec![false; 24],
-        }
-    }
-
-    /// Rings from their values alone, as a seeded curve gives them: an hour
-    /// with a load is a sampled hour.
-    pub fn measured(weekday: Vec<f64>, weekend: Vec<f64>) -> HourlyByDay {
-        let loaded = |ring: &[f64]| ring.iter().map(|v| *v > 0.0).collect();
-        HourlyByDay {
-            weekday_sampled: loaded(&weekday),
-            weekend_sampled: loaded(&weekend),
-            weekday,
-            weekend,
-        }
-    }
-
-    /// One day type's ring and the hours it has sampled.
-    pub fn day(&self, weekend: bool) -> (&[f64], &[bool]) {
-        if weekend {
-            (&self.weekend, &self.weekend_sampled)
-        } else {
-            (&self.weekday, &self.weekday_sampled)
-        }
-    }
-}
 
 /// `OriginRings`: per day type, per hour of day, origin floor to EMA'd
 /// boarding count, in insertion order (the TypeScript `Map` order).
@@ -85,6 +45,9 @@ pub struct ElevatorTelemetry {
     pub util: IndexMap<i64, f64>,
     pub hourly: IndexMap<i64, HourlyByDay>,
     pub origins: IndexMap<i64, OriginRings>,
+    /// Each elevator's demand at the top of the hour now under way, which the
+    /// next sample weighs against its own (#2466).
+    pub hour_start: IndexMap<i64, f64>,
 }
 
 /// `foldOrigins(rings, isWeekend, hour, counts)`.
@@ -179,7 +142,14 @@ impl Simulation {
                 .filter_map(|&f| line(f))
                 .map(|l| l.riders as f64)
                 .sum();
-            let demand = share(load + waiting);
+            // The hour that ended reads the larger crowd of its two ends: 7 AM
+            // still reads the 8:00 crowd, and a rush that ends on the hour
+            // keeps its last busy hour (#2466).
+            let now = share(load + waiting);
+            let demand = tel
+                .hour_start
+                .insert(t.id, now)
+                .map_or(now, |start| start.max(now));
             alive_hourly.push(t.id);
             let rings = tel.hourly.entry(t.id).or_insert_with(HourlyByDay::empty);
             let sized = |n: usize| n == 24;
@@ -217,6 +187,7 @@ impl Simulation {
         tel.util.retain(|id, _| alive_util.contains(id));
         tel.hourly.retain(|id, _| alive_hourly.contains(id));
         tel.origins.retain(|id, _| alive_hourly.contains(id));
+        tel.hour_start.retain(|id, _| alive_hourly.contains(id));
     }
 
     /// The telemetry as JSON for the WASM host's read model:
@@ -465,13 +436,18 @@ mod tests {
         let doc = sim.telemetry_json();
         let mut other = Simulation::new_game(1, GameMode::Classic);
         other.seed_telemetry(&doc).expect("a well-formed document");
-        assert_eq!(other.telemetry, sim.telemetry);
+        // The hour's start is the save's (`elevatorLoad`), not the read model's.
+        let mut read_model = sim.telemetry.clone();
+        assert!(!read_model.hour_start.is_empty());
+        read_model.hour_start.clear();
+        assert_eq!(other.telemetry, read_model);
         // A removed shaft leaves every store at the next hour pass.
         assert!(sim.tower.remove_transport(id).is_some());
         sim.tick(60.0);
         assert!(sim.telemetry.hourly.is_empty());
         assert!(sim.telemetry.util.is_empty());
         assert!(sim.telemetry.origins.is_empty());
+        assert!(sim.telemetry.hour_start.is_empty());
     }
 
     #[test]
