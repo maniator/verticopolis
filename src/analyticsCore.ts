@@ -11,6 +11,7 @@ import type { FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
 import type { TrapKind } from "./wasmhost/hostFault";
 import type { AppActionName } from "./analyticsAppActions";
+import type { FileFailureCode } from "./analyticsActions";
 
 /**
  * Gameplay analytics core: the typed event vocabulary, the cross-cutting common
@@ -211,7 +212,7 @@ export interface GameplayEvents {
    *  or accessibility-toggle state). Cookieless: these are aggregate counts and
    *  per-session behavior, never an identity. `reason` is only on
    *  `import_failed` and `export_failed`: the closed `FileFailureCode` (#2075). */
-  app_action: { action: AppActionName; detail?: string; reason?: string };
+  app_action: { action: AppActionName; detail?: string; reason?: FileFailureCode };
   /** A discrete gameplay economy action the player took at the build/editor money
    *  boundary: demolishing a facility, tuning pricing, or tuning transport
    *  capacity. One parametrized event (keyed by `action`) like `app_action`, but

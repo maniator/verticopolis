@@ -9,7 +9,7 @@ import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
-import type { EnginePort } from "../simport/enginePort";
+import type { EnginePort, PortRecord } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
 import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, exportFile, loadStored, newerSaveRefused, saveBytes, saveText, stampCamera, swapDone } from "./portLifecycle";
@@ -445,23 +445,22 @@ export class SaveLoad {
   }
 
   /**
-   * Import an original 1994 SimTower save (`.TDT`). The engine reads and
-   * checks it first (the binary walker's hardening, then the trust boundary
-   * every save goes through) and stages it; the fidelity report comes from
-   * its record. Nothing is adopted or persisted until the player confirms
-   * with "Open tower". A garbage file never reaches the tower, the same
-   * contract as importGame.
-   */
+   * Import a 1994 SimTower save (`.TDT`): the engine reads, checks and stages
+   * it, and nothing is adopted until the player confirms with "Open tower"
+   * (importGame's contract). A refusal or a throw is an import_failed. */
   async importLegacy(buffer: ArrayBuffer, filename: string): Promise<void> {
     const port = this.deps.enginePort();
-    await port.prepareTdt?.();
     const bytes = new Uint8Array(buffer);
-    const rec = port.loadTdt(bytes, filename);
-    if (rec[0] !== 1) {
-      // The refusal is already player-readable: the importer's own sentence,
-      // or "This SimTower save couldn't be read." with the detail.
-      trackFileFailure("import_failed", "tdt", refusalCode(port.lastRefusalCode()));
-      this.deps.ui.toast(port.lastReason() ?? "This SimTower save couldn't be read.", "bad");
+    let rec: PortRecord | undefined;
+    try {
+      await port.prepareTdt?.();
+      rec = port.loadTdt(bytes, filename);
+    } catch {
+      rec = undefined; // the reader threw before answering
+    }
+    if (rec?.[0] !== 1) {
+      trackFileFailure("import_failed", "tdt", rec ? refusalCode(port.lastRefusalCode()) : "error");
+      this.deps.ui.toast((rec && port.lastReason()) ?? "This SimTower save couldn't be read.", "bad");
       return;
     }
     const facts = importFacts(rec, this.deps.portCodes(), port);

@@ -381,6 +381,31 @@ describe("SaveLoad .TDT import report analytics", () => {
     expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("Not a SimTower save.", "bad");
   });
 
+  it("a reader that throws reports an import_failed with reason error and shows the refusal toast", async () => {
+    const { saves, deps } = setup({
+      prepareTdt: () => Promise.resolve(),
+      loadTdt: () => {
+        throw new Error("unreachable");
+      },
+      lastReason: () => "a stale reason from an earlier file",
+      lastRefusalCode: () => "unreadable",
+    });
+    await saves.importLegacy(new ArrayBuffer(4), "THROWS.TDT");
+    expect(deps.ui.showImportReport).not.toHaveBeenCalled();
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt", "error");
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("This SimTower save couldn't be read.", "bad");
+  });
+
+  it("a reader module that fails to load reports an import_failed with reason error", async () => {
+    const { saves, deps } = setup({
+      prepareTdt: () => Promise.reject(new Error("chunk failed")),
+      loadTdt: vi.fn(),
+    });
+    await saves.importLegacy(new ArrayBuffer(4), "OFFLINE.TDT");
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt", "error");
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("This SimTower save couldn't be read.", "bad");
+  });
+
   it("two reads behind a busy dialog, the first superseded by the second, report one read: the second's", async () => {
     const { saves, deps } = setup({
       prepareTdt: () => Promise.resolve(),
