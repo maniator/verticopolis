@@ -202,6 +202,9 @@ jobs:
         with:
           path: /tmp/dl
           pattern: shots-*
+          # Each shoot job uploads one artifact holding a shots-<shard>/ folder
+          # per shard it rendered; merging them gives /tmp/dl/shots-<shard>/.
+          merge-multiple: true
 
       - id: drift
         name: Detect drift vs the committed gallery (no commit)
@@ -313,6 +316,9 @@ jobs:
         with:
           path: /tmp/dl
           pattern: shots-*
+          # Each shoot job uploads one artifact holding a shots-<shard>/ folder
+          # per shard it rendered; merging them gives /tmp/dl/shots-<shard>/.
+          merge-multiple: true
 
       - name: Assemble and commit the regenerated gallery
         run: |

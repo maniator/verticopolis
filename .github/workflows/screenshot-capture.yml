@@ -8,7 +8,9 @@ name: Screenshot capture (reusable)
 # approval).
 #
 # For each shard (scripts/screenshot-shards.ts partitions SCENES; the `verify`
-# coverage gate here fails the run if any scene is in no shard or two), ONE job:
+# coverage gate here fails the run if any scene is in no shard or two), a shoot
+# job (which packs several small shards, one after another; `jobs` in the same
+# script):
 #   - renders the shard's scenes TWICE in the same pinned Playwright image, each
 #     leg from its OWN `npm run build` + its OWN preview server, the two legs
 #     running CONCURRENTLY (both build+render at once), and
@@ -25,8 +27,10 @@ name: Screenshot capture (reusable)
 # the two legs in PARALLEL (each fully isolated: own build outDir, own preview
 # port, own SHOTS_DIR output root) makes wall-clock ~1x a leg's build+render
 # instead of ~2x, without weakening the guard: both builds are still independent,
-# they just overlap in time. The verified run-a set is uploaded as shots-<shard>
-# for the caller to assemble.
+# they just overlap in time. The verified run-a set of each shard is staged as
+# shots-<shard>/ inside the job's one artifact (shots-job-<n>), so a caller that
+# downloads every shots-* artifact with merge-multiple gets one shots-<shard>/
+# folder per shard to assemble.
 #
 # This job is READ-ONLY: it checks out and executes PR-head code (npm ci, build,
 # the screenshot scripts), so it must never hold a write-scoped token, and its
@@ -42,7 +46,7 @@ on:
         type: string
     outputs:
       shards:
-        description: "JSON array of shard names (for the caller to loop over the shots-<shard> artifacts)."
+        description: "JSON array of shard names (for the caller to loop over the shots-<shard> folders)."
         value: ${{ jobs.resolve-image.outputs.shards }}
       image:
         description: "The pinned Playwright image tag used."
@@ -102,6 +106,7 @@ jobs:
     outputs:
       image: ${{ steps.pin.outputs.image }}
       shards: ${{ steps.shards.outputs.shards }}
+      jobs: ${{ steps.shards.outputs.jobs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -130,20 +135,24 @@ jobs:
         run: node scripts/screenshot-shards.ts verify
 
       - id: shards
-        name: Emit the shard matrix
-        run: echo "shards=$(node scripts/screenshot-shards.ts matrix)" >> "$GITHUB_OUTPUT"
+        name: Emit the shard list and the shoot jobs
+        run: |
+          echo "shards=$(node scripts/screenshot-shards.ts matrix)" >> "$GITHUB_OUTPUT"
+          echo "jobs=$(node scripts/screenshot-shards.ts jobs)" >> "$GITHUB_OUTPUT"
 
       - id: pin
         run: |
           ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
           echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
 
-  # One job per shard: render its scenes twice, prove the two renders match, and
-  # upload the verified set. The whole determinism guard lives here.
+  # One job per packed group of shards: render each shard's scenes twice, prove
+  # the two renders match, and upload the verified sets. The whole determinism
+  # guard lives here.
   shoot:
+    name: shoot (${{ matrix.shards }})
     needs: resolve-image
     runs-on: ubuntu-latest
-    # A shard takes about five minutes and has peaked near fifteen.
+    # A job renders about three minutes of shards; a busy runner has doubled one.
     timeout-minutes: 30
     permissions:
       contents: read
@@ -157,7 +166,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.resolve-image.outputs.shards) }}
+        shards: ${{ fromJSON(needs.resolve-image.outputs.jobs) }}
     env:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     steps:
@@ -193,10 +202,10 @@ jobs:
       # sharing a build (a shared build rendered twice would hide the build-time class
       # this guard exists to catch). This step only supplies the pinned browser and
       # stages the verified run-a set to upload; the script does the rest.
-      - name: Render this shard twice in parallel and prove it is deterministic
+      - name: Render each shard twice in parallel and prove it is deterministic
         id: render
         env:
-          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ matrix.shards }}
         run: |
           # Locate the image's pinned Chromium and fail fast if it is not there:
           # an empty PW_CHROME would let Playwright fall back to some other browser,
@@ -208,31 +217,39 @@ jobs:
             exit 1
           fi
           export PW_CHROME
-          # Render each leg into its own fresh root and byte-diff them. SHARD is passed
-          # as an argument (not interpolated into a script body), so a shard name can
-          # never break out. The script exits non-zero on any render failure or on
+          # Render each leg into its own fresh root and byte-diff them, one shard
+          # at a time (the check reuses its temp roots and ports). Each shard name
+          # is passed as an argument (not interpolated into a script body), so a
+          # shard name can never break out; `verify` already holds every name to
+          # [a-z0-9-]. The script exits non-zero on any render failure or on
           # nondeterminism, which fails this step.
-          rc=0
-          node scripts/screenshot-determinism-check.ts "$SHARD" || rc=$?
-          # Stop on any failure: a partial set must never be staged, because the
-          # caller reads a missing image as a deleted one and would commit it.
-          if [ "$rc" -ne 0 ]; then exit "$rc"; fi
-          # Stage the verified run-a set for upload. run-a lives under the same temp
-          # base the check uses (os.tmpdir(), overridable via SCREENSHOT_TMP), so read
-          # it from there rather than a hardcoded path. The .shard-complete marker is
-          # the authoritative "this shard finished" signal (the consumers count it),
-          # so a shard that legitimately renders nothing still uploads a marker and
-          # is not mistaken for a missing artifact.
+          # run-a lives under the same temp base the check uses (os.tmpdir(),
+          # overridable via SCREENSHOT_TMP), so read it from there rather than a
+          # hardcoded path.
           run_a="$(node -p 'process.env.SCREENSHOT_TMP || require("os").tmpdir()')/run-a"
           stage=/tmp/stage
-          rm -rf "$stage"; mkdir -p "$stage/shots"
-          touch "$stage/.shard-complete"
-          [ -d "$run_a" ] && cp -a "$run_a/." "$stage/shots/"
+          rm -rf "$stage"; mkdir -p "$stage"
+          for shard in $SHARDS; do
+            echo "::group::shard $shard"
+            rc=0
+            node scripts/screenshot-determinism-check.ts "$shard" || rc=$?
+            # Stop on any failure: a partial set must never be staged, because the
+            # caller reads a missing image as a deleted one and would commit it.
+            if [ "$rc" -ne 0 ]; then exit "$rc"; fi
+            # Stage the verified run-a set. The .shard-complete marker is the
+            # authoritative "this shard finished" signal (the consumers count it),
+            # so a shard that legitimately renders nothing still uploads a marker
+            # and is not mistaken for a missing one.
+            mkdir -p "$stage/shots-$shard/shots"
+            touch "$stage/shots-$shard/.shard-complete"
+            [ -d "$run_a" ] && cp -a "$run_a/." "$stage/shots-$shard/shots/"
+            echo "::endgroup::"
+          done
 
-      - name: Upload this shard's screenshots (verified)
+      - name: Upload this job's screenshots (verified)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: shots-${{ matrix.shard }}
+          name: shots-job-${{ strategy.job-index }}
           path: /tmp/stage
           retention-days: 5
           if-no-files-found: error
@@ -250,7 +267,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: determinism-diff-${{ matrix.shard }}
+          name: determinism-diff-${{ strategy.job-index }}
           path: determinism-diff
           # "ignore", not "error": the step runs on EVERY job failure via
           # if: failure(), and evidence only exists when the byte-diff or a

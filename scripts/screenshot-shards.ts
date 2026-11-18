@@ -19,6 +19,8 @@
  *   node scripts/screenshot-shards.ts names          -> shard names, space-joined  (human/debug)
  *   node scripts/screenshot-shards.ts print <shard>  -> that shard's scene ids, comma-joined  (ONLY=)
  *   node scripts/screenshot-shards.ts verify         -> exit 0 if coverage is exact, else exit 1
+ *   node scripts/screenshot-shards.ts jobs           -> the shards packed into CI jobs, as a JSON array of
+ *                                                       space-joined shard names (the shoot matrix)
  *
  * The workflow's shard matrix is built from `matrix` (not hand-listed in the
  * YAML) so the set of jobs is derived from this same SHARDS map: a shard added
@@ -31,6 +33,7 @@
  * native type-stripping, and import siblings with an explicit `.ts` extension.
  */
 import { SCENES } from "./screenshot-scenes.ts";
+import { planShards } from "../src/tests/ci/e2eShards.ts";
 
 // The partition: explicit scene-id groups, NOT a count/index split. Grouped by
 // capture cost so the shards finish together. Now that a settle skips its discarded
@@ -153,6 +156,48 @@ export const SHARDS: Record<string, string[]> = {
   misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "overview-map-gaps", "overview-map-gaps-phone", "palette-fit"],
 };
 
+// The shoot jobs. Every shard above keeps its own scenes and its own artifact
+// folder, but a job renders several shards one after another, because each job
+// pays about a minute of container start and npm ci before it renders, and the
+// small feature shards render in under a minute. Fifteen one-shard jobs made the
+// drift check alone queue 15 runners on every push (November 2026), so pull
+// requests waited minutes for a runner.
+export const SHOOT_JOBS = 7;
+
+// The render step's seconds per shard in CI, both legs and both builds
+// included (the lower of runs 44232857883 and 44234106281, since a busy runner
+// can double one). The packing places the slowest first, so a new or
+// unmeasured shard (counted at six seconds a scene) only moves the balance.
+// Refresh from a drift-check run's "Render" step times when a shard grows.
+export const SHARD_SECONDS: Record<string, number> = {
+  appearance: 82,
+  desk: 161,
+  "elevator-auto": 25,
+  engine: 129,
+  features: 181,
+  "fire-response": 89,
+  "front-doors": 16,
+  "linked-folder": 37,
+  misc: 152,
+  "not-found": 17,
+  "open-recent": 34,
+  "previous-versions": 32,
+  showcase: 139,
+  "star-up": 35,
+  "traffic-jump": 28,
+};
+
+/** The shards packed into {@link SHOOT_JOBS} jobs of about equal render time,
+ *  longest first; each entry is one job's shard names, space-joined. Every
+ *  shard lands in exactly one job. */
+export function shootJobs(): string[] {
+  const shards = Object.entries(SHARDS).map(([file, ids]) => ({ file, tests: ids.length }));
+  const jobs = Math.min(SHOOT_JOBS, shards.length);
+  return planShards(shards, jobs, SHARD_SECONDS)
+    .sort((a, b) => b.seconds - a.seconds)
+    .map((job) => job.files.join(" "));
+}
+
 function allSceneIds(): string[] {
   return SCENES.map((s) => s.id);
 }
@@ -193,6 +238,11 @@ function main(): void {
     process.stdout.write(JSON.stringify(Object.keys(SHARDS)));
     return;
   }
+  if (cmd === "jobs") {
+    // JSON array for the workflow's `fromJSON(...)` shoot matrix.
+    process.stdout.write(JSON.stringify(shootJobs()));
+    return;
+  }
   if (cmd === "names") {
     process.stdout.write(Object.keys(SHARDS).join(" "));
     return;
@@ -219,7 +269,7 @@ function main(): void {
     console.log(`shard coverage OK: ${allSceneIds().length} scenes across ${Object.keys(SHARDS).length} shards.`);
     return;
   }
-  console.error("usage: screenshot-shards.ts (matrix | names | print <shard> | verify)");
+  console.error("usage: screenshot-shards.ts (matrix | jobs | names | print <shard> | verify)");
   process.exit(1);
 }
 
