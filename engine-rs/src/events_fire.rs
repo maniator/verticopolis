@@ -70,7 +70,8 @@ impl Simulation {
             message: message.clone(),
         });
         self.emit(&message, LogKind::Bad);
-        if !self.has_any(Kind::Security) {
+        // A tip is a fix, which Classic leaves to the player (#549).
+        if self.mode.advises_fixes() && !self.has_any(Kind::Security) {
             self.emit(
                 "Tip: a Security office fights fires for free. Build one to defend your tower.",
                 LogKind::Bad,

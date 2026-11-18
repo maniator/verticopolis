@@ -286,12 +286,12 @@ impl Simulation {
         }
         if !floors.is_empty() {
             let fix = if self.mode.infestation_recovery().is_some() {
-                "Call an exterminator, or bulldoze and rebuild."
+                " Call an exterminator, or bulldoze and rebuild."
             } else {
-                "Bulldoze and rebuild to clear them."
+                "" // Classic names the cause only (#549).
             };
             let msg = format!(
-                "🪳 {} neglected room(s) on floor(s) {} became cockroach-infested and can no longer be cleaned. {}",
+                "🪳 {} neglected room(s) on floor(s) {} became cockroach-infested and can no longer be cleaned.{}",
                 floors.len(),
                 format_floors(&floors),
                 fix

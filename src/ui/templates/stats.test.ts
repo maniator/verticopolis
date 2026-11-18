@@ -344,6 +344,20 @@ describe("the problem rows' Help links (#2036)", () => {
     expect(topicAfter(bad, "Stranded floors")).toBe("access");
   });
 
+  it("names the fix for a recycling shortfall or a stranded floor in Modern only (#549)", () => {
+    const text = (mode: "classic" | "modern", capacity: number) =>
+      body({ mode, stats: { star: 3 }, report: { recycling: { capacity, demandMet: false }, strandedFloors: [5] } }).textContent ?? "";
+    const classic = text("classic", 1000);
+    expect(classic, "the stranded floors' cause").toContain("they earn rating but draw no visitors.");
+    expect(classic).not.toContain("Add an elevator that reaches them.");
+    expect(classic).not.toContain("(build more)");
+    expect(text("classic", 0), "no center").not.toContain("(build one)");
+    const modern = text("modern", 1000);
+    expect(modern).toContain("Add an elevator that reaches them.");
+    expect(modern).toContain("(build more)");
+    expect(text("modern", 0)).toContain("no center (build one)");
+  });
+
   it("links the elevators heading only when a shaft runs full", () => {
     const heading = (utilization: number) =>
       [...body({ report: { elevators: [{ id: 1, kind: "elevatorStandard", bottom: 1, top: 2, cars: 1, capacity: 21, utilization }] } }).querySelectorAll(".stats-section")]

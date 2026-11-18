@@ -28,7 +28,13 @@ impl Simulation {
             Some((ground.floor, ground.x as f64 + ground.width as f64 / 2.0))
         };
         let destroyed = self.blast(fine, epicenter);
-        self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine. Build Security!", with_thousands(fine)), LogKind::Bad);
+        // Classic names what happened only (#549).
+        let fix = if self.mode.advises_fixes() {
+            " Build Security!"
+        } else {
+            ""
+        };
+        self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine.{fix}", with_thousands(fine)), LogKind::Bad);
     }
 
     /// A bomb going off at `epicenter` (floor, x), or nowhere when the tower

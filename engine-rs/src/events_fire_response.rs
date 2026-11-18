@@ -247,7 +247,13 @@ impl Simulation {
         let landed = r.helicopter.as_ref().is_some_and(|h| h.arrive <= now);
         if landed && !self.events.active.is_empty() {
             self.extinguish_all();
-            self.emit("🚒 The Fire Rescue helicopter put the fire out. The rooms that were ablaze are gutted. Bulldoze and rebuild them.", LogKind::Good);
+            // Classic names what happened only (#549).
+            let fix = if self.mode.advises_fixes() {
+                " Bulldoze and rebuild them."
+            } else {
+                ""
+            };
+            self.emit(&format!("🚒 The Fire Rescue helicopter put the fire out. The rooms that were ablaze are gutted.{fix}"), LogKind::Good);
         }
         let Some(r) = self.events.fire.as_mut() else {
             return;

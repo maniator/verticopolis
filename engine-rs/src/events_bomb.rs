@@ -210,7 +210,13 @@ impl Simulation {
         }
         let when = clock_label(deadline);
         if offices.is_empty() {
-            self.emit(&format!("💣 You refused the ransom. With no Security to search, the bomb goes off at {when}. Build Security!"), LogKind::Bad);
+            // Classic names what happens only (#549).
+            let fix = if self.mode.advises_fixes() {
+                " Build Security!"
+            } else {
+                ""
+            };
+            self.emit(&format!("💣 You refused the ransom. With no Security to search, the bomb goes off at {when}.{fix}"), LogKind::Bad);
         } else {
             let n = offices.len() * GUARDS_PER_OFFICE;
             self.emit(&format!("💣 You refused the ransom. {n} Security guards are searching the tower; the bomb goes off at {when}."), LogKind::Bad);
