@@ -187,7 +187,9 @@ fn a_cinema_earns_from_its_fill_capped_at_a_full_house_with_the_blockbuster_on_t
 #[test]
 fn the_venue_card_reads_its_local_demand_share() {
     let (mut sim, shop) = offices_and_shop(GameMode::Classic, 4, 12, 20);
-    let pct = (fraction(&mut sim, shop) * 100.0).round() as i64;
+    // Rounded down, so the percent never claims a threshold the advice
+    // has not reached (#549).
+    let pct = (fraction(&mut sim, shop) * 100.0 + 1e-9).floor() as i64;
     assert!(pct > 0);
     let facts = serde_json::to_value(sim.service_diagnostic_facts(shop).unwrap()).unwrap();
     assert_eq!(facts["retail"]["localDemandPct"], pct);

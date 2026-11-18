@@ -82,6 +82,9 @@ describe("retailDisplayLines (commercial-venue inspector card)", () => {
     expect(quiet.textContent).toContain("Local demand: 0% of capacity.");
     expect(quiet.textContent).not.toContain("hold off on new venues");
     expect(quiet.textContent).not.toContain("another venue would still sell");
-    expect(render({ ...FULL, advice: "underServed" }).textContent).toContain("another venue would still sell");
+    expect(render({ ...FULL, tier: "average", advice: "underServed" }).textContent).toContain("another venue would still sell");
+    const lowUnderServed = render({ ...FULL, advice: "underServed" }).textContent;
+    expect(lowUnderServed).toContain("few of them reach this venue");
+    expect(lowUnderServed).not.toContain("another venue would still sell");
   });
 });
