@@ -38,6 +38,9 @@ export {
   trackEconomyAction,
   trackEconomyActionOnce,
   trackEmergencyChoice,
+  trackFileFailure,
+  refusalCode,
+  type FileFailureCode,
 } from "./analyticsActions";
 export { headerNow, trackFileImported, trackFileExported, trackTdtImportRead, type SaveFileFormat } from "./analyticsFiles";
 

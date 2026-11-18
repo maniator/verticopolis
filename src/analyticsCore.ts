@@ -209,8 +209,9 @@ export interface GameplayEvents {
    *  vocabulary stays small and a dashboard breaks the surface down by `action`.
    *  `detail` carries the small extra dimension an action needs (the new mute
    *  or accessibility-toggle state). Cookieless: these are aggregate counts and
-   *  per-session behavior, never an identity. */
-  app_action: { action: AppActionName; detail?: string };
+   *  per-session behavior, never an identity. `reason` is only on
+   *  `import_failed` and `export_failed`: the closed `FileFailureCode` (#2075). */
+  app_action: { action: AppActionName; detail?: string; reason?: string };
   /** A discrete gameplay economy action the player took at the build/editor money
    *  boundary: demolishing a facility, tuning pricing, or tuning transport
    *  capacity. One parametrized event (keyed by `action`) like `app_action`, but

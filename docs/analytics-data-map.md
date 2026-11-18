@@ -158,12 +158,29 @@ Four `app_action` codes report a save, load, import or export that failed (#1533
 | --- | --- | --- | --- |
 | `autosave_failed` | `timer`, `manual` or `file` | A background or system save (`timer`: the timer and tower-swap autosaves, the pre-update flush, the context-loss flush and the .TDT adoption flush) or a Quick Save or slot save (`manual`) threw, or (`file`, from 4.11) the autosave's write of the tower's own My Towers file failed after the crash copy was written, such as a full or blocked `localStorage` | Latched once per page life, so events can exceed sessions; read sessions with a failed save, not failures. The `detail` is the first source that failed |
 | `load_failed` | none | A slot load from the saves manager or the title-screen picker adopted nothing | An empty slot and an unreadable one read alike. Quick Load ("No saved tower found") is not counted |
-| `import_failed` | `save` (.vctower) or `tdt` (.TDT) | An imported file was refused or unreadable | Counted per attempt |
-| `export_failed` | `save` (.vctower) or `tdt` (.TDT) | An export wrote no file: the engine threw (a memory failure on a huge tower) or refused (a Modern tower cannot become a `.TDT`) | Counted per attempt. A download the browser blocks is not seen |
+| `import_failed` | `save` (.vctower) or `tdt` (.TDT), and `reason` (below) | An imported file was refused or unreadable | Counted per attempt |
+| `export_failed` | `save` (.vctower) or `tdt` (.TDT), and `reason` (below) | An export wrote no file: the engine threw (a memory failure on a huge tower) or refused (a Modern tower cannot become a `.TDT`) | Counted per attempt. A download the browser blocks is not seen |
 
 These are lower bounds like every client event: a failure that kills the tab, or
 a blocked relay, reports nothing. `docs/analytics-measurement-status.md` rows 8
 to 10 and 24 say what they can and cannot support.
+
+From the release that ships #2075, `import_failed` and `export_failed` also carry
+`reason`, a closed code. The engine gives it with a refusal
+(`lastRefusalCode()`, `engine-rs/src/file_refusal.rs`) and the page sends that
+word, never the refusal's sentence, which can quote the file:
+
+| `reason` | Meaning |
+| --- | --- |
+| `too_large` | The file is larger than the engine reads |
+| `not_tower` | The file is no Verticopolis tower file |
+| `damaged` | A tower file whose contents cannot be read |
+| `newer_version` | A file or save from a later version of the game |
+| `not_save` | Readable contents that hold no saved game |
+| `unreadable` | A 1994 `.TDT` the reader could not walk |
+| `modern` | A Modern tower, which a `.TDT` cannot hold |
+| `refused` | Any other refusal, the loader's or the writer's own, or a code this build does not know |
+| `error` | The engine threw (a memory failure on a huge tower), the `.TDT` reader failed to load, or another step failed |
 
 ## Graphics recovery
 

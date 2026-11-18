@@ -147,3 +147,33 @@ fn vctower_export_writes_the_bytes_of_the_tree_path() {
         assert_eq!(got.as_bytes(), want.as_slice());
     }
 }
+
+#[test]
+fn each_file_refusal_names_its_closed_code_and_a_success_clears_it() {
+    let mut e = built(GameMode::Modern);
+    let code = |e: &Engine| e.port_last_refusal_code();
+    assert_eq!(e.port_tdt_export(), vec![0.0]);
+    assert_eq!(code(&e).as_deref(), Some("modern"));
+    assert_eq!(e.port_load_tdt(b"junk", "X.TDT")[0], 0.0);
+    assert_eq!(code(&e).as_deref(), Some("unreadable"));
+    assert_eq!(e.port_load_vctower("not a file")[0], 0.0);
+    assert_eq!(code(&e).as_deref(), Some("not_tower"));
+    assert_eq!(e.port_load_vctower_bytes(b"VCTOWER2 no newline")[0], 0.0);
+    assert_eq!(code(&e).as_deref(), Some("damaged"));
+    assert_eq!(e.port_load_vctower("VCTOWER9\n")[0], 0.0);
+    assert_eq!(code(&e).as_deref(), Some("newer_version"));
+    // A build name from before 2.0 is the stamp's own refusal.
+    assert_eq!(e.port_export_vctower("1.9.0", 1.7e12), None);
+    assert_eq!(code(&e).as_deref(), Some("refused"));
+    assert_eq!(e.port_export_vctower_bytes("1.9.0", 1.7e12), None);
+    assert_eq!(code(&e).as_deref(), Some("refused"));
+    let text = e.port_export_vctower("3.0.0", 1.7e12).unwrap();
+    assert_eq!(code(&e), None);
+    assert_eq!(e.port_load_vctower("not a file")[0], 0.0);
+    assert_eq!(e.port_load_vctower(&text)[0], 1.0);
+    assert_eq!(code(&e), None, "a done load clears the last refusal");
+    // A call that is no file member leaves the code alone.
+    assert_eq!(e.port_load_tdt(b"junk", "X.TDT")[0], 0.0);
+    assert_eq!(e.port_load_save("not a save")[0], 0.0);
+    assert_eq!(code(&e).as_deref(), Some("unreadable"));
+}

@@ -1,4 +1,5 @@
-import { headerNow, trackAppAction, trackFileExported } from "../analytics";
+import { headerNow, trackFileExported, trackFileFailure } from "../analytics";
+import { ExportRefused } from "./portLifecycle";
 import type { ViewReader } from "../simport/viewReader";
 import { SaveGame } from "../storage/SaveGame";
 import type { UI } from "../ui/UI";
@@ -101,7 +102,8 @@ export async function runExportFlow(
   } catch (err) {
     // Never fail silently: main.ts fires this with `void`, so an unhandled
     // rejection here would leave the player with no download and no feedback.
-    trackAppAction("export_failed", "save");
+    // An engine refusal carries its closed code; a throw is `error` (#2075).
+    trackFileFailure("export_failed", "save", err instanceof ExportRefused ? err.code : "error");
     deps.ui.toast("Export failed: " + (err instanceof Error ? err.message : String(err)), "bad");
   } finally {
     clearTimeout(watchdog);

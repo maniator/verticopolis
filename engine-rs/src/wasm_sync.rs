@@ -21,6 +21,7 @@ impl Engine {
             render_memo: Default::default(),
             undo: Default::default(),
             undo_notice: None,
+            refusal: None,
         }
     }
 }

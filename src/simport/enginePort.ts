@@ -448,6 +448,9 @@ export interface EnginePortFiles {
   tdtTowerName(): string | undefined;
   /** Swaps the staged tower in (the `legacy` source): `[status, generation]`. */
   adoptTdt(): PortRecord;
+  /** The closed code of the last refused file read or write (#2075), safe
+   *  for analytics; undefined when the last one worked. */
+  lastRefusalCode(): string | undefined;
   /** Writes the tower as a `.TDT` file and answers the report's numbers. */
   tdtExport(): PortRecord;
   /** The last done `tdtExport`'s bytes, handed over once. */

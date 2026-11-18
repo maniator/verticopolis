@@ -3,7 +3,7 @@ import type { CalendarKind } from "../shared/engineTypes";
 import { SaveGame } from "../storage/SaveGame";
 import { isStorageWriteError } from "../storage/saveFailureCopy";
 import { SaveFailureNotice, type SaveWarningSurface } from "./saveFailureNotice";
-import { headerNow, trackAppAction, trackAppActionOnce, trackFileExported, trackFileImported, trackTdtImportRead } from "../analytics";
+import { headerNow, refusalCode, trackAppAction, trackAppActionOnce, trackFileExported, trackFileFailure, trackFileImported, trackTdtImportRead, type FileFailureCode } from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";
 import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
@@ -400,14 +400,14 @@ export class SaveLoad {
       bytes = rec[0] === 1 ? port.tdtFile() : undefined;
       if (!bytes) {
         // The engine's refusal is the player's sentence (a Modern tower, a
-        // tower too deep for 1994).
-        trackAppAction("export_failed", "tdt");
+        // tower too deep for 1994); analytics gets its closed code.
+        trackFileFailure("export_failed", "tdt", refusalCode(port.lastRefusalCode()));
         this.deps.ui.sayVisibly(port.lastReason() ?? "Export failed."); // not a toast: a dialog may be up (GH #658)
         return;
       }
       report = exportReport(exportFacts(rec, this.deps.portCodes(), port.towerName()));
     } catch (err) {
-      trackAppAction("export_failed", "tdt");
+      trackFileFailure("export_failed", "tdt", "error");
       this.deps.ui.sayVisibly("Export failed: " + (err instanceof Error ? err.message : String(err)));
       return;
     }
@@ -425,20 +425,21 @@ export class SaveLoad {
 
   /** Import a `.vctower` file: a binary one as bytes, text as text (`uiImport.ts`). */
   async importGame(data: string | Uint8Array): Promise<void> {
+    let reason: FileFailureCode = "error"; // a throw before the engine answered
     try {
-      // The engine reads the file and says why it refuses one, in the
-      // player's words (`vctower_import.rs`); the page only shows it. The
-      // founder rule for a file without a build stamp is the engine's too.
+      // The engine reads the file, and words a refusal for the player with a
+      // closed code for analytics; the founder rule is the engine's too.
       const port = this.deps.enginePort();
       this.deps.beforeSwap?.("open");
       const loaded = typeof data === "string" ? port.loadVctower(data) : port.loadVctowerBytes(data);
+      if (loaded[0] !== 1) reason = refusalCode(port.lastRefusalCode());
       if (loaded[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
       this.deps.towerSwapped();
       trackFileImported("vctower", () => this.deps.reader().header);
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.swapRefused?.();
-      trackAppAction("import_failed", "save");
+      trackFileFailure("import_failed", "save", reason);
       this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
     }
   }
@@ -459,7 +460,7 @@ export class SaveLoad {
     if (rec[0] !== 1) {
       // The refusal is already player-readable: the importer's own sentence,
       // or "This SimTower save couldn't be read." with the detail.
-      trackAppAction("import_failed", "tdt");
+      trackFileFailure("import_failed", "tdt", refusalCode(port.lastRefusalCode()));
       this.deps.ui.toast(port.lastReason() ?? "This SimTower save couldn't be read.", "bad");
       return;
     }
