@@ -23,6 +23,7 @@ function person(over: Partial<PersonDetail> = {}): PersonDetail {
     waitMinutes: 15,
     tripWaitMinutes: 19.6,
     shaftId: 3,
+    gaveUp: false,
     ...over,
   };
 }
@@ -93,6 +94,17 @@ describe("what became of someone the engine let go", () => {
     expect(goneWords(turned, catalog)).toEqual({ now: "Went back", note: `They went back to ${catalogFacility(catalog, "condo").name}, floor 20.` });
   });
 
+  it("says someone who gave up waiting went back, or left by the street door (#2188)", () => {
+    const office = { place: "room", id: 7, kind: "office", floor: 12 } as const;
+    const diner = person({ purpose: "meal", gaveUp: true, floor: 12, from: { place: "floor", floor: 12 }, to: office });
+    expect(goneWords(diner, catalog)).toEqual({
+      now: "Went back",
+      note: `They gave up waiting and went back to ${catalogFacility(catalog, "office").name}, floor 12.`,
+    });
+    const worker = person({ purpose: "toWork", gaveUp: true, floor: 1, from: { place: "floor", floor: 1 }, to: { place: "lobby", floor: 1 } });
+    expect(goneWords(worker, catalog)).toEqual({ now: "Left the tower", note: "They gave up waiting and left the tower." });
+  });
+
   it("falls back to leaving when neither end is on their floor", () => {
     expect(goneWords(person({ state: "riding", floor: 33 }), catalog).now).toBe("Left the tower");
     expect(goneWords(person({ floor: 4, from: { place: "none" }, to: { place: "none" } }), catalog).now).toBe("Left the tower");
@@ -121,6 +133,11 @@ describe("the person card's words", () => {
     expect(personWhy(person({ purpose: "fromWork" }))).toBe("Heading home from work");
     expect(personWhy(person({ purpose: "meal" }))).toBe("Going out to eat");
     expect(personWhy(person({ purpose: "meal", returning: true }))).toBe("Heading back after a meal");
+    // #2188: someone who gave up is not on the way back from where they
+    // never got to.
+    expect(personWhy(person({ purpose: "meal", returning: false, gaveUp: true }))).toBe("Gave up waiting to go out to eat, heading back");
+    expect(personWhy(person({ purpose: "toWork", gaveUp: true }))).toBe("Gave up waiting to get to work, heading back");
+    expect(personWhy(person({ purpose: "unknown", gaveUp: true }))).toBe("Gave up waiting, heading back");
     expect(personWhy(person({ purpose: "schoolRun", from: { place: "room", id: 1, kind: "condo", floor: 3 } }))).toBe("Taking the kids to school");
     expect(personWhy(person({ purpose: "schoolRun" }))).toBe("Back from the school run");
     expect(personWhy(person({ purpose: "salesCall" }))).toBe("Off on a sales call");
@@ -133,6 +150,8 @@ describe("the person card's words", () => {
     expect(personRole(person({ purpose: "leaveHome", from: { place: "room", id: 1, kind: "condo", floor: 5 } }))).toBe("Resident");
     expect(personRole(person({ purpose: "meal", returning: true, to: { place: "room", id: 1, kind: "office", floor: 5 } }))).toBe("Office worker");
     expect(personRole(person({ purpose: "visit", from: { place: "lobby", floor: 1 } }))).toBe("Visitor");
+    // Someone who gave up belongs to the room they head back to (#2188).
+    expect(personRole(person({ purpose: "meal", gaveUp: true, from: { place: "floor", floor: 5 }, to: { place: "room", id: 1, kind: "office", floor: 5 } }))).toBe("Office worker");
     expect(personRole(person({ purpose: "schoolRun" }))).toBe("Parent");
   });
 

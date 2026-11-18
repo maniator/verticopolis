@@ -33,6 +33,7 @@ const WORKER = record("personCard", {
   waitMinutes: 15,
   tripWaitMinutes: 20,
   shaftId: 3,
+  gaveUp: 0,
 });
 
 describe("PersonCards", () => {
@@ -55,7 +56,14 @@ describe("PersonCards", () => {
       waitMinutes: 15,
       tripWaitMinutes: 20,
       shaftId: 3,
+      gaveUp: false,
     });
+  });
+
+  it("reads someone who gave up waiting (#2188)", () => {
+    const rec = WORKER.slice();
+    rec[LAYOUT.records.personCard.indexOf("gaveUp")] = 1;
+    expect(new PersonCards(mockPort({ personCard: () => rec })).person(42)?.gaveUp).toBe(true);
   });
 
   it("reads a housekeeper's step and an end with nothing to name", () => {

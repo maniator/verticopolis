@@ -3,7 +3,7 @@ import { keyed } from "lit-html/directives/keyed.js";
 import { catalogFacility, type Catalog } from "../../catalog/catalogTypes";
 import { isHotelKind } from "../../presentation/viewKinds";
 import type { FacilityKind } from "../../shared/types";
-import type { PersonDetail, ShiftStep, TripPlace } from "../../simport/personCards";
+import type { PersonDetail, PersonPurpose, ShiftStep, TripPlace } from "../../simport/personCards";
 import { floorTag } from "../format";
 
 /**
@@ -55,7 +55,8 @@ const isHome = (kind: FacilityKind): boolean => kind === "condo" || kind === "re
 function ownRoom(p: PersonDetail): FacilityKind | null {
   // An outing heads back to their own room, and coming home or in to work
   // ends at it; every other trip starts there.
-  const endsAtOwn = (p.returning && (p.purpose === "meal" || p.purpose === "visit")) || p.purpose === "returnHome" || p.purpose === "toWork";
+  // Someone who gave up heads back to where the trip began (#2188).
+  const endsAtOwn = p.gaveUp || (p.returning && (p.purpose === "meal" || p.purpose === "visit")) || p.purpose === "returnHome" || p.purpose === "toWork";
   const own = endsAtOwn ? p.to : p.from;
   return own.place === "room" ? own.kind : null;
 }
@@ -81,8 +82,24 @@ export function personRole(p: PersonDetail): string {
   }
 }
 
+/** What a trip someone gave up on was for, after "Gave up waiting". */
+const GAVE_UP_ON: Readonly<Partial<Record<PersonPurpose, string>>> = {
+  toWork: "to get to work",
+  fromWork: "to head home",
+  leaveHome: "to head out",
+  returnHome: "to get home",
+  meal: "to go out to eat",
+  visit: "to go out for a visit",
+  schoolRun: "for the school run",
+  salesCall: "to go on a sales call",
+};
+
 /** Why they are out. */
 export function personWhy(p: PersonDetail): string {
+  if (p.gaveUp) {
+    const on = GAVE_UP_ON[p.purpose];
+    return on ? `Gave up waiting ${on}, heading back` : "Gave up waiting, heading back";
+  }
   switch (p.purpose) {
     case "toWork":
       return "Coming in to work";
@@ -159,6 +176,10 @@ export function goneWords(p: PersonDetail, catalog: Catalog): { now: string; not
   const left = { now: "Left the tower", note: "They left the tower." };
   const onFloor = (t: TripPlace): boolean => t.place !== "none" && t.floor === p.floor;
   const leadsOut = (t: TripPlace): boolean => t.place === "metro" || (t.place === "lobby" && t.floor === 1);
+  if (p.gaveUp) {
+    if (leadsOut(p.to) || p.to.place === "none") return { now: "Left the tower", note: "They gave up waiting and left the tower." };
+    return { now: "Went back", note: `They gave up waiting and went back to ${placeWords(p.to, catalog)}.` };
+  }
   if (onFloor(p.to)) {
     if (leadsOut(p.to)) return left;
     return { now: p.to.place === "room" ? "Went inside" : "Arrived", note: `They reached ${placeWords(p.to, catalog)}.` };

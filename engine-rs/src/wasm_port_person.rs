@@ -23,8 +23,10 @@ use super::Engine;
 /// mood); `waitMinutes` is that wait in game minutes and
 /// `tripWaitMinutes` every wait of the trip so far, this one included.
 /// `shaftId` is the next shaft the person takes, or the one they wait at or
-/// ride, NaN when the trip takes none.
-pub(crate) const PERSON_CARD: [&str; 20] = [
+/// ride, NaN when the trip takes none. `gaveUp` is 1 for someone who gave
+/// up waiting to set out and is going back the way they came (#2188): then
+/// `from` is the floor they stand on and `to` where the trip began.
+pub(crate) const PERSON_CARD: [&str; 21] = [
     "id",
     "stateCode",
     "floor",
@@ -45,6 +47,7 @@ pub(crate) const PERSON_CARD: [&str; 20] = [
     "waitMinutes",
     "tripWaitMinutes",
     "shaftId",
+    "gaveUp",
 ];
 
 /// A housekeeper's steps by code (`shiftStep` in `personCard`).
@@ -117,6 +120,7 @@ pub(crate) fn person_card(sim: &Simulation, id: i64) -> Option<Vec<f64>> {
         p.wait / CROWD_SECONDS_PER_MINUTE,
         (p.trip_wait + p.wait) / CROWD_SECONDS_PER_MINUTE,
         p.shaft_id.map_or(f64::NAN, |s| s as f64),
+        flag(f.gave_up),
     ]);
     Some(r)
 }

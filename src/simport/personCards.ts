@@ -54,6 +54,10 @@ export interface PersonDetail {
   tripWaitMinutes: number;
   /** The shaft taken next, waited at or ridden; null when the trip takes none. */
   shaftId: number | null;
+  /** Gave up waiting to set out and is going back the way they came
+   *  (#2188): `from` is the floor they stand on, `to` where the trip began,
+   *  and `purpose` still says what the trip was for. */
+  gaveUp: boolean;
 }
 
 interface Layout {
@@ -104,6 +108,7 @@ export class PersonCards {
       waitMinutes: r[at.waitMinutes],
       tripWaitMinutes: r[at.tripWaitMinutes],
       shaftId: Number.isNaN(shaft) ? null : shaft,
+      gaveUp: r[at.gaveUp] === 1,
     };
   }
 

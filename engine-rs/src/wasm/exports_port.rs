@@ -180,9 +180,10 @@ impl Engine {
         self.port_shaft_card(id)
     }
     /// Person `id`'s trip (#2092) as the layout's `personCard` record: why
-    /// they are out, where the leg they are on began and ends, and their
-    /// wait. Empty for an id that names nobody in the tower now. Read on
-    /// demand while a card is open; the view frame carries none of it.
+    /// they are out, where the leg they are on began and ends, their wait,
+    /// and whether they gave up waiting to set out (`gaveUp`, #2188: then
+    /// the leg runs from where they stand back to where the trip began).
+    /// Empty for an id that names nobody now. Read only while a card is open.
     #[wasm_bindgen(js_name = personCard)]
     pub fn person_card(&self, id: f64) -> Vec<f64> {
         self.port_person_card(id)

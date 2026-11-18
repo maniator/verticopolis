@@ -1,5 +1,5 @@
 {
-  "version": 32,
+  "version": 33,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -560,7 +560,8 @@
       "wait",
       "waitMinutes",
       "tripWaitMinutes",
-      "shaftId"
+      "shaftId",
+      "gaveUp"
     ],
     "statsSheet": [
       "ratingPopulation",
