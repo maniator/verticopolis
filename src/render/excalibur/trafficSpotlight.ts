@@ -1,26 +1,29 @@
-import { viewWorld } from "../../presentation/viewWorld";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
  * The Traffic readout's spotlight: after a tap on the HUD's "Backed up · B2",
- * the floor it names is banded across the lot and the transports behind its
- * reading (`congestionCause`) are outlined, for a few seconds. The state lives
- * here, keyed by engine, so `TowerEngine` stays a thin shell. Drawing it costs
- * nothing while no spotlight is up: one map lookup per frame.
+ * the waiting line it names is marked for a few seconds: its stretch of the
+ * floor banded red, and its elevator outlined in yellow on that floor only.
+ * Never the whole floor or the whole shaft (owner, 2026-11-17: the old band
+ * across the lot "highlighted the whole floor, not where the jam is"). The
+ * state lives here, keyed by engine, so `TowerEngine` stays a thin shell.
+ * Drawing it costs nothing while no spotlight is up: one map lookup per
+ * frame.
  */
 
-/** One transport's column, in tiles and floors. */
-export interface SpotShaft {
+/** A stretch of one floor, in tiles. */
+export interface SpotSpan {
   readonly x: number;
   readonly width: number;
-  readonly bottom: number;
-  readonly top: number;
 }
 
 interface Spot {
   readonly floor: number;
-  readonly shafts: readonly SpotShaft[];
+  /** The line and its elevator together. */
+  readonly span: SpotSpan;
+  /** The elevator the line waits for. */
+  readonly shaft: SpotSpan;
   readonly startMs: number;
 }
 
@@ -32,15 +35,16 @@ export const SPOTLIGHT_MS = 4000;
 const FADE_MS = 600;
 /** Pulses per second while it is up (none under reduced motion). */
 const PULSE_HZ = 1.5;
-/** The floor band: the Map's Jammed red, so the two read as one signal. */
+/** The line's band: the Map's Jammed red, so the two read as one signal. */
 const BAND_FILL = "rgba(210, 60, 60, 0.18)";
 const BAND_EDGE = "#d23c3c";
-/** The transports' outline: the selection's yellow. */
+/** The elevator's outline: the selection's yellow. */
 const SHAFT_EDGE = "#ffd24a";
 
-/** Put the spotlight on `floor` and `shafts`, replacing any still up. */
-export function spotlightTraffic(engine: TowerEngine, floor: number, shafts: readonly SpotShaft[], nowMs = performance.now()): void {
-  spots.set(engine, { floor, shafts, startMs: nowMs });
+/** Put the spotlight on the line over `span` on `floor`, waiting for the
+ *  elevator over `shaft`, replacing any still up. */
+export function spotlightTraffic(engine: TowerEngine, floor: number, span: SpotSpan, shaft: SpotSpan, nowMs = performance.now()): void {
+  spots.set(engine, { floor, span, shaft, startMs: nowMs });
 }
 
 /** The floor the spotlight is on, or null when none is up. */
@@ -69,8 +73,8 @@ export function drawTrafficSpotlight(engine: TowerEngine, ctx: CanvasRenderingCo
   const z = engine.cam.zoom;
   const rowY = engine.worldToScreenY(spot.floor);
   const rowH = FLOOR * z;
-  const left = engine.worldToScreenX(0);
-  const width = viewWorld().lotWidth * TILE * z;
+  const left = engine.worldToScreenX(spot.span.x);
+  const width = spot.span.width * TILE * z;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = BAND_FILL;
@@ -82,9 +86,6 @@ export function drawTrafficSpotlight(engine: TowerEngine, ctx: CanvasRenderingCo
   ctx.setLineDash([]);
   ctx.strokeStyle = SHAFT_EDGE;
   ctx.lineWidth = 3;
-  for (const t of spot.shafts) {
-    const top = engine.worldToScreenY(t.top);
-    ctx.strokeRect(engine.worldToScreenX(t.x) - 2, top - 2, t.width * TILE * z + 4, (t.top - t.bottom + 1) * FLOOR * z + 4);
-  }
+  ctx.strokeRect(engine.worldToScreenX(spot.shaft.x) - 2, rowY - 2, spot.shaft.width * TILE * z + 4, rowH + 4);
   ctx.restore();
 }

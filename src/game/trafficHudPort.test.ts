@@ -1,24 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { refreshTraffic, updateTraffic } from "./trafficHud";
-import { PortCodes } from "../simport/portCodes";
-import { mockPort } from "../tests/portKit/mockPort";
 import type { GameApp } from "../main";
 
 /**
- * The traffic chip on the engine port: the port answers at once, so it draws
- * every answer in the order it was asked (its hysteresis steps from one answer
- * to the next) and sends a failed answer to the frame error log without
- * throwing. The drawing itself is pinned in `trafficHud.test.ts`, and the
- * chip on the Rust engine's own answer in `trafficHud.integration.test.ts`.
+ * The traffic chip over the renderer's queue projection (the engine's
+ * `queueView`): it reads the projection once per refresh, walks a projection
+ * it has already walked only once, draws every read in the order it was made
+ * (its hysteresis steps from one to the next) and sends a failed read to the
+ * frame error log without throwing. The drawing itself is pinned in
+ * `trafficHud.test.ts`, and the chip on the Rust engine's own lines in
+ * `trafficHud.integration.test.ts`.
  */
 
-const codes = new PortCodes(mockPort());
+type Landings = Map<number, Map<number, { count: number; tier: 0 | 1 | 2 }>>;
 
-/** A fake app whose engine port hands out the records a test controls. */
-function fakeApp(hotspot: () => Float64Array) {
+/** One fed-up line of `count` riders at `floor` for shaft 7. */
+const line = (count: number, floor = 7): Landings => new Map([[7, new Map([[floor, { count, tier: 2 as const }]])]]);
+
+/** A fake app whose projection hands out the landings a test controls. */
+function fakeApp(landings: () => Landings) {
   return {
-    enginePort: { hotspot: vi.fn(hotspot) },
-    portCodes: codes,
+    engine: { sim: { tower: {}, crowd: { queueView: vi.fn(() => ({ landings: landings(), boarded: new Map() })) } } },
     lastTrafficTier: 0,
     frameErrors: [] as Array<{ at: string; message: string }>,
   };
@@ -38,20 +40,37 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("updateTraffic on the engine port", () => {
-  it("asks the port once per refresh, and reads NaN as no hotspot floor", () => {
-    const app = fakeApp(() => Float64Array.of(0.2, NaN));
+describe("updateTraffic on the queue projection", () => {
+  it("reads the projection once per refresh with the renderer's tower", () => {
+    const app = fakeApp(() => new Map());
     updateTraffic(app as unknown as GameApp);
-    expect(app.enginePort.hotspot).toHaveBeenCalledOnce();
+    expect(app.engine.sim.crowd.queueView).toHaveBeenCalledExactlyOnceWith(app.engine.sim.tower);
     expect(label()).toBe("Smooth");
   });
 
-  it("draws every answer in the order it was asked, stepping the hysteresis through each", () => {
-    // 0.42 is not past Busy's margin (0.43) from Smooth, 0.9 is, and 0.78 then
-    // holds Backed up, since it is not down to 0.77: a skipped middle answer
-    // would show Busy.
-    const answers = [0.42, 0.9, 0.78];
-    const app = fakeApp(() => Float64Array.of(answers.shift()!, 7));
+  it("walks one projection once, however often it is drawn", () => {
+    /** The landings, counting the walks over their shafts. */
+    class Counted extends Map<number, Map<number, { count: number; tier: 0 | 1 | 2 }>> {
+      walks = 0;
+      override [Symbol.iterator]() {
+        this.walks++;
+        return super[Symbol.iterator]();
+      }
+    }
+    const kept = new Counted(line(25, 9));
+    kept.walks = 0;
+    const app = fakeApp(() => kept);
+    for (let i = 0; i < 3; i++) updateTraffic(app as unknown as GameApp);
+    expect(kept.walks).toBe(1);
+    expect([label(), floor()]).toEqual(["Backed up", " · 9F"]);
+  });
+
+  it("draws every read in the order it was made, stepping the hysteresis through each", () => {
+    // 4 is not Busy, 25 is Backed up, and 16 then holds Backed up, since it is
+    // not below three quarters of its edge (15): a skipped middle read would
+    // show Busy.
+    const answers = [4, 25, 16];
+    const app = fakeApp(() => line(answers.shift()!));
     const tiers: number[] = [];
     for (let i = 0; i < 3; i++) {
       updateTraffic(app as unknown as GameApp);
@@ -61,7 +80,7 @@ describe("updateTraffic on the engine port", () => {
     expect([label(), floor()]).toEqual(["Backed up", " · 7F"]);
   });
 
-  it("logs a port that throws to the frame error log and still returns", () => {
+  it("logs a projection that throws to the frame error log and still returns", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const app = fakeApp(() => {
       throw new Error("port down");
@@ -77,7 +96,7 @@ describe("updateTraffic on the engine port", () => {
     vi.spyOn(document, "getElementById").mockImplementation(() => {
       throw new Error("draw failed");
     });
-    const app = fakeApp(() => Float64Array.of(0.5, 7));
+    const app = fakeApp(() => line(8));
     expect(() => refreshTraffic(app as unknown as GameApp)).toThrow("draw failed");
     updateTraffic(app as unknown as GameApp);
     expect(app.frameErrors.map((e) => e.message.split("\n")[0])).toEqual(["[traffic] draw failed"]);

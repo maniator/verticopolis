@@ -38,7 +38,7 @@ import { BulldozeDragChoice } from "./game/bulldozeDrag";
 import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion, togglePassersBy, isPassersBy, applyPassersBy } from "./game/audioPrefs";
 import { showStats, loadFromSlot } from "./game/appModals";
 import { openFile, saveFile } from "./game/fileSpaceCommands";
-import { refreshTraffic } from "./game/trafficHud";
+import { jumpToTraffic, refreshTraffic } from "./game/trafficHud";
 import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
@@ -75,8 +75,8 @@ import type { Catalog } from "./catalog/catalogTypes";
  * and VC_TOOLING=1 builds only (bootstrap.ts gates the publish; production
  * bundles carry none): the public fields (sim, engine, speed, grid) plus, via
  * any-cast, `selectPicked`, `selected`, `refreshEditor`, `onUpdateAvailable`,
- * `setSpeed`, `onboarding.dismissSplash` and `refreshTraffic` (the last pins the
- * traffic chip); renaming any needs every consumer updated (TypeScript won't catch it).
+ * `setSpeed`, `onboarding.dismissSplash`, `refreshTraffic` (pins the traffic
+ * chip) and `jumpToTraffic` (the chip's tap, answering whether it went); renaming any needs every consumer updated (TypeScript won't catch it).
  */
 class GameApp implements GameAppPorts {
   /** The engine (either one, through the port), its view and code tables. */
@@ -403,6 +403,10 @@ class GameApp implements GameAppPorts {
    *  screenshot tooling (scripts/scenes/features.ts, screenshot-page-ops.ts)
    *  awaits `window.game.refreshTraffic()` to pin the chip. @internal */
   refreshTraffic(): void { refreshTraffic(this); }
+  /** The Traffic readout's tap, answering whether the camera went to a line
+   *  and its spotlight went up. Body in game/trafficHud.ts; the screenshot
+   *  tooling (scripts/scenes/trafficJump.ts) checks the answer. @internal */
+  jumpToTraffic(): boolean { return jumpToTraffic(this); }
 
   // ---- PWA update ---------------------------------------------------------
 

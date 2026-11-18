@@ -107,9 +107,17 @@ The Map's **Traffic** view colors each floor:
 - **Busy**: the elevators are working hard.
 - **Jammed**: tenants on this floor are starting to give up on the tower.
 
-It reads each floor the way the ratings do: how crowded its elevators, stairs and escalators are, or how long its people really wait on average, whichever is worse. The **Traffic** readout in the [info strip](/help/tower/map-and-windows/#the-info-strip) across the top of the game, the morning complaint about elevator waits and a room's card read it the same way, so they all point at the floor that is losing tenants. Click or tap the Traffic readout when it names a floor (or Tab to it and press <kbd>Enter</kbd>) and the view zooms in on it, centered on what is backing it up: the floor flashes red for a few seconds, and the elevators, stairs or escalators behind its reading are outlined in yellow. When the floor's people are waiting too long on average, every elevator that stops there is outlined.
+It reads each floor the way the ratings do: how crowded its elevators, stairs and escalators are, or how long its people really wait on average, whichever is worse. The morning complaint about elevator waits and a room's card read it the same way, so they all point at the floor that is losing tenants. A floor's average wait is remembered between rushes, so a floor can stay Busy or Jammed on the Map at night with nobody waiting.
 
-![The view zoomed in on floor 11 after a tap on "Gridlock · 11F": the floor banded in red and the elevator behind it outlined in yellow](../../../../../docs/screenshots/features/traffic-jump.png)
+### The Traffic readout
+
+The **Traffic** readout in the [info strip](/help/tower/map-and-windows/#the-info-strip) across the top of the game watches the people waiting right now. It names the worst line in the tower at this moment. A line counts by how long the person at its front has waited: while the person at its front has only just walked up, each person in it counts for a twentieth (a car's worth reads Smooth, but a fresh crowd of a hundred or more reads Busy at once); once that person is getting impatient, a quarter of its people count; and once they are fed up, everyone in that line counts. The readout picks the line that counts for the most. It reads **Smooth** when no line counts, **Busy** for a handful of people, **Backed up** (in red) for about a car's worth, and **Gridlock** for several cars' worth. Above Smooth it names the floor of that line, such as "Backed up · B4".
+
+Click or tap the Traffic readout when it names a floor (or Tab to it and press <kbd>Enter</kbd>) and the view zooms in on that line: its stretch of the floor flashes red for a few seconds, and the elevator the people are waiting for is outlined in yellow on that floor. That is the elevator to give more cars, an express stop or a second shaft. If the line has already gone by the time you tap, nothing moves.
+
+The Traffic readout and the Map's Traffic view can disagree, and that is expected: the readout is the line in front of you, the Map is how each floor has fared over its recent trips. A red readout at 9 in the morning with a green Map means a rush your elevators are slow to clear; a red Map floor with a Smooth readout at night means its tenants remember long waits from earlier in the day.
+
+![The view zoomed in on a line after a tap on the Traffic readout: the line's stretch of the floor banded in red and its elevator outlined in yellow](../../../../../docs/screenshots/features/traffic-jump.png)
 
 
 ## See also

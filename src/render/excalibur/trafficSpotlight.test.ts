@@ -3,8 +3,6 @@ import { drawTrafficSpotlight, spotlightAlpha, spotlightTraffic, SPOTLIGHT_MS, t
 import type { TowerEngine } from "./TowerEngine";
 import { FLOOR, TILE } from "../scale";
 
-vi.mock("../../presentation/viewWorld", () => ({ viewWorld: () => ({ lotWidth: 100 }) }));
-
 /** A spy canvas and an engine with an identity-ish camera. */
 function setup(reducedMotion = false) {
   const ctx = {
@@ -39,14 +37,16 @@ describe("spotlightAlpha", () => {
 });
 
 describe("drawTrafficSpotlight", () => {
-  it("bands the floor, outlines each shaft and drops itself once over", () => {
+  it("bands the line's stretch, outlines its elevator on that floor only, and drops itself once over", () => {
     const { ctx, engine, c } = setup(true);
     drawTrafficSpotlight(engine, c, 0);
     expect(ctx.fillRect).not.toHaveBeenCalled(); // nothing up yet
-    spotlightTraffic(engine, -1, [{ x: 40, width: 4, bottom: -6, top: 30 }], 1000);
+    spotlightTraffic(engine, -1, { x: 36, width: 11 }, { x: 40, width: 4 }, 1000);
     drawTrafficSpotlight(engine, c, 1500);
-    expect(ctx.fillRect).toHaveBeenCalledWith(0, FLOOR, 100 * TILE, FLOOR); // B2's row across the lot
-    expect(ctx.strokeRect).toHaveBeenCalledWith(40 * TILE - 2, -30 * FLOOR - 2, 4 * TILE + 4, 37 * FLOOR + 4); // the shaft
+    // B2's row from the line's left end, 11 tiles: never the whole lot.
+    expect(ctx.fillRect).toHaveBeenCalledExactlyOnceWith(36 * TILE, FLOOR, 11 * TILE, FLOOR);
+    // The elevator, one floor tall: never the whole shaft.
+    expect(ctx.strokeRect).toHaveBeenLastCalledWith(40 * TILE - 2, FLOOR - 2, 4 * TILE + 4, FLOOR + 4);
     expect(trafficSpotlightFloor(engine)).toBe(-1);
     drawTrafficSpotlight(engine, c, 1000 + SPOTLIGHT_MS + 1);
     expect(trafficSpotlightFloor(engine)).toBeNull();
