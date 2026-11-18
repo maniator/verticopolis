@@ -11,8 +11,9 @@ import { ENGINE_PATH, SALT_SECTION, installed, tamperCache } from "./engineCache
  * digests of the package it was built with; the loader fetches `BUILD.json`,
  * the glue and the binary, hashes what arrived, and refuses unless it is that
  * package. Here the cache or the network is made to serve something else, and
- * the page must refuse it with a reason, instantiate nothing, and add no
- * reload of its own.
+ * the page must refuse it with a reason and instantiate nothing. A page a
+ * worker controls adds no reload of its own; a page no worker controls
+ * reloads once by itself for files from another build, then stops.
  *
  * A refusal stops the game behind the engine failure message. Instrumentation,
  * installed before the page's own scripts: counters on `WebAssembly.instantiate` and friends and on Blob URLs
@@ -185,6 +186,7 @@ test.describe("an uncontrolled page", () => {
 
   test("refuses a binary from another build served over the network", async ({ page }) => {
     await spy(page);
+    const seen = navigations(page);
     await page.route("**/engine/verticopolis_engine_bg.wasm", async (route) => {
       const response = await route.fetch();
       const body = Buffer.concat([await response.body(), Buffer.from(SALT_SECTION)]);
@@ -192,19 +194,38 @@ test.describe("an uncontrolled page", () => {
       await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
     });
     await page.goto("/");
+    await expect.poll(() => seen.count, { message: "the page reloads once by itself for another build's files" }).toBe(2);
     const failure = await expectRefused(page, "wasm", { oversize: true });
     expect(failure.package?.controlled, "no worker controlled this page").toBe(false);
   });
 
   test("refuses a glue from another build served over the network", async ({ page }) => {
     await spy(page);
+    const seen = navigations(page);
     await page.route("**/engine/verticopolis_engine.js", async (route) => {
       const response = await route.fetch();
       const body = Buffer.from(`${await response.text()}\n// another build\n`);
       await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
     });
     await page.goto("/");
+    await expect.poll(() => seen.count).toBe(2);
     const failure = await expectRefused(page, "glue", { oversize: true });
     expect(failure.package?.controlled).toBe(false);
+  });
+
+  test("a persisting mismatch reloads the page once by itself, then stops", async ({ page }) => {
+    await spy(page);
+    await page.route("**/engine/verticopolis_engine_bg.wasm", async (route) => {
+      const response = await route.fetch();
+      const body = Buffer.concat([await response.body(), Buffer.from(SALT_SECTION)]);
+      await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
+    });
+    const seen = navigations(page);
+    await page.goto("/");
+    await expect.poll(() => seen.count).toBe(2);
+    await expectRefused(page, "wasm", { oversize: true });
+    // Long enough for a second reload to show.
+    await page.waitForTimeout(5_000);
+    expect(seen.count, "the player's visit and the page's one reload, no more").toBe(2);
   });
 });

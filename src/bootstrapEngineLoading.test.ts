@@ -4,6 +4,7 @@ import { EngineBootError } from "./wasmhost/engineBoot";
 import { EnginePackageError } from "./wasmhost/enginePackageCheck";
 import { ENGINE_LOADING_DELAY_MS, ENGINE_LOADING_TEXT } from "./engineLoading";
 import { resetEngineStatus } from "./analyticsEngineStatus";
+import { MISMATCH_RELOAD_KEY } from "./engineCrash/mismatchReload";
 
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
@@ -26,6 +27,7 @@ function stubWebGL(): void {
 describe("bootGame, the engine loading line (#1132)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    sessionStorage.removeItem(MISMATCH_RELOAD_KEY);
     vi.unstubAllGlobals();
     document.body.innerHTML = "";
     delete (window as unknown as { game?: unknown }).game;
@@ -62,6 +64,8 @@ describe("bootGame, the engine loading line (#1132)", () => {
   it("sends a refused package to the exception tracker by code and kind, not by digest", async () => {
     stubWebGL();
     vi.spyOn(console, "error").mockImplementation(() => {});
+    // This tab already reloaded once for this build's mismatch, so boot stops.
+    sessionStorage.setItem(MISMATCH_RELOAD_KEY, JSON.stringify([__APP_SHA__]));
     const run = bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() }))).catch((e: unknown) => e);
     await vi.waitFor(() => expect(held.fail).not.toBe(noop));
     held.fail(new EnginePackageError("mismatch", "the wasm is not the file expected (aaaaaaaaaaaa)", { file: "wasm", expected: null, found: "aaaaaaaaaaaa", expectedPackage: null, servedPackage: null, controlled: false }));

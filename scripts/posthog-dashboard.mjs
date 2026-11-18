@@ -640,6 +640,15 @@ function buildInsights(ids) {
         "app_action graphics_recovered by where the loss happened (game: mid-game, title: behind the title screen), production, from the build that ships it (2026-11-16). One event per recovery that worked, a lower bound like every client event. Read it beside the crash event with repeat false; crash is deduped per page life on its flag set, so do not add the two as a count of first losses.",
       query: trends([series("app_action", "Recoveries")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["graphics_recovered"])] }),
     },
+    {
+      name: "Engine files from another build, reloaded",
+      // A reference spec, not yet on the live Gameplay Overview. It carries no
+      // `overview` mark, so the add-only sync (#2458) leaves it alone; mark it
+      // when the owner wants the tile placed.
+      description:
+        "app_action engine_reload (detail mismatch), production, from the build that ships it (2026-11-18): a boot on a page no service worker controls, whose engine files were from another build than the page, reloaded once by itself instead of showing the stop screen. One event per reload, a lower bound like every client event. A controlled page, or a page that came back as a build the tab already reloaded from, still stops, and shows as engine_status package-mismatch with no reload event.",
+      query: trends([series("app_action", "Reloads")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["engine_reload"])] }),
+    },
     // App-chrome actions (the app_action event). COOKIELESS: every tile here is
     // per-session and cohort, never per-person. "8% of sessions exported, more
     // among returning desktop players" is answerable; "who are my power users" is

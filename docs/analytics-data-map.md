@@ -173,6 +173,14 @@ One `app_action` counts the WebGL losses the game survived (2026-11-16). The fac
 | --- | --- | --- | --- |
 | `graphics_recovered` | `game` or `title` | The device dropped the game's WebGL graphics and the game rebuilt them in place, mid-game (`game`) or behind the title screen (`title`) | Counted per recovery, a lower bound like every client event. Read it beside `crash` with `repeat` false (a first loss that ended on the crash screen). `crash` is deduped per page life on its flag set, so do not add the two as a count of first losses |
 
+## Engine files from another build
+
+One `app_action` counts the boots that reloaded once by themselves because the engine files were from another build than the page (2026-11-18). A browser can serve a cached older page while the engine files come from the newer build that is live; the byte check refuses that pair. On a page no service worker controls, the page now reloads once per build per tab before the stop screen (a controlled page would get the same pair from its precache, so it keeps the screen and its Repair), and that boot's `engine_status` settle row still says `package-mismatch` at `load`.
+
+| `action` | `detail` | When | Reading |
+| --- | --- | --- | --- |
+| `engine_reload` | `mismatch` | Boot found engine files from another build and reloaded the page once | Counted per reload, a lower bound like every client event. The page life after it sends its own `engine_status` rows, so a reload that worked is a `settle` row with `none` from the same session. A page that comes back as a build the tab already reloaded from stops on the screen as before, and its settle row says `package-mismatch` with no second `engine_reload`. |
+
 ## Bridge floors between rooms (Modern)
 
 From the release after 4.6.0, a new Modern tower starts with **Bridge floors between rooms**
