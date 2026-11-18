@@ -30,6 +30,8 @@ import { recentTowers } from "../storage/recentTowers";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import { setCurrentFile, setCurrentLinkedFile } from "./currentFile";
 import { captureOutgoing, dropOutgoing, keepOutgoing, keptSettled, openingFile, resetOutgoingForTests } from "./keepOutgoing";
+import { keepOpenedFile } from "./fileKeep";
+import { claimTower } from "./towerDocument";
 
 /** The engine port and the UI the module talks to, as spies. */
 function makeApp(name = "Harmony Tower 2.0") {
@@ -85,6 +87,33 @@ describe("the tower left by opening another", () => {
     expect(m.track).toHaveBeenCalledExactlyOnceWith("tower_kept", "file");
     expect(raw.ui.toast).toHaveBeenCalledWith('Saved "Harmony" in My Towers.', "good");
     expect(recentTowers()[0], "the kept file tops Open Recent").toMatchObject({ place: "towers", id: own.id, name: "Harmony" });
+  });
+
+  it("heads Open Recent above a tower opened from the device, even when its keep is written first", async () => {
+    // Behind the title screen the keep writes the Auto-save's bytes, with no
+    // packing, so its write is queued before the open's own.
+    m.live = false;
+    const own = await fileSpace.save("Harmony", "tower", Uint8Array.from([0]));
+    localStorage.setItem("verticopolis-tower-file", JSON.stringify({ file: own.id, savedAt: 5 }));
+    const { app, swap } = makeApp("Throwaway");
+    // The picked file is big, so its write lands after the keep's.
+    const add = fileSpace.add.bind(fileSpace);
+    const slowAdd = vi.spyOn(fileSpace, "add").mockImplementation(async (...args) => {
+      await vi.waitFor(async () => expect((await fileSpace.read(own.id))?.byteLength).toBeGreaterThan(1));
+      return add(...args);
+    });
+    let kept: Promise<unknown> = Promise.resolve();
+    // File > Open… from the device, as `onImport` runs it: the open claims the
+    // tower, the swap happens inside the import, then the picked file is kept.
+    await claimTower(async () => {
+      captureOutgoing(app, "open");
+      swap();
+      kept = keepOutgoing(app);
+      await keepOpenedFile("Beta.vctower", Uint8Array.from([1]), "tower");
+    });
+    slowAdd.mockRestore();
+    expect(await kept).toBe("file");
+    expect(recentTowers().map((t) => t.name), "the tower left is line 1, so going back is one pick").toEqual(["Harmony", "Beta"]);
   });
 
   it("opening its own file again to go back keeps the minutes since as a new file, never over the file being read", async () => {

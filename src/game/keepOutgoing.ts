@@ -12,7 +12,7 @@ import { vctowerFileOf } from "./autosaveMirror";
 import { linkedFolder } from "../storage/linkedFolder";
 import { currentFileId, currentLinkedFile } from "./currentFile";
 import { saveBytes } from "./portLifecycle";
-import { crashCopyRef } from "./towerDocument";
+import { claimsSettled, crashCopyRef } from "./towerDocument";
 
 /**
  * Never lose the tower the player leaves (owner, 2026-11-16, NO LOST SAVES).
@@ -239,7 +239,7 @@ async function keep(app: Pick<GameApp, "ui">, o: Outgoing): Promise<"file" | "fo
     }
     const entry = await fileSpace.add(o.name, "tower", bytes);
     // The tower just left heads File > Open Recent, so going back is one pick.
-    noteTowersFile(entry);
+    await noteKept(entry);
     trackAppAction("tower_kept", "new");
     app.ui.toast(`Kept your last tower in My Towers as "${entry.name}".`, "good");
     return "new";
@@ -249,11 +249,22 @@ async function keep(app: Pick<GameApp, "ui">, o: Outgoing): Promise<"file" | "fo
   }
 }
 
+/** Put the kept tower at the head of File > Open Recent once the open that
+ *  replaced it has noted the tower coming in. The keep starts inside that open
+ *  (the swap happens mid-import). When the open writes the file it brought in
+ *  first (File > Open… from the device, a 1994 import), the keep can finish
+ *  first, as a keep with no packing does, and the tower left must still head
+ *  the list. */
+async function noteKept(entry: Parameters<typeof noteTowersFile>[0]): Promise<void> {
+  await claimsSettled();
+  noteTowersFile(entry);
+}
+
 /** Write the tower into its own My Towers file. False when the file is gone
  *  or another window wrote it since, so the tower gets a new file instead. */
 async function keptInOwnFile(id: string, bytes: Uint8Array): Promise<boolean> {
   try {
-    noteTowersFile(await fileSpace.overwrite(id, bytes));
+    await noteKept(await fileSpace.overwrite(id, bytes));
     return true;
   } catch (err) {
     if (err instanceof FileGoneError || err instanceof FileConflictError) return false;

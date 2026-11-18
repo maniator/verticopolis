@@ -65,6 +65,9 @@ let live: DocApp | null = null;
 let crash: { generation: number; savedAt: number } | null = null;
 /** Opens that will name the live tower's file themselves (`claimTower`). */
 let claims = 0;
+/** Settles when the last claim ends ({@link claimsSettled}). */
+let claimsIdle: Promise<void> = Promise.resolve();
+let releaseClaims: (() => void) | null = null;
 /** The file writes, one after another. */
 let writing: Promise<unknown> = Promise.resolve();
 let unsubscribe: (() => void) | null = null;
@@ -248,13 +251,28 @@ export function crashCopyWritten(generation: number, savedAt: number, packed: Ui
  * every open settles, a live tower still without a file gets one at once.
  */
 export async function claimTower<T>(work: () => Promise<T>): Promise<T> {
+  if (claims === 0) claimsIdle = new Promise((resolve) => (releaseClaims = resolve));
   claims++;
   try {
     return await work();
   } finally {
     claims--;
-    if (claims === 0 && live && currentFileId() === null && currentLinkedFile() === null) autosaveIfLive(live.saveLoad);
+    if (claims === 0) {
+      releaseClaims?.();
+      releaseClaims = null;
+      if (live && currentFileId() === null && currentLinkedFile() === null) autosaveIfLive(live.saveLoad);
+    }
   }
+}
+
+/** Settles once no open is claiming the live tower: at once when none is.
+ *  The keep of the tower just left waits for it before it heads Open Recent,
+ *  so the open's own note of the tower coming in never lands above it.
+ *  So a claim must never await `keptSettled()`: the keep would wait for the
+ *  claim and the claim for the keep. Opens await it before they claim
+ *  (`openRow`). */
+export function claimsSettled(): Promise<void> {
+  return claims === 0 ? Promise.resolve() : claimsIdle;
 }
 
 /** The Auto-save came back in (Continue's load, Open Recent's): it is the tower the ref names. */
@@ -322,6 +340,9 @@ export function resetTowerDocumentForTests(): void {
   live = null;
   crash = null;
   claims = 0;
+  releaseClaims?.();
+  releaseClaims = null;
+  claimsIdle = Promise.resolve();
   writing = Promise.resolve();
   fileFailSaid = false;
 }
