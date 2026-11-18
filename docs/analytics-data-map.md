@@ -75,10 +75,10 @@ an event sent before boot carries `version` only.
 
 | Event | Fields | When | Why |
 | --- | --- | --- | --- |
-| `new_game_started` | `mode` | A tower is founded | Funnel entry: new towers |
-| `first_build` | `tool` | First facility in a tower | Funnel: did they build anything |
+| `new_game_started` | `mode`, `tower_n`, `page_life` | A tower is founded | Funnel entry: new towers |
+| `first_build` | `tool`, `tower_n`, `page_life` | First facility in a tower | Funnel: did they build anything |
 | `tool_used` | `tool` | First use of each tool in a session | Tool mix |
-| `star_reached` | `star` | Each star rung crossed | Progression depth |
+| `star_reached` | `star`, `tower_n`, `page_life` | Each star rung crossed | Progression depth |
 | `milestone_reached` | `id` | An optional milestone is achieved (from the engine's event) | Which goals players reach, beyond stars |
 | `session_end` | `seconds`, `final` | Every tab hide and page hide | Session length, read only through the `session_lengths` view |
 | `boot` | `reason`, `version`, `mode`, `star`, `floors`, `population`, `flights` | Once per page life | Why a session started and the tower it opened. `flights` counts its stairs and escalators, so a read can see how many Modern towers build past Classic's limit of 64 (Modern has none) |
@@ -131,6 +131,23 @@ Outside the typed vocabulary:
   therefore shows `<player text>` where a name was.
 - **Vercel page-view counts and Speed Insights** (`src/telemetry.ts`): anonymous
   page visits and page performance metrics, on the same host gate.
+
+
+## The first-tower funnel's tower fields
+
+`new_game_started`, `first_build` and `star_reached` carry two fields so the
+funnel can be counted per tower rather than per tab (#2392, from the first
+release that sends them):
+
+| Field | Values | Why |
+| --- | --- | --- |
+| `tower_n` | 1 to 50 | Which tower of this page life the event belongs to. An ordinal held in memory and never stored, so a reload starts it over. It moves on whenever the game takes up another tower (a New, an Open, an import) and at each founding the engine reports, so it has gaps; only two events carrying the same number matter. An undo or redo keeps it. 50 means the 50th tower or a later one, so a per-tower count leaves it out |
+| `page_life` | random id | The same in-memory page-life id the `engine_status` rows carry: minted once per page life and never stored. It keeps two page lives of one tab apart, since `tower_n` starts over on a reload |
+
+Together they name one tower of one page life and nothing more: they cannot
+link a page life to another visit, a device or a person, and the tower's name
+and contents are never sent. A star the replaced tower earns in the moment
+before a swap lands on a number no founding carries, so it finishes no funnel.
 
 ## Persistence failure actions
 

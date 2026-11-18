@@ -39,6 +39,9 @@ function makeStub(): AnalyticsAdapter & {
   };
 }
 
+
+/** The first-tower funnel's tower fields (#2392): tower `n` of this page life. */
+const tw = (n: number) => ({ tower_n: n, page_life: expect.any(String) });
 describe("analytics adapter seam", () => {
   let restore: AnalyticsAdapter;
   let stub: ReturnType<typeof makeStub>;
@@ -129,9 +132,9 @@ describe("analytics adapter seam", () => {
     ]);
     // Props ride through untouched (spot-check across the vocabulary).
     const byName = new Map(stub.events);
-    expect(byName.get("new_game_started")).toEqual({ mode: "modern" });
-    expect(byName.get("first_build")).toEqual({ tool: "office" });
-    expect(byName.get("star_reached")).toEqual({ star: 3 });
+    expect(byName.get("new_game_started")).toEqual({ mode: "modern", ...tw(1) });
+    expect(byName.get("first_build")).toEqual({ tool: "office", ...tw(1) });
+    expect(byName.get("star_reached")).toEqual({ star: 3, ...tw(1) });
     expect(byName.get("session_builds")).toEqual({ builds: 2 });
     expect(byName.get("session_peak_floors")).toEqual({ floors: 5 });
     expect(byName.get("tool_session_uses")).toEqual({ tool: "office", uses: 2 });
@@ -155,7 +158,7 @@ describe("analytics adapter seam", () => {
     // the stub sees nothing more: custom events go relay-only, and the page
     // inject carries the kept page-level pair (Speed Insights, then the
     // page-view inject, same order as pre-seam).
-    expect(vi.mocked(sendToRelay)).toHaveBeenCalledWith("star_reached", { star: 5 });
+    expect(vi.mocked(sendToRelay)).toHaveBeenCalledWith("star_reached", { star: 5, ...tw(1) });
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
     expect(vi.mocked(injectSpeedInsights).mock.invocationCallOrder[0]).toBeLessThan(

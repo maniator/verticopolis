@@ -34,6 +34,9 @@ function propsFor(name: string): unknown[] {
   return sent().filter(([n]) => n === name).map(([, p]) => p);
 }
 
+/** The first-tower funnel's tower fields (#2392): tower `n` of this page life. */
+const tw = (n: number) => ({ tower_n: n, page_life: expect.any(String) });
+
 const founded = (mode = "classic") => ({ name: "tower_founded", payload: { mode } });
 const placed = (kind: string, floor: number, count = 1) => ({ name: "facility_placed", payload: { kind, floor, count } });
 const star = (s: number) => ({ name: "star_reached", payload: { star: s } });
@@ -74,9 +77,9 @@ describe("analytics engine bridge", () => {
       { name: "capacity_changed", payload: { kind: "elevatorStandard" } },
     ]);
     expect(sent()).toEqual([
-      ["new_game_started", { mode: "modern" }],
-      ["first_build", { tool: "lobby" }], // the kind placed; once per tower
-      ["star_reached", { star: 2 }],
+      ["new_game_started", { mode: "modern", ...tw(2) }], // the founding is the page life's second tower
+      ["first_build", { tool: "lobby", ...tw(2) }], // the kind placed; once per tower
+      ["star_reached", { star: 2, ...tw(2) }],
       ["emergency_choice", { kind: "fireRescue", decision: "accept" }],
       ["economy_action", { action: "price_tune" }], // latched once per session
       ["economy_action", { action: "capacity_tune" }],
@@ -134,7 +137,7 @@ describe("analytics engine bridge", () => {
 
   it("reports every rung of a multi-rung jump", () => {
     forwardGameplayEvents([star(3), star(4)]);
-    expect(propsFor("star_reached")).toEqual([{ star: 3 }, { star: 4 }]);
+    expect(propsFor("star_reached")).toEqual([{ star: 3, ...tw(1) }, { star: 4, ...tw(1) }]);
   });
 
   it("sums placements, so a brush's per-tile events count the tiles it laid", () => {
@@ -153,9 +156,9 @@ describe("analytics engine bridge", () => {
     // A load hands its events on with no founding: the funnel stays closed.
     forwardGameplayEvents([placed("hotelSingle", 6)]);
     expect(sent()).toEqual([
-      ["first_build", { tool: "office" }],
-      ["new_game_started", { mode: "classic" }],
-      ["first_build", { tool: "shop" }],
+      ["first_build", { tool: "office", ...tw(1) }],
+      ["new_game_started", { mode: "classic", ...tw(2) }],
+      ["first_build", { tool: "shop", ...tw(2) }],
     ]);
   });
 
@@ -172,7 +175,7 @@ describe("analytics engine bridge", () => {
       star(3),
     ]);
     expect(engineBridgeStats().rejected).toBe(8);
-    expect(sent()).toEqual([["star_reached", { star: 3 }]]);
+    expect(sent()).toEqual([["star_reached", { star: 3, ...tw(1) }]]);
   });
 
   it("rate-limits the per-occurrence sends but keeps counting", () => {
@@ -213,13 +216,16 @@ describe("analytics engine bridge", () => {
     // carries a tool that tower did not place first.
     const funnel = sent().filter(([n]) => n === "new_game_started" || n === "first_build");
     expect(funnel.filter(([n]) => n === "first_build")).toEqual([
-      ["first_build", { tool: "office" }],
-      ["first_build", { tool: "hotelSingle" }],
+      ["first_build", { tool: "office", ...tw(2) }],
+      // A, 19 empty towers and the held-back B came first: C is tower 23.
+      ["first_build", { tool: "hotelSingle", ...tw(BRIDGE_SEND_LIMIT + 3) }],
     ]);
-    funnel.forEach(([n], i) => {
-      if (n === "first_build") expect(funnel[i - 1][0]).toBe("new_game_started");
+    funnel.forEach(([n, props], i) => {
+      if (n !== "first_build") return;
+      expect(funnel[i - 1][0]).toBe("new_game_started");
+      expect((props as { tower_n: number }).tower_n).toBe((funnel[i - 1][1] as { tower_n: number }).tower_n);
     });
-    expect(funnel[funnel.length - 2]).toEqual(["new_game_started", { mode: "modern" }]);
+    expect(funnel[funnel.length - 2]).toEqual(["new_game_started", { mode: "modern", ...tw(BRIDGE_SEND_LIMIT + 3) }]);
     // B's builds were still counted for the session.
     gameplaySession.end(false);
     expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
@@ -249,7 +255,7 @@ describe("analytics engine bridge", () => {
     fail = false;
     drainEngineEvents(src);
     drainEngineEvents(src);
-    expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]); // once, not lost or repeated
+    expect(propsFor("new_game_started")).toEqual([{ mode: "classic", ...tw(2) }]); // once, not lost or repeated
     expect(engineBridgeStats().engineDropped).toBe(3);
   });
 
@@ -270,7 +276,7 @@ describe("analytics engine bridge", () => {
       },
     };
     expect(() => drainEngineEvents(trapped as unknown as GameplayEventSource)).not.toThrow();
-    expect(propsFor("star_reached")).toEqual([{ star: 2 }]);
+    expect(propsFor("star_reached")).toEqual([{ star: 2, ...tw(1) }]);
   });
 
   it("drops the engine's pending events unsent when a window closes, and refills the send budget", () => {
@@ -283,7 +289,7 @@ describe("analytics engine bridge", () => {
     expect(engineBridgeStats().discarded).toBe(2);
     vi.mocked(sendToRelay).mockReset();
     forwardGameplayEvents([star(4)]);
-    expect(sent()).toEqual([["star_reached", { star: 4 }]]);
+    expect(sent()).toEqual([["star_reached", { star: 4, ...tw(1) }]]);
   });
 
   it("asks the source to let go of held events at the session's own flushes, and only there (#874)", () => {
@@ -331,7 +337,7 @@ describe("analytics engine bridge", () => {
     try {
       expect(() => forwardGameplayEvents([star(2), founded()])).not.toThrow();
       expect(engineBridgeStats().foldFailures).toBe(1);
-      expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
+      expect(propsFor("new_game_started")).toEqual([{ mode: "classic", ...tw(2) }]);
     } finally {
       spy.mockRestore();
     }
@@ -365,8 +371,8 @@ describe("analytics engine bridge", () => {
     drainEngineEvents(live);
     gameplaySession.end(false);
     expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
-    expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
-    expect(propsFor("first_build")).toEqual([{ tool: "lobby" }]);
+    expect(propsFor("new_game_started")).toEqual([{ mode: "classic", ...tw(2) }]);
+    expect(propsFor("first_build")).toEqual([{ tool: "lobby", ...tw(2) }]);
     expect(engineBridgeStats()).toMatchObject({ rejected: 1, drainFailures: 1 });
     // A new window drops what the engine holds unsent; nothing is folded twice.
     queue.push(placed("lobby", 1));

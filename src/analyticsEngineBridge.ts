@@ -3,6 +3,7 @@ import { GAMEPLAY_EVENT_RULES } from "./events/gameplayEventRules";
 import type { GameplayEvent } from "./events/gameplayEvents";
 import { RateLimiter } from "./analyticsRateLimit";
 import { gameplaySession } from "./analyticsSession";
+import { nextAnalyticsTower } from "./analyticsTower";
 import { trackBombOutcome, trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice, trackFireOutcome } from "./analyticsActions";
 
 /**
@@ -128,7 +129,8 @@ function fold(event: GameplayEvent, now: number): void {
       // A founding the rate limit holds back closes the funnel, so no
       // first_build is sent without its own new_game_started ahead of it,
       // and the new tower's first build is never credited to the tower
-      // before it.
+      // before it. Sent or not, it is another tower for the funnel's tower_n.
+      nextAnalyticsTower();
       if (allowSend("new_game_started", now)) gameplaySession.noteNewGame(event.payload.mode);
       else gameplaySession.noteNewGameUnreported();
       return;

@@ -6,6 +6,8 @@ import { currentFileId, setCurrentFile } from "./currentFile";
 // Loading main.ts boots the game at module scope; this test only needs the
 // class, so the boot is stubbed out.
 vi.mock("../bootstrap", () => ({ bootGame: vi.fn() }));
+vi.mock("../analyticsTower", async (original) => ({ ...(await original<typeof import("../analyticsTower")>()), nextAnalyticsTower: vi.fn() }));
+import { nextAnalyticsTower } from "../analyticsTower";
 import type { TrafficTier } from "../presentation/traffic";
 
 /**
@@ -229,5 +231,17 @@ describe("followSwap and the live tower's My Towers file", () => {
     const app = standIn(1);
     GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
     expect(currentFileId()).toBe("this tower");
+  });
+});
+
+describe("followSwap and the first-tower funnel's tower number (#2392)", () => {
+  it("moves the number on for another tower, a restore included, and keeps it on an undo or redo step", () => {
+    vi.mocked(nextAnalyticsTower).mockClear();
+    GameApp.prototype.followSwap.call(standIn(0) as unknown as GameApp);
+    expect(nextAnalyticsTower).toHaveBeenCalledTimes(1);
+    GameApp.prototype.followSwap.call(standIn(0) as unknown as GameApp, "restore");
+    expect(nextAnalyticsTower).toHaveBeenCalledTimes(2);
+    GameApp.prototype.followSwap.call(standIn(0) as unknown as GameApp, "step");
+    expect(nextAnalyticsTower, "a step is the same tower").toHaveBeenCalledTimes(2);
   });
 });

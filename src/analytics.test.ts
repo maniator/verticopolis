@@ -21,6 +21,9 @@ function setVisibility(state: "visible" | "hidden"): void {
   Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
 }
 
+
+/** The first-tower funnel's tower fields (#2392): tower `n` of this page life. */
+const tw = (n: number) => ({ tower_n: n, page_life: expect.any(String) });
 describe("gameplay analytics events", () => {
   beforeEach(() => {
     window.location.href = prod;
@@ -36,8 +39,8 @@ describe("gameplay analytics events", () => {
   it("reports new_game_started, star_reached with their props on a deployed host", () => {
     gameplaySession.noteNewGame("modern");
     gameplaySession.noteStar(3);
-    expect(sendToRelay).toHaveBeenNthCalledWith(1, "new_game_started", { mode: "modern" });
-    expect(sendToRelay).toHaveBeenNthCalledWith(2, "star_reached", { star: 3 });
+    expect(sendToRelay).toHaveBeenNthCalledWith(1, "new_game_started", { mode: "modern", ...tw(1) });
+    expect(sendToRelay).toHaveBeenNthCalledWith(2, "star_reached", { star: 3, ...tw(1) });
   });
 
   it("fires no event on a non-deployed host (localhost, e2e preview)", () => {
@@ -96,7 +99,7 @@ describe("gameplay analytics events", () => {
     gameplaySession.noteBuild("floor");
     gameplaySession.noteBuild("office");
     expect(sendToRelay).toHaveBeenCalledTimes(1);
-    expect(sendToRelay).toHaveBeenCalledWith("first_build", { tool: "floor" });
+    expect(sendToRelay).toHaveBeenCalledWith("first_build", { tool: "floor", ...tw(1) });
   });
 
   it("dedups tool_used per distinct tool, not per selection", () => {
@@ -112,9 +115,9 @@ describe("gameplay analytics events", () => {
     gameplaySession.noteBuild("floor"); // first build of tower A
     gameplaySession.noteNewGame("modern"); // founding tower B resets the latch
     gameplaySession.noteBuild("office"); // first build of tower B fires again
-    expect(sendToRelay).toHaveBeenNthCalledWith(1, "first_build", { tool: "floor" });
-    expect(sendToRelay).toHaveBeenNthCalledWith(2, "new_game_started", { mode: "modern" });
-    expect(sendToRelay).toHaveBeenNthCalledWith(3, "first_build", { tool: "office" });
+    expect(sendToRelay).toHaveBeenNthCalledWith(1, "first_build", { tool: "floor", ...tw(1) });
+    expect(sendToRelay).toHaveBeenNthCalledWith(2, "new_game_started", { mode: "modern", ...tw(1) });
+    expect(sendToRelay).toHaveBeenNthCalledWith(3, "first_build", { tool: "office", ...tw(1) });
   });
 
   it("arm claims the listener wiring exactly once until reset", () => {
@@ -167,6 +170,7 @@ describe("common event enrichment (S4)", () => {
       tenure: "d7-29",
       recency: "7d",
       mode: "modern",
+      ...tw(1),
     });
     expect(sendToRelay).toHaveBeenNthCalledWith(2, "star_reached", {
       platform: "twa",
@@ -174,6 +178,7 @@ describe("common event enrichment (S4)", () => {
       tenure: "d7-29",
       recency: "7d",
       star: 3,
+      ...tw(1),
     });
   });
 
@@ -182,14 +187,14 @@ describe("common event enrichment (S4)", () => {
     // props are spread last.
     setCommonProps({ mode: "should-be-overridden" });
     gameplaySession.noteNewGame("classic");
-    expect(sendToRelay).toHaveBeenCalledWith("new_game_started", { mode: "classic" });
+    expect(sendToRelay).toHaveBeenCalledWith("new_game_started", { mode: "classic", ...tw(1) });
   });
 
   it("clears the common props on reset, so a later event carries none", () => {
     setCommonProps({ platform: "twa" });
     gameplaySession.reset();
     gameplaySession.noteStar(2);
-    expect(sendToRelay).toHaveBeenCalledWith("star_reached", { star: 2 });
+    expect(sendToRelay).toHaveBeenCalledWith("star_reached", { star: 2, ...tw(1) });
   });
 });
 
@@ -370,10 +375,10 @@ describe("startGameplaySession wiring", () => {
  * events someone happened to remember.
  */
 const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
-  new_game_started: { mode: "modern" },
-  first_build: { tool: "office" },
+  new_game_started: { mode: "modern", tower_n: 1, page_life: "page" },
+  first_build: { tool: "office", tower_n: 1, page_life: "page" },
   tool_used: { tool: "lobby" },
-  star_reached: { star: 3 },
+  star_reached: { star: 3, tower_n: 1, page_life: "page" },
   milestone_reached: { id: "pop-500" },
   session_end: { seconds: 42, final: true },
   boot: { reason: "continue", version: "1.0.0", mode: "modern", star: 2, floors: 10, population: 90, flights: 6 },
