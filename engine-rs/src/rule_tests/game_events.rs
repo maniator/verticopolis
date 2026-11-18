@@ -326,3 +326,96 @@ fn a_declined_rescue_can_be_called_again_while_the_fire_burns() {
     assert_eq!(sim.money, money - offered);
     assert_eq!(sim.call_fire_rescue(), Err(FireRescueRefusal::None));
 }
+
+/// The first office's id.
+fn first_office(sim: &Simulation) -> i64 {
+    sim.tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Office)
+        .unwrap()
+        .id
+}
+
+/// The emergency notices name what happened in Classic and add the fix in
+/// Modern (#549). Some of these Classic cases cannot come up in play
+/// (Classic sends fires, thieves and bombs only to a tower with Security,
+/// which it never lets go), so the tower is set up by hand to reach each
+/// notice in both modes.
+#[test]
+fn the_emergency_notices_name_a_fix_in_modern_only() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let advises = mode.advises_fixes();
+        // A fire with no Security: the tip.
+        let mut fire = office_tower(mode, 3, false);
+        assert!(fire.start_fire_at(first_office(&fire)));
+        assert_eq!(
+            logged(&fire, "fights fires for free"),
+            advises,
+            "{mode:?} tip"
+        );
+        // The paid helicopter lands.
+        fire.resolve_choice(true);
+        fire.land_helicopter();
+        assert!(logged(&fire, "helicopter put the fire out"), "{mode:?}");
+        assert_eq!(
+            logged(&fire, "Bulldoze and rebuild them."),
+            advises,
+            "{mode:?} helicopter"
+        );
+        // A fire that burns a room down.
+        let mut burn = office_tower(mode, 3, false);
+        assert!(burn.start_fire_at(first_office(&burn)));
+        burn.resolve_choice(false);
+        script_main(&mut burn, |r| r.next() < 0.01);
+        burn.maybe_random_event();
+        assert!(logged(&burn, "burned down"), "{mode:?}");
+        assert_eq!(
+            logged(&burn, "Bulldoze the rubble and rebuild."),
+            advises,
+            "{mode:?} burned"
+        );
+        // A bomb with no Security to find it.
+        let mut boom = office_tower(mode, 4, false);
+        boom.bomb_threat();
+        assert!(logged(&boom, "A bomb detonated"), "{mode:?}");
+        assert_eq!(logged(&boom, "Build Security!"), advises, "{mode:?} blast");
+        // A refused ransom with no Security to search.
+        let mut refused = office_tower(mode, 4, false);
+        refused.events.pending = Some(crate::events::PendingChoice {
+            kind: "bombThreat",
+            cost: 300_000.0,
+            message: "ransom".into(),
+        });
+        refused.resolve_choice(false);
+        assert!(logged(&refused, "You refused the ransom."), "{mode:?}");
+        assert_eq!(
+            logged(&refused, "Build Security!"),
+            advises,
+            "{mode:?} ransom"
+        );
+    }
+}
+
+/// A theft Security could not stop names the fix in Modern only (#549).
+/// Modern's thief reaches a tower with no Security; Classic sends one only
+/// to a tower with Security, which catches a thief it can reach, so its
+/// notice is read straight from the text it would carry.
+#[test]
+fn a_theft_names_the_fix_in_modern_only() {
+    let robbed = thief_day(GameMode::Modern, false);
+    assert!(logged(&robbed, "made off with $"));
+    assert!(logged(&robbed, "Build Security."));
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let notice = office_tower(mode, 2, false).theft_notice(12_000.0);
+        assert!(
+            notice.starts_with("🕵️ A thief slipped through the tower and made off with $12,000."),
+            "{notice}"
+        );
+        assert_eq!(
+            notice.ends_with(" Build Security."),
+            mode.advises_fixes(),
+            "{mode:?}: {notice}"
+        );
+    }
+}

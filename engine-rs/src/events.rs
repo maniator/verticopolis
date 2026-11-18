@@ -424,7 +424,16 @@ impl Simulation {
                 self.events.fires_gut_rooms += 1;
                 gutted += 1;
                 self.events.active.shift_remove(&id);
-                let msg = format!("🔥 The {} on {} burned down. Only a gutted shell remains. Bulldoze the rubble and rebuild.", name, self.floor_label(floor));
+                let fix = if self.mode.advises_fixes() {
+                    " Bulldoze the rubble and rebuild."
+                } else {
+                    ""
+                };
+                let msg = format!(
+                    "🔥 The {} on {} burned down. Only a gutted shell remains.{fix}",
+                    name,
+                    self.floor_label(floor)
+                );
                 self.emit(&msg, LogKind::Bad);
             } else {
                 let adjacent = self

@@ -45,13 +45,22 @@ impl Simulation {
         }
         let loss = 5_000.0 + self.events.extra.int(0, 20_000) as f64;
         self.money -= loss;
-        self.emit(
-            &format!(
-                "🕵️ A thief slipped through the tower and made off with ${}. Build Security.",
-                with_thousands(loss)
-            ),
-            LogKind::Bad,
-        );
+        let notice = self.theft_notice(loss);
+        self.emit(&notice, LogKind::Bad);
+    }
+
+    /// The notice for a thief who got away with `loss`. Classic names the
+    /// loss only (#549); Modern adds the fix.
+    pub(crate) fn theft_notice(&self, loss: f64) -> String {
+        let fix = if self.mode.advises_fixes() {
+            " Build Security."
+        } else {
+            ""
+        };
+        format!(
+            "🕵️ A thief slipped through the tower and made off with ${}.{fix}",
+            with_thousands(loss)
+        )
     }
 
     /// Where the thief prowls: a floor with something on it and a tile of

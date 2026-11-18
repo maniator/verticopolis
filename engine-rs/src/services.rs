@@ -11,6 +11,9 @@ use crate::tower::{Unit, UnitState};
 pub const PARKING_WORKERS_PER_SPACE: f64 = 24.0;
 pub const GARBAGE_COLLECT_HOUR: f64 = 5.0;
 pub const METRO_PLATFORM_CUTOFF_MSG: &str = "Your metro platform is cut off. Build a passenger elevator, stairs, or an escalator down to the platform so commuters can reach the station.";
+/// The cut-off notice in Classic, which names the cause only (#549).
+pub(crate) const METRO_PLATFORM_CUTOFF_CAUSE: &str =
+    "Your metro platform is cut off, so commuters can't reach the station.";
 /// `ECON.exterminatorCalloutFee`: the flat fee of one exterminator call.
 pub const EXTERMINATOR_CALLOUT_FEE: f64 = 5000.0;
 /// `ECON.exterminatorPerRoomFee`: added once per infested room billed.
@@ -241,10 +244,13 @@ impl Simulation {
     pub fn nudge_stranded(&mut self) {
         let stranded = !self.stranded_floors(true).is_empty();
         if stranded && !self.stranded_nudged {
-            self.emit(
-                "A floor with tenant space is reachable only by a long stair climb no one will make. Nobody will move in or visit. Add an elevator that reaches it, then check it in the inspector.",
-                LogKind::Info,
-            );
+            // Classic names the cause only, as the 1994 game did (#549).
+            let notice = if self.mode.advises_fixes() {
+                "A floor with tenant space is reachable only by a long stair climb no one will make. Nobody will move in or visit. Add an elevator that reaches it, then check it in the inspector."
+            } else {
+                "A floor with tenant space is reachable only by a long stair climb no one will make. Nobody will move in or visit."
+            };
+            self.emit(notice, LogKind::Info);
         }
         self.stranded_nudged = stranded;
     }
@@ -254,7 +260,12 @@ impl Simulation {
             u.kind == Kind::Metro && u.is_operational() && !self.tower.is_metro_platform_served(u)
         });
         if orphaned && !self.metro_platform_nudged {
-            self.emit(METRO_PLATFORM_CUTOFF_MSG, LogKind::Info);
+            let notice = if self.mode.advises_fixes() {
+                METRO_PLATFORM_CUTOFF_MSG
+            } else {
+                METRO_PLATFORM_CUTOFF_CAUSE
+            };
+            self.emit(notice, LogKind::Info);
         }
         self.metro_platform_nudged = orphaned;
     }
@@ -453,7 +464,12 @@ impl Simulation {
                 LogKind::Good,
             );
         } else {
-            self.emit("The VIP was unimpressed. Grow your population and amenities, then rebuild interest.", LogKind::Bad);
+            let notice = if self.mode.advises_fixes() {
+                "The VIP was unimpressed. Grow your population and amenities, then rebuild interest."
+            } else {
+                "The VIP was unimpressed."
+            };
+            self.emit(notice, LogKind::Bad);
             self.vip_visit_day = (self.clock.day() + 5) as f64;
         }
     }

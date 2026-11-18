@@ -381,6 +381,7 @@ pub fn rng_state_where(script: impl Fn(&mut crate::rng::Rng) -> bool) -> u32 {
         .unwrap()
 }
 mod nobody_vanishes;
+mod notice_fixes;
 mod split_lot_lobbies;
 mod split_lot_open_ground;
 mod split_lot_play;

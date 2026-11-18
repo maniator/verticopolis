@@ -157,7 +157,7 @@ fn the_dirty_clock_survives_a_reload_and_a_far_future_booking_is_clamped() {
 }
 
 #[test]
-fn the_infestation_notice_offers_the_exterminator_only_where_the_mode_has_one() {
+fn the_infestation_notice_offers_the_exterminator_and_a_fix_only_in_modern() {
     for mode in [GameMode::Classic, GameMode::Modern] {
         let mut sim = hotel_tower(1, mode);
         hotel(&mut sim, X0, UnitState::Dirty);
@@ -175,6 +175,15 @@ fn the_infestation_notice_offers_the_exterminator_only_where_the_mode_has_one() 
             mode.infestation_recovery().is_some(),
             "{mode:?}: {notice}"
         );
-        assert!(notice.contains("bulldoze") || notice.contains("Bulldoze"));
+        // Classic names the cause only (#549); Modern says what to do.
+        assert_eq!(
+            notice.contains("bulldoze"),
+            mode.advises_fixes(),
+            "{mode:?}: {notice}"
+        );
+        assert!(
+            notice.ends_with("can no longer be cleaned.") != mode.advises_fixes(),
+            "{notice}"
+        );
     }
 }

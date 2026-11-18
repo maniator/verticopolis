@@ -221,8 +221,8 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
           recyclingCap > 0 || (s.star >= 3 && recyclingShort)
             ? html`<span class="k">Recycling</span><span class="v" style="color:${recyclingShort ? "var(--bad)" : "var(--good)"}">${
                 recyclingCap === 0
-                  ? `${fmt(s.population)} population, no center (build one)`
-                  : `${fmt(s.population)} / ${fmt(recyclingCap)} processed${recyclingShort ? " (build more)" : ""}`
+                  ? `${fmt(s.population)} population, no center${catalog.rules.advisesFixes ? " (build one)" : ""}`
+                  : `${fmt(s.population)} / ${fmt(recyclingCap)} processed${recyclingShort && catalog.rules.advisesFixes ? " (build more)" : ""}`
               }${helpIf(recyclingShort, "recycling")}</span>`
             : nothing
         }
@@ -231,7 +231,7 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
         stranded || ratingRow !== nothing
           ? html`<div class="col kv">${
               stranded
-                ? html`<span class="k" style="color:var(--muted);grid-column:1/-1">Stranded = leased floors reachable only by a long stair climb no one will make; they earn rating but draw no visitors. Add an elevator that reaches them.</span>`
+                ? html`<span class="k" style="color:var(--muted);grid-column:1/-1">Stranded = leased floors reachable only by a long stair climb no one will make; they earn rating but draw no visitors.${catalog.rules.advisesFixes ? " Add an elevator that reaches them." : ""}</span>`
                 : nothing
             }${
               ratingRow !== nothing
