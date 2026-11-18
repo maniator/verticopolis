@@ -365,3 +365,41 @@ fn a_landings_queue_line_is_the_engines_answer() {
         assert!(e.port_queue_line(s, floor).is_empty(), "{s} {floor}");
     }
 }
+
+/// A queue view built over the last step's answers as one built from
+/// nothing: the landings in the crowd's order, and the cars of the shafts
+/// that still stand, after a shaft goes and the lines move.
+#[test]
+fn the_queue_view_built_over_the_last_one_answers_as_a_fresh_one() {
+    let mut e = built();
+    let lift = shaft(&e, Kind::ElevatorStandard);
+    let service = shaft(&e, Kind::ElevatorService);
+    e.sim.crowd.people = vec![
+        waiter(1, lift, 2, 0.0, false),
+        waiter(2, service, 4, 0.0, true),
+    ];
+    e.sim.crowd.queue_view(&e.sim.tower);
+    assert!(e.sim.tower.remove_transport(service).is_some());
+    e.sim.crowd.step += 1;
+    e.sim.crowd.people = vec![
+        waiter(3, lift, 4, STRESS_WAIT, false),
+        waiter(4, lift, 1, 0.0, false),
+        waiter(5, lift, 4, 0.0, false),
+    ];
+    let order = |v: &crate::render_reads::QueueView| -> Vec<(i64, Vec<(i64, i64, i64)>)> {
+        let landings = v.landings.iter();
+        let floors = |f: &crate::crowd::fasthash::FastIndexMap<
+            i64,
+            crate::render_reads::QueueLanding,
+        >| { f.iter().map(|(fl, l)| (*fl, l.count, l.tier)).collect() };
+        landings.map(|(s, f)| (*s, floors(f))).collect()
+    };
+    let kept = e.sim.crowd.queue_view(&e.sim.tower).clone();
+    e.sim.crowd.queue_cache = None;
+    e.sim.crowd.queue_spare.clear();
+    let fresh = e.sim.crowd.queue_view(&e.sim.tower).clone();
+    assert_eq!(order(&kept), order(&fresh));
+    assert_eq!(order(&kept), vec![(lift, vec![(4, 2, 2), (1, 1, 0)])]);
+    assert_eq!(kept.boarded, fresh.boarded);
+    assert_eq!(kept.boarded.len(), 1, "only the standard elevator stands");
+}

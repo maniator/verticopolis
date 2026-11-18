@@ -100,7 +100,8 @@ impl Crowd {
     pub fn queue_view(&mut self, tower: &Tower) -> &QueueView {
         let key = (self.step, tower.revision);
         if self.queue_cache.as_ref().is_none_or(|(k, _)| *k != key) {
-            let view = self.build_queue_view(tower);
+            let old = self.queue_cache.take().map(|(_, view)| view);
+            let view = self.build_queue_view(tower, old.unwrap_or_default());
             self.queue_cache = Some((key, view));
         }
         &self.queue_cache.as_ref().expect("built above").1
@@ -109,9 +110,15 @@ impl Crowd {
     /// `elevatorQueueView`: one walk of the crowd for the landings and one of
     /// the transports for the cars. A landing counts only an elevator's
     /// waiters on a floor it stops at, and on a staff-only shaft only staff.
-    fn build_queue_view(&self, tower: &Tower) -> QueueView {
-        let mut landings: FastIndexMap<i64, FastIndexMap<i64, QueueLanding>> =
-            FastIndexMap::default();
+    /// It is built into the last step's view, its maps and lists emptied in
+    /// place (`Crowd::queue_spare`), so a step allocates nothing once they
+    /// have grown (hot-path HP-3).
+    fn build_queue_view(&mut self, tower: &Tower, mut view: QueueView) -> QueueView {
+        for (_, mut floors) in view.landings.drain(..) {
+            floors.clear();
+            self.queue_spare.push(floors);
+        }
+        let (landings, spare) = (&mut view.landings, &mut self.queue_spare);
         let stops = tower.stop_bits();
         for p in &self.people {
             let Some(shaft_id) = p.shaft_id else { continue };
@@ -130,23 +137,30 @@ impl Crowd {
             }
             let landing = landings
                 .entry(shaft_id)
-                .or_default()
+                .or_insert_with(|| spare.pop().unwrap_or_default())
                 .entry(p.floor)
                 .or_default();
             landing.count += 1;
             landing.tier = landing.tier.max(wait_tier(p.wait));
         }
-        let boarded = tower
-            .transports
-            .iter()
-            .filter(|t| t.kind.is_elevator())
-            .map(|t| {
-                let cars = (0..t.cars)
-                    .map(|i| self.car_riders.get(&(t.id, i)).copied().unwrap_or(0))
-                    .collect();
-                (t.id, cars)
-            })
-            .collect();
-        QueueView { landings, boarded }
+        // The elevators alone, in list order, from the per-revision index:
+        // Modern sets no limit on stairs and escalators, so a walk over
+        // every transport would grow with the flights (section 3 of
+        // `docs/performance/hot-path-review.md`).
+        let floors = tower.dispatch_floors();
+        let mut n = 0;
+        for &k in &floors.elevators {
+            let t = &tower.transports[k];
+            if n == view.boarded.len() {
+                view.boarded.push((t.id, Vec::new()));
+            }
+            let (id, cars) = &mut view.boarded[n];
+            *id = t.id;
+            cars.clear();
+            cars.extend((0..t.cars).map(|i| self.car_riders.get(&(t.id, i)).copied().unwrap_or(0)));
+            n += 1;
+        }
+        view.boarded.truncate(n);
+        view
     }
 }
