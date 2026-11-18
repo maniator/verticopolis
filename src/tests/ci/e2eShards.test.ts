@@ -183,9 +183,9 @@ describe("e2eShardSeconds.json", () => {
     }
   });
 
-  it("splits into four shards within a tenth of each other", () => {
+  it("splits into six shards within a tenth of each other", () => {
     const files = Object.keys(measured).map((file) => ({ file, tests: 1 }));
-    const shards = planShards(files, 4, measured);
+    const shards = planShards(files, 6, measured);
     const times = shards.map((shard) => shard.seconds);
     expect(Math.max(...times) / Math.min(...times)).toBeLessThan(1.1);
   });
