@@ -58,6 +58,10 @@ export type AppActionName =
   // `game` (mid-game) or `title` (behind the title screen). A failed or
   // repeat loss is the `crash` event instead.
   | "graphics_recovered"
+  // The page reloaded once by itself at boot because its engine files came
+  // from another build (a cached older page meeting a newer deploy;
+  // `src/engineCrash/mismatchReload.ts`). `detail` is `mismatch`.
+  | "engine_reload"
   // Dialogs / navigation.
   | "settings_open"
   // The manual opened in a new tab; `detail` = where (src/ui/fromGame.ts

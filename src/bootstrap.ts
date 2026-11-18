@@ -1,10 +1,11 @@
 import { html, nothing, render, type TemplateResult } from "lit-html";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { injectPageTelemetry } from "./telemetry";
-import { startGameplaySession, trackAppActionOnce } from "./analytics";
+import { startGameplaySession, trackAppAction, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { removeLegacyCohortKeys } from "./engineCrash/legacyKeys";
+import { MISMATCH_RELOAD_LINE, claimMismatchReload, reloadForMatchingFiles } from "./engineCrash/mismatchReload";
 import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, markCrashReload, reloadSoon, tabStore } from "./engineCrash/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import { openSaves } from "./storage/SaveGame";
@@ -293,7 +294,6 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     await savesOpened;
     let bootState: EngineBootState = booted.state;
     stopLoadingLine();
-    publishBootState(bootState);
     // The reliability instrument's one row per page life (`engine_status`,
     // `analyticsEngineStatus.ts`): codes only, read from the boot state. The
     // message stays behind; only the stage and the reason are handed over.
@@ -314,7 +314,20 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       const f = bootState.failure;
       throw new Error(`the Rust engine did not start (${f?.stage}): ${f?.package ? `${f.reason}, ${f.package.kind}` : f?.message}`);
     };
-    if (bootState.engine === "none" && bootState.failure) stopEngineless();
+    // Engine files from another build than this page (a cached older page
+    // meeting a newer deploy) take one reload per build per tab, which fetches
+    // a matching pair, before the stop screen. The failure is not published,
+    // so `__vcEngineBoot` only ever shows the page that stays.
+    const loadFailure = bootState.engine === "none" ? bootState.failure : null;
+    if (loadFailure && claimMismatchReload(tabStore(), __APP_SHA__, loadFailure)) {
+      settle();
+      trackAppAction("engine_reload", "mismatch");
+      showCrashReload(MISMATCH_RELOAD_LINE);
+      reloadForMatchingFiles();
+      return;
+    }
+    publishBootState(bootState);
+    if (loadFailure) stopEngineless();
     // The first tower, on the Rust engine.
     const wasmModule = booted.module;
     let tower: BootTower | null = null;
