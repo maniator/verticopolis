@@ -2,7 +2,7 @@
 
 use super::commuters;
 use super::doors::route_out_nearest;
-use super::landing::{landing_slots, Landings};
+use super::landing::Landings;
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::staff_shift;
 use super::visits::{begin_dwell, leave_venue};
@@ -28,7 +28,9 @@ fn trip_floors(p: &Person) -> i64 {
 pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     let mut frustrated = 0;
     let mut travelling = 0;
-    let mut landings = landing_slots(crowd, tower);
+    // The crowd's lists from the last slice, filled again in place.
+    let mut landings = std::mem::take(&mut crowd.landings);
+    landings.fill(crowd, tower);
     let room = super::expected_time::spare_lines(crowd);
     let mut lines = super::line_count::LineCount::new(tower, room);
     for i in 0..crowd.people.len() {
@@ -86,6 +88,7 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     crowd.frustration += (target - crowd.frustration) * (dt_sec * 0.5).min(1.0);
     super::line_count::waits_seen::keep_lines(crowd, lines.counted(), dt_sec);
     super::floor_index::settle(crowd);
+    crowd.landings = landings;
 }
 
 fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, landings: &mut Landings) {

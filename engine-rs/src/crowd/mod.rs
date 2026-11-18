@@ -303,6 +303,13 @@ pub struct Crowd {
     pub open_cars: Vec<crate::dispatch::OpenCar>,
     /// The queue projection and its (step, tower revision). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
+    /// The queue projection's per-shaft maps from an earlier build, emptied,
+    /// so a build allocates nothing once they have grown. Never saved.
+    pub queue_spare:
+        Vec<crate::crowd::fasthash::FastIndexMap<i64, crate::render_reads::QueueLanding>>,
+    /// The motion pass's landing lists from its last slice, kept so the next
+    /// slice fills them in place (`landing::Landings`). Never saved.
+    pub landings: landing::Landings,
     /// The clock hour of the step, so nobody stays in or walks into a venue after it closes. `None`
     /// (a crowd stepped on its own) leaves every venue open. Set by the step, and saved as it left it.
     pub hour: Option<i64>,
@@ -374,6 +381,8 @@ impl Crowd {
             closed_cars: Default::default(),
             open_cars: Default::default(),
             queue_cache: None,
+            queue_spare: Vec::new(),
+            landings: Default::default(),
             hour: None,
             minute: None,
             weekend: false,

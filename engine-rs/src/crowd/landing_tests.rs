@@ -378,3 +378,40 @@ fn a_line_running_left_reads_from_its_back_to_the_face() {
     assert_eq!((from, to), (slot_x(line, 3, 4), t.x as f64));
     assert!(from < to);
 }
+
+/// The landing lists the motion pass keeps between slices answer as a fresh
+/// build does once the lines change: nobody left over from the last slice
+/// keeps a place, and a landing nobody waits at any more has no line.
+#[test]
+fn landings_filled_again_answer_as_a_fresh_build() {
+    let (mut sim, shaft) = tower();
+    waiting(&mut sim, shaft, 3);
+    let mut kept = Landings::default();
+    kept.fill(&sim.crowd, &sim.tower);
+    assert!(kept.lines.get(&(shaft, 2)).is_some());
+    // The line on floor 2 goes, and one rider waits on floor 3 instead, so
+    // the kept lists' first landing is a different one.
+    for p in sim.crowd.people.iter_mut() {
+        p.state = PState::Riding;
+    }
+    let i = rider(&mut sim, shaft, 120.0);
+    sim.crowd.people[i].state = PState::Waiting;
+    sim.crowd.people[i].floor = 3;
+    kept.fill(&sim.crowd, &sim.tower);
+    let fresh = landing_slots(&sim.crowd, &sim.tower);
+    for i in 0..sim.crowd.people.len() + 1 {
+        assert_eq!(kept.slot(i), fresh.slot(i), "rider {i}");
+    }
+    assert!(kept.slot(i).is_some(), "the floor 3 rider has a place");
+    for floor in [2, 3] {
+        assert_eq!(
+            kept.lines.get(&(shaft, floor)),
+            fresh.lines.get(&(shaft, floor)),
+            "the line on floor {floor}"
+        );
+    }
+    assert!(
+        kept.lines.get(&(shaft, 2)).is_none(),
+        "nobody waits on floor 2"
+    );
+}
