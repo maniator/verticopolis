@@ -90,21 +90,64 @@ describe("a failed save reports autosave_failed", () => {
     expect(trackAppActionOnce).toHaveBeenLastCalledWith("autosave_failed", "timer");
   });
 
-  it("reports a drain a swap joined as `swap`, since its save is the one that failed (#1631)", async () => {
-    let fail: (err: unknown) => void = () => {};
+  /** A save that waits for the test to settle it, one per call. */
+  function heldSaves(): ((err?: unknown) => void)[] {
+    const settle: ((err?: unknown) => void)[] = [];
     vi.spyOn(SaveGame, "saveAsync").mockImplementation(
       () =>
-        new Promise((_, reject) => {
-          fail = reject;
+        new Promise((resolve, reject) => {
+          settle.push((err) => (err === undefined ? resolve(null) : reject(err)));
         }),
     );
+    return settle;
+  }
+
+  it("labels a failure by the save in flight: a timer save that fails while a swap waits is `timer` (#1631)", async () => {
+    const settle = heldSaves();
     const { load } = makeLoad();
     const timer = load.autosave();
-    const swap = load.autosave("swap");
-    expect(swap).toBe(timer);
-    fail(new DOMException("quota", "QuotaExceededError"));
+    expect(load.autosave("swap")).toBe(timer);
+    settle[0](new DOMException("quota", "QuotaExceededError"));
+    await timer;
+    expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "timer");
+  });
+
+  it("labels the queued swap save `swap` when it is the one that fails (#1631)", async () => {
+    const settle = heldSaves();
+    const { load } = makeLoad();
+    const timer = load.autosave();
+    void load.autosave("swap");
+    settle[0]();
+    await vi.waitFor(() => expect(settle).toHaveLength(2));
+    settle[1](new DOMException("quota", "QuotaExceededError"));
     await timer;
     expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "swap");
+  });
+
+  it("labels a timer save queued behind a swap save `timer` when it fails (#1631)", async () => {
+    const settle = heldSaves();
+    const { load } = makeLoad();
+    const swap = load.autosave("swap");
+    void load.autosave();
+    settle[0]();
+    await vi.waitFor(() => expect(settle).toHaveLength(2));
+    settle[1](new DOMException("quota", "QuotaExceededError"));
+    await swap;
+    expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "timer");
+  });
+
+  it("drops a swap request a failed drain never ran, so the next timer save is `timer` (#1631)", async () => {
+    const settle = heldSaves();
+    const { load } = makeLoad();
+    const timer = load.autosave();
+    void load.autosave("swap");
+    settle[0](new DOMException("quota", "QuotaExceededError"));
+    await timer;
+    vi.mocked(trackAppActionOnce).mockClear();
+    const next = load.autosave();
+    settle[1](new DOMException("quota", "QuotaExceededError"));
+    await next;
+    expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "timer");
   });
 
   it("tells the player once while autosave keeps failing, and again after it worked in between", async () => {

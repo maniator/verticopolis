@@ -221,9 +221,8 @@ describe("wireControllers", () => {
     expect((d.enginePort as () => unknown)()).toBe(app.enginePort);
     expect(d.getView()).toEqual({ view: 1 });
     expect(app.engine.viewState).toHaveBeenCalled();
-    d.towerSwapped(); // breaks the report leash, the app follows the swap, then it autosaves (the timer's guards, tested below)
-    expect([vi.mocked(app.ui.precedence.towerSwapped).mock.calls.length, vi.mocked(app.followSwap).mock.calls.length, vi.mocked(app.saveLoad.autosave).mock.calls.length]).toEqual([1, 1, 1]);
-    expect(app.saveLoad.autosave).toHaveBeenCalledWith("swap"); // its failure reports as `swap` (#1631)
+    d.towerSwapped(); // breaks the report leash, follows the swap, then autosaves once as `swap` (#1631; the timer's guards, tested below)
+    expect([vi.mocked(app.ui.precedence.towerSwapped).mock.calls.length, vi.mocked(app.followSwap).mock.calls.length, vi.mocked(app.saveLoad.autosave).mock.calls]).toEqual([1, 1, [["swap"]]]);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
     expect(d.ui.downloadFile("f.json", "body")).toBe(false); // passed through for GH #997
