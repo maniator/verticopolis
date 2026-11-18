@@ -78,9 +78,11 @@ export class Engine {
     /**
      * `buildSkyBridge(floor, x)` (Modern): lays the whole sky bridge a
      * click at the cell asks for, every missing tile of the gap between
-     * two sky lobbies, or nothing. `[status, delta, tiles]`.
+     * two sky lobbies, or nothing, in look `look` (an index into the
+     * catalog's `rules.skyBridge.looks`; the glass skywalk when omitted).
+     * `[status, delta, tiles]`.
      */
-    buildSkyBridge(floor: number, x: number): Float64Array;
+    buildSkyBridge(floor: number, x: number, look: number): Float64Array;
     /**
      * `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`. An
      * unknown kind is refused with "Unknown facility.".
@@ -482,6 +484,12 @@ export class Engine {
     resolveChoice(accept: boolean): void;
     restore(text: string): Float64Array;
     /**
+     * `restyleSkyBridge(floor, x, look)` (Modern): dresses the whole sky
+     * bridge at the cell in look `look`, an index into the catalog's
+     * `rules.skyBridge.looks`. Free. `[status, delta]`.
+     */
+    restyleSkyBridge(floor: number, x: number, look: number): Float64Array;
+    /**
      * Tooling only: the room covering a tile (structure excluded),
      * serialized as the save would, or null.
      */
@@ -669,6 +677,12 @@ export class Engine {
     setWeather(name: string): boolean;
     shaftCard(id: number): Float64Array;
     shaftSchedule(id: number): Float64Array;
+    /**
+     * `skyBridgeLooks()`: every sky bridge as `[floor, from, to, look]`,
+     * four numbers each, `from..to` its columns and `look` an index into the
+     * catalog's `rules.skyBridge.looks`. Read once per layout change.
+     */
+    skyBridgeLooks(): Float64Array;
     startExtend(id: number): Float64Array;
     /**
      * Tooling only: the daily roll's fire outbreak in room `id`, with the

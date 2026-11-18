@@ -62,10 +62,11 @@ pub(crate) const ONBOARDING_FLAGS: [u8; 5] = [
 ];
 
 /// Each command's own slots after [`DELTA`], for the view layout.
-pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 31] = [
+pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 32] = [
     ("buildAt", &[]),
     ("paintTiles", &["placed"]),
     ("buildSkyBridge", &["tiles"]),
+    ("restyleSkyBridge", &[]),
     ("buildShaft", &[]),
     ("demolish", &[]),
     ("demolishTile", &[]),

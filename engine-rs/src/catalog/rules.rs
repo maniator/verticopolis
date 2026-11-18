@@ -99,4 +99,7 @@ pub struct SkyBridgeRule {
     /// The price of one bridge tile over open air: a bare lobby tile's
     /// (the lobby's price plus the floor's) times the bridge's factor.
     pub tile_cost: f64,
+    /// The looks a bridge can wear, in the order the tool lists them; the
+    /// first is the plain lobby. A bridge's look is its index here.
+    pub looks: Vec<&'static str>,
 }

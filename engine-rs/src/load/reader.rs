@@ -268,6 +268,8 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         kind.subtype_list(),
     ) {
         (Some(s), Some(list)) => list.iter().copied().find(|c| *c == s),
+        // A sky bridge tile's look (`tower/skybridge_look.rs`).
+        (Some(s), None) if kind == Kind::Lobby => crate::tower::look_named(s),
         _ => None,
     };
     let retail = kind.subtype_list().is_some();

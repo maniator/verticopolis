@@ -138,5 +138,6 @@ fn sky_bridge_rule() -> super::rules::SkyBridgeRule {
         min_star: crate::tower::SKYBRIDGE_MIN_STAR,
         max_span: crate::tower::SKYBRIDGE_MAX_SPAN,
         tile_cost: bare * crate::tower::SKYBRIDGE_PRICE_FACTOR,
+        looks: crate::tower::SKYBRIDGE_LOOKS.to_vec(),
     }
 }

@@ -1,13 +1,17 @@
 //! The Sky Bridge tool (Modern, `tower/skybridge.rs`): one click on the open
 //! air between two sky lobbies lays the whole bridge, or nothing.
 //! [`Simulation::quote_skybridge`] is its dry run, the span and the full
-//! price a placement ghost shows; [`Simulation::build_skybridge`] lays it.
+//! price a placement ghost shows; [`Simulation::build_skybridge`] lays it,
+//! and [`Simulation::restyle_skybridge`] changes a bridge's look.
 
 use crate::build::BuildResult;
 use crate::facilities::Kind;
 use crate::gameplay::GameplayEvent;
 use crate::sim::Simulation;
-use crate::tower::{OverAir, SKYBRIDGE_MIN_STAR};
+use crate::tower::{
+    look_subtype, OverAir, FINISH_THE_BRIDGE, NEW_SKYBRIDGE_LOOK, POINT_AT_A_BRIDGE,
+    SKYBRIDGE_MIN_STAR,
+};
 use std::ops::Range;
 
 /// The refusal in Classic, which has no bridges, as in 1994.
@@ -98,6 +102,16 @@ impl Simulation {
     /// full price, or lays nothing and says why
     /// ([`quote_skybridge`](Simulation::quote_skybridge)).
     pub fn build_skybridge(&mut self, floor: i64, x: i64) -> BuildResult {
+        self.build_skybridge_as(floor, x, NEW_SKYBRIDGE_LOOK)
+    }
+
+    /// [`build_skybridge`](Simulation::build_skybridge) in look `look`, an
+    /// index into [`SKYBRIDGE_LOOKS`](crate::tower::SKYBRIDGE_LOOKS); an
+    /// index past the list lays the new bridge's look. Finishing a half
+    /// bridge dresses the whole bridge in it.
+    pub fn build_skybridge_as(&mut self, floor: i64, x: i64, look: usize) -> BuildResult {
+        let subtype =
+            look_subtype(look).unwrap_or_else(|| look_subtype(NEW_SKYBRIDGE_LOOK).flatten());
         let quote = self.quote_skybridge(floor, x);
         if !quote.ok {
             return BuildResult {
@@ -119,6 +133,9 @@ impl Simulation {
                 }
             }
         }
+        if let Some(cols) = self.tower.skybridge_at(floor, quote.tiles.start) {
+            self.tower.dress_skybridge(floor, cols, subtype);
+        }
         self.money -= quote.cost;
         self.note_edit_cash(-quote.cost);
         self.gameplay.push(GameplayEvent::FacilityPlaced {
@@ -126,6 +143,44 @@ impl Simulation {
             floor,
             count: laid.len() as i64,
         });
+        BuildResult {
+            ok: true,
+            reason: None,
+        }
+    }
+
+    /// Dress the whole bridge a tile at (`floor`, `x`) belongs to in look
+    /// `look`, an index into [`SKYBRIDGE_LOOKS`](crate::tower::SKYBRIDGE_LOOKS).
+    /// A look costs nothing. Refused off a bridge tile, on a half bridge
+    /// (a click finishes it instead), for an index past the list, and in
+    /// Classic.
+    ///
+    /// ```
+    /// use verticopolis_engine::clock::GameMode;
+    /// use verticopolis_engine::sim::Simulation;
+    ///
+    /// let mut sim = Simulation::new_game(1, GameMode::Modern);
+    /// assert!(!sim.restyle_skybridge(15, 120, 2).ok);
+    /// ```
+    pub fn restyle_skybridge(&mut self, floor: i64, x: i64, look: usize) -> BuildResult {
+        let refuse = |reason: &str| BuildResult {
+            ok: false,
+            reason: Some(reason.into()),
+        };
+        if let Some(reason) = self.edit_refusal() {
+            return refuse(reason);
+        }
+        if !self.mode.builds_skybridges() {
+            return refuse(MODERN_ONLY);
+        }
+        let (Some(subtype), Some(cols)) = (look_subtype(look), self.tower.skybridge_at(floor, x))
+        else {
+            return refuse(POINT_AT_A_BRIDGE);
+        };
+        if !self.tower.skybridge_finished(floor, &cols) {
+            return refuse(FINISH_THE_BRIDGE);
+        }
+        self.tower.dress_skybridge(floor, cols, subtype);
         BuildResult {
             ok: true,
             reason: None,

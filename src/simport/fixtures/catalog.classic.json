@@ -2118,7 +2118,7 @@
     "variantHouseholds": false,
     "venueFlights": false
   },
-  "version": 25,
+  "version": 26,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",
