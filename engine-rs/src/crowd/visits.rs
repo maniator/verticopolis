@@ -1,4 +1,5 @@
-//! Port of `crowd/visits.ts`: attendance round trips and the dwell entry.
+//! Port of the retired TypeScript `src/engine/crowd/visits.ts`: attendance
+//! round trips and the dwell entry.
 
 use super::meals::matches_meal_origin_kind;
 use super::spawn::{

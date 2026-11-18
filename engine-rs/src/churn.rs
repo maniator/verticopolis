@@ -1,4 +1,4 @@
-//! Port of `sim/churn.ts`: vacate, move-ins, names, relocations.
+//! Port of the retired TypeScript `src/engine/sim/churn.ts`: vacate, move-ins, names, relocations.
 
 use crate::econ::rent_config;
 use crate::facilities::Kind;
@@ -17,9 +17,10 @@ mod move_in;
 mod move_ins_save;
 mod names;
 
-/// `CongestionBindingClass` (sim/gripe.ts): the transport class whose shaft
-/// binds a floor's congestion reading; `Walkways` is the stairs-and-escalators
-/// tie, `None` the transportless defensive case.
+/// `CongestionBindingClass` (the retired TypeScript `src/engine/sim/gripe.ts`):
+/// the transport class whose shaft binds a floor's congestion reading;
+/// `Walkways` is the stairs-and-escalators tie, `None` the transportless
+/// defensive case.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CongestionBindingClass {
     Elevator,

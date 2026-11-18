@@ -1,10 +1,11 @@
-//! Tests for `charges.rs`, mirroring `src/engine/sim/charges.test.ts`.
+//! Tests for `charges.rs`, mirroring the retired TypeScript `src/engine/sim/charges.test.ts`.
 use super::*;
 use crate::clock::GameMode;
 use crate::facilities::MAX_FLOOR as GRID_MAX_FLOOR;
 
-/// The `charges.test.ts` fixture: a lobby, floors 2..4, an office on 2,
-/// an elevator on 1..2 and stairs, every placement asserted.
+/// The fixture of the retired TypeScript `src/engine/sim/charges.test.ts`: a
+/// lobby, floors 2..4, an office on 2, an elevator on 1..2 and stairs, every
+/// placement asserted.
 fn fixture() -> (Simulation, i64, i64, i64) {
     let mut sim = Simulation::new_game(1, GameMode::Classic);
     for x in 10..40 {
@@ -395,7 +396,7 @@ fn extend_bills_the_down_end_the_same_way() {
     );
 }
 
-/// `extendBill` vectors, the same answers `econConfig.ts` gives.
+/// `extendBill` vectors, the same answers the retired TypeScript `src/engine/econConfig.ts` gives.
 #[test]
 fn extend_bill_matches_the_typescript_vectors() {
     let per = 5_000.0;

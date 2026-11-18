@@ -4,7 +4,7 @@
 /**
  * The gameplay events the engine emits, one entry per event. This file is the
  * contract: engine-rs/src/gameplay.rs checks GameplayEvent against it in a unit
- * test, src/engine/gameplayEvents.d.ts is generated from it (npm run
+ * test, src/events/gameplayEvents.d.ts is generated from it (npm run
  * gen:events), and the conformance lock hashes the drained events per
  * checkpoint. Payload rule: closed enums and small bounded integers only. No
  * free text, no tower names, no money amounts. A field of any other type is

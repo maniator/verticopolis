@@ -1,4 +1,4 @@
-//! `housekeepingCoverage` (`src/engine/sim/services.ts`): what the housekeeping
+//! `housekeepingCoverage` (the retired TypeScript `src/engine/sim/services.ts`): what the housekeeping
 //! crews can reach, for the stats screen and the exterminator modal (and the
 //! housekeeping diagnostics, which read it from here).
 
@@ -10,7 +10,7 @@ use crate::housekeeping::HK_MAIDS_PER_UNIT;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
-/// `HK_NOMINAL_ROOMS_PER_MAID` (`src/engine/economy/housekeeping.ts`): the
+/// `HK_NOMINAL_ROOMS_PER_MAID` (the retired TypeScript `src/engine/economy/housekeeping.ts`): the
 /// rooms one maid cleans in a shift, nominally.
 pub const HK_NOMINAL_ROOMS_PER_MAID: i64 = 19;
 

@@ -1,5 +1,5 @@
 //! The overlays' heat cells and the traffic HUD's hotspot
-//! (`floorHeatmap` and `peakCongestionHotspot`, `src/engine/sim/congestion.ts`).
+//! (`floorHeatmap` and `peakCongestionHotspot`, the retired TypeScript `src/engine/sim/congestion.ts`).
 //! A cell is a column span on a floor with a severity from 0 (good) to 1 (bad)
 //! and, for two housekeeping categories, a semantic `tint`. Cells come back in
 //! the order the TypeScript emits them.

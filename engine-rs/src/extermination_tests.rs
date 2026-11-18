@@ -1,5 +1,5 @@
 //! Tests for a pending exterminator booking across a save (#902), mirroring
-//! `src/engine/sim/exterminationPersistence.test.ts`.
+//! the retired TypeScript `src/engine/sim/exterminationPersistence.test.ts`.
 use super::*;
 use crate::clock::{CalendarKind, GameMode};
 use crate::load::{deserialize, UNIT_CAP};

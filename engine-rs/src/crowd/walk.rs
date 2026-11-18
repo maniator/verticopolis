@@ -1,4 +1,4 @@
-//! Port of `crowd/walk.ts`.
+//! Port of the retired TypeScript `src/engine/crowd/walk.ts`.
 
 use super::doors::route_out_nearest;
 use super::motion::give_up;

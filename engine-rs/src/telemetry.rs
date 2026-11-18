@@ -1,4 +1,4 @@
-//! Port of `sampleElevatorUtil` (`src/engine/sim/congestion.ts`) and the
+//! Port of `sampleElevatorUtil` (the retired TypeScript `src/engine/sim/congestion.ts`) and the
 //! origin-ring fold (`src/engine/scheduleOrigins.ts`): the hourly elevator
 //! telemetry the schedule dialog, the stats screen and the facility
 //! diagnostics read. Sampling only: no rng. The one gameplay reader is the

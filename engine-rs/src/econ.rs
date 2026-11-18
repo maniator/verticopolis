@@ -1,4 +1,4 @@
-//! Port of the pricing parts of `src/engine/econConfig.ts` and `pricing.ts`.
+//! Port of the pricing parts of the retired TypeScript `src/engine/econConfig.ts` and `src/engine/pricing.ts`.
 
 use crate::facilities::Kind;
 

@@ -1,9 +1,9 @@
 //! The inspector's demand and congestion map caches. The TypeScript inspector reads the
-//! demand map through `demandMemo` (`sim/demand.ts`, keyed on the tower
-//! revision and the game hour); this is its port, for the diagnostics reads
-//! only. Nothing in the Rust simulation reads it. (The highest built floor,
-//! which the TypeScript reads through `floorBounds`, comes from the tower's
-//! own `floor_bounds` since #1237.)
+//! demand map through `demandMemo` (the retired TypeScript `src/engine/sim/demand.ts`,
+//! keyed on the tower revision and the game hour); this is its port, for the
+//! diagnostics reads only. Nothing in the Rust simulation reads it. (The highest built
+//! floor, which the TypeScript reads through `floorBounds`, comes from the tower's own
+//! `floor_bounds` since #1237.)
 //!
 //! It lives on the `Simulation`, beside `reach_memo` and `noise_memo`, so a
 //! load (which builds a fresh `Simulation`) starts it empty. Its key carries

@@ -1,4 +1,4 @@
-//! Port of `src/engine/elevatorSchedule.ts`: the optional per-shaft schedule.
+//! Port of the retired TypeScript `src/engine/elevatorSchedule.ts`: the optional per-shaft schedule.
 
 use serde_json::{json, Map, Value};
 

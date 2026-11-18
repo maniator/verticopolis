@@ -1,5 +1,5 @@
 //! A Metro rider's trip between the station and a floor of the tower
-//! (`venueTrips.ts`).
+//! (the retired TypeScript `src/engine/crowd/venueTrips.ts`).
 
 use super::{add, inside_x, pick_x, seed_for};
 use crate::crowd::{Crowd, METRO_DWELL_MAX, METRO_DWELL_MIN};

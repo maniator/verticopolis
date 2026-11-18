@@ -1,7 +1,7 @@
-//! The floors and rooms a spawn step picks from: `spawnFloors` in
-//! `crowd/spawn.ts`, rebuilt on each spawn step that has room to spawn
-//! (#1143 item 4, A4 in #1158). The TypeScript also builds them when the
-//! crowd is full (T2 in #1170).
+//! The floors and rooms a spawn step picks from: `spawnFloors` in the retired
+//! TypeScript `src/engine/crowd/spawn.ts`, rebuilt on each spawn step that has
+//! room to spawn (#1143 item 4, A4 in #1158). The TypeScript also builds them
+//! when the crowd is full (T2 in #1170).
 //!
 //! Each list keeps the order in which the walk over the rooms first meets a
 //! floor, as the TypeScript's `Set`s do. The lists dedupe with one bit per

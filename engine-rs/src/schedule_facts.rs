@@ -3,7 +3,7 @@
 //! load) and the Simulate staging summary (the busiest hour, the cars on shift
 //! then, and how the fleet is staged). A port of `scheduleAdvice`,
 //! `stagingSummary` and the preset recommendation
-//! (`src/engine/scheduleAuthoring.ts`) so the host reads facts instead of
+//! (the retired TypeScript `src/engine/scheduleAuthoring.ts`) so the host reads facts instead of
 //! recomputing them. The answer also carries the draft's homes as the shaft
 //! would hold them (each on a served floor), and the staging counts read those.
 //!

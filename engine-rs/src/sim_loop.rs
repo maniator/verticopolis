@@ -1,4 +1,4 @@
-// The time step (from the TypeScript reference's `sim/loop.ts`) and the
+// The time step (from the retired TypeScript `src/engine/sim/loop.ts`) and the
 // weather hash.
 
 use crate::crowd::{motion, spawn, PState, CROWD_SECONDS_PER_MINUTE, GIVE_UP};

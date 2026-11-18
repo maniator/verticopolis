@@ -1,5 +1,6 @@
-//! Port of `src/engine/Tower.ts`, `tower/placement.ts`, `tower/transport.ts`
-//! and `tower/expressStops.ts`.
+//! Port of the retired TypeScript `src/engine/Tower.ts`,
+//! `src/engine/tower/placement.ts`, `src/engine/tower/transport.ts` and
+//! `src/engine/tower/expressStops.ts`.
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};

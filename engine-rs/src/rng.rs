@@ -1,4 +1,4 @@
-//! Mulberry32, a port of `src/engine/rng.ts`. The TypeScript keeps the state
+//! Mulberry32, a port of the retired TypeScript `src/engine/rng.ts`. The TypeScript keeps the state
 //! as a signed 32-bit integer through `| 0` and `Math.imul`; wrapping u32
 //! arithmetic produces the same bits.
 

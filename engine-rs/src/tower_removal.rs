@@ -1,4 +1,4 @@
-//! Unit removal, twin of `src/engine/tower/removal.ts`. The unit list keeps
+//! Unit removal, twin of the retired TypeScript `src/engine/tower/removal.ts`. The unit list keeps
 //! its order, which saves, `pick_x` and every pass over the list read, so a
 //! removal closes the gap instead of swapping the last unit in. Each function
 //! costs one pass over the list however many units it removes (HP-6 in

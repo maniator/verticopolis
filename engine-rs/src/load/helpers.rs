@@ -183,13 +183,14 @@ pub(super) fn to_uint32(x: f64) -> u32 {
     m as u32
 }
 
-/// `FAR_COORD` (v1tov2.ts): a room floor, column or width at least this far
-/// from 0 is left out of the checks (floor) and the reflow (all three), so no
-/// loop over its stories or columns runs where adding 1 stops moving, no
-/// `as i64` saturates, and both engines treat it alike (#858).
+/// `FAR_COORD` (the retired TypeScript `src/engine/migrations/v1tov2.ts`): a
+/// room floor, column or width at least this far from 0 is left out of the
+/// checks (floor) and the reflow (all three), so no loop over its stories or
+/// columns runs where adding 1 stops moving, no `as i64` saturates, and both
+/// engines treat it alike (#858).
 pub(super) const FAR_COORD: f64 = 4_503_599_627_370_496.0;
 
-/// `!(Math.abs(v) < FAR_COORD)` in v1tov2.ts: NaN counts as far.
+/// `!(Math.abs(v) < FAR_COORD)` in that file: NaN counts as far.
 pub(super) fn is_far(v: f64) -> bool {
     v.is_nan() || v.abs() >= FAR_COORD
 }

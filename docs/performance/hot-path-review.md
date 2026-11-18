@@ -259,7 +259,9 @@ engine did, #1875). Every other removal is a finding.
 
 The table lists the caches, indexes and counters on the hot paths today. Its
 TypeScript column is a record of where each one came from: that engine was
-deleted in #1875, so its paths no longer exist. Rows with "none" there are
+deleted in #1875, so its paths resolve only at commit
+[`a5d0048`](https://github.com/maniator/verticopolis/tree/a5d004820ae620e1f70663449286bbf733772962/src/engine),
+the last before #1956 removed `src/engine/`. Rows with "none" there are
 Rust-only,
 with their Rust status at 9cd44d1 (`main` once #1139 merged) unless a row
 names a later commit. Each PR that adds, ports or removes one updates its row
@@ -268,7 +270,7 @@ PR merges, the table's owner replaces the number with the merge commit.
 Between those PRs the table belongs to the repository owner (maniator), the
 #1158 audit's assignee, who corrects any row that has gone stale.
 
-| What it keeps | TypeScript | Keyed on | Rust (at 9cd44d1 unless noted) |
+| What it keeps | TypeScript (retired) | Keyed on | Rust (at 9cd44d1 unless noted) |
 | --- | --- | --- | --- |
 | units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts`; a removal looks its unit up in `byId` and finds its place at the end of the list or with one `indexOf`, and a removal of several searches from the end (#1290) | kept on every edit | `by_id` (a `FastMap` since #1290), `transport_by_id`; `remove_unit` reads the unit's index from `by_id` and rewrites only the entries after it, and `remove_units` takes a command's removals in one pass (#1290; a single removal is still O(U) in both engines, accepted by the owner as #1370; A17 in #1158) |
 | positions of plain floor tiles on the brush's floor | `LobbyUpgrades.at`, `src/engine/tower/removal.ts` (#1290), with `first`, the lowest place a unit placed can stand, kept on add and remove | one brush command; dropped on any removal inside it, read again for another floor | not needed: `take_floor_slot` reads the index from `by_id` |

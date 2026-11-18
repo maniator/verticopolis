@@ -1,6 +1,7 @@
 //! The noise check shared by satisfaction's noise erosion and its cause
-//! attribution (`noiseAfflicted` in `sim/satisfaction.ts`), with the
-//! per-revision memo the TypeScript keeps in front of it (#1051).
+//! attribution (`noiseAfflicted` in the retired TypeScript
+//! `src/engine/sim/satisfaction.ts`), with the per-revision memo the TypeScript
+//! keeps in front of it (#1051).
 
 use crate::facilities::Kind;
 use crate::rules::noise_rule_for;

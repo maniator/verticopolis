@@ -1,9 +1,9 @@
-//! A unit's save entry (`serializeUnit` in sim/coerce.ts), walked once
-//! (`SaveEntries`) and read as a tree ([`Unit::serialize`]), written straight
-//! to the save text ([`SavedUnit`], [`Unit::save_text`], see `save_entry`),
-//! or counted
-//! ([`Unit::saves_only_position`]), so the three never disagree on a key or
-//! the rule that leaves it out.
+//! A unit's save entry (`serializeUnit` in the retired TypeScript
+//! `src/engine/sim/coerce.ts`), walked once (`SaveEntries`) and read as a tree
+//! ([`Unit::serialize`]), written straight to the save text ([`SavedUnit`],
+//! [`Unit::save_text`], see `save_entry`), or counted
+//! ([`Unit::saves_only_position`]), so the three never disagree on a key or the
+//! rule that leaves it out.
 
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use serde_json::Value;
@@ -112,7 +112,8 @@ impl SaveEntries for Unit {
 }
 
 impl Unit {
-    /// `serializeUnit` (sim/coerce.ts): the unit's save entry as a tree.
+    /// `serializeUnit` (the retired TypeScript `src/engine/sim/coerce.ts`): the
+    /// unit's save entry as a tree.
     pub fn serialize(&self) -> Value {
         entry_tree(self)
     }

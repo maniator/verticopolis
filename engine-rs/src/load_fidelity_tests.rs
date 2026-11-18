@@ -1,6 +1,6 @@
 //! A save at random state 0 reloads at state 0 (#856), and hand-edited saves
 //! load as the TypeScript loader loads them (#858). Mirrors
-//! `src/engine/rng.test.ts` and `src/engine/sim/loaderFidelity.test.ts`; the
+//! the retired TypeScript `src/engine/rng.test.ts` and `src/engine/sim/loaderFidelity.test.ts`; the
 //! cross-engine half is the loader table (`conformance/loader-cases.json`).
 //! Each current save also goes through the streamed reader (#1225), which
 //! `Engine.fromSave` loads through, so every narrowing holds there too.

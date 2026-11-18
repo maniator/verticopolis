@@ -1,4 +1,5 @@
-//! Port of `sim/services.ts`: recycling, parking, advisories, extermination.
+//! Port of the retired TypeScript `src/engine/sim/services.ts`: recycling,
+//! parking, advisories, extermination.
 
 use crate::demand::RECYCLING_POP_PER_CENTER;
 use crate::facilities::Kind;
@@ -20,7 +21,7 @@ pub const EXTERMINATOR_CALLOUT_FEE: f64 = 5000.0;
 pub const EXTERMINATOR_PER_ROOM_FEE: f64 = 2000.0;
 
 /// Why `callExterminator` refused, with the quote a host can show when the
-/// funds fall short (`ExterminatorResult` in sim/services.ts).
+/// funds fall short (`ExterminatorResult` in the retired TypeScript `src/engine/sim/services.ts`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExterminatorRefusal {
     /// Classic has no exterminator.
@@ -115,7 +116,8 @@ pub(crate) fn with_thousands(x: f64) -> String {
     out
 }
 
-/// The garbage advisory (`nudgeServiceShortfalls` in `sim/services.ts`).
+/// The garbage advisory (`nudgeServiceShortfalls` in the retired TypeScript
+/// `src/engine/sim/services.ts`).
 pub(crate) fn waste_nudge_message(pop: f64, need: f64, have: impl std::fmt::Display) -> String {
     format!(
         "♻️ Garbage is piling up: {} population needs {need} Recycling Center{} (you have {have}). Tenant ratings fall until it is handled, and 4★ requires demand met.",
@@ -124,7 +126,8 @@ pub(crate) fn waste_nudge_message(pop: f64, need: f64, have: impl std::fmt::Disp
     )
 }
 
-/// The suite-parking advisory (`nudgeServiceShortfalls` in `sim/services.ts`).
+/// The suite-parking advisory (`nudgeServiceShortfalls` in the retired
+/// TypeScript `src/engine/sim/services.ts`).
 pub(crate) fn suite_nudge_message(suites: f64, spots: impl std::fmt::Display) -> String {
     format!(
         "🚗 Hotel suites need a working parking space each: {suites} suite{}, {spots} space(s) chained to a ramp.",
@@ -310,7 +313,7 @@ impl Simulation {
     /// is infested right now. `Ok` carries the cost and the room count.
     pub fn call_exterminator(&mut self) -> Result<(f64, usize), ExterminatorRefusal> {
         // `rules.infestationRecovery()` is null for Classic and the fee pair
-        // for Modern (ruleSets.ts).
+        // for Modern (the retired TypeScript `src/engine/ruleSets.ts`).
         let Some((callout_fee, per_room_fee)) = self.tower.mode.infestation_recovery() else {
             return Err(ExterminatorRefusal::Unavailable);
         };

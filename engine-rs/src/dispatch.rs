@@ -1,4 +1,4 @@
-//! Port of `src/engine/ElevatorDispatch.ts`: the SCAN controller that moves
+//! Port of the retired TypeScript `src/engine/ElevatorDispatch.ts`: the SCAN controller that moves
 //! each car against the statistical waiting estimate and the crowd's calls.
 
 use std::collections::{BTreeMap, HashMap};

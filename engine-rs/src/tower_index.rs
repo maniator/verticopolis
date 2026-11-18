@@ -11,19 +11,19 @@
 //! indexes answer from one walk per tower revision.
 //! The spawn step's rooms per floor joined them with #1143 item 4.
 //!
-//! They are keyed on `revision` and the unit count. Every placement and
-//! removal bumps the revision, a load ends in `reindex`, which resets the
-//! memo and bumps it too, and no other path adds, removes, moves, resizes or
-//! retypes a unit (the census, the overlay floor extents and the onboarding
-//! floor fact read each unit's kind and floor). The
-//! dispatch floor lists also read the transports' spans and stops and the
-//! lobby tiles: placing, removing or resizing a transport, a stop toggle, a
-//! stop clear and the express-stop rule bump the revision as well. The
-//! count guards one case only: a list cut behind the revision rebuilds
-//! instead of indexing past its end. A change that keeps the count
-//! and skips the bump would be served stale; no production path makes one.
-//! (`roomUnits` in `tower/rooms.ts` also keys on the array's identity. Here
-//! only a load replaces the list, and it reindexes.)
+//! They are keyed on `revision` and the unit count. Every placement and removal
+//! bumps the revision, a load ends in `reindex`, which resets the memo and
+//! bumps it too, and no other path adds, removes, moves, resizes or retypes a
+//! unit (the census, the overlay floor extents and the onboarding floor fact
+//! read each unit's kind and floor). The dispatch floor lists also read the
+//! transports' spans and stops and the lobby tiles: placing, removing or
+//! resizing a transport, a stop toggle, a stop clear and the express-stop rule
+//! bump the revision as well. The count guards one case only: a list cut behind
+//! the revision rebuilds instead of indexing past its end. A change that keeps
+//! the count and skips the bump would be served stale; no production path makes
+//! one. (`roomUnits` in the retired TypeScript `src/engine/tower/rooms.ts` also
+//! keys on the array's identity. Here only a load replaces the list, and it
+//! reindexes.)
 //!
 //! The room and tile indexes hand out shared slices rather than borrows of
 //! the memo, so a caller can hold one while it makes any other memoized
@@ -141,8 +141,9 @@ pub(crate) fn floor_slot(floor: i64) -> Option<usize> {
     (0..FLOOR_SLOTS as i64).contains(&i).then_some(i as usize)
 }
 
-/// Room unit ids per floor, in unit order: `unitsByFloor` in `spawnFloors`
-/// (`crowd/spawn.ts`), which the TypeScript rebuilds on every spawn step.
+/// Room unit ids per floor, in unit order: `unitsByFloor` in `spawnFloors` (the
+/// retired TypeScript `src/engine/crowd/spawn.ts`), which the TypeScript
+/// rebuilds on every spawn step.
 pub struct FloorRooms {
     /// The rooms on floor `MIN_FLOOR + i` are `ids[start[i]..start[i + 1]]`.
     start: Vec<usize>,
@@ -265,10 +266,11 @@ impl Tower {
         census
     }
 
-    /// How many housekeeping units the tower has, for the housekeeping
-    /// passes' early return (it was `maxStaffFor`'s ceiling, `staffCeiling`
-    /// in `crowd/spawn.ts`, before housekeepers came in for their shift).
-    /// Read from the census, since a housekeeping unit is never a tile.
+    /// How many housekeeping units the tower has, for the housekeeping passes'
+    /// early return (it was `maxStaffFor`'s ceiling, `staffCeiling` in the
+    /// retired TypeScript `src/engine/crowd/spawn.ts`, before housekeepers came
+    /// in for their shift). Read from the census, since a housekeeping unit is
+    /// never a tile.
     pub(crate) fn housekeeping_units(&self) -> i64 {
         self.census().kinds[Kind::Housekeeping as usize]
     }
@@ -346,10 +348,11 @@ impl Tower {
         Some(run)
     }
 
-    /// `floorBounds` in `Tower.ts`: the lowest and highest floor any unit
-    /// sits on, tiles included, both folded from the ground floor, so an
-    /// empty tower reads `(1, 1)`. Behind `highest_floor` and `lowest_floor`,
-    /// which the panel getters read on every refresh (#1237, A11 in #1158).
+    /// `floorBounds` in the retired TypeScript `src/engine/Tower.ts`: the
+    /// lowest and highest floor any unit sits on, tiles included, both folded
+    /// from the ground floor, so an empty tower reads `(1, 1)`. Behind
+    /// `highest_floor` and `lowest_floor`, which the panel getters read on
+    /// every refresh (#1237, A11 in #1158).
     pub(crate) fn floor_bounds(&self) -> (i64, i64) {
         let key = self.index_key();
         let cached = self.memo.borrow().bounds;
@@ -366,11 +369,12 @@ impl Tower {
         bounds
     }
 
-    /// The floor the metro stations stand on, their bottom row, when the
-    /// tower has one. Every station stands on the same row (`metro_reason`). Placement asks it for every tile a drag, a brush, a bridge or
-    /// an extend lays, so it is memoized until a station registers or
-    /// unregisters (`Memo::metro_changes`): a revision key would walk every
-    /// unit again after each tile.
+    /// The floor the metro stations stand on, their bottom row, when the tower
+    /// has one. Every station stands on the same row (`metro_reason`).
+    /// Placement asks it for every tile a drag, a brush, a bridge or an extend
+    /// lays, so it is memoized until a station registers or unregisters
+    /// (`Memo::metro_changes`): a revision key would walk every unit again
+    /// after each tile.
     pub(crate) fn metro_floor(&self) -> Option<i64> {
         let key = self.memo.borrow().metro_changes;
         let cached = self.memo.borrow().metro_floor;

@@ -1,4 +1,4 @@
-//! Port of `src/engine/Ledger.ts`.
+//! Port of the retired TypeScript `src/engine/Ledger.ts`.
 
 use indexmap::IndexMap;
 use serde_json::{json, Map, Value};

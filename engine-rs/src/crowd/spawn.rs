@@ -1,4 +1,5 @@
-//! Port of `crowd/spawn.ts`, `crowd/trips.ts` and `crowd/venueTrips.ts`.
+//! Port of the retired TypeScript `src/engine/crowd/spawn.ts`,
+//! `src/engine/crowd/trips.ts` and `src/engine/crowd/venueTrips.ts`.
 
 use super::doors;
 use super::meals::MealOrigin;
@@ -21,7 +22,7 @@ pub(crate) use metro_trips::metro_arrival;
 use metro_trips::metro_departure;
 pub use staff::spawn_step;
 
-// ---- trips.ts -------------------------------------------------------------
+// ---- src/engine/crowd/trips.ts ---------------------------------------------
 
 /// `(crowd.nextId * 2654435761) | 0`: a double product (rounded past 2^53,
 /// which an id above about 3.4 million reaches) then ToInt32.
@@ -223,9 +224,9 @@ pub fn venue_has_room(u: &Unit, mode: GameMode) -> bool {
     }
 }
 
-// ---- venueTrips.ts ---------------------------------------------------------
+// ---- src/engine/crowd/venueTrips.ts ----------------------------------------
 
-// ---- spawn.ts --------------------------------------------------------------
+// ---- src/engine/crowd/spawn.ts ---------------------------------------------
 
 /// A deferred spawn option: the closures of `spawnTrips`, evaluated only
 /// when picked so the rng draws land in the same order.

@@ -1,4 +1,4 @@
-//! Port of `crowd/segmentGraph.ts`: reachability probes.
+//! Port of the retired TypeScript `src/engine/crowd/segmentGraph.ts`: reachability probes.
 //!
 //! `segReachable` asks whether a passenger route runs from any lobby
 //! segment to a target, and the TypeScript answers with one route search

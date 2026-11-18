@@ -1,6 +1,6 @@
 //! A fire outbreak and the paid-rescue offer it raises, split from
 //! `events.rs` for its size: `startFireOn` and `offerFireRescue` in
-//! `src/engine/EventSystem.ts`.
+//! the retired TypeScript `src/engine/EventSystem.ts`.
 
 use crate::events::PendingChoice;
 use crate::facilities::Kind;

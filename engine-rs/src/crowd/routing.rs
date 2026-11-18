@@ -1,4 +1,5 @@
-//! Port of `crowd/routing.ts`: adjacency graphs, BFS routing, elevator calls.
+//! Port of the retired TypeScript `src/engine/crowd/routing.ts`: adjacency
+//! graphs, BFS routing, elevator calls.
 
 use super::banks::balance_shafts;
 use super::expected_time;

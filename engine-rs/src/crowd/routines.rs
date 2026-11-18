@@ -1,4 +1,5 @@
-//! Port of `crowd/routines.ts` (Modern-only demographic routines).
+//! Port of the retired TypeScript `src/engine/crowd/routines.ts` (Modern-only
+//! demographic routines).
 
 use super::spawn::{add, Options, SpawnFloors};
 use super::Crowd;

@@ -1,8 +1,8 @@
-//! The renderer's reads that the port answers (facade slice 7, PR 5b): the
-//! garage and waste fills (`parkingUsage` and `recyclingFill` in
-//! `sim/services.ts`) and the elevator queue projection (`elevatorQueueView`
-//! in `crowd/routing.ts`). The renderer reads the fills once per scene sync
-//! and the queue once per frame.
+//! The renderer's reads that the port answers (facade slice 7, PR 5b): the garage and
+//! waste fills (`parkingUsage` and `recyclingFill` in the retired TypeScript
+//! `src/engine/sim/services.ts`) and the elevator queue projection
+//! (`elevatorQueueView` in `src/engine/crowd/routing.ts`). The renderer reads the
+//! fills once per scene sync and the queue once per frame.
 
 use crate::crowd::fasthash::FastIndexMap;
 

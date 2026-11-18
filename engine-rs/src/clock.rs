@@ -216,7 +216,7 @@ mod tests {
     use super::*;
 
     /// One reading of the clock on a calendar. The retired TypeScript engine
-    /// held the same rows (`clockReadings.test.ts`, #1875).
+    /// held the same rows (the retired TypeScript `src/engine/clockReadings.test.ts`, #1875).
     struct Row {
         name: &'static str,
         calendar: Calendar,

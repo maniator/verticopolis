@@ -1,7 +1,7 @@
 //! The Modern intent presets for an elevator's schedule: a read-only query
 //! that answers the active-car rows and home floors a named preset sets for
 //! one shaft. A port of `presetSchedule` and `recommendedPreset`
-//! (`src/engine/scheduleAuthoring.ts`) so the host reads the preset instead of
+//! (the retired TypeScript `src/engine/scheduleAuthoring.ts`) so the host reads the preset instead of
 //! building it. The rule is unchanged: morning and evening rush hours, a
 //! two-car overnight cap, half-fleet shoulders, and staging drawn from the
 //! shaft's own lobbies.

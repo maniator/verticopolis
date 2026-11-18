@@ -1,6 +1,8 @@
-//! Read-side tower queries: ports of `tower/routing.ts`, `tower/transport.ts`
-//! (the stop and distance helpers), `tower/segments.ts`, `tower/rooms.ts` and
-//! `census.ts`. Memos are keyed on `revision` the way the TypeScript caches are.
+//! Read-side tower queries: ports of the retired TypeScript
+//! `src/engine/tower/routing.ts`, `src/engine/tower/transport.ts` (the stop and
+//! distance helpers), `src/engine/tower/segments.ts`, `src/engine/tower/rooms.ts`
+//! and `src/engine/census.ts`. Memos are keyed on `revision` the way the
+//! TypeScript caches are.
 
 use std::collections::{HashMap, HashSet};
 
@@ -325,7 +327,7 @@ impl Tower {
         cols.cloned().unwrap_or_default()
     }
 
-    // ---- segments (tower/segments.ts) --------------------------------------
+    // ---- segments (the retired TypeScript `src/engine/tower/segments.ts`) ----
 
     /// `segmentsOf`: the contiguous structural runs on a floor.
     pub fn segments_of(&self, floor: i64) -> Vec<(i64, i64)> {
@@ -412,7 +414,7 @@ impl Tower {
         seg_id(floor, runs.first().map(|r| r.0).unwrap_or(0))
     }
 
-    /// `runAt` (crowd/walk.ts).
+    /// `runAt` (the retired TypeScript `src/engine/crowd/walk.ts`).
     pub fn run_at(&self, floor: i64, x: i64) -> Option<(i64, i64)> {
         for &run in self.segment_runs(floor).iter() {
             if x < run.0 {
@@ -466,7 +468,7 @@ impl Tower {
         }
     }
 
-    /// `lobbySegs` (crowd/segmentGraph.ts).
+    /// `lobbySegs` (the retired TypeScript `src/engine/crowd/segmentGraph.ts`).
     pub fn lobby_segs(&self) -> Vec<i64> {
         let runs = self.segment_runs(1);
         if runs.is_empty() {

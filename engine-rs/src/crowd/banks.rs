@@ -1,4 +1,4 @@
-//! Port of `crowd/shaftBanks.ts`.
+//! Port of the retired TypeScript `src/engine/crowd/shaftBanks.ts`.
 
 use super::fasthash::FastMap;
 use super::{Crowd, Route};

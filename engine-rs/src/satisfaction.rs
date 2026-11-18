@@ -1,4 +1,5 @@
-//! Port of `sim/satisfaction.ts`, `sim/satisfactionStep.ts` and `sim/gripe.ts`.
+//! Port of the retired TypeScript `src/engine/sim/satisfaction.ts`,
+//! `src/engine/sim/satisfactionStep.ts` and `src/engine/sim/gripe.ts`.
 
 use indexmap::IndexMap;
 

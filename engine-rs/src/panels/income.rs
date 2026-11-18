@@ -1,4 +1,4 @@
-//! `incomeBreakdown` (`src/engine/sim/stats.ts`) over the ledger
+//! `incomeBreakdown` (the retired TypeScript `src/engine/sim/stats.ts`) over the ledger
 //! (`src/engine/Ledger.ts`): the average dollars per day for each report
 //! category over the ledger's kept days (`WINDOW`), for the stats screen.
 

@@ -1,5 +1,6 @@
-//! The 1994 original's variable time pacing (`timePacing.ts`): the two
-//! frame/minute conversions the TDT codec needs.
+//! The 1994 original's variable time pacing (the retired TypeScript
+//! `src/engine/timePacing.ts`): the two frame/minute conversions the TDT codec
+//! needs.
 
 pub const FRAMES_PER_DAY: f64 = 2600.0;
 pub const DAY_START_MINUTE: f64 = 7.0 * 60.0;
