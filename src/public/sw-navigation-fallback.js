@@ -45,13 +45,17 @@
  * scripts this worker never stored. So the page is checked another way: the
  * build puts it after every `assets/` file in the precache manifest
  * (`pageLastTransform`), Workbox installs the entries one at a time in that
- * order, and every `assets/` file the page names must already be in the
- * precache. A page from another build names files that are not, and the
- * install fails, to be tried again at the next update check (#1949). A host's
- * rewrite adds its own script and names no `assets/` file, so it passes.
- * The precache can still hold an older build's files until this worker
- * activates, so the check is for a page newer than the worker, the one a
- * deploy brings; a rollback that lands mid-install is not caught (#2206).
+ * order, and every `assets/` file the page names must be one this worker
+ * asked for earlier in the same install: looked up in the precache (a file
+ * the installed build already cached and this build keeps, which Workbox
+ * does not fetch again) or fetched for it. A page from another build names
+ * files this build's manifest does not list, and the install fails, to be
+ * tried again at the next update check (#1949). That holds for a page older
+ * than the worker as well as a newer one: the precache can still hold the
+ * previous build's files until this worker activates, but this worker never
+ * asks for the ones its manifest dropped, so a rollback that lands
+ * mid-install is refused too (#2206). A host's rewrite adds its own script
+ * and names no `assets/` file, so it passes.
  */
 (function () {
   var nativeFetch = self.fetch;
@@ -77,31 +81,38 @@
     }
     return found;
   };
-  // Whether every file in `urls` is in a Workbox precache.
-  var allPrecached = function (urls) {
-    return self.caches.keys().then(function (names) {
-      var precaches = names.filter(function (name) {
-        return name.indexOf("precache") !== -1;
-      });
-      return Promise.all(
-        urls.map(function (url) {
-          return Promise.all(
-            precaches.map(function (name) {
-              return self.caches.open(name).then(function (cache) {
-                return cache.match(url, { ignoreSearch: true });
-              });
-            }),
-          ).then(function (hits) {
-            return hits.some(Boolean);
-          });
-        }),
-      ).then(function (each) {
-        return each.every(Boolean);
-      });
+  // The files this worker asked for during this install, without their
+  // query. Workbox installs its manifest one entry at a time: it looks each
+  // entry up in its precache (`caches.match` with the precache's
+  // `cacheName`), and fetches it, with an `integrity`, only when the lookup
+  // misses. So by the page (the last entry) this holds every `assets/` file
+  // the worker will keep, whether the installed build had already cached it
+  // or not.
+  var askedFor = Object.create(null);
+  var bare = function (url) {
+    return url.split("?")[0].split("#")[0];
+  };
+  var allAskedFor = function (urls) {
+    return urls.every(function (url) {
+      return askedFor[bare(url)] === true;
     });
   };
+  var isInstalling = function () {
+    return !!self.serviceWorker && self.serviceWorker.state === "installing";
+  };
+  var nativeMatch = self.caches && self.caches.match;
+  if (nativeMatch) {
+    self.caches.match = function (request, options) {
+      var precache = !!options && typeof options.cacheName === "string" && options.cacheName.indexOf("precache") !== -1;
+      if (precache && isInstalling()) askedFor[bare(new Request(request).url)] = true;
+      return nativeMatch.apply(self.caches, arguments);
+    };
+  }
   self.fetch = function (input, init) {
-    var installing = self.serviceWorker && self.serviceWorker.state === "installing";
+    var installing = isInstalling();
+    if (installing && input instanceof Request && input.mode !== "navigate" && input.integrity && !isPage(input.url)) {
+      askedFor[bare(input.url)] = true;
+    }
     if (installing && input instanceof Request && input.mode !== "navigate" && input.integrity && isPage(input.url)) {
       return nativeFetch.call(self, new Request(input, { integrity: "" }), init).then(function (response) {
         if (!response.ok) return response;
@@ -109,10 +120,7 @@
           .clone()
           .text()
           .then(function (html) {
-            return allPrecached(assetsNamed(html, input.url));
-          })
-          .then(function (sameBuild) {
-            if (!sameBuild) throw new TypeError("The page names files this worker does not precache, so it is from another build (#1949).");
+            if (!allAskedFor(assetsNamed(html, input.url))) throw new TypeError("The page names files this worker does not precache, so it is from another build (#1949).");
             return response;
           });
       });

@@ -352,3 +352,50 @@ test("an install refuses the next build's page, and the next install stores its 
     await context?.close();
   }
 });
+
+/**
+ * The same holds the other way (#2206). A rollback that lands while the next
+ * build's worker installs serves the older build's page, and every file that
+ * page names is still in Cache Storage from the worker already installed. The
+ * install must refuse it anyway, because the installing worker's manifest
+ * does not list those files, and the installed build keeps playing.
+ */
+test("an update refuses the older build's page while the newer build installs", async ({ browser }) => {
+  let context: BrowserContext | undefined;
+  try {
+    const first = await installedFirst(browser);
+    context = first.context;
+    const before = deployments.requests.length;
+    deployments.pageFrom("A");
+    deployments.serve("B");
+    await first.page.evaluate(async () => {
+      await (await navigator.serviceWorker.getRegistration())?.update().catch(() => undefined);
+    });
+    await expect
+      .poll(() => deployments.requests.slice(before).some((r) => r.path === "/index.html" && r.from === "A"), { message: "B's installing worker fetched A's page", timeout: 90_000 })
+      .toBe(true);
+    const pending = () =>
+      first.page.evaluate(async () => {
+        const r = await navigator.serviceWorker.getRegistration();
+        return r?.installing || r?.waiting ? "a new worker" : "none";
+      });
+    await expect.poll(pending, { message: "the install was refused", timeout: 30_000 }).toBe("none");
+    await expect(first.page.locator('[data-act="update"]'), "no update is offered").toHaveCount(0);
+    // The refused install may leave the entries it stored before the page in
+    // the shared precache (only an activation clears them), so check A's own.
+    const { keys } = await cacheContents(first.page);
+    const r = deployments.revisions.A;
+    for (const name of [`verticopolis_engine.js?__WB_REVISION__=${r.glue}`, `verticopolis_engine_bg.wasm?__WB_REVISION__=${r.wasm}`, `BUILD.json?__WB_REVISION__=${r.record}`]) {
+      expect(keys, "A's engine files are still in the cache").toContain(`/engine/${name}`);
+    }
+    deployments.pageFrom(null);
+    deployments.serve("A");
+    await first.page.reload();
+    await expectControlledWithEngine(first.page);
+    await hostedGame(first.page);
+  } finally {
+    deployments.pageFrom(null);
+    deployments.serve("A");
+    await context?.close();
+  }
+});
