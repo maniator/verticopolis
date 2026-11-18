@@ -156,6 +156,12 @@ pub struct TripFacts {
     pub to: Place,
     /// On the way back from a meal or a visit.
     pub returning: bool,
+    /// Gave up waiting to set out and is going back the way they came
+    /// (`walk::turn_back`, #2188): `from` is the floor they stand on and
+    /// `to` where the trip began, and `purpose` still says what the trip
+    /// was for. Only while they walk back: once there, the next trip reads
+    /// as itself.
+    pub gave_up: bool,
     /// A housekeeper's step in their working day.
     pub shift: Option<StaffTrip>,
 }
@@ -195,6 +201,25 @@ fn is_food(kind: Kind) -> bool {
 
 /// The card's facts for person `p`.
 pub fn trip_facts(p: &Person, tower: &Tower) -> TripFacts {
+    if p.gave_up && p.returning && !p.staff {
+        // A turn sets `returning`, but they never reached where they were
+        // going: read the trip as it set out, and send them back to its
+        // start (#2188). `gave_up` stays set after the walk back, so a
+        // worker sent out again (their desk taken) reads as that new trip.
+        let set_out = facts_for(p, tower, false);
+        return TripFacts {
+            from: Place::Floor(p.floor),
+            to: set_out.from,
+            gave_up: true,
+            ..set_out
+        };
+    }
+    facts_for(p, tower, p.returning)
+}
+
+/// The card's facts for person `p`, read as on the way back when
+/// `returning`.
+fn facts_for(p: &Person, tower: &Tower, returning: bool) -> TripFacts {
     let first = p.floors.first().copied().unwrap_or(p.floor);
     let last = p.floors.last().copied().unwrap_or(p.floor);
     let facts = |purpose, from, to| TripFacts {
@@ -202,6 +227,7 @@ pub fn trip_facts(p: &Person, tower: &Tower) -> TripFacts {
         from,
         to,
         returning: false,
+        gave_up: false,
         shift: None,
     };
     if p.staff {
@@ -223,7 +249,7 @@ pub fn trip_facts(p: &Person, tower: &Tower) -> TripFacts {
             Some(v) if is_food(v.kind) => Purpose::Meal,
             _ => Purpose::Visit,
         };
-        let (home_floor, venue_floor) = if p.returning {
+        let (home_floor, venue_floor) = if returning {
             (last, first)
         } else {
             (first, last)
@@ -236,13 +262,13 @@ pub fn trip_facts(p: &Person, tower: &Tower) -> TripFacts {
             Some(v) => Place::Room(v.id),
             None => Place::Floor(venue_floor),
         };
-        let (from, to) = if p.returning {
+        let (from, to) = if returning {
             (venue, home)
         } else {
             (home, venue)
         };
         return TripFacts {
-            returning: p.returning,
+            returning,
             ..facts(purpose, from, to)
         };
     }

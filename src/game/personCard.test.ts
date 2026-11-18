@@ -22,6 +22,7 @@ function person(over: Partial<PersonDetail> = {}): PersonDetail {
     waitMinutes: 0,
     tripWaitMinutes: 3,
     shaftId: 2,
+    gaveUp: false,
     ...over,
   };
 }

@@ -1,7 +1,8 @@
-use super::{trip_facts, Errand, ErrandPlace, Place, Purpose};
+use super::{trip_facts, Errand, ErrandPlace, Place, Purpose, TripFacts};
 use crate::clock::GameMode;
 use crate::crowd::spawn::{add, spawn_step};
 use crate::crowd::staff_shift::StaffTrip;
+use crate::crowd::walk::turn_back;
 use crate::facilities::Kind;
 use crate::rule_tests::{at_time, shaft, strip_tower};
 use crate::sim::Simulation;
@@ -133,6 +134,86 @@ fn a_meal_trip_runs_from_the_office_to_the_counter_and_back() {
         (Place::Room(t.food), Place::Room(t.office))
     );
     assert!(back.returning);
+}
+
+/// Person `i` runs out of patience before boarding, as `motion::advance`
+/// turns them.
+fn give_up_waiting(sim: &mut Simulation, i: usize) {
+    turn_back(&mut sim.crowd, i);
+    sim.crowd.people[i].gave_up = true;
+}
+
+#[test]
+fn a_diner_who_gave_up_heads_back_to_the_office_and_not_from_the_counter() {
+    // #2188: the turn sets `returning`, which read as on the way back from
+    // the fast food they never reached.
+    let mut t = tower3();
+    let i = person(&mut t.sim, (2, 10), (3, 20));
+    let p = &mut t.sim.crowd.people[i];
+    p.meal_venue_id = Some(t.food);
+    p.origin_unit_id = Some(t.office);
+    give_up_waiting(&mut t.sim, i);
+    let f = facts(&t.sim, i);
+    assert!(f.gave_up);
+    assert!(!f.returning);
+    assert_eq!(f.purpose, Purpose::Meal);
+    assert_eq!((f.from, f.to), (Place::Floor(2), Place::Room(t.office)));
+}
+
+#[test]
+fn a_worker_who_gave_up_at_the_lobby_goes_back_out_through_it() {
+    let mut t = tower3();
+    let i = person(&mut t.sim, (1, 30), (2, 11));
+    t.sim.crowd.people[i].errand = Some(Errand {
+        place: ErrandPlace::Office,
+        inbound: true,
+    });
+    give_up_waiting(&mut t.sim, i);
+    let f = facts(&t.sim, i);
+    assert!(f.gave_up);
+    assert_eq!(f.purpose, Purpose::ToWork);
+    assert_eq!((f.from, f.to), (Place::Floor(1), Place::Lobby(1)));
+}
+
+#[test]
+fn a_worker_sent_out_again_after_giving_up_reads_as_leaving() {
+    // Back at the office after giving up, a worker whose desk is taken is
+    // sent out: `returning` clears but `gave_up` stays, and the card reads
+    // the trip out to the lobby, not the walk back.
+    let mut t = tower3();
+    let i = person(&mut t.sim, (2, 11), (1, 30));
+    t.sim.crowd.people[i].errand = Some(Errand {
+        place: ErrandPlace::Office,
+        inbound: false,
+    });
+    give_up_waiting(&mut t.sim, i);
+    t.sim.crowd.people[i].returning = false;
+    let f = facts(&t.sim, i);
+    assert!(!f.gave_up);
+    assert!(!f.returning);
+    assert_eq!(f, facts_without_give_up(&mut t.sim, i));
+}
+
+/// The same person's facts with `gave_up` clear, for comparison.
+fn facts_without_give_up(sim: &mut Simulation, i: usize) -> TripFacts {
+    sim.crowd.people[i].gave_up = false;
+    facts(sim, i)
+}
+
+#[test]
+fn a_diner_really_on_the_way_back_still_reads_from_the_counter() {
+    // `returning` without `gave_up` (a real way back, or a turn after an
+    // edit, which keeps `gave_up` clear: #2019) reads as before.
+    let mut t = tower3();
+    let i = person(&mut t.sim, (2, 10), (3, 20));
+    let p = &mut t.sim.crowd.people[i];
+    p.meal_venue_id = Some(t.food);
+    p.origin_unit_id = Some(t.office);
+    p.returning = true;
+    let f = facts(&t.sim, i);
+    assert!(!f.gave_up);
+    assert!(f.returning);
+    assert_eq!(f.from, Place::Room(t.food));
 }
 
 #[test]
