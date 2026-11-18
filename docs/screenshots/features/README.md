@@ -63,15 +63,18 @@ on the module's middle story, where the crowd engine stands routed commuters.
 | `metro-platform-waiting.png` | The platform mid-rush with the track empty: commuters who rode down (or just stepped off the last train) wait at the yellow edge among the benches, posters, and vending machines. |
 | `metro-station-train.png` | The consist pulled in: coupled cars with lit window bands and door pairs at the crowd, the red livery stripe running the platform's length. |
 
-## Traffic congestion chip (peak-driven + hotspot floor)
+## Traffic readout (the worst waiting line)
 
-Captured from the built app via the unified generator (`scripts/screenshots.ts`, `traffic` scene) on an identical jammed
-tower (three office floors slammed onto one weak elevator, peak congestion 2.07).
+Captured from the built app via the unified generator (`scripts/screenshots.ts`). The chip shots (`traffic` scene) step a
+jammed tower (three office floors slammed onto one weak elevator) until the readout leaves Smooth; the jump shots
+(`traffic-jump` scenes) step the Monday-morning crowd tower until it reads red and tap it.
 
 | Screenshot | Shows |
 |---|---|
-| `traffic-chip.png` | **Gridlock · 11F**: the chip tiers on peak per-floor congestion (matching the overlay legend) and names the hotspot floor on one line, tier word bold and the floor a lighter footnote. |
+| `traffic-chip.png` | The chip above Smooth: it follows the tower's worst line of people waiting for an elevator right now and names that line's floor, tier word bold and the floor a lighter footnote. |
 | `traffic-chip-mobile.png` | The same state at phone width: the HUD wraps its stats onto rows and the chip (bars + tier + floor) reads cleanly there too. |
+| `traffic-jump.png` | **Backed up · 1F** after a tap: the view zoomed in on the lobby line, its stretch of the floor banded red from the shaft to the last person in it, and its elevator outlined in yellow on that floor only. |
+| `traffic-jump-mobile.png` | The same tap at phone width. |
 
 ## Tablet responsive breakpoint
 
