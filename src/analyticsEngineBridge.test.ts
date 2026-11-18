@@ -5,12 +5,14 @@ import { fileURLToPath } from "node:url";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
 import { RATE_LIMIT_MAX } from "./analyticsRateLimit";
+import { nextAnalyticsTower } from "./analyticsTower";
 import {
   BRIDGE_SEND_LIMIT,
   REMOVAL_SEND_LIMIT,
   bindEngineBridge,
   drainEngineEvents,
   engineBridgeStats,
+  flushBeforeTowerSwap,
   forwardGameplayEvents,
   resetEngineBridge,
   type GameplayEventSource,
@@ -299,6 +301,33 @@ describe("analytics engine bridge", () => {
     gameplaySession.end(); // a hide: the report folds the engine's last events
     gameplaySession.startEpoch(); // a window closing: dropped unsent
     expect(calls).toEqual([undefined, { release: true }, { release: true }]);
+  });
+
+  it("folds the outgoing tower's held events before a swap (#2392)", () => {
+    const calls: unknown[] = [];
+    const queue: unknown[] = [star(2)];
+    bindEngineBridge(() => ({ drainGameplayEvents: (opts?: unknown) => (calls.push(opts), queue.splice(0) as never), gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } }));
+    flushBeforeTowerSwap();
+    expect(calls).toEqual([{ release: true }]);
+    expect(sent()).toEqual([["star_reached", { star: 2, ...tw(1) }]]);
+  });
+
+  it("keeps a New and an Open in one frame on different tower numbers (#2392)", () => {
+    // Each swap hands the outgoing buffer's undrained events on ahead of the
+    // next tower's own (`Engine::adopt`), and the app bumps the tower number
+    // when it follows the swap (`followEngineTower`).
+    let live: unknown[] = [];
+    bindEngineBridge(() => source(live));
+    const swapTo = (own: unknown[]) => {
+      flushBeforeTowerSwap(); // SaveLoad's beforeSwap
+      live = [...live.splice(0), ...own];
+      nextAnalyticsTower(); // GameApp.followSwap
+    };
+    swapTo([founded()]); // New: the founding waits for the next drain
+    swapTo([star(2)]); // Open, before any frame drained
+    drainEngineEvents(source(live));
+    expect(propsFor("new_game_started")).toEqual([{ mode: "classic", ...tw(3) }]);
+    expect(propsFor("star_reached")).toEqual([{ star: 2, ...tw(4) }]); // the opened tower's own number
   });
 
   it("refills the removal budget when a window closes", () => {

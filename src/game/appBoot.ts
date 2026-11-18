@@ -19,7 +19,7 @@ import { rebuildEngine } from "./engineWiring";
 import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow";
 import { gameplaySession, setCommonProps } from "../analytics";
 import { reportCrashException } from "../analyticsErrors";
-import { bindEngineBridge } from "../analyticsEngineBridge";
+import { bindEngineBridge, flushBeforeTowerSwap } from "../analyticsEngineBridge";
 import { clockOf } from "../simport/headerClock";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
@@ -162,7 +162,9 @@ export function wireControllers(app: GameApp): void {
     // drives (found, load, import). See SPEC-modal-precedence-reports CAP-5.
     // The tower being left is kept in My Towers once the next is in, since the
     // autosave below writes over it (owner, 2026-11-16; `keepOutgoing.ts`).
+    // The outgoing tower's last analytics events fold before it goes (#2392).
     beforeSwap: (kind) => {
+      flushBeforeTowerSwap();
       swapKind = kind;
       captureOutgoing(app, kind);
     },

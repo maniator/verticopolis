@@ -10,6 +10,7 @@ import { outcome } from "../simport/portCodes";
 import { statsReport } from "../simport/statsSheet";
 import { catalogOf } from "./portAccess";
 import { NEWER_SAVE_REFUSAL, loadStored, newerSaveRefused } from "./portLifecycle";
+import { flushBeforeTowerSwap } from "../analyticsEngineBridge";
 import { groupDigits } from "../ui/format";
 
 /**
@@ -127,11 +128,21 @@ export async function confirmExterminate(app: GameApp, opts: { readonly reopenSt
   );
 }
 
+/** The Auto-save's swap. The outgoing tower's last analytics events fold
+ *  first, as SaveLoad's `beforeSwap` does for its swaps (#2392). */
+function autoSaveSwap(app: GameApp): (text: string) => boolean {
+  const swap = loadStored(app.enginePort, () => app.followSwap());
+  return (text) => {
+    flushBeforeTowerSwap();
+    return swap(text);
+  };
+}
+
 /** Load the Auto-save and adopt it as the live tower (the Open window's
  *  Auto-save row). */
 export function loadFromSlot(app: GameApp, slot: "auto"): void {
   // The engine loads the save and the app follows the swap.
-  const swap = loadStored(app.enginePort, () => app.followSwap());
+  const swap = autoSaveSwap(app);
   let newer = false;
   const load = (text: string): boolean => {
     const loaded = swap(text);
@@ -164,7 +175,7 @@ export function loadFromSlot(app: GameApp, slot: "auto"): void {
  * `followSwap` owns both, so every arrival route behaves identically.
  */
 export function loadFromSplash(app: GameApp, slot: "auto"): boolean {
-  const load = loadStored(app.enginePort, () => app.followSwap());
+  const load = autoSaveSwap(app);
   const before = app.enginePort.generation();
   let loaded: boolean;
   try {

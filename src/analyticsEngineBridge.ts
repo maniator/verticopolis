@@ -249,12 +249,25 @@ export function drainEngineEvents(source: GameplayEventSource | undefined, now =
   forwardGameplayEvents(batch, now);
 }
 
+/** The live tower, as `bindEngineBridge` was given it. */
+let liveSource: () => GameplayEventSource | undefined = () => undefined;
+
+/** Fold the live tower's last events before the game swaps another tower in
+ *  (#2392). A swap hands undrained events on to the next tower, so without
+ *  this a New and an Open in one frame would fold the New's founding after
+ *  the Open had already started its own tower number, and the two towers
+ *  would share one. Held events are let go, as at a hide. Never throws. */
+export function flushBeforeTowerSwap(): void {
+  drainEngineEvents(liveSource(), monotonicNow(), true);
+}
+
 /** Bind the bridge to the live tower, so the session can fold the engine's
- *  last events before it reports (page hide), and drop them unsent when the
+ *  last events before it reports (page hide) and before a swap, and drop them unsent when the
  *  window they belong to closes (`GameplaySession.startEpoch`, reached only
  *  from the session reset since #991). Called once at
  *  boot. */
 export function bindEngineBridge(live: () => GameplayEventSource | undefined): void {
+  liveSource = live;
   gameplaySession.setEngineFlush((closing) => {
     if (!closing) {
       drainEngineEvents(live(), monotonicNow(), true);
