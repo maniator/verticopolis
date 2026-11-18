@@ -14,6 +14,7 @@ mod lobby_halls;
 mod metro;
 mod placement;
 mod removal;
+mod shaft_rooms;
 mod skybridge;
 mod tall_lobby;
 mod transport_reach;
@@ -23,6 +24,8 @@ mod undoing;
 mod unit_save;
 
 pub use lobby_halls::HallRun;
+#[cfg(test)]
+pub(crate) use shaft_rooms::{ROOM_IN_SHAFT, SHAFT_THROUGH_ROOM};
 pub(crate) use skybridge::{OverAir, Row as BridgeRow, PEOPLE_CROSSING, SKYBRIDGE_PRICE_FACTOR};
 pub use skybridge::{SkybridgeSpan, SKYBRIDGE_MAX_SPAN, SKYBRIDGE_MIN_STAR};
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};

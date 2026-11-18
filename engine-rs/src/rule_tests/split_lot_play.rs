@@ -97,22 +97,22 @@ fn split(parted: Parted, basement: bool) -> Simulation {
     }
     let bottom = if basement { 0 } else { 1 };
     for left in [A, B] {
-        let r = sim.build_transport(Kind::ElevatorStandard, left + 18, bottom, TOP);
+        let r = sim.build_transport(Kind::ElevatorStandard, left, bottom, TOP);
         assert!(r.ok, "elevator at {left}: {:?}", r.reason);
         for f in 2..=4 {
             for k in 0..2 {
-                let r = sim.build(Kind::Office, f, left + 1 + k * 9);
-                assert!(r.ok, "office {f}/{}: {:?}", left + 1 + k * 9, r.reason);
+                let r = sim.build(Kind::Office, f, left + 4 + k * 9);
+                assert!(r.ok, "office {f}/{}: {:?}", left + 4 + k * 9, r.reason);
             }
         }
         for f in 5..=TOP {
             for k in 0..2 {
-                let r = sim.build(Kind::Condo, f, left + 1 + k * 16);
+                let r = sim.build(Kind::Condo, f, left + 4 + k * 16);
                 assert!(r.ok, "condo {f}: {:?}", r.reason);
             }
         }
     }
-    let r = sim.build(Kind::FastFood, 2, B + 24);
+    let r = sim.build(Kind::FastFood, 2, B + 22);
     assert!(r.ok, "fast food: {:?}", r.reason);
     sim
 }

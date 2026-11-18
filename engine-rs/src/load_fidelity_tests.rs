@@ -23,22 +23,22 @@ fn draws(rng: &mut Rng, n: usize) -> Vec<f64> {
     (0..n).map(|_| rng.next()).collect()
 }
 
-/// A small Modern tower: two offices, a condo, one elevator.
+/// A small Modern tower: two offices, a condo, one elevator beside them.
 fn tower() -> Simulation {
     let mut sim = Simulation::new(7, GameMode::Modern, CalendarKind::RealWorld, false);
     sim.money = 1e8;
-    for x in 170..192 {
+    for x in 166..192 {
         assert!(sim.build(Kind::Lobby, 1, x).ok);
     }
     for fl in 2..=3 {
-        for x in 171..191 {
+        for x in 167..191 {
             assert!(sim.build(Kind::Floor, fl, x).ok);
         }
     }
     assert!(sim.build(Kind::Office, 2, 172).ok);
     assert!(sim.build(Kind::Office, 2, 181).ok);
     assert!(sim.build(Kind::Condo, 3, 172).ok);
-    assert!(sim.build_transport(Kind::ElevatorStandard, 171, 1, 3).ok);
+    assert!(sim.build_transport(Kind::ElevatorStandard, 167, 1, 3).ok);
     sim
 }
 

@@ -1,6 +1,6 @@
 {
   "id": "hotel-exterminator-modern",
-  "description": "The Modern tower-one hotel loses every housekeeping crew, its rooms go dirty and then infested, and an exterminator is called short of funds, with funds, and again while pending; the treatment lands the next morning, two crews are rebuilt and cannot keep up, so a second booking follows and lands.",
+  "description": "The Modern tower-one hotel loses every housekeeping crew, its rooms go dirty and then infested, and an exterminator is called short of funds, with funds, and again while pending; the treatment lands the next morning, two crews are rebuilt (a single room is sold to make room for one) and cannot keep up, so a second booking follows and lands.",
   "start": {
     "fixture": "conformance/fixtures/towerone_6.vctower",
     "mode": "modern"
@@ -178,10 +178,16 @@
       "label": "cleared"
     },
     {
+      "op": "sell",
+      "floor": 21,
+      "x": 212,
+      "kind": "hotelSingle"
+    },
+    {
       "op": "build",
       "kind": "housekeeping",
       "floor": 21,
-      "x": 216
+      "x": 204
     },
     {
       "op": "tick",

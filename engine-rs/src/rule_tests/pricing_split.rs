@@ -19,7 +19,7 @@ use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::tower::{Unit, UnitState};
 
-use super::{seeded_game, MID};
+use super::{seeded_game, side_elevator, MID};
 
 pub(super) const X0: i64 = MID - 30;
 
@@ -35,7 +35,7 @@ pub(super) fn strip(mode: GameMode, seed: u32) -> Simulation {
     for i in 0..60 {
         assert!(sim.tower.place(Kind::Floor, 2, X0 + i).ok);
     }
-    assert!(sim.build_transport(Kind::ElevatorStandard, X0, 1, 2).ok);
+    side_elevator(&mut sim, X0, 2);
     sim.money = 1e9;
     sim
 }

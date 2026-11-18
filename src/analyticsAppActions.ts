@@ -183,6 +183,10 @@ export type AppActionName =
   // A drag's release said why it stopped (src/game/dragRefusal.ts, #1847,
   // #2046): `detail` `extend` (an elevator's arrow) or `bulldoze`.
   | "drag_stopped"
+  // A build, extend or resize the engine refused because an elevator shaft
+  // and a room would share a tile (src/game/shaftRoomRefusal.ts): `detail`
+  // `room` (a room where a shaft runs) or `shaft` (a shaft through a room).
+  | "shaft_room_refused"
   // A tap on the HUD's Traffic readout above Smooth (src/game/trafficHud.ts):
   // the camera went to the floor it names. `detail` `shafts` when the
   // transports behind the reading were found and lit, `none` when not.

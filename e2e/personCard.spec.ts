@@ -14,7 +14,9 @@ async function towerWithAWalker(page: Page): Promise<number> {
   return page.evaluate(() => {
     const g = (window as any).game;
     document.getElementById("splash")?.remove();
-    if (!g.sim.buildTransport("elevatorStandard", 186, 1, 3).ok) throw new Error("shaft placement failed");
+    // The fixture's offices fill floor 3 from x 34, and a shaft can't run
+    // through a room, so the shaft stands on the bare floor west of them.
+    if (!g.sim.buildTransport("elevatorStandard", 24, 1, 3).ok) throw new Error("shaft placement failed");
     // The fixture freezes the clock, so run it a minute at a time on the
     // engine until someone the render draws is out walking.
     const walker = () => (g.reader.update(), g.engine.sim.crowd.people.find((p: any) => p.state !== "riding"));

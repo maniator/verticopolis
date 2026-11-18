@@ -13,6 +13,7 @@ import { quoteShaft } from "./portAccess";
 import { lobbyHeightFor } from "./lobbyHeight";
 import { finishesHalfBridge, quoteSkyBridge } from "./skyBridgeTool";
 import { trackAppAction } from "../analyticsActions";
+import { countShaftRoomRefusal } from "./shaftRoomRefusal";
 
 /** Takes a drag step's refusal reason in place of a toast (`dragRefusal.ts`). */
 type RefusalSink = (reason: string) => void;
@@ -77,6 +78,7 @@ export class BuildActions {
     } else if (!quiet && res.reason) {
       this.deps.audio.sfx("error");
       this.deps.ui.toast(res.reason, "bad");
+      countShaftRoomRefusal(res.reason);
     }
     return res.ok;
   }
@@ -111,7 +113,10 @@ export class BuildActions {
     const res = outcome(port, port.buildShaft(this.deps.portCodes().kind(kind), x, bottom, top));
     this.deps.audio.sfx(res.ok ? "build" : "error");
     const reason = res.reason ?? (res.ok ? "" : this.transportReason(kind, x, bottom, top));
-    if (!res.ok) this.deps.ui.toast(reason, "bad");
+    if (!res.ok) {
+      this.deps.ui.toast(reason, "bad");
+      countShaftRoomRefusal(reason);
+    }
     return { ok: res.ok, reason };
   }
 

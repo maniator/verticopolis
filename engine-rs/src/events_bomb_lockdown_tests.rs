@@ -34,7 +34,7 @@ fn busy_morning_with(mode: GameMode, security: bool) -> Simulation {
     if security {
         assert!(sim.build(Kind::Security, 2, 194).ok);
     }
-    assert!(sim.build_transport(Kind::ElevatorStandard, 204, 1, 10).ok);
+    assert!(sim.build_transport(Kind::ElevatorStandard, 234, 1, 10).ok);
     for u in sim.tower.units.iter_mut() {
         if u.state == UnitState::Construction {
             u.state = UnitState::Empty;

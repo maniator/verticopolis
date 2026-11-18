@@ -40,10 +40,13 @@ function fixture(mode: GameMode = "classic") {
   const sim = look(engine);
   for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
   for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+  // The shaft stands left of the strip, clear of the office (a shaft never
+  // runs through a room).
+  for (let x = 9; x >= 6; x--) expect(sim.tower.place("lobby", 1, x).ok && sim.tower.place("floor", 2, x).ok).toBe(true);
   const r = sim.tower.place("office", 2, 12);
   expect(r.ok).toBe(true);
   const office = sim.tower.units.find((u) => u.id === r.unitId) as unknown as Placed;
-  expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
+  expect(sim.buildTransport("elevatorStandard", 6, 1, 2).ok).toBe(true);
   const lift = sim.tower.transports[sim.tower.transports.length - 1] as unknown as Placed;
   return { engine, sim, office, lift };
 }
