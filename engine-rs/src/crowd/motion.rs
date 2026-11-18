@@ -28,9 +28,7 @@ fn trip_floors(p: &Person) -> i64 {
 pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     let mut frustrated = 0;
     let mut travelling = 0;
-    // The crowd's lists from the last slice, filled again in place.
-    let mut landings = std::mem::take(&mut crowd.landings);
-    landings.fill(crowd, tower);
+    let mut landings = Landings::refill(crowd, tower);
     let room = super::expected_time::spare_lines(crowd);
     let mut lines = super::line_count::LineCount::new(tower, room);
     for i in 0..crowd.people.len() {

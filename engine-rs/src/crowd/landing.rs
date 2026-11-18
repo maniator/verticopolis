@@ -138,6 +138,14 @@ pub fn landing_slots(crowd: &Crowd, tower: &Tower) -> Landings {
 }
 
 impl Landings {
+    /// The crowd's lists from the last slice, taken off it and filled again
+    /// in place for this one. The slice hands them back when it ends.
+    pub fn refill(crowd: &mut Crowd, tower: &Tower) -> Landings {
+        let mut landings = std::mem::take(&mut crowd.landings);
+        landings.fill(crowd, tower);
+        landings
+    }
+
     /// Fills in every waiting elevator rider's place and the lines they
     /// stand in, emptying what an earlier slice left here first.
     pub fn fill(&mut self, crowd: &Crowd, tower: &Tower) {
