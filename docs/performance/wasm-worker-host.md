@@ -1,5 +1,9 @@
 # The WASM engine in a Web Worker: measured
 
+> **Historical record.** The worker host was not adopted, and the TypeScript
+> engine these figures compare against was deleted in #1875. The game runs the
+> WASM engine on the main thread ([engine-host.md](../architecture/engine-host.md)).
+
 > **Snapshot, measured 2026-10-14 17:22 to 22:10 UTC on commit `c80416c`
 > (app 2.32.0).** This is one run on one cloud container, and it is not a live
 > figure. The live numbers come from re-running `npm run perf:worker`

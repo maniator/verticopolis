@@ -94,7 +94,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   keyed by a real index (a kind code, a stop, a floor) or a byte codec is fine
   and goes on the allowlist in `src/tests/namedFlags.guard.test.ts` with its
   reason. This is the pattern the owner rejected in PR #1403.
-- **Rust follows the same source rules.** The engine port in `engine-rs/` is held to
+- **Rust follows the same source rules.** The engine in `engine-rs/` is held to
   the same conventions as the TypeScript, with no grandfathered comments:
   American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
   Rust sources at zero), and the 500-line file ceiling that
@@ -264,7 +264,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   2.66.0 and engine crate 1.0.0; every build is the Rust-only
   build). A simulation change
   lands in `engine-rs/`. The TypeScript reference engine was deleted (#1875);
-  its rules are Rust tests now (`docs/architecture/ts-engine-retirement-map.md`).
+  every rule and its tests live in `engine-rs/` now, so never add a TypeScript
+  copy of a rule.
 - **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
   conformance lock, the save/frame layout/catalog/identity versions and the
   binding declaration `src/engineBinding/engine.d.ts`.** The PR that moves one sets

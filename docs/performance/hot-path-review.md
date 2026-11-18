@@ -83,12 +83,13 @@ hotel-heavy figures on 2026-10-27 at `main` d8e5a84; recount them
 with `buildLargeTower`, `buildHotelTower` and the fixture loaders in
 `src/tests/perfCompare/scenarios.ts` when they matter.
 
-**Entry points.** Rust names first, TypeScript second.
+**Entry points.** Rust names first; the camelCase names after a slash are the
+retired TypeScript engine's, kept so the HP-8 table's rows still line up.
 
 | Tier | Entry point | How often |
 | --- | --- | --- |
 | Per frame | the host's frame read (`frame_view`, then `decodeFrame` or `applyRecords` in `src/wasmhost/`), render sync, `runFrame` in `src/game/frameLoop.ts`, build preview (`canBuild` on every pointer move) | every rendered frame |
-| Per step | `Simulation::advance_step` (`engine-rs/src/sim_loop.rs`) / `advanceStep` (`src/engine/sim/loop.ts`): elevator demand, the spawn step, construction. `tick` runs one or more steps, so "per tick" elsewhere means per step | a step from the frame loop is 1 to 20 game minutes (`quantumFor` in `src/engine/sim/fixedStep.ts`), sized so about one runs per frame, at most `MAX_STEPS_PER_FRAME` (4); `tick` splits a longer advance into steps of up to 30 minutes; the perf harness steps 2 minutes, 720 per game day |
+| Per step | `Simulation::advance_step` (`engine-rs/src/sim_loop.rs`): elevator demand, the spawn step, construction. `tick` runs one or more steps, so "per tick" elsewhere means per step | a step from the frame loop is 1 to 20 game minutes (`quantum_for` in `engine-rs/src/fixed_step.rs`), sized so about one runs per frame, at most `MAX_STEPS_PER_FRAME` (4); `tick` splits a longer advance into steps of up to 30 minutes; the perf harness steps 2 minutes, 720 per game day |
 | Per chunk | motion chunks of up to 2.5 game minutes inside a step: `elevator_calls` / `elevatorCalls`, `move_cars` / `moveCars`, `motion::advance` and the crowd's advance | one per short step, up to 8 per 20-minute step (12 when `tick` runs a 30-minute sub-step, which the frame loop does not send) |
 | Per hour | `on_hour` / `onHour`: presence, hotel checkout, housekeeping dispatch, satisfaction, move-ins, traffic income, elevator utilization, star evaluation | every 60 game minutes (30 steps in the perf harness) |
 | Per day | `on_day` / `onDay`: rent and maintenance, random events, VIP, milestones, nudges | every game day |
@@ -130,7 +131,7 @@ Each item has an id so a review can record it (section 6).
 function, name its callers up to an entry point in section 2 and write down the
 tier and every loop in between. A helper is as hot as its hottest caller. This
 needs the repository as well as the diff: search the callers across every
-hot-path surface, both engines, the hosts and the frame loop included.
+hot-path surface, the engine, the hosts and the frame loop included.
 
 **HP-2 Find whole-collection work under a multiplier.** The rule: flag any
 operation whose cost grows with a section 2 collection (units, rooms, floors,
@@ -240,24 +241,26 @@ inherited algorithm is superlinear on a hot path, the PR fixes it or records it
 under section 7. A port is the cheapest time to fix one, because the
 conformance suite is already comparing the new code with the old.
 
-**HP-8 Compare with the TypeScript's caches before porting.** Before porting a
-function, list the caches, indexes and counters the TypeScript version and its
-callees use, and port each one or name the Rust structure that answers the
-same query at the same cost or less. Anything else is a dropped cache, which
+**HP-8 Keep every cache.** Before porting, moving or rewriting a function,
+list the caches, indexes and counters the old version and its callees use (for
+a port of retired TypeScript, the table's TypeScript column), and keep each one
+or name the structure that answers the same query at the same cost or less. Anything else is a dropped cache, which
 section 7 makes always `patch`; a reason in the PR body or a comment in the
 port (for example that the TypeScript cache "is pure" or the value is
 "computed fresh") does not close it. The same holds outside a port: a change
-that removes or bypasses a cache, index or counter either engine has (a
+that removes or bypasses a cache, index or counter the engine or a host has (a
 refactor that undoes one of #1139's caches, say) is an HP-8 finding.
 Bypassing means computing what the cache holds without reading it, such as a
 new scan where the cache already answers the query. Removing one is not a
 finding in two cases: the change replaces it with a structure the record names
 that answers the same query at the same cost or less, or it removes the query
 itself, so nothing asks it anywhere any more (as retiring the TypeScript
-engine will). Every other removal is a finding.
+engine did, #1875). Every other removal is a finding.
 
-The table lists the caches, indexes and counters on the hot paths today: the
-TypeScript ones, and the Rust-only ones with "none" in the TypeScript column,
+The table lists the caches, indexes and counters on the hot paths today. Its
+TypeScript column is a record of where each one came from: that engine was
+deleted in #1875, so its paths no longer exist. Rows with "none" there are
+Rust-only,
 with their Rust status at 9cd44d1 (`main` once #1139 merged) unless a row
 names a later commit. Each PR that adds, ports or removes one updates its row
 and names itself there by number, and its HP-8 review checks that. Once the
@@ -340,9 +343,9 @@ these fixes it, in this order of preference:
 changes no observable result:
 
 - Iteration stays in insertion order. No new iteration over a `HashMap` or
-  `HashSet`, and no sort the other engine does not do.
-- The same random draws from the same seeded streams (`engine-rs/src/rng.rs`,
-  `src/engine/rng.ts`), in the same order. Caching a value a draw depends on,
+  `HashSet`, and no new sort that changes an order the results depend on.
+- The same random draws from the same seeded streams (`engine-rs/src/rng.rs`),
+  in the same order. Caching a value a draw depends on,
   or skipping a call that draws, moves every later hash.
 - Events stay in the same order, gameplay results stay identical, and saves
   stay byte-identical.
@@ -357,11 +360,9 @@ changes no observable result:
 - Every cache that outlives one pass is reset on load: in Rust, keep it in
   `tower.memo`, which `Tower::reindex` resets, or on a structure a load builds
   fresh (as `reach_memo` on the `Simulation` that `load::deserialize`
-  returns), and say which; in TypeScript, name where it resets. The hosts'
-  in-place merge (`src/wasmhost/merge.ts`) also replaces state under the
-  caches, so a cache it can see needs a merge test as well.
+  returns), and say which; in host TypeScript, name where it resets.
 - Evidence: the conformance lock (`conformance/expected.json`) unchanged, a
-  test for each invalidation input (edit, load, merge, each non-structural
+  test for each invalidation input (edit, load, each non-structural
   input), and, for engine hot paths, the seeded differential and a
   byte-identical save on the reference saves.
 
@@ -408,7 +409,7 @@ A PR that touches a hot-path surface (section 1) fills in this note under the
 Complexity heading of the pull request template, or writes "n/a" there with a
 reason. A significant change must give every field: one that adds, ports,
 moves or rewrites code on a per-frame, per-step, per-chunk, per-hour or
-wall-clock path in either engine, the binding, a host or rendering; adds,
+wall-clock path in the engine, the binding, a host or rendering; adds,
 changes or removes a cache, index or counter; changes what crosses the WASM
 boundary or the engine build; or adds per-command work that grows with the
 units placed or removed.
@@ -418,7 +419,7 @@ units placed or removed.
 - Sizes: U, R, P, F, T on the reference saves that matter here.
 - Before and after: for example O(P × U) per step becomes O(P) per step plus O(U) per revision.
 - Repeated scans that remain, and why each is acceptable (frequency times size, measured or estimated).
-- Caches (HP-8): the caches, indexes and counters either engine has here, and whether this ports, keeps or replaces each one, with nothing dropped or bypassed.
+- Caches (HP-8): the caches, indexes and counters the engine and the hosts have here, and whether this ports, keeps or replaces each one, with nothing dropped or bypassed.
 - Results and invalidation (HP-10): cache keys, invalidation tests, conformance and differential evidence.
 - Measurements, each labeled cloud estimate or desktop evidence, or "none".
 ```
@@ -530,8 +531,8 @@ Two kinds are always `patch`, even when an open issue already lists them:
 
 - code the PR adds, ports or rewrites that puts a whole-collection walk under
   any HP-2 multiplier at a tier HP-2 does not allow;
-- a change that drops, removes or bypasses a cache, index or counter either
-  engine has, in a port or not, apart from the two removals HP-8 allows
+- a change that drops, removes or bypasses a cache, index or counter the
+  engine or a host has, in a port or not, apart from the two removals HP-8 allows
   (HP-8).
 
 The false-positive test above does not apply to these two: a new id scan that
@@ -627,17 +628,17 @@ The Hot-Path Auditor's prompt:
 > diff holds uncommitted changes). Apply `docs/performance/hot-path-review.md`,
 > items HP-1 to HP-12, to this change. For each changed, added or ported
 > function (and each removed one, through its former callers), trace its callers
-> across every hot-path surface in section 1 (both engines, the hosts, the frame
+> across every hot-path surface in section 1 (the engine, the hosts, the frame
 > loop, rendering and UI) up to an entry point in section 2, and record the tier
 > and the loops in between. Flag whole-collection work, route searches,
 > allocations, clones, sorts, hashing and id scans under a multiplier, including
 > inside helpers the diff calls but does not change. Check that the change keeps
-> every cache, index and counter either engine has on these paths (the HP-8
-> table) and computes nothing one already answers; for ported code, also list
-> the TypeScript caches, indexes and counters for the same function and its
-> callees and check that each was carried over. For each finding give the
+> every cache, index and counter the engine and the hosts have on these paths
+> (the HP-8 table) and computes nothing one already answers; for ported, moved
+> or rewritten code, also list the old version's caches, indexes and counters
+> for the same function and its callees and check that each was carried over. For each finding give the
 > location, entry point and tier, collection sizes from section 2, the section 4
-> estimate, the TypeScript equivalent, the proposed remedy, any risk to results
+> estimate, the old version where the code was ported or moved, the proposed remedy, any risk to results
 > or cache invalidation (HP-10), and whether an open issue already lists it
 > (search #1158, #1143, #859 and the curated rows of
 > `_bmad-output/implementation-artifacts/backlog.md` with their issues). Report

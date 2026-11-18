@@ -100,8 +100,10 @@ checklist, a lint rule or a test of the code it governs.
 Verticopolis has **two test tiers**:
 
 - **Tier-1: vitest** (`npm test`, i.e. `vitest run`). Fast, headless, run under a
-  **happy-dom** environment (formerly jsdom). Covers the engine, game
-  controllers, UI logic, sprites, audio, and storage. The suite has generous
+  **happy-dom** environment. Covers the game controllers, UI logic, sprites,
+  audio and storage, and (in the integration project) the Rust engine through
+  its WASM binding. The engine's own rules are Rust tests (`cargo test` in
+  `engine-rs/`). The suite has generous
   timeouts (30s) because a few tests drive many in-game days of the full
   simulation over a tall tower. It is split by filename into two **vitest
   projects** (`vite.config.ts` `test.projects`):
@@ -124,9 +126,9 @@ Verticopolis has **two test tiers**:
     [conformance/README.md](./conformance/README.md).
 
     **One engine.** `engine-rs/` is the only engine the game runs
-    (since app 2.66.0 and engine crate 1.0.0). It began as a Rust port of a TypeScript engine, which
-    was deleted in #1875; the rules its tests held are Rust tests now
-    (`docs/architecture/ts-engine-retirement-map.md`). The conformance lock, the goldens and the fuzz corpus are the
+    (since app 2.66.0 and engine crate 1.0.0), and every simulation rule and
+    its tests live there (`engine-rs/src/rule_tests/` and each module's own
+    tests). The conformance lock, the goldens and the fuzz corpus are the
     Rust engine's own regression records, written by the Rust run and checked
     natively (`cargo run --release --features conformance --bin conformance`)
     and through the WASM binding from Node with
@@ -138,7 +140,7 @@ Verticopolis has **two test tiers**:
     writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
     every fixture with the engine and reads it back through the web game's
     readers. Every build runs the WASM engine alone
-    (see below), with no TypeScript fallback. The served package
+    (see below), with no fallback. The served package
     (`src/public/engine/`) is build output and is not checked in. The build
     writes two flavors (#1057): the player package the game ships, and a
     tooling package with the binding's tier 3 test ops, which `npm run dev`,
@@ -149,7 +151,7 @@ Verticopolis has **two test tiers**:
     once the toolchain in engine-rs/README.md is installed. `npm run e2e`
     needs it too, since every spec runs on the WASM engine, and so does `npm run build`: its precache check
     (`scripts/verify-precache.ts`) refuses a build without the engine, so no
-    build ships a silent TypeScript fallback. Without a Rust toolchain, run
+    build ships without it. Without a Rust toolchain, run
     `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate build without the
     engine (it cannot run the game, and a dev serve without the package stops on the engine failure screen; it exists for tooling that never boots one). A stale local build fails the unit test that checks its source
     hash. CI restores it from the
@@ -171,8 +173,7 @@ Verticopolis has **two test tiers**:
     reads the emitted sourcemaps and fails a build that ships test code, a
     production build that ships the harnesses' tower (#921), and a build that
     does not precache the engine package.
-    `?engine=` and `vc.engine` are ignored. See
-    `docs/performance/player-bundle.md` for what still ships and why. A simulation change lands in the
+    See `docs/performance/player-bundle.md` for what ships and why. A simulation change lands in the
     Rust engine. An engine PR that adds a branch adds a scenario that reaches it;
     the `rust-coverage` job (`cargo llvm-cov`, line floor in
     `engine-rs.yml`) is how review checks that, and the floor only moves up.
@@ -184,8 +185,7 @@ Verticopolis has **two test tiers**:
     it), so a changed price or size moves that digest in the PR that changes
     it.
     Forged-save handling is pinned the same way by
-    `conformance/loader-cases.json` (written by the retired TypeScript loader
-    and frozen since #1875; a Rust test replays it), and the `.TDT` codec by
+    `conformance/loader-cases.json` (frozen; a Rust test replays it), and the `.TDT` codec by
     `conformance/tdt-cases.json` (frozen; `cargo run --release --features conformance --bin tdt`
     and a Rust test replay it, and a changed `.TDT` byte moves a hash in the PR that changes it).
     The codec also has a Rust-only fuzz (`engine-rs/tests/tdt_fuzz.rs`):
@@ -211,8 +211,7 @@ Verticopolis has **two test tiers**:
     corpus entry with its golden (`npx tsx scripts/fuzz-corpus.ts --update`
     pins the native run's records under `conformance/fuzz-corpus/goldens/`);
     the `fuzz-corpus` job then holds every entry's native run to its golden
-    and the WASM run to the native one. Until #1875 the scenarios were also
-    replayed on the TypeScript engine. A run summary names its seed range and the
+    and the WASM run to the native one. A run summary names its seed range and the
     `seed_block` and `seed_offset` that replay it, the seeds that diverged,
     the seeds that timed out, and the time the WASM leg took. The nightly
     records the window key (`scripts/fuzz-key.ts`, a hash over the engine's
@@ -220,7 +219,7 @@ Verticopolis has **two test tiers**:
     nights can be compared.
 
     **Suites on the engine port.** A converted suite does not build a
-    `Simulation` and poke it. It names its engines with `describeEngines`
+    `Simulation` and poke it. It declares itself with `describeEngines`
     (`src/tests/portKit/portSim.ts`) and drives one `PortSim` per test: port
     commands (`build`, `buildTransport`, `tick`), the tooling-only members
     (`startFire`, `bombThreat`, `setMoney`), and reads from `sim.state`, a
@@ -239,10 +238,7 @@ Verticopolis has **two test tiers**:
     once per PR in three shards, reported as the required
     `test-engine (host)` check; the
     `test-engine (unit)` leg runs the unit tests with the package
-    required, so the package's own tests run instead of skipping. Until
-    #1421 those legs also ran every suite with each `Simulation` hosted on
-    the engine (story-engine-test-parity, #878); the hosted projects and the
-    mirror host behind them are gone, and so are their per-test markers. The Rust
+    required, so the package's own tests run instead of skipping. The Rust
     workflow uses its own `on.push.paths` list to select PR engine jobs, so
     there is no second independent list or YAML snapshot test.
 
@@ -428,8 +424,9 @@ the agreed floors. Floors are measured over the whole app (not just the strong
 engine layer), so the report can't overstate coverage by scoping to the parts
 that are easy to test.
 
-- **Global floor:** 85% statements / 85% lines / 80% functions / 80% branches,
-  aggregated over the measured set.
+- **Global floor:** 93% statements / 94% lines / 94% functions / 86% branches,
+  aggregated over the measured set (`coverage.thresholds` in
+  [`vite.config.ts`](./vite.config.ts)).
 - **Per-file floors** for the render and audio layers (the sprite painters, the
   pixel-sprite code, and the audio graph in `ToneAudioEngine`). These exist so a single weak file
   **can't hide behind strong siblings**. There is no cross-file masking. Draw
@@ -446,10 +443,10 @@ e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
 - **`src/main.ts`**: the composition root. Its constructor boots the WebGL
   `TowerEngine`, so `new GameApp()` can't run under happy-dom. Its testable
   *logic* lives in the measured `src/game/*` controllers.
-- **`src/render/excalibur/**`**: the Excalibur/WebGL engine wrapper.
-- **`src/wasmhost/engineWorker.ts`**: the experimental worker host's Web
-  Worker entry, the browser glue around `EngineWorkerCore`, which is measured
-  in Node against the real package and a fake engine.
+- **`src/render/excalibur/TowerEngine.ts`, `towerScene.ts`,
+  `towerReconcile.ts`**: the Excalibur/WebGL engine wrapper, whose code all
+  bakes an `ex.Canvas` or drives the live engine. The rest of
+  `src/render/excalibur/` is measured.
 - **`src/render/atlas/browserEntry.ts`, `verify.ts`, `verifyExtras.ts`**: the
   sprite atlas bake's browser half (the page API the export drives and the
   pixel checks), which reads pixels back from a live canvas. The pipeline they
@@ -462,7 +459,8 @@ not game logic: the gallery/preview pages (`src/gallery.ts`,
 (`src/game/toolingTower.ts` and `toolingSim.ts`, which drive the Rust engine
 package the coverage run does not build; their tests run on the `test-engine (unit)` leg,
 and the e2e specs and the screenshot gallery drive them),
-plus the usual non-code (`*.d.ts`, `*.config.*`) and the tests themselves.
+plus the usual non-code (`*.d.ts`, `*.config.*`), fixtures (`*.fixture.ts`)
+and the tests themselves.
 
 ### What you might assume is untestable but ISN'T
 
@@ -717,8 +715,9 @@ or else close and reopen the PR. `npm run release` on a local
 ### The engine crate version
 
 `engine-rs/Cargo.toml` carries its own version, separate from the app's. It is
-the answer to "which engine contract is this?": `engineIdentity()` reports it
-and About will show it (#963 slice 3). The app version stays what players see.
+the answer to "which engine contract is this?": `engineIdentity()` reports it,
+and the version line on the splash, in Settings and in About shows it
+(`src/wasmhost/engineLabel.ts`). The app version stays what players see.
 
 **The crate version goes up with any of these** (the PR that moves one sets
 `crate:` in its note, and the release PR raises the version):
@@ -736,19 +735,21 @@ and About will show it (#963 slice 3). The app version stays what players see.
   the catalog version has none yet, see #1154);
 - the binding's declaration, `src/engineBinding/engine.d.ts`, outside comments.
 
-An internal change that keeps all of these, such as a performance
-optimization, needs no bump. The build hash (`sources` in the package's
-`BUILD.json`) tells such builds apart. While the crate is 0.x, take a minor
-bump for a save, frame or view layout, catalog, identity schema or interface change,
-and a patch bump for a lock change on its own. Publishing is #893.
+Those always move the crate version. Every other change to the engine's code,
+an internal one such as a performance optimization included, takes at least a
+**patch** (owner, 2026-11-17, after #2438 shipped without one). The build hash
+(`sources` in the package's `BUILD.json`) tells builds apart within a version.
+
+The levels follow the app's split (owner, 2026-11-14): **minor** for a new
+API (a call, an answer field, a catalog entry a host can use), **patch** for a
+fix, a behavior correction or an internal change, a lock change on its own
+included. Any PR that changes the engine's code declares one of the two;
+review checks it.
 
 The crate version is independent of the app version: an app release never
-requires a crate release, and the app's 3.0.0 does not wait for the crate.
-Crate 1.0.0 (2026-10-30, the owner's call) marks that the shipped game runs on
-this engine alone. Publishing the crate, shipping the conformance lock inside
-it and writing the compatibility policy stay with #893; the bump rules after
-1.0.0 are part of that policy, so #893 sets them, and until then the 0.x rules
-above still say when a bump is due.
+requires a crate release, and a crate release never requires an app one.
+Crate 1.0.0 (2026-10-30, the owner's call) marked that the shipped game runs on
+this engine alone.
 
 **How:** in the feature PR, set `crate:` and add an Engine line in its note,
 then run `npm run engine:compat`. It rewrites `engine-rs/src/compat-record.json`
@@ -761,7 +762,7 @@ PR raises `version` in `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock` and
 `engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`) and
 re-records, so `engineIdentity()` reports the new version. Two PRs that both
 move the lock still meet in the record's `lockDigest`; whoever merges second
-merges main in and re-records.
+rebases onto `main` and re-records.
 
 **What the guard sees and what it does not.** `src/tests/engineCompat.guard.test.ts`
 recomputes the lock digest, the five version constants and a digest of
@@ -1055,7 +1056,7 @@ alone.
   and `engine-bench/` at 500 lines. Files
   already over it sit on a shrink-only ratchet
   (`src/tests/fileSize.ratchet.txt`): split them, never add to them.
-- **Rust follows the same source rules.** The engine port in `engine-rs/` is held to
+- **Rust follows the same source rules.** The engine in `engine-rs/` is held to
   the same conventions as the TypeScript, with no grandfathered comments:
   American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
   Rust sources at zero), and the 500-line ceiling above (inline `#[cfg(test)]`
@@ -1096,7 +1097,7 @@ alone.
 
 | Path | What |
 | --- | --- |
-| `engine-rs/` | The simulation: the Rust engine, compiled to WebAssembly, and the only engine the game runs. No host access (`engine-rs/tests/independence.rs`), deterministic, tested with `cargo test`. It owns the rules, caps and tuning (`facilities.rs`, `rules.rs`), the catalog the UI reads (`catalog.rs`), saves and `.TDT`, and undo. Its module map and how to build, test and change it: [`engine-rs/README.md`](./engine-rs/README.md). |
+| `engine-rs/` | The simulation: the Rust engine, compiled to WebAssembly, and the only engine the game runs. No host access (`engine-rs/tests/independence.rs`), deterministic, tested with `cargo test`. It owns the rules, caps and tuning (`facilities.rs`, `rules/`), the catalog the UI reads (`catalog.rs`), saves and `.TDT`, and undo. Its module map and how to build, test and change it: [`engine-rs/README.md`](./engine-rs/README.md). |
 | `src/simport/` | `EnginePort`, the one synchronous interface the game uses to call the engine, and the shared view reader that decodes the engine's frame. |
 | `src/engineBinding/`, `src/wasmhost/` | The WASM binding and its declaration (`engine.d.ts`); loading the engine package, its build metadata and the catalog checks. |
 | `src/shared/` | Types and small helpers shared across the game. |
@@ -1112,7 +1113,8 @@ alone.
 | `src/tests/` | Vitest fixtures, integration suites (`*.integration.test.ts`) and the repository-wide guard tests; unit tests colocate next to their source. |
 | `conformance/` | The conformance lock and catalog digests the engine is held to. |
 | `e2e/` | Tier-2 Playwright end-to-end specs. |
-| `docs/` | Contributor docs, including `screenshots.md`. |
+| `docs/` | Contributor docs: the architecture pages (`docs/architecture/`, start at its [README](./docs/architecture/README.md)), `screenshots.md`, the performance and analytics references, and the docs site's source (`docs/engine-site/`). |
+| `.github/workflows/` | CI and release automation. What runs on a pull request and why: [`docs/ci/pipeline.md`](./docs/ci/pipeline.md). |
 
 ## License
 
