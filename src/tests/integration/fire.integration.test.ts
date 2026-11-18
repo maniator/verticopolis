@@ -1,20 +1,7 @@
 import { it, expect } from "vitest";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import { isOperational } from "../../shared/types";
-import { PortSim, describeEngines, type Draft, type Leg } from "../portKit/portSim";
-
-/** A standard elevator's width. */
-const SHAFT_WIDTH = 4;
-
-/** Lobby and floor-2 tiles for a shaft just left of `x0`, so the shaft
- *  stands clear of the rooms built from `x0` (a shaft never runs through a
- *  room). */
-function besideTheLobby(draft: Draft, x0: number): void {
-  for (let x = x0 - 1; x >= x0 - SHAFT_WIDTH; x--) {
-    expect(draft.tower.place("lobby", 1, x).ok).toBe(true);
-    expect(draft.tower.place("floor", 2, x).ok).toBe(true);
-  }
-}
+import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** A floor-2 tower served by an elevator, with `n` occupied offices — the only
  *  flammable rooms, so `startFire()` ignites an office deterministically. */
@@ -22,9 +9,8 @@ function firePrep(leg: Leg, seed: number, n = 1) {
   const draft = newSeededDraft(seed);
   const x0 = Math.floor(LOT_WIDTH / 2) - 20;
   for (let i = 0; i < 70; i++) draft.tower.place("floor", 2, x0 + i);
-  besideTheLobby(draft, x0);
   const sim = new PortSim(leg, draft);
-  sim.mustBuildTransport("elevatorStandard", x0 - SHAFT_WIDTH, 1, 2);
+  sim.mustBuildTransport("elevatorStandard", x0, 1, 2);
   for (let i = 0; i < n; i++) sim.mustBuild("office", 2, x0 + i * 9);
   const ids = sim.setup((d) => {
     const offices = d.tower.units.filter((u) => u.kind === "office");
@@ -132,9 +118,8 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
     const draft = newSeededDraft(11);
     const x0 = Math.floor(LOT_WIDTH / 2) - 20;
     for (let i = 0; i < 40; i++) draft.tower.place("floor", 2, x0 + i);
-    besideTheLobby(draft, x0);
     const sim = new PortSim(leg, draft);
-    sim.mustBuildTransport("elevatorStandard", x0 - SHAFT_WIDTH, 1, 2); // served floor
+    sim.mustBuildTransport("elevatorStandard", x0, 1, 2); // served floor
     const shopId = sim.setup((d) => {
       d.tower.place("shop", 2, 0 + x0); // the only flammable room (earns traffic income)
       const shop = d.tower.units.find((u) => u.kind === "shop")!;

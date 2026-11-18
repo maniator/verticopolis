@@ -33,8 +33,7 @@ function roomTower(leg: Leg, mode: "classic" | "modern", seed: number, kind: Fac
   for (let i = 0; i < 40; i++) draft.tower.place("floor", 2, x0 + i);
   draft.money = 1e9;
   const sim = new PortSim(leg, draft);
-  // The shaft stands at the right end, clear of the rooms (at most 36 tiles).
-  sim.mustBuildTransport("elevatorStandard", x0 + 36, 1, 2);
+  sim.mustBuildTransport("elevatorStandard", x0, 1, 2);
   for (let i = 0; i < n; i++) sim.mustBuild(kind, 2, x0 + i * width);
   const rooms = () => sim.state.tower.units.filter((u) => u.kind === kind);
   expect(rooms()).toHaveLength(n);

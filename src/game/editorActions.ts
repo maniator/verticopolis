@@ -15,7 +15,6 @@ import type { ViewReader } from "../simport/viewReader";
 import { groupDigits } from "../ui/format";
 import { NOT_ENOUGH_MONEY } from "../simport/request";
 import { sayHeldRefusal, type HeldRefusal } from "./dragRefusal";
-import { countShaftRoomRefusal } from "./shaftRoomRefusal";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 import { rememberPlayerText } from "../analyticsPlayerText";
 import { trackAppAction } from "../analytics";
@@ -452,7 +451,6 @@ export class EditorActions {
           if (res.reason === NOT_ENOUGH_MONEY) return this.refuse(res.reason);
           this.deps.audio.sfx("error");
           if (res.reason) this.deps.ui.toast(res.reason, "bad");
-          countShaftRoomRefusal(res.reason);
         } else {
           this.deps.audio.sfx("build");
         }

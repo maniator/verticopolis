@@ -27,9 +27,8 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     document.getElementById("splash")?.remove();
     // The star-2 fixture carries no transports; add one shaft so the cull has
     // real elevator-car actors to hide and restore. A relayed build, so on the
-    // WASM engine the shaft is the engine's. The fixture's offices fill floor
-    // 3 from x 34, and a shaft can't run through a room, so it stands west of them.
-    if (!g.sim.buildTransport("elevatorStandard", 24, 1, 3).ok) throw new Error("shaft placement failed");
+    // WASM engine the shaft is the engine's.
+    if (!g.sim.buildTransport("elevatorStandard", 186, 1, 3).ok) throw new Error("shaft placement failed");
   });
   await expectEngineHosted(page);
   await page.evaluate(() => {

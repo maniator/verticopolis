@@ -151,7 +151,7 @@ fn classic_a_poor_access_office_waits_for_a_shaft_and_empties_when_it_goes() {
     let office = put(&mut sim, Kind::Office, 2, 0);
     assert!(gated(&mut sim, office));
     assert!(!fills_within(&mut sim, office, 300));
-    assert!(sim.build_transport(Kind::ElevatorStandard, 9, 1, 6).ok);
+    assert!(sim.build_transport(Kind::ElevatorStandard, 0, 1, 6).ok);
     let near = sim.tower.transports[1].id;
     assert!(sim.tower.set_cars(near, 8));
     assert!(!gated(&mut sim, office));

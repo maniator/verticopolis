@@ -16,35 +16,35 @@
       "op": "buildRow",
       "kind": "lobby",
       "floor": 1,
-      "from": 163,
+      "from": 167,
       "to": 206
     },
     {
       "op": "buildRow",
       "kind": "floor",
       "floor": 2,
-      "from": 164,
+      "from": 168,
       "to": 205
     },
     {
       "op": "buildRow",
       "kind": "floor",
       "floor": 3,
-      "from": 164,
+      "from": 168,
       "to": 205
     },
     {
       "op": "buildRow",
       "kind": "floor",
       "floor": 4,
-      "from": 164,
+      "from": 168,
       "to": 205
     },
     {
       "op": "buildRow",
       "kind": "floor",
       "floor": 5,
-      "from": 164,
+      "from": 168,
       "to": 205
     },
     {
@@ -92,14 +92,14 @@
     {
       "op": "buildTransport",
       "kind": "elevatorStandard",
-      "x": 164,
+      "x": 168,
       "bottom": 1,
       "top": 5
     },
     {
       "op": "setCars",
       "floor": 1,
-      "x": 164,
+      "x": 168,
       "cars": 3
     },
     {
@@ -122,7 +122,7 @@
     {
       "op": "setSchedule",
       "floor": 1,
-      "x": 164,
+      "x": 168,
       "schedule": {
         "activeCars": {
           "weekday": [
@@ -202,7 +202,7 @@
     {
       "op": "setSchedule",
       "floor": 1,
-      "x": 164,
+      "x": 168,
       "schedule": {
         "activeCars": {
           "weekday": [
@@ -229,7 +229,7 @@
     {
       "op": "setSchedule",
       "floor": 1,
-      "x": 164,
+      "x": 168,
       "schedule": {}
     },
     {

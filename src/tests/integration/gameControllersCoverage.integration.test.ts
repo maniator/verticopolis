@@ -135,14 +135,11 @@ function fixture() {
   const sim = draftTower();
   for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
   for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-  // The shaft stands left of the strip, clear of the office (a shaft never
-  // runs through a room).
-  for (let x = 9; x >= 6; x--) expect(sim.tower.place("lobby", 1, x).ok && sim.tower.place("floor", 2, x).ok).toBe(true);
   const r = sim.tower.place("office", 2, 12);
   expect(r.ok).toBe(true);
   const office = sim.tower.getUnit(r.unitId!)! as unknown as Unit;
   office.state = "occupied";
-  expect(sim.buildTransport("elevatorStandard", 6, 1, 2).ok).toBe(true);
+  expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
   const lift = last(shaftsOf(sim));
   return { sim, office, lift };
 }
@@ -310,7 +307,7 @@ describe.skipIf(noEngine)("BuildActions (paint runs, bulldoze gauntlet, transpor
 
   it("tryBuildTransport surfaces the build's own failure reason as a toast", async () => {
     sim.money = 0;
-    const r = await build.tryBuildTransport("elevatorStandard", 21, 1, 2);
+    const r = await build.tryBuildTransport("elevatorStandard", 20, 1, 2);
     expect(r).toEqual({ ok: false, reason: "Not enough money." });
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
@@ -320,7 +317,7 @@ describe.skipIf(noEngine)("BuildActions (paint runs, bulldoze gauntlet, transpor
     // The diagnosis walks every unit for the caps, so it runs only on a refusal.
     const diagnose = vi.spyOn(build, "transportReason");
     sim.money = CAT.economy.startingMoney;
-    const r = await build.tryBuildTransport("elevatorStandard", 21, 1, 2);
+    const r = await build.tryBuildTransport("elevatorStandard", 20, 1, 2);
     expect(r).toEqual({ ok: true, reason: "" });
     expect(diagnose).not.toHaveBeenCalled();
     expect(f.sfx).toEqual(["build"]);
@@ -334,7 +331,7 @@ describe.skipIf(noEngine)("BuildActions (paint runs, bulldoze gauntlet, transpor
     );
     // validateTransport passes here (clear column, built floors), so the build
     // failed for a reason placement can't diagnose — the generic fallback.
-    expect(await build.transportReason("elevatorStandard", 21, 1, 2)).toBe(
+    expect(await build.transportReason("elevatorStandard", 20, 1, 2)).toBe(
       "A shaft can't go here. Leave a clear column through built floors.",
     );
   });

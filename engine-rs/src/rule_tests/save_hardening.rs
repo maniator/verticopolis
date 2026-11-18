@@ -8,7 +8,7 @@
 //! `transport-*`); the tests here hold the rules those cases add up to, on a
 //! played tower. The unit cap's refusal and its junk filter are
 //! `load_stream_tests::the_unit_cap`.
-use super::{seeded_game, side_elevator, MID};
+use super::{seeded_game, MID};
 use crate::clock::GameMode;
 use crate::facilities::{Kind, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR};
 use crate::load::deserialize;
@@ -31,7 +31,7 @@ pub fn sample_game() -> Simulation {
     for x in X0..X0 + 12 {
         sim.tower.place(Kind::Floor, 2, x);
     }
-    side_elevator(&mut sim, X0, 2);
+    assert!(sim.build_transport(Kind::ElevatorStandard, X0, 1, 2).ok);
     assert!(sim.build(Kind::Office, 2, X0).ok);
     sim.money = 1_234_567.0;
     sim.tick(60.0 * 5.0);
