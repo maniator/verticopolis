@@ -406,7 +406,7 @@ export class SaveLoad {
         this.deps.ui.sayVisibly(port.lastReason() ?? "Export failed."); // not a toast: a dialog may be up (GH #658)
         return;
       }
-      report = exportReport(exportFacts(rec, this.deps.portCodes(), port.towerName()));
+      report = exportReport(exportFacts(rec, this.deps.portCodes(), port));
     } catch (err) {
       trackFileFailure("export_failed", "tdt", "error");
       this.deps.ui.sayVisibly("Export failed: " + (err instanceof Error ? err.message : String(err)));

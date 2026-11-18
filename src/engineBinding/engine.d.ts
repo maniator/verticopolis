@@ -707,6 +707,12 @@ export class Engine {
     structureKindAt(floor: number, x: number): string | undefined;
     tdtExport(): Float64Array;
     tdtFile(): Uint8Array | undefined;
+    /**
+     * The file name a `.TDT` export of this tower downloads as: A to Z and
+     * 0 to 9 from its name, upper-cased and cut to 8 characters, and
+     * `TOWER1.TDT` for a name with none or a DOS device name (#1676).
+     */
+    tdtFilename(): string;
     tdtNote(i: number): string | undefined;
     tdtTowerName(): string | undefined;
     tick(dt_minutes: number): void;

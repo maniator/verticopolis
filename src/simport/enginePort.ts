@@ -455,9 +455,9 @@ export interface EnginePortFiles {
   tdtExport(): PortRecord;
   /** The last done `tdtExport`'s bytes, handed over once. */
   tdtFile(): Uint8Array | undefined;
-  /** Ready to read or write a `.TDT` file. Only an engine with no `.TDT`
-   *  codec of its own has it (the TypeScript engine borrows the Rust one,
-   *  which loads asynchronously); the Rust engine reads the file itself. */
+  /** The name a `.TDT` export of the tower downloads as (8.3, DOS-safe, #1676). */
+  tdtFilename(): string;
+  /** Readies a `.TDT` read or write on an engine without its own codec; the Rust engine has one and leaves this out. */
   prepareTdt?(): Promise<void>;
 }
 

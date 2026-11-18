@@ -112,6 +112,13 @@ mod tests {
         assert_eq!(legacy_filename("a very long name"), "AVERYLON.TDT");
         assert_eq!(legacy_filename("con"), "TOWER1.TDT");
         assert_eq!(legacy_filename("§§"), "TOWER1.TDT");
+        // The cases the TypeScript copy pinned before #1676 moved them here.
+        assert_eq!(legacy_filename("verticopolis prime"), "VERTICOP.TDT");
+        assert_eq!(legacy_filename("---"), "TOWER1.TDT");
+        assert_eq!(legacy_filename(""), "TOWER1.TDT");
+        assert_eq!(legacy_filename("lpt1"), "TOWER1.TDT");
+        assert_eq!(legacy_filename("COM9"), "TOWER1.TDT");
+        assert_eq!(legacy_filename("Com10"), "COM10.TDT");
         assert_eq!(kind_tenant(Kind::Security), Some(14));
     }
 }

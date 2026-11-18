@@ -24,7 +24,6 @@ import {
   wireModel,
 } from "../fixtures/tdtLayout";
 import { LegacyExportError, buildTDT, describeWithCodec, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
-import { legacyFilename } from "../../storage/tdtFilename";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { catalogFor } from "../catalogFixture";
@@ -1428,17 +1427,6 @@ describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving rec
       expect(count, `${state} room`).toBe(5);
       expect(parseTdtBinary(bytes).warnings).toEqual([]);
     }
-  });
-});
-
-describe("legacyFilename", () => {
-  it("filenames are DOS-safe: A-Z0-9, upper, max 8 chars, never empty or a device name", () => {
-    expect(legacyFilename("My Tower!")).toBe("MYTOWER.TDT");
-    expect(legacyFilename("verticopolis prime")).toBe("VERTICOP.TDT");
-    expect(legacyFilename("---")).toBe("TOWER1.TDT");
-    // Reserved DOS device names can't exist as files on the target systems.
-    expect(legacyFilename("Con")).toBe("TOWER1.TDT");
-    expect(legacyFilename("lpt1")).toBe("TOWER1.TDT");
   });
 });
 

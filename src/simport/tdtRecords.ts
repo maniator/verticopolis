@@ -110,12 +110,17 @@ export function importFacts(
   };
 }
 
-/** A done `tdtExport`'s export report numbers, for the tower named
- *  `towerName`. */
-export function exportFacts(rec: PortRecord, codes: PortCodes, towerName: string | undefined): ExportReportFacts {
+/** A done `tdtExport`'s export report numbers, with the tower's name and
+ *  the file name the engine gives the download (`tdtFilename`, #1676). */
+export function exportFacts(
+  rec: PortRecord,
+  codes: PortCodes,
+  port: Pick<EnginePort, "towerName" | "tdtFilename">,
+): ExportReportFacts {
   const at = slots(rec, codes.fields("tdtExport"));
   return {
-    towerName: towerName ?? "",
+    towerName: port.towerName() ?? "",
+    filename: port.tdtFilename(),
     counts: pick(at, EXPORT_COUNTS),
     stats: pick(at, ENCODE_STATS),
     topFloor: at("topFloor"),

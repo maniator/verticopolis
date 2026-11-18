@@ -41,7 +41,6 @@ export type _TypeSurfacePins = [
 
 // --- 2. Runtime surface: value bindings must resolve, not just typecheck. ---
 import * as tdtImportHelpers from "../storage/tdtImportHelpers";
-import * as tdtFilename from "../storage/tdtFilename";
 import * as saveGame from "../storage/SaveGame";
 import * as pixelSprites from "../render/pixelSprites";
 import * as structure from "../render/sprites/structure";
@@ -52,7 +51,6 @@ import * as toneVoices from "../audio/toneVoices";
 
 const RUNTIME_EXPORTS: Record<string, string[]> = {
   tdtImportHelpers: ["looksLikeLegacyTower"],
-  tdtFilename: ["legacyFilename"],
   saveGame: ["SLOT_COUNT", "SaveGame", "TOWER_FILE_EXT"],
   pixelSprites: [
     "FASTFOOD_LOOKS", "PAL", "RESTAURANT_LOOKS", "SHIRTS", "SHOP_LOOKS", "SKIN", "drawRoom", "person",
@@ -77,7 +75,7 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
 };
 
 const MODULES: Record<string, Record<string, unknown>> = {
-  tdtImportHelpers, tdtFilename,
+  tdtImportHelpers,
   saveGame, pixelSprites, structure, spriteFacilities, audio, toneScenes, toneVoices,
 };
 

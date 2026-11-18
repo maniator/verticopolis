@@ -265,6 +265,7 @@ export const BINDING_EXPORT_TIERS = {
   tdtExport: T2,
   lastRefusalCode: T2,
   tdtFile: T2,
+  tdtFilename: T2,
   // Tier 2, the port's render queries (facade slice 7, PR 5b): what the
   // renderer reads beyond the view frame, per frame or per scene sync.
   congestion: T2,

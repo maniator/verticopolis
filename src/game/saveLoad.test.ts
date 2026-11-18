@@ -7,7 +7,7 @@ import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { trackAppAction, trackFileExported, trackFileFailure, trackFileImported, trackTdtImportRead } from "../analytics";
 import { precedenceUi } from "../ui/precedenceUi.fixture";
 import { showImportReport } from "../ui/uiDialogs";
-import { importFacts } from "../simport/tdtRecords";
+import { exportFacts, importFacts } from "../simport/tdtRecords";
 import {
   RESUME_AFTER_RECOVERY_KEY,
   SaveLoad,
@@ -307,13 +307,15 @@ describe("SaveLoad.recoverFromContextLoss", () => {
 describe("SaveLoad legacy files", () => {
   it("the export report's download writes the engine's .TDT bytes", async () => {
     const bytes = Uint8Array.of(1, 2, 3);
-    const { saves, deps } = setup({
+    const { saves, deps, port } = setup({
       prepareTdt: () => Promise.resolve(),
       tdtExport: () => Float64Array.of(1, 0),
       tdtFile: () => bytes,
       towerName: () => "Spire",
     });
     await saves.exportLegacy();
+    // The report reads the tower's name and the download's name from the engine (#1676).
+    expect(exportFacts).toHaveBeenCalledExactlyOnceWith(Float64Array.of(1, 0), expect.any(PortCodes), port);
     const [, cb] = deps.ui.showExportReport.mock.calls[0] as unknown as [
       unknown,
       { onDownload(): void },

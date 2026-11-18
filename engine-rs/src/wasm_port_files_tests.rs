@@ -102,6 +102,17 @@ fn a_tdt_round_trips_through_stage_and_adopt() {
 }
 
 #[test]
+fn the_tdt_filename_follows_the_towers_name() {
+    let mut e = built(GameMode::Classic);
+    e.sim.tower.tower_name = None;
+    assert_eq!(e.port_tdt_filename(), "TOWER1.TDT");
+    e.sim.tower.tower_name = Some("Grand Plaza 2".into());
+    assert_eq!(e.port_tdt_filename(), "GRANDPLA.TDT");
+    e.sim.tower.tower_name = Some("nul".into());
+    assert_eq!(e.port_tdt_filename(), "TOWER1.TDT");
+}
+
+#[test]
 fn refused_tdt_files_and_towers_answer_a_bare_status() {
     let mut e = built(GameMode::Modern);
     assert_eq!(e.port_tdt_export(), vec![0.0]);
