@@ -224,7 +224,7 @@ impl Simulation {
     /// older save carried no response.
     fn first_fire(&self) -> Option<usize> {
         let id = *self.events.active.first()?;
-        self.tower.units.iter().position(|u| u.id == id)
+        self.tower.index_of(id)
     }
 
     /// One step of the answer to a fire: guards go out to a fire an older
