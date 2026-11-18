@@ -77,7 +77,8 @@ describe("the first-tower funnel's tower number", () => {
   it("starts over in a new page life under a new page-life id, so a reload never reuses a key", () => {
     forwardGameplayEvents([founded()]);
     const [, before, lifeBefore] = funnel()[0];
-    // A reload: a fresh page life, its count and its id both new.
+    // A reload: a fresh page life, its count and its id both new. A real
+    // reload loads fresh modules; the two reset hooks stand in for that.
     gameplaySession.reset();
     resetEngineStatus();
     vi.mocked(sendToRelay).mockReset();

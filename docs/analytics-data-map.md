@@ -146,8 +146,9 @@ release that sends them):
 
 Together they name one tower of one page life and nothing more: they cannot
 link a page life to another visit, a device or a person, and the tower's name
-and contents are never sent. A star the replaced tower earns in the moment
-before a swap lands on a number no founding carries, so it finishes no funnel.
+and contents are never sent. The game folds the outgoing tower's last events
+before every swap, so a star it earns in the moment before a New or an Open
+keeps its own tower's number.
 
 ## Persistence failure actions
 
