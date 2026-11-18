@@ -3,9 +3,9 @@ import type { CatalogRules } from "../catalog/catalogTypes";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
 import type { VacateReason } from "../shared/types";
 import {
-  FAR_WALK_COPY,
   accessCopy,
   amenityCopy,
+  farWalkCopy,
   gripeCopy,
   lobbyWarningCopy,
   noRateCopy,
@@ -75,7 +75,7 @@ export function joinParts(parts: PortUnitParts, between?: () => readonly Templat
 }
 
 /** The catalog rules the card's copy follows, read when a card renders. */
-export type DiagnosticRules = () => Pick<CatalogRules, "quotesLobbyDistance">;
+export type DiagnosticRules = () => Pick<CatalogRules, "quotesLobbyDistance" | "advisesFixes">;
 
 /** A facility's display name by kind key (the catalog's `name`), or
  *  undefined for a kind the catalog does not list. */
@@ -116,12 +116,13 @@ export function createPortUnitParts(
 
   /** Engine supplies cause and contributing flags, never a TypeScript
    *  recomputation. The words, and the manual page that answers them. */
-  const cause = (r: PortRecord, prefix: "gripe" | "leaseGripe"): { copy: string; topic?: HelpTopic } | undefined => {
+  const cause = (r: PortRecord, prefix: "gripe" | "leaseGripe", advises: boolean): { copy: string; topic?: HelpTopic } | undefined => {
     if (!flag(r, prefix)) return undefined;
     const reason = named(layout.vacateReasons, at(r, `${prefix}Cause`));
     if (!reason) return undefined;
     const facts: GripeCopyFacts = {
       cause: reason,
+      advises,
       binding: named(layout.bindings, at(r, `${prefix}Binding`)),
       elevatorHere: flag(r, `${prefix}ElevatorHere`),
       adjacent: flag(r, `${prefix}Adjacent`),
@@ -138,22 +139,27 @@ export function createPortUnitParts(
     const r = port.unitFacts(id);
     if (r.length < layout.records.unitFacts.length || at(r, "id") !== id) return { head: [], tail: [], lines: [] };
 
+    // The catalog's rules, read once per card. Classic names each problem's
+    // cause only; Modern adds the fix (#549).
+    const modeRules = rules();
+    const advises = modeRules.advisesFixes;
     const head: TemplateResult[] = [];
     let out = head;
-    const access = accessCopy(named(layout.accessLines, at(r, "access")) ?? "");
+    const access = accessCopy(named(layout.accessLines, at(r, "access")) ?? "", advises);
     if (access) out.push(access.bad ? line(access.text, bad, "access") : line(access.text, good));
     const rate = noRateCopy(named(layout.noRateLines, at(r, "noRate")) ?? "");
     if (rate) out.push(line(rate));
     const extra = supplemental?.(id);
     if (extra) out.push(...extra.lines);
-    if (flag(r, "farWalk")) out.push(line(FAR_WALK_COPY, bad, "farWalk"));
+    if (flag(r, "farWalk")) out.push(line(farWalkCopy(advises), bad, "farWalk"));
 
     if (flag(r, "lobby")) {
       const sinking = flag(r, "sinking");
       const hasSlot = flag(r, "slot");
       const advice = lobbyWarningCopy({
         sinking,
-        quotesDistance: rules().quotesLobbyDistance,
+        advises,
+        quotesDistance: modeRules.quotesLobbyDistance,
         distance: at(r, "lobbyDistance"),
         slotFloor: hasSlot ? at(r, "slotFloor") : undefined,
         onSlot: flag(r, "onSlot"),
@@ -165,12 +171,12 @@ export function createPortUnitParts(
     const tail: TemplateResult[] = [];
     out = tail;
 
-    const main = cause(r, "gripe");
+    const main = cause(r, "gripe", advises);
     if (main) out.push(line(`Main gripe: ${main.copy}`, bad, main.topic));
 
     if (flag(r, "wontLease")) {
-      const lease = cause(r, "leaseGripe");
-      out.push(line(wontLeaseCopy(lease?.copy, at(r, "carry")), bad, lease?.topic ?? "wontLease"));
+      const lease = cause(r, "leaseGripe", advises);
+      out.push(line(wontLeaseCopy(lease?.copy, at(r, "carry"), advises), bad, lease?.topic ?? "wontLease"));
     }
 
     if (flag(r, "notice")) {
@@ -178,6 +184,7 @@ export function createPortUnitParts(
       if (reason) {
         const lines = noticeCopy({
           reason,
+          advises,
           minutesLeft: at(r, "minutesLeft"),
           satisfaction: at(r, "noticeSatisfaction"),
           keepAt: at(r, "keepAt"),

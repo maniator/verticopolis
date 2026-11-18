@@ -15,7 +15,8 @@ const C: i64 = MID - 15;
 const OFFICE_FLOOR: i64 = 5;
 /// A real average wait three times the Classic limit: congestion 3.0.
 const REAL: f64 = 3.0;
-const WARNING: &str = "Tenants are complaining of long elevator waits. Add cars or shafts.";
+/// Classic's warning names the cause only (#549).
+const WARNING: &str = "Tenants are complaining of long elevator waits.";
 
 /// Lobby and floors 2 to 6, an occupied office on 5, one elevator, and the
 /// office floor's tenants waiting `REAL` times the limit on average.
@@ -88,6 +89,21 @@ fn the_morning_warning_names_jammed_commutes() {
         "{:?}",
         sim.log.iter().map(|e| &e.text).collect::<Vec<_>>()
     );
+}
+
+/// Modern's morning warning also says what to do about it (#549).
+#[test]
+fn the_modern_morning_warning_adds_the_fix() {
+    let (mut sim, _) = calm_tower_with_jammed_commutes();
+    sim.mode = GameMode::Modern;
+    sim.clock.minutes = 9.0 * 60.0;
+    for _ in 0..12 {
+        sim.update_satisfaction();
+    }
+    let said: Vec<&str> = sim.log.iter().map(|e| e.text.as_str()).collect();
+    let fix = format!("{WARNING} Add cars or shafts.");
+    assert!(said.contains(&fix.as_str()), "{said:?}");
+    assert!(!said.contains(&WARNING), "{said:?}");
 }
 
 /// A floor whose stairs carry the floor above's load binds on the stairs

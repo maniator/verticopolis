@@ -13,10 +13,13 @@ impl Simulation {
     pub fn update_satisfaction(&mut self) {
         let mut ctx = self.build_satisfaction_context(false);
         if ctx.global_cong > 1.4 && self.clock.hour() == 9 && self.rng.chance(0.5) {
-            self.emit(
-                "Tenants are complaining of long elevator waits. Add cars or shafts.",
-                LogKind::Bad,
-            );
+            // Classic names the cause only, as the 1994 game did (#549).
+            let warning = if self.mode.advises_fixes() {
+                "Tenants are complaining of long elevator waits. Add cars or shafts."
+            } else {
+                "Tenants are complaining of long elevator waits."
+            };
+            self.emit(warning, LogKind::Bad);
         }
         let mut notices: Vec<(i64, Kind, &'static str)> = Vec::new();
         let mut settled = self.settled_floors();

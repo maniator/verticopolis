@@ -68,7 +68,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     () => catalogOf(app).rules,
     (id) => {
       const facts = port.serviceDiagnostics(id);
-      return facts ? portServiceSections(facts) : NO_SERVICE_LINES;
+      return facts ? portServiceSections(facts, catalogOf(app).rules.advisesFixes) : NO_SERVICE_LINES;
     },
     (kind) => findCatalogFacility(catalogOf(app), kind as FacilityKind)?.name,
   );
@@ -97,7 +97,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     // stored; each read puts them between the kept halves, after the lobby
     // advice and above any gripe or notice.
     const recycling = u.kind === "recycling" && !INERT_STATES.has(u.state)
-      ? () => recyclingLinesOf(header.population, port.recyclingCapacity(), port.recyclingFill(), port.recyclingDemandMet())
+      ? () => recyclingLinesOf(header.population, port.recyclingCapacity(), port.recyclingFill(), port.recyclingDemandMet(), catalogOf(app).rules.advisesFixes)
       : undefined;
     // The notice deadline counts down minute by minute while the key moves
     // hourly, so a card with a notice is read whole each time. Only a
@@ -123,7 +123,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
       unit: (id, fresh = false) => portUnitLines(id, fresh),
       transport: (id) => {
         const shaft = cards.shaft(id);
-        return transportLoadLines(shaft?.utilization, shaft?.nearCapacity === true);
+        return transportLoadLines(shaft?.utilization, shaft?.nearCapacity === true, catalogOf(app).rules.advisesFixes);
       },
     },
     currentSchedule: (id) => scheduleFromSlots(port.shaftSchedule(id)),

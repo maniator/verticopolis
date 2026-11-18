@@ -76,6 +76,11 @@ fn each_mode_states_its_rules() {
     assert_eq!(c["rules"]["quotesLobbyDistance"], Value::Bool(false));
     assert_eq!(v["rules"]["exportsTo1994"], Value::Bool(false));
     assert_eq!(v["rules"]["quotesLobbyDistance"], Value::Bool(true));
+    // #549: Classic's cards and notices name the cause only; Modern adds
+    // what to do about it.
+    assert!(!classic.advises_fixes && modern.advises_fixes);
+    assert_eq!(c["rules"]["advisesFixes"], Value::Bool(false));
+    assert_eq!(v["rules"]["advisesFixes"], Value::Bool(true));
     // #2091: SimTower had no decorative walkers, so only Modern may draw them.
     assert!(!classic.decorative_passers_by && modern.decorative_passers_by);
     assert_eq!(c["rules"]["decorativePassersBy"], Value::Bool(false));

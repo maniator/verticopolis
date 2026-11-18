@@ -13,20 +13,25 @@ type Lines = TemplateResult[];
 const bad = "var(--bad)";
 const good = "var(--good)";
 
+/** A fix that follows a problem's cause, as " text", where the mode advises
+ *  fixes (the catalog's `rules.advisesFixes`, #549); Classic names the cause
+ *  only, as the 1994 game's inspector did. */
+const fixOf = (advises: boolean, text: string): string => (advises ? ` ${text}` : "");
+
 export function hotelRatingLines(rating: string | undefined): Lines {
   if (rating === "counts") return [html`<div style="color:${good}">Counts toward stars: yes.</div>`];
   if (rating === "excluded") return [html`<div style="color:${bad}">Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income).</div>`];
   return [];
 }
 
-export function hotelConditionLines(condition: string | undefined, days: number, exterminator: boolean): Lines {
+export function hotelConditionLines(condition: string | undefined, days: number, exterminator: boolean, advises: boolean): Lines {
   if (condition === "dirty") return [
     html`<div style="color:${bad}">Dirty: the guest checked out, so it can't be re-let until a maid cleans it. Left dirty for ${days} days, it turns infested: cockroaches housekeeping can no longer clear. Staff reach rooms by service elevator or stairs.</div>`,
   ];
   if (condition === "infested") return [
-    exterminator
+    exterminator && advises
       ? html`<div style="color:${bad}">Cockroach infested: neglected too long, so housekeeping can no longer clean it. Call an exterminator (clears every room infested at the time you book) or bulldoze this one and rebuild.</div>`
-      : html`<div style="color:${bad}">Cockroach infested: neglected too long. It can't be cleaned. Bulldoze it and rebuild.</div>`,
+      : html`<div style="color:${bad}">Cockroach infested: neglected too long. It can't be cleaned.${fixOf(advises, "Bulldoze it and rebuild.")}</div>`,
   ];
   return [];
 }
@@ -47,21 +52,21 @@ export interface HousekeepingDisplay {
   recovery: boolean;
 }
 
-export function housekeepingDisplayLines(c: HousekeepingDisplay): Lines {
+export function housekeepingDisplayLines(c: HousekeepingDisplay, advises: boolean): Lines {
   if (c.status !== "adequate" && c.status !== "nominalShortfall" && c.status !== "observedShortfall") return [];
   const out: Lines = [
     html`<div>Fields ${c.maidsPerUnit} maids, each cleaning up to ~${c.roomsPerMaid} rooms a day when travel is short. Tower: ${c.crews} crew${c.crews === 1 ? "" : "s"} (${c.maids} maid${c.maids === 1 ? "" : "s"}) for ${c.rooms} hotel room(s).</div>`,
   ];
   if (c.status === "observedShortfall") {
-    out.push(html`<div style="color:${bad}">Falling behind: ${c.leftover} room(s) went unserved yesterday (${c.cleaned} cleaned). Add another Housekeeping unit or improve staff transport.</div>`);
+    out.push(html`<div style="color:${bad}">Falling behind: ${c.leftover} room(s) went unserved yesterday (${c.cleaned} cleaned).${fixOf(advises, "Add another Housekeeping unit or improve staff transport.")}</div>`);
   } else if (c.status === "nominalShortfall") {
-    out.push(html`<div style="color:${bad}">Likely under capacity: rooms may pile up dirty. Add another Housekeeping unit.</div>`);
+    out.push(html`<div style="color:${bad}">Likely under capacity: rooms may pile up dirty.${fixOf(advises, "Add another Housekeeping unit.")}</div>`);
   }
   if (c.hasInfested) {
-    out.push(html`<div style="color:${bad}">${c.infested} room(s) are infested; cleaning can't recover them. ${c.recovery ? "Call an exterminator, or bulldoze and rebuild." : "Bulldoze and rebuild to clear them."}</div>`);
+    out.push(html`<div style="color:${bad}">${c.infested} room(s) are infested; cleaning can't recover them.${fixOf(advises, c.recovery ? "Call an exterminator, or bulldoze and rebuild." : "Bulldoze and rebuild to clear them.")}</div>`);
   }
   if (c.hasOutOfReach) {
-    out.push(html`<div style="color:${bad}">${c.outOfReach} room(s) are out of staff reach and can never be cleaned. Extend a service elevator or stairs to their floors.</div>`);
+    out.push(html`<div style="color:${bad}">${c.outOfReach} room(s) are out of staff reach and can never be cleaned.${fixOf(advises, "Extend a service elevator or stairs to their floors.")}</div>`);
   }
   return out;
 }
@@ -75,9 +80,9 @@ export interface ParkingDisplay {
   suites: number;
 }
 
-export function parkingDisplayLines(c: ParkingDisplay): Lines {
+export function parkingDisplayLines(c: ParkingDisplay, advises: boolean): Lines {
   if (c.status === "disconnected") return [
-    html`<div style="color:${bad}">Ramp access: none. This space is dead (no relief). Chain it to a Parking Ramp.</div>`,
+    html`<div style="color:${bad}">Ramp access: none. This space is dead (no relief).${fixOf(advises, "Chain it to a Parking Ramp.")}</div>`,
   ];
   if (c.status !== "ramp" && c.status !== "connected") return [];
   const result: Lines = [];
@@ -122,9 +127,10 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
 
 /** Shoppers: a venue more than two floors from a (sky) lobby and from a
  *  working metro platform loses half its trade. Rust decides whether it applies; this only words it. */
-export function commercialLobbyLines(c: ServiceDiagnosticFacts["commercial"]): Lines {
+export function commercialLobbyLines(c: ServiceDiagnosticFacts["commercial"], advises: boolean): Lines {
   if (c.lobbyFar !== true) return [];
-  return [html`<div style="color:${bad}">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground, a sky lobby (every 15th floor) or a working Metro platform.</div>`];
+  const fix = fixOf(advises, "Keep it within 2 floors of the ground, a sky lobby (every 15th floor) or a working Metro platform.");
+  return [html`<div style="color:${bad}">Shoppers: too far from a lobby. Traffic is halved.${fix}</div>`];
 }
 
 /** The service lines split by where the card puts them (see
@@ -133,13 +139,14 @@ export type ServiceSections = SupplementalLines;
 
 /** The WASM export returns a keyed object from Rust's typed struct.
  * This adapter does not know about slots, status code integers or thresholds. */
-export function portServiceSections(facts: ServiceDiagnosticFacts): ServiceSections {
+export function portServiceSections(facts: ServiceDiagnosticFacts, advises: boolean): ServiceSections {
   const out: Lines = [
     ...hotelRatingLines(facts.hotel.rating),
     ...hotelConditionLines(
       facts.hotel.condition,
       facts.hotel.infestDays ?? NaN,
       facts.hotel.recovery === true,
+      advises,
     ),
   ];
   const h = facts.housekeeping;
@@ -150,13 +157,13 @@ export function portServiceSections(facts: ServiceDiagnosticFacts): ServiceSecti
     leftover: h.leftover ?? NaN, infested: h.infested ?? NaN,
     outOfReach: h.outOfReach ?? NaN, hasInfested: h.hasInfested === true,
     hasOutOfReach: h.hasOutOfReach === true, recovery: h.recovery === true,
-  }));
+  }, advises));
   const p = facts.parking;
   out.push(...parkingDisplayLines({
     status: p.status, shortage: p.shortage === true,
     have: p.have ?? NaN, total: p.total ?? NaN,
     offices: p.offices ?? NaN, suites: p.suites ?? NaN,
-  }));
-  out.push(...commercialLobbyLines(facts.commercial));
+  }, advises));
+  out.push(...commercialLobbyLines(facts.commercial, advises));
   return { lines: out, trailing: retailDisplayLines(facts.retail) };
 }

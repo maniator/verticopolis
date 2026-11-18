@@ -14,6 +14,15 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// Whether a room's card, a service card and the tower's notices say
+    /// what to do about a problem as well as what it is (#549). Modern
+    /// does; Classic names the cause only, the way the 1994 game's
+    /// inspector did ("Office neighbor is too noisy") and left the remedy
+    /// to the player.
+    pub fn advises_fixes(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// Whether the tower can be exported for SimTower (1994) as a `.TDT`.
     /// Only a Classic tower can: the 1994 format has no place for Modern's
     /// mechanics, so `build_tdt` refuses a Modern save and a frontend

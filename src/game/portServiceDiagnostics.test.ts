@@ -24,7 +24,7 @@ function printed(parts: {
   housekeeping?: Partial<ServiceDiagnosticFacts["housekeeping"]>;
   retail?: Partial<ServiceDiagnosticFacts["retail"]>;
   commercial?: Partial<ServiceDiagnosticFacts["commercial"]>;
-} = {}): string {
+} = {}, advises = true): string {
   const facts: ServiceDiagnosticFacts = {
     hotel: { ...base.hotel, ...parts.hotel },
     parking: { ...base.parking, ...parts.parking },
@@ -32,7 +32,7 @@ function printed(parts: {
     retail: { ...base.retail, ...parts.retail },
     commercial: { ...base.commercial, ...parts.commercial },
   };
-  const { lines, trailing } = portServiceSections(facts);
+  const { lines, trailing } = portServiceSections(facts, advises);
   return renderToFragment(html`${[...lines, ...trailing]}`).textContent ?? "";
 }
 
@@ -46,7 +46,7 @@ describe("engine-owned keyed service diagnostic presentation", () => {
 
   it("renders hotel eligibility, dirty deadlines and recovery without recalculating game policy", () => {
     expect(printed({ hotel: { rating: "counts", condition: "dirty", infestDays: 3 } })).toContain("Left dirty for 3 days");
-    const classic = printed({ hotel: { rating: "excluded", condition: "infested", recovery: false } });
+    const classic = printed({ hotel: { rating: "excluded", condition: "infested", recovery: false } }, true);
     expect(classic).toContain("Counts toward stars: no");
     expect(classic).toContain("Bulldoze it and rebuild");
     expect(classic).not.toContain("Call an exterminator");
@@ -122,5 +122,41 @@ describe("engine-owned keyed service diagnostic presentation", () => {
 
   it("returns no warning for unrelated units or missing service data", () => {
     expect(printed()).toBe("");
+  });
+
+  it("names each service problem without its fix in Classic (#549)", () => {
+    const housekeeping = {
+      status: "observedShortfall" as const, crews: 1, maids: 6, rooms: 40, maidsPerUnit: 6, roomsPerMaid: 2,
+      cleaned: 12, leftover: 4, infested: 2, outOfReach: 3, hasInfested: true, hasOutOfReach: true, recovery: false,
+    };
+    const facts = {
+      housekeeping,
+      parking: { status: "disconnected" },
+      commercial: { lobbyFar: true },
+      hotel: { condition: "infested", recovery: false },
+    } as const;
+    const classic = printed(facts, false);
+    const modern = printed(facts, true);
+    for (const fix of [
+      "Add another Housekeeping unit",
+      "Bulldoze and rebuild to clear them.",
+      "Extend a service elevator",
+      "Chain it to a Parking Ramp.",
+      "Keep it within 2 floors",
+      "Bulldoze it and rebuild.",
+    ]) {
+      expect(classic, fix).not.toContain(fix);
+      expect(modern, fix).toContain(fix);
+    }
+    for (const cause of [
+      "Falling behind: 4 room(s) went unserved yesterday (12 cleaned).",
+      "2 room(s) are infested; cleaning can't recover them.",
+      "3 room(s) are out of staff reach and can never be cleaned.",
+      "Ramp access: none. This space is dead (no relief).",
+      "Shoppers: too far from a lobby. Traffic is halved.",
+      "Cockroach infested: neglected too long. It can't be cleaned.",
+    ]) {
+      expect(classic, cause).toContain(cause);
+    }
   });
 });
