@@ -283,7 +283,9 @@ builds them, for the web game's own tests and tooling.
   (`schedule.autoTune`, which every Modern elevator starts with): the engine
   re-tunes that shaft's car counts at 5 AM each game day from its measured
   traffic, and the save then carries `elevatorLoad`, the elevators' hourly
-  load rings, so a reload re-tunes the same way. An older engine would drop
+  load rings and each shaft's `hourStart` (its demand at the top of the
+  hour under way, which the next hourly sample weighs against its own), so
+  a reload re-tunes the same way. An older engine would drop
   the flag, so it refuses the save.
 
 ## Versioning

@@ -4,9 +4,12 @@
 //! as the game that saved would. A tower with no shaft on Auto leaves them
 //! out, as every save did before: nothing else the game plays reads them.
 //!
-//! Each entry is `[id, { weekday, weekend, weekdayHours, weekendHours }]`:
-//! the 24 loads of each day type and the hours of it the sampler has
-//! measured, ascending. A load reads back the entries of shafts the tower
+//! Each entry is `[id, { weekday, weekend, weekdayHours, weekendHours,
+//! hourStart }]`: the 24 loads of each day type, the hours of it the sampler
+//! has measured, ascending, and the shaft's demand at the top of the hour
+//! under way, which the next sample weighs against its own (#2466). A save
+//! from before #2466 has no `hourStart`, so the first hour after its load
+//! reads the hour's end alone, as that game did. A load reads back the entries of shafts the tower
 //! still has, and an entry that does not fit the shape is skipped, never
 //! failing the load.
 
@@ -64,12 +67,16 @@ impl Simulation {
             return None;
         }
         let entries = self.telemetry.hourly.iter().map(|(id, r)| {
-            json!([id, {
+            let mut rings = json!({
                 "weekday": r.weekday,
                 "weekend": r.weekend,
                 "weekdayHours": hours_of(&r.weekday_sampled),
                 "weekendHours": hours_of(&r.weekend_sampled),
-            }])
+            });
+            if let Some(start) = self.telemetry.hour_start.get(id) {
+                rings["hourStart"] = json!(start);
+            }
+            json!([id, rings])
         });
         Some(Value::Array(entries.collect()))
     }
@@ -91,8 +98,12 @@ impl Simulation {
                 .tower
                 .get_transport(id)
                 .is_some_and(|t| t.kind.is_elevator());
-            if let (true, Some(rings)) = (elevator, rings_of(rings)) {
-                self.telemetry.hourly.insert(id, rings);
+            if let (true, Some(hourly)) = (elevator, rings_of(rings)) {
+                self.telemetry.hourly.insert(id, hourly);
+                let start = rings.get("hourStart").and_then(Value::as_f64);
+                if let Some(start) = start.filter(|f| (0.0..=1.0).contains(f)) {
+                    self.telemetry.hour_start.insert(id, start);
+                }
             }
         }
     }

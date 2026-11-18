@@ -238,8 +238,9 @@ The crate has no default features.
   (`schedule_auto::AUTO_TUNE_HOUR`) the engine sets that shaft's car counts
   from its measured traffic, the hours it has measured only, and leaves the
   staging and timings alone. Such a save carries `elevatorLoad`, the
-  elevators' hourly load rings, so a reload re-tunes as the game that saved
-  would; an older engine would drop the flag, so it refuses the save. A
+  elevators' hourly load rings and each shaft's `hourStart` (its demand at
+  the top of the hour under way, which the next hourly sample weighs against
+  its own), so a reload re-tunes as the game that saved would; an older engine would drop the flag, so it refuses the save. A
   save takes the oldest of these versions that reads it whole. All six load
   here.
 

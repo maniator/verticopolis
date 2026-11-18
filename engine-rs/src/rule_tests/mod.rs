@@ -14,6 +14,7 @@ mod attendance;
 mod auto_backlog;
 mod auto_basement_rush;
 mod auto_idle_express;
+mod auto_rush_end;
 mod busy_meter_riders;
 mod calendar;
 mod canon;
