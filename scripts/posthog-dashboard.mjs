@@ -72,13 +72,6 @@ function inAction(values) {
   return { key: "action", operator: "exact", type: "event", value: values };
 }
 
-/** A `where` clause keeping only events whose numeric `prop` exceeds `n`
- *  (e.g. session_emergencies with at least one fire, for the "% of sessions with
- *  a fire" numerator). */
-function whereGt(prop, n) {
-  return { key: prop, operator: "gt", type: "event", value: n };
-}
-
 /** One event series node. `math` may be a count math ("total"/"dau") or a
  *  property percentile ("median"/"p90"/"p95") paired with `prop`. */
 function series(event, name, math = "total", prop) {
@@ -342,24 +335,77 @@ function buildInsights(ids) {
       ),
     },
     {
-      name: "Session FPS percentiles (median & worst-frame)",
-      description: "Median of session_fps.p50 and worst-frame session_fps.low (production). Frame health (#538).",
+      name: "Session FPS percentiles (median & 5th-percentile low)",
+      formerName: "Session FPS percentiles (median & worst-frame)",
+      description:
+        "Median of session_fps.p50 and of session_fps.low across the rows each day (production). `low` is the 5th-percentile fps of one page life's sampled frames, a hitch signal, not its single worst frame. Observed in the field on whatever device each player has: it is not a hardware benchmark or the performance gate. From the release after 4.13.1 only frames where the simulation runs are sampled (#603); before it, paused and modal-frozen frames counted too, so compare versions on the same side of that change. The tile beside it gives the number of rows behind each day (#538, #2391).",
       query: trends(
-        [series("session_fps", "Typical fps (median of p50)", "median", "p50"), series("session_fps", "Worst-frame fps (median of low)", "median", "low")],
+        [series("session_fps", "Typical fps (median of p50)", "median", "p50"), series("session_fps", "5th-percentile fps (median of low)", "median", "low")],
         { display: "ActionsLineGraph" },
+      ),
+    },
+    {
+      name: "FPS reports per day",
+      description:
+        "How many session_fps rows arrived each day and how many sessions sent them (distinct per-tab session ids), production: the n behind the fps percentiles tile. A row is one reporting window: a page life, or the stretch after a back/forward-cache restore (#621), and it is sent only after 120 sampled frames, so short visits, killed tabs and blocked relays send none. A session that reloads sends one row per page life, so rows can outnumber sessions; it is a volume, never a coverage rate (see docs/analytics-fps-telemetry.md, #2391).",
+      query: trends([series("session_fps", "FPS rows"), series("session_fps", "Sessions sending one", "dau")], { display: "ActionsLineGraph" }),
+    },
+    {
+      name: "Session FPS by tower size and speed",
+      description:
+        "session_fps by the session's peak population and the running game speed most sampled frames ran at (3, 15 or 50 game minutes per real second), with the median typical and 5th-percentile low fps, production, 30d. Rows from the release after 4.13.1 only: earlier rows carry no population, and from that release only frames where the simulation runs are sampled. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+      query: hogql(
+        [
+          "SELECT",
+          "    multiIf(toInt(properties.population) < 1000, '1. under 1,000', toInt(properties.population) < 5000, '2. 1,000 to 4,999', toInt(properties.population) < 10000, '3. 5,000 to 9,999', '4. 10,000 or more') AS population,",
+          "    toInt(properties.speed) AS speed,",
+          "    count() AS page_lives,",
+          "    round(median(toFloat(properties.p50))) AS typical_fps,",
+          "    round(median(toFloat(properties.low))) AS low_fps_p05",
+          "FROM events",
+          "WHERE event = 'session_fps'",
+          "  AND properties.environment = 'production'",
+          "  AND toInt(properties.population) IS NOT NULL",
+          "  AND timestamp >= now() - INTERVAL 30 DAY",
+          "GROUP BY population, speed",
+          "ORDER BY population, speed",
+        ].join("\n"),
+      ),
+    },
+    {
+      name: "Engine cost per game hour by version, tower size and speed",
+      description:
+        "session_sim_cost: the real milliseconds the engine step took per game hour (median and p90), by version, population band and speed (3, 15 or 50 game minutes per real second), production, 30d. Each row is the band and speed its window stepped the most game time at, with that band's peak population, so towers of different sizes are never blended. Sent from the release after 4.13.1, once a visible tab has moved the clock 2 game hours at one band and speed. It depends on the player's machine, and a faster speed takes bigger steps, so compare versions within one population band and speed, and trust a row only with many page lives behind it. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+      query: hogql(
+        [
+          "SELECT",
+          "    properties.version AS version,",
+          "    multiIf(toInt(properties.population) < 1000, '1. under 1,000', toInt(properties.population) < 5000, '2. 1,000 to 4,999', toInt(properties.population) < 10000, '3. 5,000 to 9,999', '4. 10,000 or more') AS population,",
+          "    toInt(properties.speed) AS speed,",
+          "    count() AS page_lives,",
+          "    round(median(toFloat(properties.ms_per_game_hour)), 1) AS median_ms_per_game_hour,",
+          "    round(quantile(0.9)(toFloat(properties.ms_per_game_hour)), 1) AS p90_ms_per_game_hour",
+          "FROM events",
+          "WHERE event = 'session_sim_cost'",
+          "  AND properties.environment = 'production'",
+          "  AND toFloat(properties.ms_per_game_hour) IS NOT NULL",
+          "  AND timestamp >= now() - INTERVAL 30 DAY",
+          "GROUP BY version, population, speed",
+          "ORDER BY version DESC, population, speed",
+        ].join("\n"),
       ),
     },
     {
       name: "Modern towers by stairs and escalators (boots)",
       description:
-        "Modern sessions by the most stairs and escalators their tower held at any boot in the session (boot.flights; a session spans reloads, so this is its largest tower), with the median typical and worst-frame fps those sessions reported, production, 30d. Modern has no limit on flights since 2026-11-16, and Classic keeps 64, so the rows past 64 are towers that use the change. A session with no session_fps row counts in sessions only. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+        "Modern sessions by the most stairs and escalators their tower held at any boot in the session (boot.flights; a session spans reloads, so this is its largest tower), with the median typical and 5th-percentile low fps those sessions reported, production, 30d. Modern has no limit on flights since 2026-11-16, and Classic keeps 64, so the rows past 64 are towers that use the change. A session with no session_fps row counts in sessions only. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
       query: hogql(
         [
           "SELECT",
           "    b.bucket AS flights,",
           "    count() AS sessions,",
           "    round(medianIf(f.p50, f.p50 > 0)) AS typical_fps,",
-          "    round(medianIf(f.low, f.low > 0)) AS worst_frame_fps",
+          "    round(medianIf(f.low, f.low > 0)) AS low_fps_p05",
           "FROM (",
           "    SELECT",
           "        distinct_id,",
@@ -823,20 +869,44 @@ function buildInsights(ids) {
     },
     {
       name: "Per-session emergency severity (avg)",
-      description: "session_emergencies averaged per session: mean fire outbreaks, rooms gutted by fire, and bomb detonations, production. Emitted every session (zeros included), so this is a true per-session mean.",
-      query: trends(
+      description:
+        "Mean fire outbreaks, rooms gutted by fire and bomb detonations per session (distinct per-tab session id), production, 30d. A session's rows are summed first: it sends one session_emergencies row per page life, and from the release after 4.13.1 one more for the play after a back/forward-cache restore (#621), and each fire lands in exactly one row, so the sum is the session's total. Zeros included, so it is a true per-session mean. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+      query: hogql(
         [
-          series("session_emergencies", "Avg fires", "avg", "fires"),
-          series("session_emergencies", "Avg rooms gutted", "avg", "firesGutRooms"),
-          series("session_emergencies", "Avg bombs", "avg", "bombs"),
-        ],
-        { display: "ActionsBar" },
+          "SELECT",
+          "    round(avg(fires), 3) AS avg_fires,",
+          "    round(avg(gutted), 3) AS avg_rooms_gutted,",
+          "    round(avg(bombs), 3) AS avg_bombs,",
+          "    count() AS sessions",
+          "FROM (",
+          "    SELECT",
+          "        distinct_id,",
+          "        sum(toFloat(properties.fires)) AS fires,",
+          "        sum(toFloat(properties.firesGutRooms)) AS gutted,",
+          "        sum(toFloat(properties.bombs)) AS bombs",
+          "    FROM events",
+          "    WHERE event = 'session_emergencies'",
+          "      AND properties.environment = 'production'",
+          "      AND timestamp >= now() - INTERVAL 30 DAY",
+          "    GROUP BY distinct_id",
+          ")",
+        ].join("\n"),
       ),
     },
     {
       name: "Sessions with a fire (30d)",
-      description: "session_emergencies with at least one fire, production, 30d. The numerator for 'fraction of sessions that had a fire' (divide by total session_emergencies, which is emitted once per played session).",
-      query: trends([series("session_emergencies", "Sessions with a fire")], { display: "BoldNumber", where: [whereGt("fires", 0)] }),
+      description:
+        "Sessions (distinct per-tab session ids) with a session_emergencies row showing at least one fire, production, 30d. The numerator for 'fraction of sessions that had a fire'; the denominator is the 'Sessions reporting emergencies' tile. Counted per session, so a session that reloads, or plays on after a back/forward-cache restore (#621), still counts once. Its 30-day window is fixed in the SQL.",
+      query: hogql(
+        [
+          "SELECT uniqIf(distinct_id, toFloat(properties.fires) > 0) AS sessions_with_a_fire",
+          "FROM events",
+          "WHERE event = 'session_emergencies'",
+          "  AND properties.environment = 'production'",
+          "  AND timestamp >= now() - INTERVAL 30 DAY",
+        ].join("\n"),
+        { display: "BoldNumber" },
+      ),
     },
     {
       name: "How fires end",
@@ -845,8 +915,18 @@ function buildInsights(ids) {
     },
     {
       name: "Sessions reporting emergencies (30d)",
-      description: "Total session_emergencies, production, 30d. Emitted once per played session (zeros included), so it is the denominator for the fire / bomb rates.",
-      query: trends([series("session_emergencies", "Sessions")], { display: "BoldNumber" }),
+      description:
+        "Sessions (distinct per-tab session ids) that sent a session_emergencies row, production, 30d. Every played page life sends one (zeros included), so this is the denominator for the fire and bomb rates. Counted per session, so reloads and back/forward-cache restores (#621) do not inflate it. Its 30-day window is fixed in the SQL.",
+      query: hogql(
+        [
+          "SELECT uniq(distinct_id) AS sessions",
+          "FROM events",
+          "WHERE event = 'session_emergencies'",
+          "  AND properties.environment = 'production'",
+          "  AND timestamp >= now() - INTERVAL 30 DAY",
+        ].join("\n"),
+        { display: "BoldNumber" },
+      ),
     },
   ];
 }
@@ -1097,10 +1177,13 @@ async function main() {
   const failures = [];
   for (const spec of INSIGHTS) {
     try {
-      const existing = await findInsight(spec.name);
+      // A renamed tile names its old title in `formerName`, so the run renames
+      // the saved insight in place instead of creating a second one beside it.
+      const existing = (await findInsight(spec.name)) ?? (spec.formerName ? await findInsight(spec.formerName) : null);
       if (existing) {
         const dashboards = Array.from(new Set([...(existing.dashboards || []), dashboard.id]));
         await req("PATCH", `/insights/${existing.id}/`, {
+          name: spec.name,
           query: spec.query,
           description: spec.description,
           dashboards,

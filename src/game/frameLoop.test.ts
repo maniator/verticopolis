@@ -94,21 +94,49 @@ describe("runFrame freeze path", () => {
     }
   });
 
-  it("still samples the frame for session_fps before the freeze returns early", () => {
-    // noteFrame is a render metric, so it must run on every frame INCLUDING the
-    // ones a modal freeze bails out on. This guards the call-ordering: a refactor
-    // moving the noteFrame call below the freeze return would silently drop fps
-    // sampling whenever a modal is open.
-    const spy = vi.spyOn(gameplaySession, "noteFrame").mockImplementation(() => {});
+  it("does not sample a frozen frame for session_fps, and re-anchors the sampler (#603)", () => {
+    const sampled = vi.spyOn(gameplaySession, "noteFrame").mockImplementation(() => {});
+    const idle = vi.spyOn(gameplaySession, "noteIdleFrame").mockImplementation(() => {});
     const { app, raw } = makeApp({ shownChoice: true, accMinutes: 12 });
     runFrame(app, 1000);
-    expect(spy).toHaveBeenCalledTimes(1); // sampled despite the frozen frame
+    expect(sampled).not.toHaveBeenCalled();
+    expect(idle).toHaveBeenCalledTimes(1);
     expect(raw.enginePort.advance).not.toHaveBeenCalled(); // and the freeze still held
-    spy.mockRestore();
+    sampled.mockRestore();
+    idle.mockRestore();
+  });
+
+  it("samples a running frame for session_fps, and not a paused one (#603)", () => {
+    const sampled = vi.spyOn(gameplaySession, "noteFrame").mockImplementation(() => {});
+    const idle = vi.spyOn(gameplaySession, "noteIdleFrame").mockImplementation(() => {});
+    const running = makeApp({ speed: 2 });
+    runFrame(running.app, 16);
+    expect(sampled).toHaveBeenCalledTimes(1);
+    expect(idle).not.toHaveBeenCalled();
+    const paused = makeApp({ speed: 0 });
+    runFrame(paused.app, 16);
+    expect(sampled).toHaveBeenCalledTimes(1);
+    expect(idle).toHaveBeenCalledTimes(1);
+    sampled.mockRestore();
+    idle.mockRestore();
   });
 });
 
 describe("runFrame simulation stepping", () => {
+  it("times the engine step and hands it to the session with the clock, the speed, the population and the tower", () => {
+    const spy = vi.spyOn(gameplaySession, "noteSimStep").mockImplementation(() => {});
+    const { app, raw } = makeApp({ speed: 2, accMinutes: 0 });
+    raw.reader.generation = 4;
+    raw.enginePort.advance.mockImplementationOnce(() => {
+      raw.sim.clock.minutes = 615;
+      return Float64Array.of(1, 0);
+    });
+    runFrame(app, 1000);
+    expect(spy).toHaveBeenCalledExactlyOnceWith(expect.any(Number), 615, SPEEDS[2], raw.reader.header.population, 4);
+    expect(spy.mock.calls[0][0]).toBeGreaterThanOrEqual(0);
+    spy.mockRestore();
+  });
+
   it("hands the engine the carry, the frame, the speed's pace and the steady clock, and keeps the carry it answers", () => {
     const { app, raw } = makeApp({ speed: 1, accMinutes: 0.5, prefs: { steadyClock: false } });
     raw.enginePort.advance.mockReturnValueOnce(Float64Array.of(2, 0.75));

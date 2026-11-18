@@ -563,7 +563,7 @@ function demoModel() {
       { label: "Builds per page life", unit: "page lives", row: depth(2600, 6, 31, 58, 210) },
       { label: "Peak floor reached (per page life)", unit: "page lives", row: depth(2600, 9, 34, 51, 92) },
       { label: "Fps p50 (per page life)", unit: "page lives", row: depth(2100, 58, 41, 33, 60) },
-      { label: "Fps worst-frame low (per page life)", unit: "page lives", row: depth(2100, 42, 22, 15, 60) },
+      { label: "Fps 5th-percentile low (per page life)", unit: "page lives", row: depth(2100, 42, 22, 15, 60) },
     ],
     sections: [
       { title: "Tool mix", tables: [{ ok: true, header: "Tool", ...rows([["office", 820, 410], ["fast food", 560, 300], ["floor", 540, 295]]) }] },
@@ -645,7 +645,9 @@ async function main() {
     { label: "Builds per page life", event: "session_builds", prop: "builds" },
     { label: "Peak floor reached (per page life)", event: "session_peak_floors", prop: "floors" },
     { label: "Fps p50 (per page life)", event: "session_fps", prop: "p50" },
-    { label: "Fps worst-frame low (per page life)", event: "session_fps", prop: "low" },
+    { label: "Fps 5th-percentile low (per page life)", event: "session_fps", prop: "low" },
+    // From the release after 4.13.1; mixes machines and tower sizes, so read it by version, not alone.
+    { label: "Engine ms per game hour (per page life)", event: "session_sim_cost", prop: "ms_per_game_hour" },
   ];
   const depth = [];
   for (const d of depthSpecs) {
@@ -674,9 +676,9 @@ async function main() {
   const economyByAction = await bd("economy_action_by_action", "economy_action", "action");
   const emergencyByKind = await bd("emergency_choice_by_kind", "emergency_choice", "kind");
   const emergencyByDecision = await bd("emergency_choice_by_decision", "emergency_choice", "decision");
-  // Fire rate: the session_emergencies rows with at least one fire, over all
-  // session_emergencies (emitted once per played session), gives "% of sessions
-  // with a fire". `fires` is a server-trusted integer prop, not user input.
+  // Fire rate: the sessions (distinct_id) with a session_emergencies row that
+  // saw a fire, over the sessions that sent any. Rows come once per played
+  // reporting window, so a session can send several; the rate reads sessions. `fires` is a server-trusted integer prop, not user input.
   const firesRes = await q("session_emergencies_with_fire", buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", WINDOW.hours));
   const firesWithFire = countRow(firesRes);
 
@@ -803,7 +805,7 @@ async function main() {
             // query failed while totals succeeded; carries the hint like the rest.
             ok: firesRes.ok,
             hint: firesRes.hint,
-            caption: "Fire occurrence (session_emergencies emits once per played session)",
+            caption: "Fire occurrence (one session_emergencies row per played window; read the sessions column)",
             header: "Metric",
             rows: [
               { key: "Sessions with a fire", events: firesWithFire.events, sessions: firesWithFire.sessions },

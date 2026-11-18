@@ -178,8 +178,22 @@ export interface GameplayEvents {
    *  many foreground frames fed the estimate. The two fps numbers are computed
    *  over a bounded per-session reservoir, so they are session ESTIMATES; PostHog
    *  computes the exact CROSS-session fps percentiles from them (issue #538).
-   *  Emitted once per session, above a minimum sample count. */
-  session_fps: { p50: number; low: number; samples: number };
+   *  Emitted once per reporting window (a page life, or the stretch after a
+   *  back/forward-cache restore, #621), above a minimum sample count. From the
+   *  release after 4.13.1 only frames where the simulation runs are sampled
+   *  (#603), `population` is the tower's peak population so far and `speed` the
+   *  running game speed (game minutes per real second) most frames ran at, so a
+   *  frame rate can be read against the tower it drew. */
+  session_fps: { p50: number; low: number; samples: number; population: number; speed: number };
+  /** The engine's cost for the window: `ms_per_game_hour` is how long the
+   *  engine's steps took per game hour stepped (the `advance` call the frame
+   *  loop times, so it covers the simulation and nothing drawn), over
+   *  `game_hours` of play, for the population band and running `speed` (game
+   *  minutes per real second) the window stepped the most game time at;
+   *  `population` is that band's peak. Emitted once per reporting window after
+   *  two game hours have stepped at one band and speed, while the tab is
+   *  visible. Compare versions within a population band and speed. */
+  session_sim_cost: { ms_per_game_hour: number; game_hours: number; population: number; speed: number };
   /** A discrete app-chrome action the player took OUTSIDE the core build loop:
    *  a save/export/import, a settings or dialog open, a preference toggle, a
    *  toolbar affordance, or a landing on the standalone help/gallery page. One
@@ -234,11 +248,13 @@ export interface GameplayEvents {
    *  `rescue` (the paid helicopter landed on it) or `burnedOut` (nobody
    *  reached it). */
   fire_outcome: { outcome: FireOutcome };
-  /** Per-session summary of the SIMULATION-fired emergency activity: how many fire
+  /** Per-window summary of the SIMULATION-fired emergency activity: how many fire
    *  outbreaks ignited, how many rooms they gutted, and how many bombs detonated.
-   *  Emitted once at session end like `session_builds`, and emitted EVEN WHEN ALL
-   *  ZERO so "fraction of sessions that had a fire" has its denominator. Counts
-   *  only, never a currency figure. */
+   *  Emitted once at the end of each reporting window (a page life, or a stretch
+   *  restored from the back/forward cache), and EVEN WHEN ALL ZERO so "fraction
+   *  of sessions that had a fire" has its denominator. One session can send
+   *  several rows, so read it per `distinct_id`. Counts only, never a currency
+   *  figure. */
   session_emergencies: { fires: number; firesGutRooms: number; bombs: number };
   /** How many crash screens this page life showed, counted before the `crash`
    *  event's cap and dedup so a loop's size survives (#841). Sent once, at the

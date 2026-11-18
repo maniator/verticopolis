@@ -6,6 +6,7 @@ import { clearMenuPicks } from "./analyticsMenus";
 import { trackPageView } from "./analyticsPageView";
 import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots, takeCrashCount } from "./analyticsCrash";
 import { resetEngineStatus } from "./analyticsEngineStatus";
+import { SimCostTally, SIM_COST_MIN_GAME_HOURS } from "./analyticsSimCost";
 
 /**
  * The per-tab {@link GameplaySession} and the one process-wide instance of it,
@@ -92,6 +93,11 @@ class GameplaySession {
    *  null between segments so the first frame after a resume re-anchors instead
    *  of charging the whole background gap as one slow frame. */
   private lastFrameAt: number | null = null;
+  /** The engine's step time per game hour, the peak population and the speeds
+   *  played, for `session_sim_cost` and the context on `session_fps`. */
+  private simCost = new SimCostTally();
+  /** `session_sim_cost` fires at most once per session (like the fps event). */
+  private simCostReported = false;
   /** Emergencies this window saw, folded from the engine's events
    *  (`fire_started`, `fire_gutted`, `bomb_detonated`) by the analytics bridge.
    *  Every tower the tab plays adds to the same tallies, so a swap needs no
@@ -101,7 +107,7 @@ class GameplaySession {
    *  the old counter sampler sat), i.e. the game actually ran. Gates `session_emergencies` so a no-play prerender/hide (the
    *  frame loop never ran) does not emit a spurious zero into the denominator. */
   private played = false;
-  /** `session_emergencies` fires at most once per session (like the depth events). */
+  /** `session_emergencies` fires at most once per reporting window. */
   private emergReported = false;
   /** See {@link setEngineFlush}. */
   private engineFlush: ((closing: boolean) => void) | null = null;
@@ -116,6 +122,7 @@ class GameplaySession {
     // baseline, so the wall-clock gap the tab spent hidden is never sampled as
     // one enormous slow frame.
     this.lastFrameAt = null;
+    this.simCost.reanchor();
   }
 
   /** A new tower was founded: the funnel's entry point. Re-opens the
@@ -194,8 +201,9 @@ class GameplaySession {
   }
 
   /** Sample this frame's rendered frame-rate for the `session_fps` signal, called
-   *  every frame from the frame loop. It measures the REAL wall-clock gap between
-   *  frames with its own `performance.now()` read rather than the engine's frame
+   *  from the frame loop on every frame the simulation runs (a paused or frozen
+   *  frame calls {@link noteIdleFrame} instead, #603). It measures the REAL
+   *  wall-clock gap between frames with its own `performance.now()` read rather than the engine's frame
    *  delta: the engine clock clamps any frame longer than 200ms down to 1ms as a
    *  sim spike-guard (Excalibur `Clock.update`), so a genuine hitch (the whole
    *  point of #538) would reach us as ~1000fps at the GOOD end of the distribution
@@ -230,6 +238,22 @@ class GameplaySession {
     }
     const j = Math.floor(Math.random() * this.fpsSeen);
     if (j < FPS_RESERVOIR) this.fpsSamples[j] = fps;
+  }
+
+  /** A frame the simulation did not run (paused, or frozen behind a modal) is
+   *  not sampled, and the next running frame re-anchors (#603). */
+  noteIdleFrame(): void {
+    this.lastFrameAt = null;
+  }
+
+  /** One frame's engine step, from the frame loop: `ms` the step took, `clock`
+   *  the game clock in minutes after it, `speed` the game minutes per real
+   *  second it ran at, the tower's population, and `tower` the engine
+   *  generation it read (a new one re-anchors the clock). Foreground only,
+   *  like {@link noteFrame}. */
+  noteSimStep(ms: number, clock: number, speed: number, population: number, tower: number): void {
+    if (this.resumedAt === null) return;
+    this.simCost.note(ms, clock, speed, population, tower);
   }
 
   /** The game ran a frame (the frame loop's throttled refresh): this session
@@ -313,9 +337,28 @@ class GameplaySession {
       this.fpsReported = true;
       const sorted = [...this.fpsSamples].sort((a, b) => a - b);
       const at = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
-      trackEvent("session_fps", { p50: Math.round(at(0.5)), low: Math.round(at(0.05)), samples: this.fpsSeen });
+      trackEvent("session_fps", {
+        p50: Math.round(at(0.5)),
+        low: Math.round(at(0.05)),
+        samples: this.fpsSeen,
+        population: this.simCost.peakPopulation,
+        speed: this.simCost.mainSpeed(),
+      });
     }
-    // Per-session emergency summary, emitted once per session that actually
+    // The engine's own cost per game hour, once per window after a couple of
+    // game hours have stepped at one tower size and speed, so a release's
+    // engine speedup shows like for like.
+    const cost = this.simCost.summary();
+    if (cost && cost.gameHours >= SIM_COST_MIN_GAME_HOURS && !this.simCostReported) {
+      this.simCostReported = true;
+      trackEvent("session_sim_cost", {
+        ms_per_game_hour: Math.round(cost.msPerGameHour * 10) / 10,
+        game_hours: Math.round(cost.gameHours * 10) / 10,
+        population: cost.population,
+        speed: cost.speed,
+      });
+    }
+    // Emergency summary, emitted once per reporting window that actually
     // played (the frame loop ran). Unlike the depth/fps events it is NOT gated
     // on any count being nonzero: "fraction of sessions with a fire" needs the
     // zero-emergency sessions in the denominator. The total sums every tower the
@@ -392,24 +435,43 @@ class GameplaySession {
     this.lastReportedSec = 0;
     this.finalReported = false;
     this.built = false;
-    this.builds = 0;
-    this.peakFloors = Number.NEGATIVE_INFINITY;
-    this.depthReported = false;
-    this.fpsSamples.length = 0;
-    this.fpsSeen = 0;
-    this.fpsReported = false;
-    this.lastFrameAt = null;
     this.toolsSeen.clear();
-    this.toolUses.clear();
-    this.emerg = noEmergencies();
-    this.played = false;
-    this.emergReported = false;
+    this.reopenSummaries();
     clearActionLatches();
     clearMenuPicks();
     // Re-anchor a running foreground segment on now, so the clock keeps running
     // for the new window while the time already spent in the old one is dropped
     // with everything else.
     if (this.resumedAt !== null) this.resumedAt = Date.now();
+  }
+
+  /** The page came back from the back/forward cache (#621). Its `pagehide`
+   *  already sent the summaries and tripped their latches, so the play that
+   *  follows the restore is reported as its own window: the summaries start
+   *  from zero and their latches re-open. Nothing is reported twice, since
+   *  each build, frame and fire lands in exactly one summary, and nothing
+   *  after the restore is lost. The session clock and `session_end` carry on
+   *  as before. */
+  noteRestored(): void {
+    this.reopenSummaries();
+  }
+
+  /** Empty every per-window summary (depth, fps, engine cost, emergencies)
+   *  and re-open its latch. */
+  private reopenSummaries(): void {
+    this.builds = 0;
+    this.peakFloors = Number.NEGATIVE_INFINITY;
+    this.toolUses.clear();
+    this.depthReported = false;
+    this.fpsSamples.length = 0;
+    this.fpsSeen = 0;
+    this.fpsReported = false;
+    this.lastFrameAt = null;
+    this.simCost = new SimCostTally();
+    this.simCostReported = false;
+    this.emerg = noEmergencies();
+    this.played = false;
+    this.emergReported = false;
   }
 
   /** Hand back the crash throttle's spent slots. See `analyticsCrash.ts`. */

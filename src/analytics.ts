@@ -75,6 +75,12 @@ export function startGameplaySession(): void {
     flushEngineStatus();
     gameplaySession.end(true);
   });
+  // A page restored from the back/forward cache already reported its
+  // summaries at its `pagehide`; the play after it reports as its own window
+  // (#621). A plain load has `persisted` false and is not a restore.
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) gameplaySession.noteRestored();
+  });
   document.addEventListener("visibilitychange", () => {
     // Bank on hidden, (re)start on visible, ignore other states (e.g. prerender).
     // A hide is NOT final (the player may tab back), so session_emergencies waits.
