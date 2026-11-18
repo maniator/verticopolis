@@ -302,13 +302,13 @@ function buildInsights(ids) {
       // row 30.
       name: "First-tower funnel per tower (24h)",
       description:
-        "Towers founded in the last 30 days (at least 24 hours ago), and how many of them laid a first build and reached 2 stars within 24 hours of founding, production. A tower is one page life's tower_n (#2392), so a tab's second tower never finishes its first tower's funnel and an opened tower's stars finish none. A tower that climbs after a reload is not counted. Rows from the first release that sends tower_n only; before it, the First-tower funnel tile counts per tab. Its windows are fixed in the SQL and do not follow the dashboard date filter.",
+        "Towers founded in the last 30 days (at least 24 hours ago), and how many of them laid a first build, and then reached 2 stars, within 24 hours of founding (in that order, like a funnel), production. A tower is one page life's tower_n (#2392), so a tab's second tower never finishes its first tower's funnel and an opened tower's stars finish none. A tower that climbs after a reload, or after it is opened again, is not counted. Rows from the first release that sends tower_n only; before it, the First-tower funnel tile counts per tab. Its windows are fixed in the SQL and do not follow the dashboard date filter.",
       query: hogql(
         [
           "SELECT",
           "    count() AS towers_founded,",
           "    countIf(built >= started AND built <= started + 86400) AS first_build_24h,",
-          "    countIf(two_stars >= started AND two_stars <= started + 86400) AS two_stars_24h,",
+          "    countIf(built >= started AND two_stars >= built AND two_stars <= started + 86400) AS two_stars_24h,",
           "    round(100 * first_build_24h / towers_founded, 1) AS first_build_pct,",
           "    round(100 * two_stars_24h / towers_founded, 1) AS two_stars_pct",
           "FROM (",
