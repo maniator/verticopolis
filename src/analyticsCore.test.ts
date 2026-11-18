@@ -32,21 +32,21 @@ describe("trackEvent routing", () => {
 
   it("sends immediately when the gate is open, with the common props merged in", () => {
     setCommonProps({ platform: "web", distribution_channel: "web" });
-    trackEvent("star_reached", { star: 3 });
-    expect(sent).toEqual([{ event: "star_reached", props: { platform: "web", distribution_channel: "web", star: 3 } }]);
+    trackEvent("star_reached", { star: 3, tower_n: 1, page_life: "page" });
+    expect(sent).toEqual([{ event: "star_reached", props: { platform: "web", distribution_channel: "web", star: 3, tower_n: 1, page_life: "page" } }]);
   });
 
   it("sends nothing when the gate is closed, and keeps nothing for later", () => {
     vi.mocked(telemetryHostAllowed).mockReturnValue(false);
     trackEvent("boot", { reason: "fresh", version: "1.0.0", mode: "modern", star: 1, floors: 0, population: 0, flights: 0 });
     vi.mocked(telemetryHostAllowed).mockReturnValue(true);
-    trackEvent("star_reached", { star: 2 });
+    trackEvent("star_reached", { star: 2, tower_n: 1, page_life: "page" });
     expect(sent.map((e) => e.event), "the closed-gate event is dropped rather than queued").toEqual(["star_reached"]);
   });
 
   it("keeps the per-event prop winning over a colliding common prop", () => {
     setCommonProps({ star: 99 } as EventProps);
-    trackEvent("star_reached", { star: 2 });
+    trackEvent("star_reached", { star: 2, tower_n: 1, page_life: "page" });
     expect(sent[0].props.star).toBe(2);
   });
 

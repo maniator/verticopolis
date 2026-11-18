@@ -7,6 +7,7 @@ import { showTower } from "../ui/uiStatus";
 import { touchOverviewMap } from "./overviewMapWiring";
 import { newRenderSim } from "./portAccess";
 import { forgetCurrentFile } from "./currentFile";
+import { nextAnalyticsTower } from "../analyticsTower";
 
 /** How the app follows the tower the engine holds now. A `"swap"` (a load, a new tower, an
  *  import, a tooling swap) is another tower. A `"restore"` (a tooling harness's tower) is too,
@@ -33,6 +34,8 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   // report's entries (a report pairs them with the current tower's save). A step keeps them:
   // it is the same tower, and time does not go back.
   if (follow !== "step") {
+    // Later first-tower funnel events belong to this tower (#2392).
+    nextAnalyticsTower();
     // It is not the My Towers file the last tower was: File > Save writes
     // only the Auto-save until it is opened from or saved to one.
     forgetCurrentFile();

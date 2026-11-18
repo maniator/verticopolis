@@ -27,6 +27,14 @@ import type { AppActionName } from "./analyticsAppActions";
  * low-volume so a busy session stays well inside the provider's event budget.
  */
 
+/** The first-tower funnel's tower fields (#2392, `analyticsTower.ts`): which
+ *  tower of the page life an event belongs to (`tower_n`, an in-memory ordinal)
+ *  and the in-memory page-life id, so the funnel can be counted per tower. */
+export interface FunnelTower {
+  tower_n: number;
+  page_life: string;
+}
+
 /**
  * The event vocabulary and each event's props. Declaring it as a map makes a
  * typo'd event name or a stray prop a compile error and keeps the whole surface
@@ -43,7 +51,7 @@ export interface GameplayEvents {
    *  picture is `boot` with `reason` "continue" or "recovery". It was called
    *  `game_started` until 2026-09-14, a name that read like a session counter
    *  and was repeatedly taken for one. */
-  new_game_started: { mode: string };
+  new_game_started: { mode: string } & FunnelTower;
   /** The first facility placed in the current tower (the funnel's "did they
    *  build anything" step). Fires once per tower: for a founded tower it follows
    *  that tower's `new_game_started` (the latch re-opens in `noteNewGame`); for
@@ -59,7 +67,7 @@ export interface GameplayEvents {
    *  ground floor lays a lobby and now reports `lobby`, here and in the
    *  `tool_session_uses` mix. Builds made from any input, the editor included,
    *  count here and in the session depth events. */
-  first_build: { tool: string };
+  first_build: { tool: string } & FunnelTower;
   /** A tool was selected, reported once per distinct tool so the event captures
    *  the session's tool mix without a row per click. */
   tool_used: { tool: string };
@@ -67,7 +75,7 @@ export interface GameplayEvents {
    *  the clearest "how far do players get" signal. One row per rung crossed:
    *  before the engine bridge (through 2.29.4) a 6 Hz poll sent only the higher
    *  rung when two promotions landed between polls. */
-  star_reached: { star: number };
+  star_reached: { star: number } & FunnelTower;
   /** The tower achieved an optional milestone (a population mark, the fourth
    *  or fifth star, or one of the later goals), from the engine's
    *  `milestone_reached` event through `analyticsEngineBridge.ts` (#873 step 3,

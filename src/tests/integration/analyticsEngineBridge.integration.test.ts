@@ -18,6 +18,8 @@ import { look, newEngine, noEngine } from "../portKit/rustEngine";
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("../../analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 
+/** The first-tower funnel's tower fields (#2392): tower `n` of this page life. */
+const tw = (n: number) => ({ tower_n: n, page_life: expect.any(String) });
 const propsFor = (name: string): unknown[] =>
   vi
     .mocked(sendToRelay)
@@ -58,8 +60,8 @@ describe.skipIf(noEngine)("the analytics bridge on the engine's events", () => {
     drainEngineEvents(events);
     gameplaySession.begin();
     gameplaySession.end(false);
-    expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
-    expect(propsFor("first_build")).toEqual([{ tool: "lobby" }]);
+    expect(propsFor("new_game_started")).toEqual([{ mode: "classic", ...tw(2) }]);
+    expect(propsFor("first_build")).toEqual([{ tool: "lobby", ...tw(2) }]);
     expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
   });
 
@@ -91,8 +93,8 @@ describe.skipIf(noEngine)("the analytics bridge on the engine's events", () => {
     drainEngineEvents(events);
     gameplaySession.end(false);
     expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
-    expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
-    expect(propsFor("first_build")).toEqual([{ tool: "lobby" }]);
+    expect(propsFor("new_game_started")).toEqual([{ mode: "classic", ...tw(2) }]);
+    expect(propsFor("first_build")).toEqual([{ tool: "lobby", ...tw(2) }]);
     // A new window drops what the engine holds unsent; nothing is folded twice.
     build("lobby", 1, 184);
     gameplaySession.startEpoch();

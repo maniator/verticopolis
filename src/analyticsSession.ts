@@ -6,6 +6,7 @@ import { clearMenuPicks } from "./analyticsMenus";
 import { trackPageView } from "./analyticsPageView";
 import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots, takeCrashCount } from "./analyticsCrash";
 import { resetEngineStatus } from "./analyticsEngineStatus";
+import { analyticsTowerProps, resetAnalyticsTower } from "./analyticsTower";
 import { SimCostTally, SIM_COST_MIN_GAME_HOURS } from "./analyticsSimCost";
 
 /**
@@ -126,13 +127,13 @@ class GameplaySession {
   }
 
   /** A new tower was founded: the funnel's entry point. Re-opens the
-   *  `first_build` latch so the `new_game_started` then `first_build` funnel holds
-   *  per tower, not just for the first tower founded in the tab. The analytics
-   *  bridge calls it for the engine's `tower_founded`; a founding the rate limit
-   *  holds back calls {@link noteNewGameUnreported} instead. */
+   *  `first_build` latch so the funnel holds per tower, not just for the tab's
+   *  first one (`tower_n` tells the towers apart, #2392). The analytics bridge
+   *  calls it for the engine's `tower_founded`; a founding the rate limit holds
+   *  back calls {@link noteNewGameUnreported} instead. */
   noteNewGame(mode: string): void {
     this.built = false;
-    trackEvent("new_game_started", { mode });
+    trackEvent("new_game_started", { mode, ...analyticsTowerProps() });
   }
 
   /** A tower was founded but its `new_game_started` was not sent (the
@@ -159,7 +160,7 @@ class GameplaySession {
     if (floor > this.peakFloors) this.peakFloors = floor;
     if (this.built) return;
     this.built = true;
-    trackEvent("first_build", { tool });
+    trackEvent("first_build", { tool, ...analyticsTowerProps() });
   }
 
   /** A tool was selected. Fires `tool_used` once per distinct tool, so a session
@@ -172,7 +173,7 @@ class GameplaySession {
 
   /** The tower reached a new star rating. */
   noteStar(star: number): void {
-    trackEvent("star_reached", { star });
+    trackEvent("star_reached", { star, ...analyticsTowerProps() });
   }
 
   /** The tower achieved an optional milestone. */
@@ -479,15 +480,15 @@ class GameplaySession {
     releaseCrashSlots();
   }
 
-  /** Test hook: forget all session state. A fresh window, plus the few things a
-   *  window deliberately outlives (the listener claim, the module-level common
-   *  props and the page life's engine status, all cleared here to keep tests
-   *  isolated). */
+  /** Test hook: forget all session state. A fresh window, plus what a window
+   *  outlives (the listener claim, the common props, the page life's engine
+   *  status and tower number), all cleared here to keep tests isolated. */
   reset(): void {
     this.engineFlush = null;
     this.startEpoch();
     this.releaseCrashThrottle();
     resetEngineStatus();
+    resetAnalyticsTower();
     this.resumedAt = null;
     this.armed = false;
     setCommonProps({});

@@ -4,6 +4,7 @@ import { SaveGame } from "../storage/SaveGame";
 import { makeApp, makeSim } from "./appModals.fixture";
 import { trackAppAction } from "../analytics";
 import { NEWER_SAVE_REFUSAL } from "./portLifecycle";
+import { flushBeforeTowerSwap } from "../analyticsEngineBridge";
 
 /**
  * These pin the Auto-save loads against the hand-built fake `GameApp`
@@ -22,7 +23,16 @@ vi.mock("../storage/SaveGame", async (importActual) => {
   return { ...actual, SaveGame: { load: vi.fn() } };
 });
 
+vi.mock("../analyticsEngineBridge", () => ({ flushBeforeTowerSwap: vi.fn() }));
+
+/** The outgoing tower's analytics events fold before the engine swaps (#2392). */
+function flushedBeforeSwap(loadSave: ReturnType<typeof vi.fn>): void {
+  expect(flushBeforeTowerSwap).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(flushBeforeTowerSwap).mock.invocationCallOrder[0]).toBeLessThan(loadSave.mock.invocationCallOrder[0]!);
+}
+
 beforeEach(() => {
+  vi.mocked(flushBeforeTowerSwap).mockClear();
   vi.mocked(SaveGame.load).mockReset();
   vi.mocked(trackAppAction).mockClear();
 });
@@ -35,6 +45,7 @@ describe("loadFromSlot", () => {
     loadFromSlot(app, "auto");
     expect(SaveGame.load).toHaveBeenCalledTimes(1);
     expect(enginePort.loadSave).toHaveBeenCalledExactlyOnceWith(loaded);
+    flushedBeforeSwap(enginePort.loadSave);
     expect(followSwap).toHaveBeenCalledTimes(1);
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Tower loaded.", "good");
     expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("load_slot");
@@ -82,6 +93,7 @@ describe("loadFromSplash", () => {
     const { app, ui, enginePort, followSwap } = makeApp(makeSim());
     expect(loadFromSplash(app, "auto")).toBe(true);
     expect(enginePort.loadSave).toHaveBeenCalledExactlyOnceWith(loaded);
+    flushedBeforeSwap(enginePort.loadSave);
     expect(followSwap).toHaveBeenCalledTimes(1);
     // followSwap owns the "Welcome back" toast and the speed-0 re-pause, so that
     // every arrival route (slot, .vctower, .TDT) behaves identically.

@@ -138,7 +138,7 @@ let engagedSent = false;
 /** The page-life id: minted at the page life's first row, held in memory
  *  only, so a reload starts a new one while the relay's session id carries
  *  over. */
-function pageLifeId(): string {
+export function pageLifeId(): string {
   if (pageLife !== undefined) return pageLife;
   try {
     pageLife = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : fallbackId();

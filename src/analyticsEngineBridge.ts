@@ -3,6 +3,7 @@ import { GAMEPLAY_EVENT_RULES } from "./events/gameplayEventRules";
 import type { GameplayEvent } from "./events/gameplayEvents";
 import { RateLimiter } from "./analyticsRateLimit";
 import { gameplaySession } from "./analyticsSession";
+import { nextAnalyticsTower } from "./analyticsTower";
 import { trackBombOutcome, trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice, trackFireOutcome } from "./analyticsActions";
 
 /**
@@ -128,7 +129,8 @@ function fold(event: GameplayEvent, now: number): void {
       // A founding the rate limit holds back closes the funnel, so no
       // first_build is sent without its own new_game_started ahead of it,
       // and the new tower's first build is never credited to the tower
-      // before it.
+      // before it. Sent or not, it is another tower for the funnel's tower_n.
+      nextAnalyticsTower();
       if (allowSend("new_game_started", now)) gameplaySession.noteNewGame(event.payload.mode);
       else gameplaySession.noteNewGameUnreported();
       return;
@@ -247,12 +249,25 @@ export function drainEngineEvents(source: GameplayEventSource | undefined, now =
   forwardGameplayEvents(batch, now);
 }
 
+/** The live tower, as `bindEngineBridge` was given it. */
+let liveSource: () => GameplayEventSource | undefined = () => undefined;
+
+/** Fold the live tower's last events before the game swaps another tower in
+ *  (#2392). A swap hands undrained events on to the next tower, so without
+ *  this a New and an Open in one frame would fold the New's founding after
+ *  the Open had already started its own tower number, and the two towers
+ *  would share one. Held events are let go, as at a hide. Never throws. */
+export function flushBeforeTowerSwap(): void {
+  drainEngineEvents(liveSource(), monotonicNow(), true);
+}
+
 /** Bind the bridge to the live tower, so the session can fold the engine's
- *  last events before it reports (page hide), and drop them unsent when the
+ *  last events before it reports (page hide) and before a swap, and drop them unsent when the
  *  window they belong to closes (`GameplaySession.startEpoch`, reached only
  *  from the session reset since #991). Called once at
  *  boot. */
 export function bindEngineBridge(live: () => GameplayEventSource | undefined): void {
+  liveSource = live;
   gameplaySession.setEngineFlush((closing) => {
     if (!closing) {
       drainEngineEvents(live(), monotonicNow(), true);
