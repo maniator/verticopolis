@@ -68,7 +68,9 @@ fixes for its findings.
   predicate per fact. Numeric positions are fine inside codecs, serialization,
   dispatch bitsets and deliberately low-level tests (`AGENTS.md`).
 - A published analytics number comes from a governed definition or from tested
-  code bound to one (`CLAUDE.md` non-negotiables).
+  code bound to one, and names the window and filters it ran over: that
+  source's own, or the readout says where they differ and why (`CLAUDE.md`
+  non-negotiables, #977).
 - A new facility starts in the Rust engine (`engine-rs/src/facilities.rs` and
   its catalog), never as a render-layer special case. The Rust engine is the
   source of truth for gameplay rules, caps and tuning.
