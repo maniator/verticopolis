@@ -13,19 +13,31 @@ use crate::undo::{Step, UnitChange};
 /// them, flooded through the tower's tiles without them. Read once the tiles
 /// stand, as the gesture that laid them closes or a redo puts them back, so
 /// the step that takes them out knows each part stood on its own root before
-/// (#1848). Other low tiles the step takes out stay in the flood, so where
-/// they link two parts only the older root is kept, which only refuses more
-/// (#2210). One flood over the low tiles, once per such step.
+/// (#1848). The basement the step takes out leaves the flood too, so parts
+/// it links each keep their root (#2210). A ground-floor tile the step takes
+/// out that is not lobby stays in: no build lays one, so only edits outside
+/// every gesture can have parted what it links, and that part keeps no root
+/// of its own. One flood over the low tiles, once per such step.
 pub(crate) fn joined_roots(tower: &Tower, step: &Step) -> Vec<i64> {
-    let tiles: Vec<(i64, i64)> = step
-        .units
-        .iter()
-        .filter(|img| matches!(img.change, UnitChange::TakeOut(_)))
-        .filter_map(|img| tower.get_unit(img.id))
+    let taken = || {
+        step.units
+            .iter()
+            .filter(|img| matches!(img.change, UnitChange::TakeOut(_)))
+            .filter_map(|img| tower.get_unit(img.id))
+    };
+    let tiles: Vec<(i64, i64)> = taken()
         .filter(|u| u.kind == Kind::Lobby && u.floor == GROUND_FLOOR)
         .flat_map(tiles_of)
         .collect();
-    let piece: FastSet<(i64, i64)> = tiles.iter().copied().collect();
+    // The basement floor the step takes out (not a room on it, whose tiles
+    // the floor under it keeps) leaves the flood with the lobby tiles:
+    // where it links two parts, each part stood on its own root before it
+    // came (#2210). A basement tile is never a root, so none is lost.
+    let piece: FastSet<(i64, i64)> = taken()
+        .filter(|u| u.floor < GROUND_FLOOR && u.kind.is_structural())
+        .flat_map(tiles_of)
+        .chain(tiles.iter().copied())
+        .collect();
     let mut seen: FastSet<(i64, i64)> = FastSet::default();
     let mut roots = Vec::new();
     for start in tiles.iter().flat_map(|&tile| beside(tile)) {
