@@ -313,7 +313,7 @@ it beside `desk_title_shown` to tell a computer's title screen from a phone's.
 Traffic readout while it names a floor (above Smooth): the view zoomed in on
 the worst waiting line the readout names (`src/game/trafficHud.ts`). `detail`
 is the readout's level at the tap: `busy`, `backed-up` or `gridlock`. Builds
-before the readout followed live lines (app 4.13.0 and earlier) sent `shafts`
+before the readout followed live lines (app 4.13.1 and earlier) sent `shafts`
 when the engine named the transports behind a floor's congestion reading, or
 `none`. A tap while the readout says Smooth, or after the line has gone, does
 nothing and sends nothing. Read it against sessions that saw the readout above
