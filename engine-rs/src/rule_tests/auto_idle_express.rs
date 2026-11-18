@@ -34,13 +34,17 @@ fn every_auto_express_carries_the_morning_rush() {
     let mut sim = split_tower_32();
     for id in EXPRESSES {
         let t = sim.tower.get_transport(id).expect("the express is there");
-        assert!(t.schedule.as_ref().is_some_and(|s| s.auto_tune), "{id} is on Auto");
+        assert!(
+            t.schedule.as_ref().is_some_and(|s| s.auto_tune),
+            "{id} is on Auto"
+        );
     }
     let day = sim.clock.day();
     while sim.clock.day() == day || sim.clock.hour() < 8 {
         sim.tick(1.0);
     }
-    let rides_at = |sim: &Simulation| EXPRESSES.map(|id| sim.tower.get_transport(id).unwrap().rides);
+    let rides_at =
+        |sim: &Simulation| EXPRESSES.map(|id| sim.tower.get_transport(id).unwrap().rides);
     let before = rides_at(&sim);
     let mut worst = 0;
     while sim.clock.hour() < 10 {
@@ -49,9 +53,14 @@ fn every_auto_express_carries_the_morning_rush() {
     }
     let after = rides_at(&sim);
     let carried: Vec<u64> = (0..EXPRESSES.len()).map(|i| after[i] - before[i]).collect();
-    println!("rides 8-10 AM {carried:?}, worst basement line {worst}");
     let least = *carried.iter().min().unwrap();
     let most = *carried.iter().max().unwrap();
-    assert!(least * 3 > most, "an express sat idle through the rush: {carried:?}");
-    assert!(worst < 700, "the basement lines reached {worst}");
+    assert!(
+        least * 3 > most,
+        "an express sat idle through the rush: {carried:?}"
+    );
+    assert!(
+        worst < 700,
+        "the basement lines reached {worst} ({carried:?} rides)"
+    );
 }
