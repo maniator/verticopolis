@@ -1,5 +1,4 @@
 import { trackAppAction } from "../analyticsActions";
-import { countShaftRoomRefusal } from "./shaftRoomRefusal";
 import type { LogEntry } from "../shared/types";
 
 /**
@@ -61,5 +60,4 @@ export function sayHeldRefusal(deps: DragRefusalDeps, drag: HeldRefusal, what: S
 function say(deps: DragRefusalDeps, reason: string): void {
   deps.audio.sfx("error");
   deps.ui.toast(reason, "bad");
-  countShaftRoomRefusal(reason);
 }

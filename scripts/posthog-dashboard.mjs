@@ -683,14 +683,8 @@ function buildInsights(ids) {
     {
       name: "Drags stopped by a rule",
       description:
-        "Releases of a drag that said why it stopped (app_action drag_stopped, #1847 and #2046), split by detail: extend (an elevator's arrow drag that stopped for any reason: a floor it can't serve, such as an unbuilt lobby, another shaft or a room, too little money, the kind's longest span or the edge of the lot) or bulldoze (a bulldoze drag that left tiles), production. A refusal the press already said is not counted. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Drags that stop.",
+        "Releases of a drag that said why it stopped (app_action drag_stopped, #1847 and #2046), split by detail: extend (an elevator's arrow drag that stopped for any reason: a floor it can't serve, such as an unbuilt lobby or another shaft, too little money, the kind's longest span or the edge of the lot) or bulldoze (a bulldoze drag that left tiles), production. A refusal the press already said is not counted. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Drags that stop.",
       query: trends([series("app_action", "Stopped drags")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["drag_stopped"])] }),
-    },
-    {
-      name: "Shaft and room refusals",
-      description:
-        "Presses refused because an elevator shaft and a room would share a tile (app_action shaft_room_refused, #2454), split by detail: room (a room where a shaft runs) or shaft (a shaft built, extended or resized through a room), production. The build ghost's warning before a click is not counted. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, A shaft and a room on the same tile.",
-      query: trends([series("app_action", "Refusals")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["shaft_room_refused"])] }),
     },
     {
       name: "Persistence failures (counts, not rates)",

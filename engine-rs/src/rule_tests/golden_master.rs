@@ -36,8 +36,8 @@ fn run(mode: GameMode) -> Simulation {
         }
     }
     for floor in ROOM_FLOORS {
-        must_build(&mut sim, Kind::Office, floor, SLAB_LEFT + 4);
-        must_build(&mut sim, Kind::Office, floor, SLAB_LEFT + 13);
+        must_build(&mut sim, Kind::Office, floor, SLAB_LEFT + 2);
+        must_build(&mut sim, Kind::Office, floor, SLAB_LEFT + 12);
     }
     must_build(&mut sim, Kind::FastFood, 2, SLAB_LEFT + 22);
     must_build(&mut sim, Kind::FastFood, 3, SLAB_LEFT + 22);

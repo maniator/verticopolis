@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { trackAppAction } from "../analyticsActions";
 import { holdRefusal, sayHeldRefusal, sayPressRefusal, type HeldRefusal } from "./dragRefusal";
-import { SHAFT_THROUGH_ROOM } from "./shaftRoomRefusal";
 
 vi.mock("../analyticsActions", () => ({ trackAppAction: vi.fn() }));
 
@@ -21,16 +20,6 @@ describe("a drag's held refusal (#1847, #2046)", () => {
     expect(d.ui.toast).toHaveBeenCalledExactlyOnceWith("second", "bad");
     expect(d.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
     expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("drag_stopped", "bulldoze");
-  });
-
-  it("counts an extend that stopped at a room as a shaft and room refusal too", () => {
-    const d = deps();
-    const drag: HeldRefusal = {};
-    holdRefusal(drag)(SHAFT_THROUGH_ROOM);
-    sayHeldRefusal(d, drag, "extend");
-    expect(trackAppAction).toHaveBeenCalledTimes(2);
-    expect(trackAppAction).toHaveBeenCalledWith("drag_stopped", "extend");
-    expect(trackAppAction).toHaveBeenCalledWith("shaft_room_refused", "shaft");
   });
 
   it("says nothing for a drag that holds no reason", () => {

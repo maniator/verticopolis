@@ -213,7 +213,7 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
           Array.from({ length: 11 }, (_, i): Step => ({ name: `a floor tile on ${floor} at ${mid + 5 + i}`, run: (p) => p.buildAt(kind("floor"), floor, mid + 5 + i), moves: true })),
         ),
         { name: "a floor brush", run: (p) => p.paintTiles(kind("floor"), 2, Float64Array.of(mid + 16, mid + 17)), moves: true },
-        { name: "a shaft", run: (p) => p.buildShaft(kind("elevatorStandard"), mid + 12, 1, 2), moves: true, after: () => (ids.shaft = s.reader.tower.transports[0].id) },
+        { name: "a shaft", run: (p) => p.buildShaft(kind("elevatorStandard"), mid + 8, 1, 2), moves: true, after: () => (ids.shaft = s.reader.tower.transports[0].id) },
         { name: "a car", run: (p) => p.changeCars(ids.shaft, true), moves: true },
         { name: "a car off", run: (p) => p.changeCars(ids.shaft, false), moves: true },
         { name: "a drag opened", run: (p) => p.startExtend(ids.shaft), moves: false },

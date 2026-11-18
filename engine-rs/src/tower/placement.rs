@@ -214,15 +214,11 @@ impl Tower {
         }
     }
 
-    /// The room check a build makes (`Simulation::can_build`): the placement
-    /// rules without the floor under it, and no elevator shaft through it
-    /// (`shaft_rooms.rs`).
     pub fn can_place_room_ignoring_floor(&self, kind: Kind, floor: i64, x: i64) -> PlaceResult {
         if kind.is_structural() || kind.is_transport() {
             return PlaceResult::fail("Not a room.");
         }
-        let reason = self.room_placement_reason(kind, floor, x, false);
-        match reason.or_else(|| self.room_span_shaft_reason(kind, floor, x)) {
+        match self.room_placement_reason(kind, floor, x, false) {
             Some(r) => PlaceResult::fail(r),
             None => PlaceResult::ok(),
         }

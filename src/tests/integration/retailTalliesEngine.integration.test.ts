@@ -20,8 +20,7 @@ const X0 = Math.floor(LOT_WIDTH / 2) - 20;
 function builtTower(seed: number): Draft {
   const sim = newSeededDraft(seed);
   for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, X0 + i);
-  // At the right end, clear of the rooms the tests build from X0.
-  expect(sim.buildTransport("elevatorStandard", X0 + 36, 1, 2).ok, "elevator built").toBe(true);
+  expect(sim.buildTransport("elevatorStandard", X0, 1, 2).ok, "elevator built").toBe(true);
   return sim;
 }
 

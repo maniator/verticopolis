@@ -307,16 +307,15 @@ describe.skipIf(noEngine)("what the player is told, and what they decide (#1548)
     const shaftOf = () => look(keep.port).tower.transports.find((t) => t.id === 1139)! as unknown as { bottom: number; top: number };
     const before = { ...shaftOf() };
     expect(before.bottom).toBe(15);
-    // Both ends come in: rooms stand under the shaft's foot, and an
-    // elevator never runs through a room.
+    // The top comes down first, so the span stays within the 30-floor limit.
     for (const [up, floor] of [
       [true, 35],
-      [false, 17],
+      [false, 11],
     ] as const)
       expect(keep.port.extendShaft(1139, up, floor)[0], `move an end to ${floor}: ${keep.port.lastReason()}`).toBe(1);
     const after = shaftOf();
-    expect(after.bottom).toBeGreaterThan(before.bottom);
-    expect(after.bottom).toBe(17);
+    expect(after.bottom).toBeLessThan(before.bottom);
+    expect(after.bottom).toBe(11);
     expect(after.top).toBe(35);
 
     const reloaded = play(JSON.parse(keep.port.serialize()) as SerializedGame, store);
