@@ -91,7 +91,7 @@ impl Tower {
     /// id. A stale entry is a broken invariant: a debug build stops on it,
     /// and a release build answers `None`, so a removal never takes another
     /// unit.
-    fn index_of(&self, id: i64) -> Option<usize> {
+    pub(crate) fn index_of(&self, id: i64) -> Option<usize> {
         let idx = *self.by_id.get(&id)?;
         let stands = self.units.get(idx).is_some_and(|u| u.id == id);
         debug_assert!(stands, "by_id holds a stale index for unit {id}");

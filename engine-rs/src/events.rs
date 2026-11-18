@@ -19,7 +19,10 @@ use crate::tower::UnitState;
 
 #[path = "events_fire.rs"]
 mod fire;
+#[path = "events_fire_cover.rs"]
+mod fire_cover;
 pub use fire::FireRescueRefusal;
+use fire_cover::RoomsByKind;
 #[path = "events_fire_response.rs"]
 #[doc(hidden)]
 pub mod fire_response;
@@ -269,7 +272,7 @@ impl Simulation {
         let ids: Vec<i64> = self.events.active.iter().copied().collect();
         let mut gutted = 0;
         for id in ids {
-            if let Some(idx) = self.tower.units.iter().position(|u| u.id == id) {
+            if let Some(idx) = self.tower.index_of(id) {
                 if self.tower.units[idx].state == UnitState::Fire {
                     self.gut(idx);
                     self.events.fires_gut_rooms += 1;
@@ -307,13 +310,17 @@ impl Simulation {
         (150_000.0 + ((self.star - 2).max(0) as f64) * 120_000.0).min(500_000.0)
     }
 
-    /// `flammableUnits`: indices of real, finished, unburned rooms.
+    /// `flammableUnits`: indices of real, finished, unburned rooms, in unit
+    /// order. Read from the rooms index, past the floor tiles that make up
+    /// most of a large tower (#1285 item 3).
     fn flammable_units(&self) -> Vec<usize> {
-        (0..self.tower.units.len())
+        self.tower
+            .room_index()
+            .iter()
+            .copied()
             .filter(|&i| {
                 let u = &self.tower.units[i];
-                !u.kind.is_structural()
-                    && u.state != UnitState::Construction
+                u.state != UnitState::Construction
                     && u.state != UnitState::Fire
                     && u.state != UnitState::Gutted
             })
@@ -331,11 +338,12 @@ impl Simulation {
         self.ignite(i);
     }
 
-    fn service_within(&self, kind: Kind, floor: i64, radius: i64) -> bool {
-        self.tower
-            .units
-            .iter()
-            .any(|u| u.kind == kind && u.is_operational() && (u.floor - floor).abs() <= radius)
+    /// Whether one of `rooms` works and stands within `radius` floors.
+    fn service_within(&self, rooms: &[usize], floor: i64, radius: i64) -> bool {
+        rooms.iter().any(|&i| {
+            let u = &self.tower.units[i];
+            u.is_operational() && (u.floor - floor).abs() <= radius
+        })
     }
 
     #[doc(hidden)]
@@ -344,32 +352,34 @@ impl Simulation {
     /// from an office within `SECURITY_RADIUS` floors. Before any guard was
     /// sent (a fire no response tracks yet) any office that near counts.
     pub fn control_chance(&self, floor: i64) -> f64 {
+        self.control_chance_in(&RoomsByKind::of(&self.tower), floor)
+    }
+
+    /// [`Self::control_chance`] over rooms the fire pass gathered once.
+    fn control_chance_in(&self, rooms: &RoomsByKind, floor: i64) -> f64 {
         let sec = match &self.events.fire {
             Some(r) => r.guards_fighting(self.clock.minutes, floor, SECURITY_RADIUS),
-            None => self.service_within(Kind::Security, floor, SECURITY_RADIUS),
+            None => self.service_within(rooms.of_kind(Kind::Security), floor, SECURITY_RADIUS),
         };
-        let med = self.service_within(Kind::Medical, floor, MEDICAL_RADIUS);
+        let med = self.service_within(rooms.of_kind(Kind::Medical), floor, MEDICAL_RADIUS);
         0.5 + (if sec { 0.2 } else { 0.0 }) + (if med { 0.3 } else { 0.0 })
     }
 
-    fn spread_fire_to(&mut self, target: Option<i64>) {
+    fn spread_fire_to(&mut self, rooms: &RoomsByKind, target: Option<i64>) {
         let Some(tid) = target else { return };
-        let Some(idx) = self.tower.units.iter().position(|u| u.id == tid) else {
+        let Some(idx) = self.tower.index_of(tid) else {
             return;
         };
         if !self.tower.units[idx].is_operational() {
             return;
         }
         let kind = self.tower.units[idx].kind;
-        let mut ops = 0;
-        for x in &self.tower.units {
-            if x.kind == kind && x.is_operational() {
-                ops += 1;
-                if ops > 1 {
-                    break;
-                }
-            }
-        }
+        let ops = rooms
+            .of_kind(kind)
+            .iter()
+            .filter(|&&i| self.tower.units[i].is_operational())
+            .take(2)
+            .count();
         if ops <= 1 {
             return;
         }
@@ -391,9 +401,12 @@ impl Simulation {
             return;
         }
         let ids: Vec<i64> = self.events.active.iter().copied().collect();
+        // Read once for the whole pass: no fire adds or removes a unit, and
+        // each check below still reads the room's state as it is now.
+        let rooms = RoomsByKind::of(&self.tower);
         let mut gutted = 0;
         for id in ids {
-            let Some(idx) = self.tower.units.iter().position(|u| u.id == id) else {
+            let Some(idx) = self.tower.index_of(id) else {
                 self.events.active.shift_remove(&id);
                 continue;
             };
@@ -405,7 +418,7 @@ impl Simulation {
                 let u = &self.tower.units[idx];
                 (u.floor, u.x, u.width, u.kind.facility().name)
             };
-            let control = self.control_chance(floor);
+            let control = self.control_chance_in(&rooms, floor);
             if self.rng.chance(control) {
                 self.gut(idx);
                 self.events.fires_gut_rooms += 1;
@@ -419,14 +432,17 @@ impl Simulation {
                     .room_at(floor, x - 1)
                     .or_else(|| self.tower.room_at(floor, x + width))
                     .map(|u| u.id);
-                self.spread_fire_to(adjacent);
+                self.spread_fire_to(&rooms, adjacent);
                 let above = self.tower.room_at(floor + 1, x).map(|u| u.id);
-                self.spread_fire_to(above);
+                self.spread_fire_to(&rooms, above);
             }
         }
         self.note_gutted(gutted);
+        // Only a room is tenanted or asleep: the loader and every write keep
+        // floor tiles empty, so the rooms index holds every unit this touches.
         if !self.events.active.is_empty() {
-            for u in self.tower.units.iter_mut() {
+            for &i in self.tower.room_index().iter() {
+                let u = &mut self.tower.units[i];
                 if u.is_tenanted() || u.state == UnitState::Asleep {
                     u.satisfaction = (u.satisfaction - 0.05).max(0.0);
                 }

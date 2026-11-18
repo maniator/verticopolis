@@ -48,12 +48,13 @@ impl Simulation {
                 seq: self.fx.explosion.seq + 1,
             };
             let reach = self.blast_reach(floor, x);
-            for i in 0..self.tower.units.len() {
+            // Gutting changes no unit's place in the list, so the rooms index
+            // read here stays good for the whole pass.
+            for &i in self.tower.room_index().iter() {
                 let u = &self.tower.units[i];
                 if reach
                     .iter()
                     .any(|&(f, first, last)| u.floor == f && u.x <= last && u.x + u.width > first)
-                    && !u.kind.is_structural()
                     && u.state != UnitState::Construction
                     && u.state != UnitState::Gutted
                 {
