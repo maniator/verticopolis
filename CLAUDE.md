@@ -250,7 +250,19 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   the view, the dashboard and the saved insights all carried that correction
   already, and prose did not stop the query running. If no governed definition
   covers the measure and you are not writing tested code, say so in the readout
-  and propose a metric rather than quietly inventing a number.
+  and propose a metric rather than quietly inventing a number. **The window
+  and filters are part of the definition** (#977). A published figure names
+  the window and filters it ran over (the dates or rolling interval, the
+  environment, the versions, the test-account filter), and they are the
+  governed source's own, or the readout says where they differ and why.
+  Governed arithmetic over the wrong window is how the readout that started
+  this rule went wrong: it compared rolling `now() - INTERVAL 14 DAY` windows
+  that cut a day in half, so a week that fell 14 percent read as up 11
+  percent. A governed source with its own fixed window says so where it is
+  read (the per-tower funnel's 24 hours and 30 days are fixed in its SQL and
+  ignore the dashboard's date filter; the persistence failures tile has no
+  version filter, so a readout reads it from the first build that sends its
+  codes), and a readout that quotes it quotes that window.
 - **A published snapshot says so, at the top.** Anything dated and not
   refreshing carries its window above the figures rather than in a footer, with
   a pointer to wherever the live number lives: the dashboard when it carries
