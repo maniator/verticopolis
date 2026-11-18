@@ -178,8 +178,19 @@ export interface GameplayEvents {
    *  many foreground frames fed the estimate. The two fps numbers are computed
    *  over a bounded per-session reservoir, so they are session ESTIMATES; PostHog
    *  computes the exact CROSS-session fps percentiles from them (issue #538).
-   *  Emitted once per session, above a minimum sample count. */
-  session_fps: { p50: number; low: number; samples: number };
+   *  Emitted once per session, above a minimum sample count. `population` is the
+   *  tower's peak population so far and `speed` the game speed (game minutes per
+   *  real second, 0 for paused) most frames ran at, so a frame rate can be read
+   *  against the tower it drew (added in the release after 4.13.0). */
+  session_fps: { p50: number; low: number; samples: number; population: number; speed: number };
+  /** The engine's cost for the session: `ms_per_game_hour` is how long the
+   *  engine's steps took per game hour stepped (the `advance` call the frame
+   *  loop times, so it covers the simulation and nothing drawn), over
+   *  `game_hours` of play; `population` is the tower's peak population and
+   *  `speed` the running game speed (game minutes per real second) most frames
+   *  used. Emitted once per session after two game hours have stepped, while
+   *  the tab is visible. Compare versions within a population band. */
+  session_sim_cost: { ms_per_game_hour: number; game_hours: number; population: number; speed: number };
   /** A discrete app-chrome action the player took OUTSIDE the core build loop:
    *  a save/export/import, a settings or dialog open, a preference toggle, a
    *  toolbar affordance, or a landing on the standalone help/gallery page. One

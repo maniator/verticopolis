@@ -109,6 +109,19 @@ describe("runFrame freeze path", () => {
 });
 
 describe("runFrame simulation stepping", () => {
+  it("times the engine step and hands it to the session with the clock, the speed and the population", () => {
+    const spy = vi.spyOn(gameplaySession, "noteSimStep").mockImplementation(() => {});
+    const { app, raw } = makeApp({ speed: 2, accMinutes: 0 });
+    raw.enginePort.advance.mockImplementationOnce(() => {
+      raw.sim.clock.minutes = 615;
+      return Float64Array.of(1, 0);
+    });
+    runFrame(app, 1000);
+    expect(spy).toHaveBeenCalledExactlyOnceWith(expect.any(Number), 615, SPEEDS[2], raw.reader.header.population);
+    expect(spy.mock.calls[0][0]).toBeGreaterThanOrEqual(0);
+    spy.mockRestore();
+  });
+
   it("hands the engine the carry, the frame, the speed's pace and the steady clock, and keeps the carry it answers", () => {
     const { app, raw } = makeApp({ speed: 1, accMinutes: 0.5, prefs: { steadyClock: false } });
     raw.enginePort.advance.mockReturnValueOnce(Float64Array.of(2, 0.75));

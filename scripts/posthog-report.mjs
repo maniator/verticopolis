@@ -646,6 +646,8 @@ async function main() {
     { label: "Peak floor reached (per page life)", event: "session_peak_floors", prop: "floors" },
     { label: "Fps p50 (per page life)", event: "session_fps", prop: "p50" },
     { label: "Fps worst-frame low (per page life)", event: "session_fps", prop: "low" },
+    // From the release after 4.13.0; mixes machines and tower sizes, so read it by version, not alone.
+    { label: "Engine ms per game hour (per page life)", event: "session_sim_cost", prop: "ms_per_game_hour" },
   ];
   const depth = [];
   for (const d of depthSpecs) {

@@ -79,7 +79,8 @@ an event sent before boot carries `version` only.
 | `tool_session_uses` | `tool`, `uses` | Session end, per tool used | Per-tool depth |
 | `session_builds` | `builds` | Session end | Build volume |
 | `session_peak_floors` | `floors` | Session end | Height reached |
-| `session_fps` | `p50`, `low`, `samples` | Session end | Frame rate |
+| `session_fps` | `p50`, `low`, `samples`, `population`, `speed` | Session end | Frame rate. `population` (the session's peak population) and `speed` (the game speed it ran at most, in game minutes per real second: 0 paused, 3, 15 or 50) arrive from the release after 4.13.0, so a read can compare towers of the same size and speed |
+| `session_sim_cost` | `ms_per_game_hour`, `game_hours`, `population`, `speed` | Session end, once the visible tab has moved the clock at least 2 game hours (from the release after 4.13.0) | Engine cost: the real milliseconds the engine step took per game hour, measured around the step in the frame loop, with the peak population and the running speed it ran at most. Read by version to see whether an engine change made the simulation cheaper or dearer, since the frame rate stays capped at the display rate |
 | `app_action` | `action`, `detail` | An app-chrome action | Which saves, dialogs and settings get used, and whether saves, loads and imports fail (see below) |
 | `economy_action` | `action`, `detail` | Demolish, price or capacity tuning, or a Modern exterminator booking (`exterminator`, `detail` `menu` or `stats`, since 4.3) | The removal and tuning side of play, and which surface books the exterminator |
 | `menu_open` | `menu`, `via`, `screen` | A trip into the menu bar begins (owner, 2026-11-14) | Which menus players open, and how (see below) |

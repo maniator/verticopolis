@@ -6,6 +6,7 @@ import { clearMenuPicks } from "./analyticsMenus";
 import { trackPageView } from "./analyticsPageView";
 import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots, takeCrashCount } from "./analyticsCrash";
 import { resetEngineStatus } from "./analyticsEngineStatus";
+import { SimCostTally, SIM_COST_MIN_GAME_HOURS } from "./analyticsSimCost";
 
 /**
  * The per-tab {@link GameplaySession} and the one process-wide instance of it,
@@ -92,6 +93,11 @@ class GameplaySession {
    *  null between segments so the first frame after a resume re-anchors instead
    *  of charging the whole background gap as one slow frame. */
   private lastFrameAt: number | null = null;
+  /** The engine's step time per game hour, the peak population and the speeds
+   *  played, for `session_sim_cost` and the context on `session_fps`. */
+  private simCost = new SimCostTally();
+  /** `session_sim_cost` fires at most once per session (like the fps event). */
+  private simCostReported = false;
   /** Emergencies this window saw, folded from the engine's events
    *  (`fire_started`, `fire_gutted`, `bomb_detonated`) by the analytics bridge.
    *  Every tower the tab plays adds to the same tallies, so a swap needs no
@@ -116,6 +122,7 @@ class GameplaySession {
     // baseline, so the wall-clock gap the tab spent hidden is never sampled as
     // one enormous slow frame.
     this.lastFrameAt = null;
+    this.simCost.reanchor();
   }
 
   /** A new tower was founded: the funnel's entry point. Re-opens the
@@ -232,6 +239,15 @@ class GameplaySession {
     if (j < FPS_RESERVOIR) this.fpsSamples[j] = fps;
   }
 
+  /** One frame's engine step, from the frame loop: `ms` the step took, `clock`
+   *  the game clock in minutes after it, `speed` the game minutes per real
+   *  second it ran at, and the tower's population. Foreground only, like
+   *  {@link noteFrame}. */
+  noteSimStep(ms: number, clock: number, speed: number, population: number): void {
+    if (this.resumedAt === null) return;
+    this.simCost.note(ms, clock, speed, population);
+  }
+
   /** The game ran a frame (the frame loop's throttled refresh): this session
    *  played, so it reports `session_emergencies` at its end even when nothing
    *  caught fire. */
@@ -313,7 +329,25 @@ class GameplaySession {
       this.fpsReported = true;
       const sorted = [...this.fpsSamples].sort((a, b) => a - b);
       const at = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
-      trackEvent("session_fps", { p50: Math.round(at(0.5)), low: Math.round(at(0.05)), samples: this.fpsSeen });
+      trackEvent("session_fps", {
+        p50: Math.round(at(0.5)),
+        low: Math.round(at(0.05)),
+        samples: this.fpsSeen,
+        population: this.simCost.peakPopulation,
+        speed: this.simCost.mainSpeed(false),
+      });
+    }
+    // The engine's own cost per game hour, once per session after a couple of
+    // game hours have stepped, with the tower size and the running speed beside
+    // it, so a release's engine speedup shows tower size by tower size.
+    if (this.simCost.gameHours >= SIM_COST_MIN_GAME_HOURS && !this.simCostReported) {
+      this.simCostReported = true;
+      trackEvent("session_sim_cost", {
+        ms_per_game_hour: Math.round(this.simCost.msPerGameHour * 10) / 10,
+        game_hours: Math.round(this.simCost.gameHours * 10) / 10,
+        population: this.simCost.peakPopulation,
+        speed: this.simCost.mainSpeed(true),
+      });
     }
     // Per-session emergency summary, emitted once per session that actually
     // played (the frame loop ran). Unlike the depth/fps events it is NOT gated
@@ -399,6 +433,8 @@ class GameplaySession {
     this.fpsSeen = 0;
     this.fpsReported = false;
     this.lastFrameAt = null;
+    this.simCost = new SimCostTally();
+    this.simCostReported = false;
     this.toolsSeen.clear();
     this.toolUses.clear();
     this.emerg = noEmergencies();

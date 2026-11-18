@@ -117,6 +117,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // and paceFactor is normalized so a full day costs the same real time, so
   // the speed buttons keep their meaning.
   const steadyClock = app.prefs.steadyClock === true;
+  // The step's own time, for the session's engine-cost summary
+  // (`session_sim_cost`); the drawing and the frame read are left out.
+  const stepStart = performance.now();
   try {
     app.accMinutes = app.enginePort.advance(app.accMinutes, dtMs, minutesPerSecond, steadyClock, true)[1];
   } catch (err) {
@@ -125,9 +128,11 @@ export function runFrame(app: GameApp, dtMs: number): void {
     app.accMinutes = 0;
     throw err;
   }
+  const stepMs = performance.now() - stepStart;
   // The view follows every frame, so the header, the HUD and the painters
   // read this frame's tower.
   readView(app);
+  gameplaySession.noteSimStep(stepMs, app.reader.header.minutes, minutesPerSecond, app.reader.header.population);
 
   // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
   // tower never makes panning feel sluggish.

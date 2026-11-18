@@ -350,6 +350,50 @@ function buildInsights(ids) {
       ),
     },
     {
+      name: "Session FPS by tower size and speed",
+      description:
+        "session_fps by the session's peak population and the game speed it ran at most (0 paused, 3, 15 or 50 game minutes per real second), with the median typical and worst-frame fps, production, 30d. Rows from the release after 4.13.0 only: earlier rows carry no population. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+      query: hogql(
+        [
+          "SELECT",
+          "    multiIf(toInt(properties.population) < 1000, '1. under 1,000', toInt(properties.population) < 5000, '2. 1,000 to 4,999', toInt(properties.population) < 10000, '3. 5,000 to 9,999', '4. 10,000 or more') AS population,",
+          "    toInt(properties.speed) AS speed,",
+          "    count() AS page_lives,",
+          "    round(median(toFloat(properties.p50))) AS typical_fps,",
+          "    round(median(toFloat(properties.low))) AS worst_frame_fps",
+          "FROM events",
+          "WHERE event = 'session_fps'",
+          "  AND properties.environment = 'production'",
+          "  AND toInt(properties.population) IS NOT NULL",
+          "  AND timestamp >= now() - INTERVAL 30 DAY",
+          "GROUP BY population, speed",
+          "ORDER BY population, speed",
+        ].join("\n"),
+      ),
+    },
+    {
+      name: "Engine cost per game hour by version and tower size",
+      description:
+        "session_sim_cost: the real milliseconds the engine step took per game hour (median and p90), by version and the session's peak population, production, 30d. Sent from the release after 4.13.0, once a visible tab has moved the clock 2 game hours. It depends on the player's machine, so compare versions within one population band and trust a row only with many page lives behind it. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+      query: hogql(
+        [
+          "SELECT",
+          "    properties.version AS version,",
+          "    multiIf(toInt(properties.population) < 1000, '1. under 1,000', toInt(properties.population) < 5000, '2. 1,000 to 4,999', toInt(properties.population) < 10000, '3. 5,000 to 9,999', '4. 10,000 or more') AS population,",
+          "    count() AS page_lives,",
+          "    round(median(toFloat(properties.ms_per_game_hour)), 1) AS median_ms_per_game_hour,",
+          "    round(quantile(0.9)(toFloat(properties.ms_per_game_hour)), 1) AS p90_ms_per_game_hour",
+          "FROM events",
+          "WHERE event = 'session_sim_cost'",
+          "  AND properties.environment = 'production'",
+          "  AND toFloat(properties.ms_per_game_hour) IS NOT NULL",
+          "  AND timestamp >= now() - INTERVAL 30 DAY",
+          "GROUP BY version, population",
+          "ORDER BY version DESC, population",
+        ].join("\n"),
+      ),
+    },
+    {
       name: "Modern towers by stairs and escalators (boots)",
       description:
         "Modern sessions by the most stairs and escalators their tower held at any boot in the session (boot.flights; a session spans reloads, so this is its largest tower), with the median typical and worst-frame fps those sessions reported, production, 30d. Modern has no limit on flights since 2026-11-16, and Classic keeps 64, so the rows past 64 are towers that use the change. A session with no session_fps row counts in sessions only. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",

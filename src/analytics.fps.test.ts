@@ -63,7 +63,7 @@ describe("session frame-rate (session_fps)", () => {
     gameplaySession.end();
     // Sorted ascending, the 20 hitch frames sit in the low tail: p05 index (10)
     // lands on 10fps, p50 index (100) on 60fps. Whole-fps values.
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 10, samples: 200 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 10, samples: 200, population: 0, speed: 0 });
   });
 
   it("records a real hitch as a low-fps sample, not a spike-clamped 1000fps", () => {
@@ -102,7 +102,7 @@ describe("session frame-rate (session_fps)", () => {
     for (let i = 0; i < 120; i++) frame(MS60);
     gameplaySession.end();
     // The duplicate-timestamp frame contributes nothing; only the 120 real frames.
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
   });
 
   it("drops a loop-interruption gap (in-place graphics recovery) instead of a sub-1fps sample", () => {
@@ -117,7 +117,7 @@ describe("session frame-rate (session_fps)", () => {
     for (let i = 0; i < 20; i++) frame(MS60); // 20 more smooth samples -> 120 total
     gameplaySession.end();
     // If the 3s gap had leaked in, `low` would collapse toward 0; it stays 60.
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
   });
 
   it("re-anchors within a session across a hide/resume, so the gap is not sampled", () => {
@@ -130,7 +130,7 @@ describe("session frame-rate (session_fps)", () => {
     // gap had leaked in as a ~0fps sample, `low` would collapse.
     for (let i = 0; i < 21; i++) frame(MS60);
     gameplaySession.end();
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
   });
 
   it("counts the true frame total past the reservoir cap (bounded memory)", () => {
@@ -140,7 +140,7 @@ describe("session frame-rate (session_fps)", () => {
     const call = vi.mocked(sendToRelay).mock.calls.find(([name]) => name === "session_fps");
     // All frames are 60fps, so the reservoir-replacement path is deterministic
     // here: p50/low stay 60 while `samples` reflects every frame seen.
-    expect(call?.[1]).toEqual({ p50: 60, low: 60, samples: 500 });
+    expect(call?.[1]).toEqual({ p50: 60, low: 60, samples: 500, population: 0, speed: 0 });
   });
 
   it("emits session_fps at most once per session", () => {
@@ -167,6 +167,6 @@ describe("session frame-rate (session_fps)", () => {
     for (let i = 0; i < 131; i++) frame(MS30);
     gameplaySession.end();
     // If the gap had leaked in, `low` would be ~0; it is a clean 30fps.
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 30, low: 30, samples: 130 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 30, low: 30, samples: 130, population: 0, speed: 0 });
   });
 });
