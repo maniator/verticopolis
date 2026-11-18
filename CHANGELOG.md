@@ -25,6 +25,17 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.13.4
+
+- After File > Open… brings in a tower from your computer, or a 1994 tower is imported, File > Open Recent now always lists the tower you just left on line 1, so going back is one pick. Before, the tower you opened could sometimes land above it.
+- Modern: Undo now takes back lobby tiles you laid across a gap together with the basement under them, when the part beyond the gap is a run of old plain ground floor. Before, the Undo was refused (#2210).
+- In Classic, a room's card and the morning elevator warning now name what's wrong without telling you how to fix it, as the 1994 game did. Modern still adds what to do about it.
+- A shop or restaurant's card now judges yesterday's business against what that day of the week usually brings, so a normal weekend no longer reads as booming (or a quiet one as very few customers).
+- The local demand figure rounds down, so it no longer shows 100% without the "another venue would still sell" tip, or 50% beside the "more retail than its shoppers fill" tip.
+- In Modern, the tower-wide retail tip no longer argues with the venue's own verdict: a slow venue in a busy tower is told shoppers are not reaching it, and a booming one in an over-built tower is told it is the exception.
+- A person who gives up waiting for their first elevator and turns back no longer shows as on the way back from where they were going. Their card says they gave up waiting, and that they are heading back from where they stand to where they set out.
+- Modern: people choosing an elevator now count every car of a shaft on Auto, since its parked cars come out as soon as anyone waits. Before, a shaft that Auto had parked down to one car looked slow, so nobody lined up for it and its cars stayed parked: in a busy tower one or two express elevators carried the whole morning rush from the parking floors while their twins stood idle, and the basement lines grew past a thousand people.
+
 ## 4.13.3
 
 - Modern: an elevator on Auto now puts every car to work whenever anyone is waiting at one of its stops. Before, it waited until more people stood in line than its running cars could take in one trip, so in a busy tower the morning commuters from the parking floors piled up by the hundreds in the basement while the few cars on shift came by already full.

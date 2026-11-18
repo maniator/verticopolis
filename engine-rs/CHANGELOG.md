@@ -15,6 +15,15 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.53.0 (2026-11-18)
+
+- The roots an undo step's ground-floor lobby tiles joined (`joined_roots`) leave out of their flood the basement the step takes out, so each part that basement linked keeps its own root and its undo is no longer refused as `Blocked` (#2210).
+- The elevator dispatch no longer sorts its two door lists (closed and open cars) every chunk. Each shaft's cars are already in order, and the shafts' id order is kept per tower revision, so a tower whose save lists its shafts in id order does no reordering at all, and one that doesn't copies the runs into place. The lists, and every game, are identical (#2060).
+- The catalog's `rules` gains `advisesFixes` (`GameMode::advises_fixes`: true in Modern), whether a card or notice that names a problem also says what to do about it (catalog version 25). Classic's 9 AM elevator warning drops its "Add cars or shafts." (#549).
+- `service_diagnostic_facts`: the retail tier reads yesterday's patronage against a baseline scaled by `weekend_multiplier` for the day yesterday was (venues with an attendance cap keep one baseline), and `localDemandPct` is rounded down instead of to the nearest (#549).
+- `TripFacts` gains `gave_up`, and the `personCard` record gains a `gaveUp` slot (view layout version 33). For someone who gave up waiting to set out, `from` is the floor they stand on, `to` is where the trip began, and `purpose` still names what the trip was for (#2188).
+- The Modern router's `stand_down` leaves a shaft whose schedule has `auto_tune` on at its whole fleet, instead of counting only the cars the dispatch last ran, and `crowd::banks` shares a bank's riders by an Auto shaft's whole fleet the same way. Regression `rule_tests::auto_idle_express` replays the owner's split tower 32. The conformance lock moves for `starter-modern` and `metro-express-modern`; every Classic scenario keeps its hashes.
+
 ## 1.52.1 (2026-11-18)
 
 - Dispatch runs every car of a shaft whose schedule has `auto_tune` on while anyone waits at its stops, and the row's count while nobody does. `Schedule::cars_for_backlog` keeps its signature and follows the same rule; the car capacity, span and homes it takes are no longer read.
