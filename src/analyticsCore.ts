@@ -180,7 +180,7 @@ export interface GameplayEvents {
    *  computes the exact CROSS-session fps percentiles from them (issue #538).
    *  Emitted once per reporting window (a page life, or the stretch after a
    *  back/forward-cache restore, #621), above a minimum sample count. From the
-   *  release after 4.13.0 only frames where the simulation runs are sampled
+   *  release after 4.13.1 only frames where the simulation runs are sampled
    *  (#603), `population` is the tower's peak population so far and `speed` the
    *  running game speed (game minutes per real second) most frames ran at, so a
    *  frame rate can be read against the tower it drew. */

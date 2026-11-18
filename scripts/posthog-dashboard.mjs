@@ -345,7 +345,7 @@ function buildInsights(ids) {
       name: "Session FPS percentiles (median & 5th-percentile low)",
       formerName: "Session FPS percentiles (median & worst-frame)",
       description:
-        "Median of session_fps.p50 and of session_fps.low across the rows each day (production). `low` is the 5th-percentile fps of one page life's sampled frames, a hitch signal, not its single worst frame. Observed in the field on whatever device each player has: it is not a hardware benchmark or the performance gate. From the release after 4.13.0 only frames where the simulation runs are sampled (#603); before it, paused and modal-frozen frames counted too, so compare versions on the same side of that change. The tile beside it gives the number of rows behind each day (#538, #2391).",
+        "Median of session_fps.p50 and of session_fps.low across the rows each day (production). `low` is the 5th-percentile fps of one page life's sampled frames, a hitch signal, not its single worst frame. Observed in the field on whatever device each player has: it is not a hardware benchmark or the performance gate. From the release after 4.13.1 only frames where the simulation runs are sampled (#603); before it, paused and modal-frozen frames counted too, so compare versions on the same side of that change. The tile beside it gives the number of rows behind each day (#538, #2391).",
       query: trends(
         [series("session_fps", "Typical fps (median of p50)", "median", "p50"), series("session_fps", "5th-percentile fps (median of low)", "median", "low")],
         { display: "ActionsLineGraph" },
@@ -360,7 +360,7 @@ function buildInsights(ids) {
     {
       name: "Session FPS by tower size and speed",
       description:
-        "session_fps by the session's peak population and the running game speed most sampled frames ran at (3, 15 or 50 game minutes per real second), with the median typical and 5th-percentile low fps, production, 30d. Rows from the release after 4.13.0 only: earlier rows carry no population, and from that release only frames where the simulation runs are sampled. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+        "session_fps by the session's peak population and the running game speed most sampled frames ran at (3, 15 or 50 game minutes per real second), with the median typical and 5th-percentile low fps, production, 30d. Rows from the release after 4.13.1 only: earlier rows carry no population, and from that release only frames where the simulation runs are sampled. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
       query: hogql(
         [
           "SELECT",
@@ -382,7 +382,7 @@ function buildInsights(ids) {
     {
       name: "Engine cost per game hour by version, tower size and speed",
       description:
-        "session_sim_cost: the real milliseconds the engine step took per game hour (median and p90), by version, population band and speed (3, 15 or 50 game minutes per real second), production, 30d. Each row is the band and speed its window stepped the most game time at, with that band's peak population, so towers of different sizes are never blended. Sent from the release after 4.13.0, once a visible tab has moved the clock 2 game hours at one band and speed. It depends on the player's machine, and a faster speed takes bigger steps, so compare versions within one population band and speed, and trust a row only with many page lives behind it. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
+        "session_sim_cost: the real milliseconds the engine step took per game hour (median and p90), by version, population band and speed (3, 15 or 50 game minutes per real second), production, 30d. Each row is the band and speed its window stepped the most game time at, with that band's peak population, so towers of different sizes are never blended. Sent from the release after 4.13.1, once a visible tab has moved the clock 2 game hours at one band and speed. It depends on the player's machine, and a faster speed takes bigger steps, so compare versions within one population band and speed, and trust a row only with many page lives behind it. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
       query: hogql(
         [
           "SELECT",

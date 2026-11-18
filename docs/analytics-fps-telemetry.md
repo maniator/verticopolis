@@ -13,7 +13,7 @@
 `session_fps` is one summary per **reporting window**:
 
 - A window is a page life: one load of the game in a tab. From the release
-  after 4.13.0, the stretch of play after the page comes back from the
+  after 4.13.1, the stretch of play after the page comes back from the
   browser's back/forward cache is its own window too (#621).
 - The row goes out at the window's **first hide** (`visibilitychange` to
   hidden, or `pagehide`), once at least 120 frames were sampled. It is then
@@ -48,7 +48,7 @@ match.
 
 - **Only the foreground.** Frames are sampled only while the tab is visible,
   and each resume re-anchors, so hidden time is never one slow frame.
-- **Only frames where the simulation runs** (from the release after 4.13.0,
+- **Only frames where the simulation runs** (from the release after 4.13.1,
   #603). A paused frame or one frozen behind a modal skips the engine step.
   On a big tower it renders faster than play does, and it used to pull the
   figure toward the display's cap. The first running frame after a pause
@@ -92,7 +92,7 @@ How the windows are cut also affects what a row reports:
 
 ## 4. Segmenting
 
-From the release after 4.13.0 each row carries the window's peak
+From the release after 4.13.1 each row carries the window's peak
 `population` and its running `speed`. The **Session FPS by tower size and
 speed** tile reads the frame rate within a population band and speed. The
 **Engine cost per game hour by version, tower size and speed** tile reads
