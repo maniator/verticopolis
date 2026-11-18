@@ -3,6 +3,7 @@
 //! replaced, which ran the whole step every hour, decision for decision.
 
 use super::*;
+use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::load::deserialize;
 use crate::rule_tests::{at_time, fixture_save};

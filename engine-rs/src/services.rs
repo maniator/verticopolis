@@ -356,7 +356,10 @@ impl Simulation {
             .take()
             .map(|ids| ids.into_iter().collect::<std::collections::HashSet<_>>());
         let mut cleared = 0;
-        for (u, at) in self.tower.marked_units() {
+        // Hotel rooms are never tiles (#1158 A35).
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
+            let (u, at) = self.tower.marked(i);
             if !u.kind.is_hotel() || u.state != UnitState::Infested {
                 continue;
             }

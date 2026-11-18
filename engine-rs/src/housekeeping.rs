@@ -236,10 +236,11 @@ fn format_floors(floors: &[i64]) -> String {
 impl Simulation {
     /// `Housekeeping.beforeCheckout`.
     pub fn housekeeping_before_checkout(&mut self) {
+        // Hotel rooms are never tiles, so these passes walk the rooms, in
+        // list order (#1158 A35).
         let leftover = self
             .tower
-            .units
-            .iter()
+            .room_units()
             .filter(|u| u.kind.is_hotel() && u.state == UnitState::Dirty)
             .count() as i64;
         let cleaned = self.housekeeping.cleaned_today;
@@ -267,7 +268,9 @@ impl Simulation {
 
     fn escalate_infestations(&mut self) {
         let mut floors: Vec<i64> = Vec::new();
-        for (u, at) in self.tower.marked_units() {
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
+            let (u, at) = self.tower.marked(i);
             if u.state != UnitState::Dirty || !u.kind.is_hotel() {
                 continue;
             }
@@ -300,8 +303,7 @@ impl Simulation {
     fn spread_cockroaches(&mut self) {
         let sources: Vec<(i64, i64, i64)> = self
             .tower
-            .units
-            .iter()
+            .room_units()
             .filter(|u| u.kind.is_hotel() && u.state == UnitState::Infested)
             .map(|u| (u.floor, u.x, u.width))
             .collect();

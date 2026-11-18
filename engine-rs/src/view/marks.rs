@@ -274,16 +274,6 @@ impl crate::tower::Tower {
         (&mut self.units[i], self.view.marks.at(i))
     }
 
-    /// Every unit in list order with its mark, for a loop over the units
-    /// that calls their setters.
-    pub(crate) fn marked_units(&mut self) -> impl Iterator<Item = (&mut Unit, Mark<'_>)> {
-        let marks = &self.view.marks;
-        self.units
-            .iter_mut()
-            .enumerate()
-            .map(move |(i, u)| (u, marks.at(i)))
-    }
-
     /// The unit with this id and its mark, for its setters; `None` for an
     /// unknown id.
     pub(crate) fn marked_by_id(&mut self, id: i64) -> Option<(&mut Unit, Mark<'_>)> {
