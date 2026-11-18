@@ -509,15 +509,17 @@ jobs:
   # project) on a tooling build. The `e2e-serial` job above runs the
   # serial project: pixel baselines, the perf gate and the engine-status specs.
   e2e-general:
-    # It runs in four shards on four runners, since one worker on one runner
-    # took 13 to 18 minutes, the longest job on a pull request. Each shard
+    # It runs in six shards on six runners, since one worker on one runner
+    # took 13 to 18 minutes, the longest job on a pull request. Four shards
+    # were enough until the suite grew from about 15 to about 28 minutes of
+    # specs (November 2026), when the slowest shard passed 10 minutes. Each shard
     # keeps one worker (see playwright.config.ts), so the specs keep the timing
     # they expect. The spec files are split by measured time
     # (scripts/e2e-shards.ts), not by Playwright's count-based --shard, which
     # put the slow specs together: two shards took about 7 minutes and the
-    # third 3. The e2e-general-result job below reports the four shards as one
+    # third 3. The e2e-general-result job below reports the six shards as one
     # e2e-general check, which is required.
-    name: e2e-general (shard ${{ matrix.shard }} of 4)
+    name: e2e-general (shard ${{ matrix.shard }} of 6)
     needs: [changes, resolve-image, engine-wasm]
     # As the e2e-serial job: skipped only for a prose-only change.
     if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
@@ -526,7 +528,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     permissions:
       contents: read
     container:
@@ -601,7 +603,7 @@ jobs:
           # The JSON goes to a file, so nothing a spec prints while it loads
           # can mix into it.
           PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/suite-list.json" npx playwright test --project=chromium --grep-invert @perf --list --reporter=json
-          node scripts/e2e-shards.ts plan "$RUNNER_TEMP/suite-list.json" ${{ matrix.shard }} 4 "$RUNNER_TEMP/shard-files.txt"
+          node scripts/e2e-shards.ts plan "$RUNNER_TEMP/suite-list.json" ${{ matrix.shard }} 6 "$RUNNER_TEMP/shard-files.txt"
           if grep -qx 'milestones\.spec\.ts' "$RUNNER_TEMP/shard-files.txt"; then
             echo "here=true" >> "$GITHUB_OUTPUT"
           else
@@ -631,7 +633,7 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
 
-  # One check for the four browser-suite shards: green when every shard
+  # One check for the six browser-suite shards: green when every shard
   # passed, or when the suite was skipped on purpose (a prose-only change);
   # red when a shard failed or was cancelled, or when the
   # shards were skipped because a job they need failed. It does not run when

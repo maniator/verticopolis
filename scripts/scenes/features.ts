@@ -338,9 +338,12 @@ export const FEATURE_SCENES: Scene[] = [
           // Step the clock in fixed chunks and refresh the chip until it leaves
           // "Smooth". The sim and the step count are both deterministic, so the
           // chip flips on the same chunk (and reads the same) every run; the
-          // wall-clock UI throttle is bypassed by refreshing explicitly.
+          // wall-clock UI throttle is bypassed by refreshing explicitly. The
+          // chunks skip their intermediate draws (pgStepNoDraw): the shot crops
+          // the DOM top bar, which the update phase alone drives, and the line
+          // takes about 34 chunks to form, so drawing every frame cost minutes.
           for (let i = 0; i < 40; i++) {
-            const stepped = await page.evaluate(pgStep, 10);
+            const stepped = await page.evaluate(pgStepNoDraw, 10);
             if (!stepped) throw new Error("traffic chip needs the stepped clock");
             const label = await page.evaluate(async () => {
               const g = (window as any).game;
