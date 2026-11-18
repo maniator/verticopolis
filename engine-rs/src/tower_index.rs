@@ -101,6 +101,11 @@ pub struct DispatchFloors {
     /// mover and the hourly sample walk the shafts and skip the flights,
     /// which Modern does not limit (owner, 2026-11-16).
     pub elevators: Vec<usize>,
+    /// Places in `elevators`, ordered by shaft id: the order the dispatch's
+    /// door lists are searched in (`dispatch_lists.rs`), kept per revision
+    /// so no chunk sorts them. Empty when `elevators` is already in id
+    /// order, as it is unless a save lists its shafts out of order.
+    pub elevators_by_id: Vec<usize>,
     /// Each floor's place in `served`, plus one (0 for a floor not served),
     /// from `served`'s first floor up, so a room finds its slot by index.
     slot_of: Vec<u32>,
@@ -431,11 +436,18 @@ impl Tower {
         let elevators = (self.transports.iter().enumerate())
             .filter(|(_, t)| t.kind.is_elevator())
             .map(|(i, _)| i)
-            .collect();
+            .collect::<Vec<usize>>();
+        let id_at = |k: usize| self.transports[elevators[k]].id;
+        let mut elevators_by_id = Vec::new();
+        if !(0..elevators.len()).is_sorted_by_key(id_at) {
+            elevators_by_id.extend(0..elevators.len());
+            elevators_by_id.sort_unstable_by_key(|&k| id_at(k));
+        }
         let floors = Arc::new(DispatchFloors {
             served,
             lobbies,
             elevators,
+            elevators_by_id,
             slot_of,
         });
         self.memo.borrow_mut().floors = Some((key, floors.clone()));

@@ -85,6 +85,8 @@ pub struct ElevatorDispatch {
     /// step on and off only these cars, so nobody boards or leaves a car
     /// that is passing a floor. Each says which way the car leaves.
     open_cars: Vec<OpenCar>,
+    /// Where each shaft's run starts in the two lists, to put them in id order.
+    door_runs: lists::DoorRuns,
     /// Scratch of zero words, the calls a stood-down car answers: none.
     no_calls: Vec<u64>,
     /// Scratch: the shaft's called stops whose callers are all bound one way.
@@ -125,8 +127,10 @@ impl ElevatorDispatch {
             .unwrap_or_else(|| DispatchRules::for_mode(tower.mode));
         self.closed_cars.clear();
         self.open_cars.clear();
+        self.door_runs.clear();
         // The elevators alone: a tower may hold thousands of flights.
         for &ti in &floors.elevators {
+            (self.door_runs).start_shaft(&self.closed_cars, &self.open_cars);
             let (kind, id) = {
                 let t = &tower.transports[ti];
                 (t.kind, t.id)
@@ -468,10 +472,9 @@ impl ElevatorDispatch {
                 t.car_dir[i] = dir;
             }
         }
-        // The crowd searches the list, and the shafts come in saved order,
-        // which need not be id order.
-        self.closed_cars.sort_unstable();
-        self.open_cars.sort_unstable();
+        // The crowd searches the lists, and the shafts come in saved order.
+        let (closed, open) = (&mut self.closed_cars, &mut self.open_cars);
+        (self.door_runs).put_in_id_order(&floors.elevators_by_id, closed, open);
     }
 }
 
