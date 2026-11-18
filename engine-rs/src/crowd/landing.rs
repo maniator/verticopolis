@@ -158,6 +158,30 @@ pub fn landing_slots(crowd: &Crowd, tower: &Tower) -> Landings {
     out
 }
 
+/// The stretch of floor the line at `shaft` on `floor` covers right now, as
+/// `(from, to)` tile x with `from <= to`: from the shaft face it starts at to
+/// the rider standing farthest from it. A rider still shuffling up to a place
+/// a boarding freed counts where they stand, so the stretch holds everyone in
+/// the line as drawn. Lines run beside the shaft across any shaft next to it,
+/// so this is the only way to tell which riders on a floor of several
+/// elevators stand in which line. `None` when nobody waits there or `shaft`
+/// is not an elevator. One pass over the crowd, so it is a read for a tap,
+/// not a frame.
+pub fn queue_line(crowd: &Crowd, tower: &Tower, shaft: i64, floor: i64) -> Option<(f64, f64)> {
+    let elevator = tower
+        .get_transport(shaft)
+        .filter(|s| s.kind.is_elevator())?;
+    let mut riders = crowd
+        .people
+        .iter()
+        .filter(|p| p.state == PState::Waiting && p.shaft_id == Some(shaft) && p.floor == floor)
+        .map(|p| p.x)
+        .peekable();
+    riders.peek()?;
+    let face = line_at(tower, elevator, floor).face;
+    Some(riders.fold((face, face), |(lo, hi), x| (lo.min(x), hi.max(x))))
+}
+
 #[cfg(test)]
 #[path = "landing_tests.rs"]
 mod tests;

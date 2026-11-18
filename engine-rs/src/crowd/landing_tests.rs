@@ -1,7 +1,7 @@
 //! The landing lines: a rider walks straight to the back of the line and
 //! never into the shaft and back out again (#2116).
 
-use super::{landing_slots, line_at, measure_line, slot_x, Landings};
+use super::{landing_slots, line_at, measure_line, queue_line, slot_x, Landings};
 use crate::clock::GameMode;
 use crate::crowd::motion::advance;
 use crate::crowd::spawn::make_person;
@@ -246,4 +246,135 @@ fn a_rider_bound_past_the_end_of_the_floor_walks_there() {
         }
     }
     assert!(arrived, "the rider reached the back of the line");
+}
+
+/// Riders on floor 2 waiting for `shaft`, `n` of them, each standing in the
+/// place `landing_slots` gives them.
+fn waiting(sim: &mut Simulation, shaft: i64, n: usize) -> Vec<i64> {
+    let ids: Vec<i64> = (0..n)
+        .map(|_| {
+            let i = rider(sim, shaft, 120.0);
+            sim.crowd.people[i].state = PState::Waiting;
+            sim.crowd.people[i].id
+        })
+        .collect();
+    stand_in_place(sim);
+    ids
+}
+
+/// Moves every waiting rider to their place in line.
+fn stand_in_place(sim: &mut Simulation) {
+    let slots = landing_slots(&sim.crowd, &sim.tower);
+    for i in 0..sim.crowd.people.len() {
+        if let Some(x) = slots.slot(i) {
+            sim.crowd.people[i].x = x;
+        }
+    }
+}
+
+#[test]
+fn a_lines_stretch_runs_past_the_elevator_beside_it() {
+    // The lone shaft at 150 plus a second one right beside it: the first
+    // shaft's line runs right, across the second, as lines in a bank do.
+    let (mut sim, first) = tower();
+    let width = Kind::ElevatorStandard.facility().width;
+    let placed = sim
+        .tower
+        .place_transport(Kind::ElevatorStandard, 150 + width, 1, 4);
+    assert!(placed.ok, "{:?}", placed.reason);
+    let second = sim.tower.transports.last().unwrap().id;
+    assert_eq!(
+        queue_line(&sim.crowd, &sim.tower, first, 2),
+        None,
+        "nobody waits yet"
+    );
+
+    let ours = waiting(&mut sim, first, 12);
+    let theirs = waiting(&mut sim, second, 3);
+    let (from, to) = queue_line(&sim.crowd, &sim.tower, first, 2).expect("a line");
+    let face = right_face(&sim, first);
+    assert_eq!(from, face, "the line starts at the shaft face");
+    assert!(
+        to > right_face(&sim, second),
+        "twelve riders reach past the shaft beside it: {to}"
+    );
+    let slots = landing_slots(&sim.crowd, &sim.tower);
+    let at = |id: i64| sim.crowd.people.iter().position(|p| p.id == id).unwrap();
+    let places: Vec<f64> = ours.iter().map(|&id| slots.slot(at(id)).unwrap()).collect();
+    assert!(
+        places.iter().all(|&x| (from..=to).contains(&x)),
+        "every rider of the line stands in its stretch: {places:?} in {from}..{to}"
+    );
+    assert_eq!(
+        places.iter().copied().fold(f64::MIN, f64::max),
+        to,
+        "it ends at the back rider"
+    );
+
+    // The other shaft's line is its own: it starts at that shaft's face and
+    // counts only its three riders.
+    let (from2, to2) = queue_line(&sim.crowd, &sim.tower, second, 2).expect("a line");
+    assert_eq!(from2, right_face(&sim, second));
+    let back = theirs
+        .iter()
+        .map(|&id| slots.slot(at(id)).unwrap())
+        .fold(f64::MIN, f64::max);
+    assert_eq!(to2, back);
+    assert_eq!(
+        queue_line(&sim.crowd, &sim.tower, first, 3),
+        None,
+        "no line on floor 3"
+    );
+
+    // The front rider boards: the rest shuffle up, and one still at the old
+    // back place is in the stretch until they move.
+    let front = sim
+        .crowd
+        .people
+        .iter()
+        .position(|p| p.id == ours[0])
+        .unwrap();
+    sim.crowd.people[front].state = PState::Riding;
+    let (_, still) = queue_line(&sim.crowd, &sim.tower, first, 2).expect("a line");
+    assert_eq!(still, to, "the back rider has not moved yet");
+    stand_in_place(&mut sim);
+    let (_, shorter) = queue_line(&sim.crowd, &sim.tower, first, 2).expect("a line");
+    assert!(
+        shorter < to,
+        "the line shortened once they shuffled up: {shorter}"
+    );
+}
+
+#[test]
+fn a_line_running_left_reads_from_its_back_to_the_face() {
+    // Floor 2 runs from x 100 to 159, so the shaft at 150 lines its riders
+    // up to the left, from its left face.
+    let mut sim = Simulation::new_game(5, GameMode::Classic);
+    sim.money = 1e12;
+    for x in 100..200 {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for x in 100..160 {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    assert!(
+        sim.tower
+            .place_transport(Kind::ElevatorStandard, 150, 1, 2)
+            .ok
+    );
+    let t = sim.tower.transports.last().unwrap().clone();
+    for _ in 0..4 {
+        let route = Route {
+            floors: vec![2, 1],
+            shafts: vec![t.id],
+        };
+        let i = make_person(&mut sim.crowd, &sim.tower, route, 120.0, None);
+        sim.crowd.people[i].state = PState::Waiting;
+    }
+    stand_in_place(&mut sim);
+    let line = line_at(&sim.tower, &t, 2);
+    assert_eq!(line.side, -1.0);
+    let (from, to) = queue_line(&sim.crowd, &sim.tower, t.id, 2).expect("a line");
+    assert_eq!((from, to), (slot_x(line, 3, 4), t.x as f64));
+    assert!(from < to);
 }

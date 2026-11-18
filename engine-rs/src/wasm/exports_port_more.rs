@@ -221,6 +221,18 @@ impl Engine {
         self.port_congestion_cause(floor)
     }
 
+    /// The stretch of floor the waiting line at elevator `shaft` on `floor`
+    /// covers, `[from, to]` in tiles with `from <= to`: from the shaft face
+    /// it starts at to the rider standing farthest from it. Lines run beside the
+    /// shaft across any shaft next to it, so this tells a frontend which
+    /// riders stand in which line. Empty when nobody waits there, the shaft
+    /// is not an elevator or the floor is not a whole number. One pass over
+    /// the crowd, so it is a read for a tap, not a frame.
+    #[wasm_bindgen(js_name = queueLine)]
+    pub fn queue_line(&self, shaft: f64, floor: f64) -> Vec<f64> {
+        self.port_queue_line(shaft, floor)
+    }
+
     /// The five onboarding facts as JSON.
     #[wasm_bindgen(js_name = onboardingFacts)]
     pub fn onboarding_facts(&self) -> String {

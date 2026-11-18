@@ -409,6 +409,16 @@ export class Engine {
      * `priceUnit(u, target)`: the new price, or null when not repriceable.
      */
     priceUnit(id: number, target: number): number | undefined;
+    /**
+     * The stretch of floor the waiting line at elevator `shaft` on `floor`
+     * covers, `[from, to]` in tiles with `from <= to`: from the shaft face
+     * it starts at to the rider standing farthest from it. Lines run beside the
+     * shaft across any shaft next to it, so this tells a frontend which
+     * riders stand in which line. Empty when nobody waits there, the shaft
+     * is not an elevator or the floor is not a whole number. One pass over
+     * the crowd, so it is a read for a tap, not a frame.
+     */
+    queueLine(shaft: number, floor: number): Float64Array;
     queueView(): Float64Array;
     quoteBuild(kind: number, floor: number, x: number): Float64Array;
     quoteRentBatch(kind: number, target: number, only_default: boolean): Float64Array;
