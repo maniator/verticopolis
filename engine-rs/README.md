@@ -2,8 +2,8 @@
 
 `engine-rs/` is the game's simulation, written in Rust and compiled to
 WebAssembly for the web game, where it is the only engine that runs. It began
-as a port of the TypeScript simulation in `src/engine/`; that code is no longer
-part of the game and is being deleted. Gameplay rules, caps and tuning live
+as a port of the TypeScript simulation in `src/engine/`, which was deleted in
+#1875; its rules are Rust tests now. Gameplay rules, caps and tuning live
 here, and a change to how the game plays lands in this crate. The crate can also
 run under hosts other than the browser (a native desktop client, a plain Rust
 program) while staying one simulation.
@@ -206,7 +206,7 @@ engine entry point that takes save JSON goes through it: `decode_vctower`,
 engine with U+FFFD where the half character was, and the web
 game repairs the same way: `parseSaveJson` (`src/storage/saveCompression.ts`)
 on every save text it reads, and `wellFormed` where a name is set (the
-tower-name callback and `Tower.setLabel`), so both engines hold one tower. And the
+tower-name callback), so the engine and the web game hold one tower name. And the
 encoder refuses a save whose JSON is longer than 32 MiB, the cap every
 reader holds to (`decode_vctower`, and on the web `inflateCapped` and
 `SaveGame.import`; the web writers check it too, through `encodeSaveJson`),
@@ -321,8 +321,9 @@ dry run `build_transport` makes first.
 of floors and positions on new games and saved towers in both modes (two
 raised to the TOWER rating, so the star-gated rules answer), with bridging on
 and off where the mode allows it and money flush, short and exactly at a
-price, and requires the Rust answer to equal the TypeScript one. The build
-paths in both engines charge the same constants the catalog quotes: the
+price, and requires each quote to match what the build then does: accepted
+or refused for the same reason, and the money it moves. The build paths
+charge the same constants the catalog quotes: the
 transport per-floor cost, and the lobby and floor tile prices from the
 facility table.
 

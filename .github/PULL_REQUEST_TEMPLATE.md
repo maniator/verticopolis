@@ -64,11 +64,11 @@ raises the versions. See .changes/README.md.
 
 <!--
 A change to a hot-path surface (section 1 of docs/performance/hot-path-review.md:
-either engine and its build, the app build settings, the WASM binding, the
+the engine and its build, the app build settings, the WASM binding, the
 hosts, saves, rendering, the frame loop, UI, analytics, audio and the app
 shell) fills in the note from section 5 of that page: hot paths and callers, sizes, complexity before and
-after, remaining scans and why, the caches, indexes and counters either engine
-has there and whether each is kept (HP-8), invalidation evidence,
+after, remaining scans and why, the caches, indexes and counters the engine
+and the hosts have there and whether each is kept (HP-8), invalidation evidence,
 measurements. A significant change (section 5) gives every field. Any other
 change, or a hot-path change section 5 does not count as significant, may
 replace the first line below with "n/a: <reason>". The second line links the

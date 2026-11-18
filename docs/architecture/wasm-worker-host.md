@@ -1,23 +1,16 @@
-# The WASM engine in a Web Worker (experimental)
+# The WASM engine in a Web Worker (retired experiment)
 
-Status: experimental and not selectable. The game boots on the main-thread
-WASM host; the flags below no longer pick a host.
-Measurements and the recommendation are in
-[`docs/performance/wasm-worker-host.md`](../performance/wasm-worker-host.md).
+**Historical record.** This page describes an experiment that is no longer in
+the code: a host that ran the engine in a Web Worker, measured against the
+main-thread mirror host of the time. Both hosts were later deleted (the
+mirror host with #1421). The game runs
+the Rust engine on the main thread with no mirror; how it does that today is
+[engine-host.md](./engine-host.md). The measurements and the recommendation
+are in [`docs/performance/wasm-worker-host.md`](../performance/wasm-worker-host.md).
+The rest of this page is kept as written, so the file paths and the
+TypeScript engine it names no longer exist.
 
-## Flags (retired)
-
-`?engine=`, `localStorage["vc.engine"]` and the `wasm-frame` and `wasm-worker`
-values used to pick a host. Boot ignores them now and always starts the Rust
-engine on the main thread, behind the engine port (`src/wasmhost/rustEngine.ts`).
-The worker host's code stayed for the measurements; nothing in the game starts it.
-
-The main-thread mirror host the next section describes (`src/wasmhost/wasmHost.ts`,
-its frame apply and save merge, and the `ShadowCommand` relay in
-`src/dualrun/`) was deleted with #1421. The section is kept as the baseline
-the measurements were taken against.
-
-## How the main-thread host works today (the baseline)
+## How the main-thread host worked (the baseline)
 
 - **Clock and steps.** The frame loop (`src/game/frameLoop.ts`) owes minutes
   per frame and cuts them into fixed steps (`src/engine/sim/fixedStep.ts`, at

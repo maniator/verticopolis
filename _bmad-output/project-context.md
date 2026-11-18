@@ -63,22 +63,18 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   `TOWER_POPULATION`) and `engine-rs/src/rules.rs` with its `rules/` submodules (the Classic and Modern rule values).
   The web UI reads them through the engine's catalog. Quote numbers from there, never
   hard-code duplicates.
-- The `src/engine/` paths below are the TypeScript reference engine, kept as a test
-  referee until it is deleted. Until the deletion, the shipped bundle still carries
-  part of it, and the boot catalog check (`src/wasmhost/catalogCheck.ts`) runs its
-  `catalogFor` (#921). `src/engine/facilities.ts` holds a copy the catalog digest
-  pins to the Rust tables; change the Rust side first.
-- `src/engine/Simulation.ts`: clock/tick, star evaluation, VIP, congestion (v1 + v2 spatial).
-- `src/engine/Tower.ts`: placement/geometry, served-floor reachability, parking chains,
-  structural support (`isSupported`, `removalReason`), staff connectivity (`staffConnected`).
-- `src/engine/EconomySystem.ts`, `EventSystem.ts`, `Crowd.ts`, `econConfig.ts`: money, disasters,
-  routing; housekeeping capacity constants (`HK_ROOMS_PER_CREW`=20, `HK_MAX_IN_FLIGHT`=4) live in
-  `EconomySystem.ts`.
-- `src/engine/ElevatorDispatch.ts`: SCAN car controller; consumes `Crowd.elevatorCalls(tower)`
-  (per-shaft **hall** calls + per-car **cab** calls). Transport-kind predicates
-  (`isStaffOnlyTransport`, `isStaffTransportKind`, `isFixedSpanTransport`) live in the
-  reference `facilities.ts`; the Rust engine's are on `Kind` in `engine-rs/src/facilities.rs`.
-- `simModel` defaults to **`"v2"`** (hourly sub-stepping + spatial per-floor congestion).
+- The TypeScript reference engine (`src/engine/`) was deleted in #1875; every rule and
+  its tests live in `engine-rs/`. Where things are:
+  - `engine-rs/src/sim.rs`, `sim_loop.rs`, `clock.rs`, `fixed_step.rs`: the clock, the step
+    loop and pacing; `star.rs`: star evaluation; `events*.rs`: VIP, fire, bomb, thief.
+  - `engine-rs/src/tower.rs` and `tower/`: placement and geometry (`is_supported`),
+    removal (`removal_reason`), served-floor reachability; `tower_query.rs`: staff
+    connectivity (`staff_connected`).
+  - `engine-rs/src/economy.rs`, `econ.rs`, `rent.rs`, `housekeeping*.rs`, `crowd/`: money,
+    rent, housekeeping and routing.
+  - `engine-rs/src/dispatch*.rs`: the elevator car controller (`ElevatorDispatch`).
+    Transport-kind predicates (`is_staff_only_transport` and the rest) are on `Kind` in
+    `engine-rs/src/facilities/predicates.rs`.
 
 ## Canon rules that are easy to get wrong
 - **Star ladder** (population + gates): 2★ 300 · 3★ 1,000 (Security) · 4★ 5,000
@@ -94,7 +90,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   floors reachable only via 3+ rides draw no commuters. Sky lobbies go every ~15 floors.
 - **Parking** has a **Ramp** + **Spaces**; a space only functions when chained (contiguous
   spaces) back to a ramp. Unconnected spaces are dead ("red X").
-- **Office noise** caps adjacent hotel/condo satisfaction (≤0.6). In **Classic** that is all it does (canon: caps but never evicts). In **Modern** it also erodes below the cap and can eventually evict (`GameRules.noiseErosionScale()` gates this; Classic returns 0).
+- **Office noise** caps adjacent hotel/condo satisfaction (≤0.6). In **Classic** that is all it does (canon: caps but never evicts). In **Modern** it also erodes below the cap and can eventually evict (`noise_erosion_scale` in `engine-rs/src/rules/satisfaction.rs` gates this; Classic returns 0).
 - **Cinemas** book an average (~$150k) or **blockbuster** (~$300k, bigger crowd) film monthly.
 - Emergencies (fire-rescue / bomb-ransom) are **player choices** via a modal that **pauses** the sim.
 - **Service elevators are staff-only**: tenants never route through or board them, and they
@@ -175,8 +171,10 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   backlog's "How items flow" section; `src/tests/backlogIssueMirror.test.ts`
   enforces the row half of the invariant (row shape, status vocabulary, refs
   present on unresolved rows, cleared on finished rows, and unique).
-- Screenshots regenerate via **`npm run screenshots:docker`** (host Chromium is broken); the
-  demo/camera reads the live `GRID.width`.
+- Screenshots regenerate in the pinned Playwright image only: approve the drift check's
+  `commit-on-approval` job, or run `npm run screenshots` inside that image (CONTRIBUTING.md
+  → Screenshots). A host browser renders different pixels. The demo camera reads the live
+  `GRID.width`.
 
 ## UI design system
 - `docs/design-system.md` is the contract for all UI/CSS work: tokens + components

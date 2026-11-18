@@ -69,7 +69,7 @@ it in one step.
 | Playing | Building it |
 | --- | --- |
 | [Your first tower](https://help.verticopolis.com/first-tower/) | [CONTRIBUTING.md](CONTRIBUTING.md): setup, quality gates, tests and coverage, versioning, review |
-| [Controls](https://help.verticopolis.com/controls/) (mouse, touch, keyboard) | [ARCHITECTURE.md](ARCHITECTURE.md): source layout, the frame loop, input, saves, the PWA |
+| [Controls](https://help.verticopolis.com/controls/) (mouse, touch, keyboard) | [ARCHITECTURE.md](ARCHITECTURE.md): source layout, the frame loop, input, saves, the PWA; deeper pages in [docs/architecture/](docs/architecture/README.md) |
 | [Rooms](https://help.verticopolis.com/rooms/) | [engine-rs/README.md](engine-rs/README.md): working on the simulation |
 | [Map and windows](https://help.verticopolis.com/tower/map-and-windows/) | [docs.verticopolis.com](https://docs.verticopolis.com/): the engine package, crate, API and conformance |
 | [Importing and exporting](https://help.verticopolis.com/your-towers/importing-exporting/) | [docs/canon/tdt-format.md](docs/canon/tdt-format.md): the `.TDT` save format |

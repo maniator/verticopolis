@@ -35,7 +35,7 @@ from the original games' source code (including the YootTower archive): nobody
 working on Verticopolis reads it, even if it is relicensed.
 
 **Where it is used.** `engine-rs/src/tdt/` is the one `.TDT` codec (the
-TypeScript engine reaches it through the WASM package, `src/engine/port/tdtCodec.ts`).
+web game reaches it through the WASM package; `src/simport/tdtRecords.ts` reads its records).
 `src/tests/integration/canon.integration.test.ts` asserts our engine constants
 against this page.
 
@@ -106,7 +106,7 @@ uniform:
   a year is 4 quarters = 12 days.
 - A clock minute inside the 1880 to 2000 span has no tick of its own; the
   exporter picks the first tick at or past it, capped at 2599.
-- `src/engine/timePacing.ts` and `engine-rs/src/tdt/pacing.rs` implement the
+- `engine-rs/src/tdt/pacing.rs` implements the
   mapping. The simulation itself runs a uniform 1,440-minute day.
 
 ## 5. Floors

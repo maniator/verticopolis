@@ -1,5 +1,11 @@
 # Research: an incremental engine read model
 
+**Historical record.** This research measured the worker host and the
+TypeScript read model, both since deleted (see
+[wasm-worker-host.md](./wasm-worker-host.md)). The game reads the engine's
+frame directly today ([engine-host.md](./engine-host.md)). The figures below
+are a dated snapshot and the code paths they name are gone.
+
 > **Snapshot, written 2026-10-15 from three result folders, none of them refreshing.** Timings: the perf:worker runs on commit `e25ec01` (app 2.34.1), Ryzen 5 5600X, RTX 3060, in `docs/performance/results/2026-10-15-e25ec01c-worker-1280x720.md` and `docs/performance/results/2026-10-15-e25ec01-worker.md` (640x360). Save shape and churn (the read model rows): `docs/performance/results/2026-10-15-df59d0d-read-model.md` (commit `df59d0d`, app 2.34.1, Node 22.22.0, TypeScript engine, over the hosted rows' 720 steps from a fresh load). Live numbers: re-run `npm run perf:worker` for the timings (`src/tests/perfWorker/`, arithmetic pinned by `src/tests/perfWorker/analysis.test.ts`); the shape rows have no live source now that the `--read-model` mode is gone, and `perf:compare`'s churn rows (`src/tests/perfCompare/churn.ts`) are the live measure of churn. A figure marked **(derived)** is computed in this doc from a code layout or from the step plan, and says how.
 
 Status: research and recommendation. The only code it brought was the read model section of the perf harness (`src/tests/perfWorker/readModel.ts`), removed because it measured on the TypeScript engine; the committed result summaries keep its numbers. Vetted by a BMGD party (game architect, game dev, UX/perf); the transcript is `_bmad-output/party-mode/read-model-deltas-party-2026-10-15.md`. It feeds backlog row `engine-rs-binding-read-model` (#868), which already names "a structural snapshot instead of a save deserialization" and "typed arrays over WASM memory" as open items. The implementation is tracked as the worker host speed plan (section 7): #1048, #1045, #1049, #1050 and #1051.

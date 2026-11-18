@@ -1,9 +1,9 @@
 name: Rust engine
 
-# The Rust port of the engine lives in engine-rs/. Its referee is the same
-# conformance suite the TypeScript engine runs (conformance/): the port must
-# reproduce every pinned checkpoint, so this job runs it on every change to the
-# crate, the scenarios or the lock, and on main. Format and lint run as hard
+# The engine lives in engine-rs/. Its referee is the conformance suite
+# (conformance/): the engine must reproduce every pinned checkpoint, so this
+# job runs it on every change to the crate, the scenarios or the lock, and on
+# main. Format and lint run as hard
 # gates, like the TypeScript lane.
 
 concurrency:

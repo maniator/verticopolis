@@ -53,7 +53,7 @@ These stay separate. Evidence for one is not evidence for another, and no implem
 
 ## What the engine does today
 
-The TypeScript reference in `src/engine/` has the same parking logic, function for function (`suiteParkingShort`, `officeParkingShort`, `functionalParkingSet`, the move-in penalty and the congestion relief). The Rust engine is the one the game runs.
+The Rust engine is the only engine the game runs. The TypeScript reference that once carried the same parking logic was deleted in #1875.
 
 | Question | Rust engine |
 |---|---|
@@ -112,7 +112,7 @@ TOWER6 is a 5-star save with 115 suites, 81 stalls and only 27 suites asleep at 
 
 WIKI and KZ both tie office parking to evaluation, and the wiki lists hotels and offices as wanting parking nearby. Ours reduces new move-ins only.
 
-The 24-workers-per-space figure (`PARKING_WORKERS_PER_SPACE`, `src/engine/census.ts`, copied to Rust) was set on 2026-07-06 by the internal parity design note (`gdd-simtower-parity-2026-07-06.md`, section 6.1), which says the original asks for one space per four offices and an office holds 6 workers. The note cites no source, and the final reference set has no row that says "one space per four offices". Treat the constant as unconfirmed until experiment E6 finds the threshold in the original.
+The 24-workers-per-space figure (`PARKING_WORKERS_PER_SPACE`, `engine-rs/src/services.rs`, first written in the retired TypeScript engine) was set on 2026-07-06 by the internal parity design note (`gdd-simtower-parity-2026-07-06.md`, section 6.1), which says the original asks for one space per four offices and an office holds 6 workers. The note cites no source, and the final reference set has no row that says "one space per four offices". Treat the constant as unconfirmed until experiment E6 finds the threshold in the original.
 
 ### P6: the per-stall data
 

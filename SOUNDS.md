@@ -56,7 +56,7 @@ sound, ask whether it thickens that soundscape or merely announces an event.
 - Every sound is original to Verticopolis, UI effects included: synthesized in
   code, rendered from the project's code, or recorded by the owner. No
   third-party sample or sound pack ships, free or paid (audio plan, principle 9).
-- The engine (`engine-rs/`, and `src/engine/` while both run) owns gameplay
+- The engine (`engine-rs/`) owns gameplay
   outcomes and emits gameplay events. It never plays, schedules, or mixes
   sound. Everything audible lives in `src/audio/`, with the call sites in
   `src/game/`.
@@ -207,7 +207,7 @@ Until those land, new gameplay-driven cues have nowhere correct to hook in.
 Rules the plan fixes for every cue, now and later:
 
 - **No separate audio event stream.** Audio uses the gameplay catalog and the
-  read model; a fact neither carries is an engine ask on both engines, never a
+  read model; a fact neither carries is an engine ask, never a
   side channel.
 - **Observe, never infer.** Audio may read state the engine publishes (a
   star, a pending choice, occupancy). It never reconstructs an engine decision
@@ -421,7 +421,7 @@ hardware or in a replay.
 - **Celebrations ring the ping bell.** `promote` and `notify` play on the
   ping bell (`strikeBell`); the bloops are for build, sell, click, and error.
 - **The engine stays free of audio.** No playback code or audio dependency
-  enters `engine-rs/` or `src/engine/`. The engine says what happened and
+  enters `engine-rs/`. The engine says what happened and
   never what it should sound like.
 - **Audio only reads.** It never calls `drainGameplayEvents()`, never writes
   to the simulation, and never parses log or bulletin text for a cue.
@@ -505,8 +505,8 @@ change is needed.
 Income feedback that rings once per transaction and as a varied cluster for a
 big payday. The engine has no income event, and audio may not parse the
 `"money"` log lines (they also cover outflows and aggregate many
-transactions into one line). It would need a new gameplay catalog event on
-both engines, played through the audio router (#965). The existing `money`
+transactions into one line). It would need a new gameplay catalog event in
+the engine, played through the audio router (#965). The existing `money`
 arpeggio is unused.
 
 ### Cinema genres (idea)

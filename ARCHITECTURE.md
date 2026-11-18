@@ -8,7 +8,9 @@ see [CONTRIBUTING.md](./CONTRIBUTING.md) → **Architecture**; this file is the
 diagram companion to it.
 
 The diagrams below are [Mermaid](https://mermaid.js.org/); GitHub renders them
-inline.
+inline. Deeper pages on single systems (saves, the engine host, the linked
+folder, the Help bar, CI) are indexed in
+[docs/architecture/README.md](docs/architecture/README.md).
 
 ## Source layout
 
@@ -37,13 +39,15 @@ src/
   engineBinding/ # the WASM binding and its type declaration (engine.d.ts)
   wasmhost/    # loading the engine package, its build metadata and catalog checks
   render/      # Excalibur.js scene, procedural sprites, the overview Map
-  ui/          # DOM controls: palette, status bar, editor panel, modals (lit-html templates)
+  ui/          # DOM controls: menu bar, windows, dialogs, palette (lit-html templates); desk/ is the 1994 desktop
   audio/       # location-based procedural soundtrack and effects (Tone.js)
-  storage/     # localStorage slots, .vctower and .TDT import/export
+  storage/     # My Towers files and versions, the Auto-save, Open Recent, the linked folder
   shared/      # types and small helpers shared across the game
   tests/       # repository-wide guard tests (file sizes, prose, named flags, ...)
 conformance/   # the conformance lock and catalog digests the engine is held to
 e2e/           # Playwright end-to-end specs
+help-site/     # the player manual (Astro + Starlight), served at help.verticopolis.com
+docs/          # contributor docs; docs/engine-site/ is the engine docs site
 ```
 
 CONTRIBUTING.md → **Where things live** is the full index of every `src/`
@@ -66,6 +70,8 @@ flowchart TD
         DOM["DOM + CSS<br/>(index.html, styles.css)"]
         Canvas["Canvas / WebGL"]
         LS["localStorage"]
+        IDB["IndexedDB"]
+        FSA["File System Access<br/>(linked folder)"]
     end
 
     subgraph root["Composition root: src/main.ts"]
@@ -84,7 +90,7 @@ flowchart TD
     end
 
     subgraph storage["Persistence: src/storage/"]
-        Save["SaveGame · Prefs"]
+        Save["Auto-save · My Towers · Prefs"]
     end
 
     subgraph port["Engine boundary: src/simport/ + src/wasmhost/"]
@@ -114,6 +120,8 @@ flowchart TD
     Scene --> Canvas
     UI --> DOM
     Save --> LS
+    Save --> IDB
+    Save -.-> FSA
 
     classDef core fill:#1f6f43,stroke:#0d3,color:#fff;
     class Sim core
@@ -257,12 +265,16 @@ flowchart LR
 The engine writes a tower as save text (`engine-rs/src/sim_save.rs`) and reads
 it back through its loader (`engine-rs/src/load.rs`), which bounds the inflate,
 coerces bad values, migrates older saves to the current version and refuses a
-save from a newer build with an "update the game" message. `SaveGame`
-(`src/storage/SaveGame.ts`) compresses the text into `localStorage` (a periodic
-autosave slot plus three named slots) and packs `.vctower` files for export.
-The original game's `.TDT` files are read and written by the engine's codec.
-Per-device preferences (`Prefs`) live in their own key, deliberately **off** the
-save. The undo history is cleared when a different tower is adopted.
+save from a newer build with an "update the game" message. The tower is the
+document: every tower has its own file in **My Towers** (IndexedDB,
+`src/storage/fileSpace.ts`) from its founding, with its previous versions, and
+File > Save and the 30-second autosave write it. The **Auto-save** is the crash
+copy every autosave writes first and Continue loads. A folder on the player's
+computer can be linked beside My Towers. The original game's `.TDT` files are
+read and written by the engine's codec. Per-device preferences (`Prefs`) live
+in their own key, deliberately **off** the save. The undo history is cleared
+when a different tower is adopted. Every path in detail:
+[docs/architecture/save-paths.md](docs/architecture/save-paths.md).
 
 A save holds the simulation only. The Excalibur scene is derived view state:
 it is rebuilt from the engine after a load and is never saved. Saves are
@@ -272,12 +284,15 @@ foreign file loads what it can instead of crashing the game.
 
 ```mermaid
 flowchart TD
-    Sim["Rust engine"] -->|save text| SG["SaveGame<br/>fflate compression"]
-    SG -->|load: migrate, or refuse a newer save| Sim
+    Sim["Rust engine"] -->|save bytes| SG["savePacker worker<br/>deflate"]
+    Load["Rust importer"] -->|"load: migrate, or refuse a newer save"| Sim
 
-    SG --> Auto["localStorage:<br/>autosave slot"]
-    SG --> Slots["localStorage:<br/>3 named slots"]
-    SG <--> File[".vctower file"]
+    SG --> Auto["Auto-save (crash copy)<br/>IndexedDB + localStorage mirror"]
+    SG --> Mine["The tower's file in My Towers<br/>IndexedDB, with previous versions"]
+    SG -.-> Linked["Linked folder<br/>(Chromium only)"]
+    Auto --> Load
+    Mine --> Load
+    Linked --> Load
     Sim <--> TDT[".TDT file<br/>engine codec"]
 
     Prefs["Prefs"] --> PLS["localStorage:<br/>separate key, off the save"]
@@ -289,9 +304,11 @@ The production build is an installable Progressive Web App built on
 [`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/) (Workbox underneath),
 with no hand-rolled service worker. `src/pwa.ts` is the only place the worker
 registers, and only the game entry imports it, so the gallery and preview
-tooling pages stay outside its scope and its precache. The Help site under
-`/help/` is never precached either (the `globIgnores` and
-`navigateFallbackDenylist` entries in `vite.config.ts`).
+tooling pages stay outside its scope and its precache. The Help site
+(help.verticopolis.com, built from `help-site/` into the same deployment and
+served from its own host by `vercel.json`) is never precached either (the
+`globIgnores` and `navigateFallbackDenylist` entries in `vite.config.ts`); its
+Help bar is described in [docs/architecture/help-bar.md](docs/architecture/help-bar.md).
 
 The worker runs in `prompt` mode: a new build waits instead of taking over the
 tab, and the game asks the player whether to update now (it saves, then
@@ -337,9 +354,10 @@ flowchart LR
   once per boot, saves and loads, tooling).
 - **One shared view reader** turns the arrays into the records the renderer
   draws. It decodes but never decides.
-- **Workers wrap the port on their own side.** A worker host, if one ships,
-  runs an `EnginePort` inside the worker behind a separate async gateway;
-  the main-thread port stays synchronous.
+- **On the main thread.** The engine runs on the page's main thread; the only
+  worker the game starts packs saves (`src/storage/savePacker.ts`). An
+  earlier experiment hosted the engine in a Web Worker and was not adopted
+  (`docs/performance/wasm-worker-host.md` has the measurements).
 
 The full contract (every member, the input rules, the exceptions) is
 [`engine-port-contract.md`](_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md).

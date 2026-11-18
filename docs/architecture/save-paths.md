@@ -1,8 +1,55 @@
 # Save, load, import and export paths
 
-State on `main` once #1642, #1646 and #1653 land (#1301, #1498, #1522). The
-engine package is the Rust/WASM engine (`engine-rs/`); there is no TypeScript
-fallback engine in the shipped game.
+How a tower is kept, opened and written, as `main` has it. The Rust engine
+(`engine-rs/`) owns what a save means; the web game owns where the bytes are
+kept. The folder linked on the player's computer has its own page,
+[linked-folder.md](./linked-folder.md).
+
+## The tower is the document
+
+Since #2380 and #2411 (owner, 2026-11-16) every tower has its own file in
+**My Towers** from the moment it is founded, named after the tower ("Name (2)"
+when that name is taken). File > Save and the 30-second autosave both write
+that file (`src/game/towerDocument.ts`). Beside it:
+
+- **The Auto-save is the crash copy.** Every autosave writes it first
+  (synchronously when the tab hides), and Continue loads it. A small record
+  (`verticopolis-tower-file`) names the file the crash copy's tower is, tagged
+  with the crash copy's write time, so a reload finds that file again only
+  while the tag still matches. At boot a newer crash copy is written into its
+  file, and a crash copy with no file gets one.
+- **My Towers** (`src/storage/fileSpace.ts`) is the game's own folder of named
+  files, in its own IndexedDB database. A file holds exactly the bytes Save As
+  would download (a `.vctower`) or the bytes the player picked (a 1994
+  `.TDT`), so it adds no format: opening one hands its bytes to the same
+  importer a picked file goes to. The three old save slots were copied in as
+  files once (`fileSpaceMigrate.ts`).
+- **Previous versions** (`src/storage/fileVersions.ts`): each tower file keeps
+  its last few versions, a minimum gap apart, the last one saved by hand, and
+  the bytes it held before the game first wrote over it.
+- **Open Recent** (`src/storage/recentTowers.ts`) is a device preference in
+  `localStorage` that only points at files.
+- **Two windows on one tower** each write its file only while it is as that
+  window last read or wrote it (`fileSpace.overwrite`); the window that finds
+  it changed moves its tower to a file of its own and says so.
+
+The save bytes are packed (deflate) in a worker (`src/storage/savePacker.ts`),
+and the file write reuses the bytes the crash copy just packed, so an autosave
+compresses once and off the main thread.
+
+```mermaid
+flowchart TD
+    Engine["Rust engine<br/>serialize · saveBytes"] -->|save bytes| Packer["savePacker worker<br/>deflate"]
+    Packer --> Crash["Auto-save (crash copy)<br/>saveStore: IndexedDB + localStorage mirror"]
+    Packer --> File["The tower's own file<br/>My Towers (fileSpace, IndexedDB)"]
+    File --> Versions["Previous versions<br/>fileVersions"]
+    Versions -->|"a previous version"| Importer
+    Packer -.->|"while linked, at most once a minute"| Linked["Linked folder file<br/>File System Access API"]
+    Crash -->|Continue, boot| Importer
+    File -->|"File > Open, Open Recent"| Importer["Rust importer<br/>loadVctower · loadTdt"]
+    Linked -->|"File > Open"| Importer
+    Importer --> Engine
+```
 
 ## Who owns what
 
@@ -10,16 +57,17 @@ fallback engine in the shipped game.
 | --- | --- | --- |
 | Save semantics | Rust engine | What a save means: the loader and its refusals (`load::deserialize_owned`, a version above `SAVE_VERSION` is refused with the update sentence), migration up the version ladder, the founder rule, the unit cap, the writer (`encode_simulation_vctower`). |
 | External files | Rust engine | `.vctower` and `.TDT` in and out: `loadVctower` (`vctower_import.rs`, every refusal is a sentence for the player), `exportVctower`, `loadTdt`, `tdtExport`. |
-| Storage container | TypeScript | The `VCZ1:` value (`src/storage/SaveGame.ts`, `vctowerWriter.ts`, `saveCompression.ts`), slots, the autosave key, the unreadable stash, quota handling, and where they are kept: the IndexedDB save store with a `localStorage` mirror (`saveStore.ts`, below). |
+| Storage container | TypeScript | The `VCZ1:` value (`src/storage/SaveGame.ts`, `vctowerWriter.ts`, `saveCompression.ts`), the autosave key, the unreadable stash, quota handling, and where they are kept: the IndexedDB save store with a `localStorage` mirror (`saveStore.ts`, below), and My Towers with its versions (`fileSpace.ts`, `fileVersions.ts`). |
 | Page | TypeScript | Formats: shows the engine's `lastReason()`, toasts, downloads, the confirm dialogs and fidelity reports. No save rule lives here. |
 
 ## Call graph
 
 | Action | Path | Codec |
 | --- | --- | --- |
-| Boot, load autosave or a slot | `SaveGame.loadResult` reads the `VCZ1:` value (TypeScript container) and hands the save text to `loadStored`, then `port.loadSave` | Rust loader |
-| Autosave, Quick Save, slot save | `saveText()` (`port.serialize`, camera stamped) then `SaveGame.save`/`saveAsync` stamp and pack the container, then `saveStore.set` (`localStorage` at once, IndexedDB in the background) | Rust serializer, TypeScript container (the engine writer packs it when the package is loaded, `fflate` otherwise) |
-| Export `.vctower` | `SaveLoad.exportGame` then `exportFileText` then `port.exportVctower(appVersion, now)` | Rust writer |
+| Boot, Continue | `SaveGame.loadResult` reads the crash copy's `VCZ1:` value (TypeScript container) and hands the save text to `loadStored`, then `port.loadSave` | Rust loader |
+| Autosave, File > Save | the save bytes (`port.saveBytes`, camera stamped) are packed in the save packer's worker, written to the crash copy (`saveStore.set`: `localStorage` at once, IndexedDB in the background), then to the tower's own file (`towerDocument.ts`, `fileSpace.save`/`overwrite`) | Rust serializer, TypeScript container |
+| File > Open, Open Recent, a previous version | the file's bytes from My Towers (or the linked folder) go to the importer below, as a picked file's do | Rust reader |
+| Save As, export `.vctower` | `port.exportVctowerBytes` writes the binary file (`VCTOWER2`); Save As keeps it in My Towers or the linked folder, export downloads it | Rust writer |
 | Import `.vctower` | `SaveLoad.importGame` then `port.loadVctower(text)` | Rust reader (container checks, shape check, loader) |
 | Import `.TDT` | `SaveLoad.importLegacy` then `port.loadTdt`, report, confirm, `adoptConfirmedLegacyImport` | Rust codec |
 | Export `.TDT` | `SaveLoad.exportLegacy` then `port.tdtExport` and `port.tdtFile` | Rust codec |
@@ -74,19 +122,14 @@ the same game, after a reload.
   load it." Open follow-up: #1643 (a newer autosave at boot is stashed once,
   then the fresh tower autosaves over the slot, and the stash cannot be
   re-imported).
-- **Nothing changes format silently.** A save is written at `SAVE_VERSION`; the
-  container version is `VCTOWER1`; a later container is refused.
+- **Nothing changes format silently.** A save is written at `SAVE_VERSION`. A
+  `.vctower` is written as the binary `VCTOWER2` file; the text `VCTOWER1`
+  file still loads, and a later container (`VCTOWER3` and up) is refused.
 
-## Migration and deprecation
+## Test referees
 
-The TypeScript `.vctower` readers and writers (`SaveGame.import`,
-`importText`, `readVctower`, `writeVctower`, `decodeVctower`) stay as test
-referees until the TypeScript save codec is deleted after the cutover (#1336).
-Production code may not call them (the pin above). The loader conformance lock
+The TypeScript container decoders in `src/storage/vctowerContainer.ts`
+(`decodeVctower`, `decodeVctowerFile`) are test referees: the WASM `.vctower`
+suite compares the engine's files against them. Production code may not call
+them (the pin above). The loader conformance lock
 (`conformance/loader-cases.json`) is replayed by Rust.
-
-## Left for a person with a browser
-
-See the PC checklist in the project thread: Firefox and WebKit determinism
-hashes, the installed-PWA update rehearsal (both #1522), and inflate time for a
-crafted 32 MiB file on the engine thread (#1652).
