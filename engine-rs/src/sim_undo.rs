@@ -482,6 +482,10 @@ mod adrift_tests;
 mod root_tests;
 
 #[cfg(test)]
+#[path = "sim_undo_joined_root_tests.rs"]
+mod joined_root_tests;
+
+#[cfg(test)]
 #[path = "sim_undo_age_tests.rs"]
 mod age_tests;
 
