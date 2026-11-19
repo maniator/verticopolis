@@ -166,9 +166,9 @@ describe("the differential's window key", () => {
     edit(root, "engine-rs/Cargo.lock", lockfile("1.23.0", "1.0.1"));
     expect(keyOf(root)).not.toBe(base);
     edit(root, "engine-rs/Cargo.lock", lockfile("1.23.0"));
+    expect(keyOf(root)).toBe(base);
+    // The consumer crate is never built by a fuzz run, so it is not an input (#1945).
     edit(root, "engine-rs/consumer/Cargo.lock", lockfile("1.23.0", "1.0.1"));
-    expect(keyOf(root)).not.toBe(base);
-    edit(root, "engine-rs/consumer/Cargo.lock", lockfile("1.23.0"));
     expect(keyOf(root)).toBe(base);
   });
 

@@ -186,4 +186,189 @@ describe("engineSourceHash", () => {
     writeFileSync(join(dir, "conformance/unrelated.json"), "{}");
     expect(engineSourceHash(c)).toBe(before);
   });
+
+  it("leaves out the consumer crate at the top of the crate, and only there (#1945)", () => {
+    const { crate: c } = crate();
+    mkdirSync(join(c, "consumer/src"), { recursive: true });
+    writeFileSync(join(c, "consumer/Cargo.toml"), '[dependencies]\nverticopolis-engine = { path = ".." }\n');
+    const before = engineSourceHash(c);
+    writeFileSync(join(c, "consumer/src/main.rs"), "fn main() {}\n");
+    writeFileSync(join(c, "consumer/Cargo.lock"), "changed");
+    expect(engineSourceHash(c)).toBe(before);
+    // A folder of the same name inside the sources is engine code.
+    mkdirSync(join(c, "src/consumer"));
+    writeFileSync(join(c, "src/consumer/mod.rs"), "pub fn f() {}\n");
+    expect(engineSourceHash(c)).not.toBe(before);
+  });
+
+  it("follows a #[path] module outside the crate, plain or in cfg_attr (#978)", () => {
+    const { crate: c } = crate();
+    mkdirSync(join(dir, "shared"));
+    writeFileSync(join(dir, "shared/rules.rs"), "pub fn r() {}\n");
+    writeFileSync(join(dir, "shared/extra.rs"), "pub fn e() {}\n");
+    writeFileSync(join(c, "src/more.rs"), '#[path = "../../shared/rules.rs"]\nmod rules;\n#[cfg_attr(feature = "x", path = "../../shared/extra.rs")]\nmod extra;\n');
+    let last = engineSourceHash(c);
+    for (const f of ["shared/rules.rs", "shared/extra.rs"]) {
+      writeFileSync(join(dir, f), "pub fn changed() {}\n");
+      const next = engineSourceHash(c);
+      expect(next, f).not.toBe(last);
+      last = next;
+    }
+  });
+
+  it("follows a #[path] module that itself includes a file", () => {
+    const { crate: c, outside } = crate();
+    mkdirSync(join(dir, "shared"));
+    writeFileSync(join(dir, "shared/rules.rs"), 'pub const C: &str = include_str!("../conformance/catalog.json");\n');
+    writeFileSync(join(c, "src/lib.rs"), '#[path = "../../shared/rules.rs"]\nmod rules;\n');
+    const before = engineSourceHash(c);
+    writeFileSync(outside, '{"moved":true}');
+    expect(engineSourceHash(c)).not.toBe(before);
+  });
+
+  it("follows the child modules of a #[path] module outside the crate", () => {
+    const { crate: c } = crate();
+    mkdirSync(join(dir, "shared/child"), { recursive: true });
+    mkdirSync(join(dir, "shared/inner/kid"), { recursive: true });
+    writeFileSync(
+      join(dir, "shared/rules.rs"),
+      '// mod gone;\npub const S: &str = "mod gone;";\npub mod child;\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\npub(crate) mod inner {\n    mod kid;\n}\n#[path = "extra.rs"]\nmod extra;\n',
+    );
+    writeFileSync(join(dir, "shared/child.rs"), "mod grand;\n");
+    writeFileSync(join(dir, "shared/child/grand.rs"), "pub fn g() {}\n");
+    writeFileSync(join(dir, "shared/inner/kid/mod.rs"), "mod leaf;\n");
+    writeFileSync(join(dir, "shared/inner/kid/leaf.rs"), "pub fn l() {}\n");
+    writeFileSync(join(dir, "shared/extra.rs"), "pub fn e() {}\n");
+    writeFileSync(join(c, "src/more.rs"), '#[path = "../../shared/rules.rs"]\nmod rules;\n');
+    let last = engineSourceHash(c);
+    for (const f of ["shared/child.rs", "shared/child/grand.rs", "shared/inner/kid/mod.rs", "shared/inner/kid/leaf.rs", "shared/extra.rs"]) {
+      writeFileSync(join(dir, f), `${readFileSync(join(dir, f), "utf8")}// changed\n`);
+      const next = engineSourceHash(c);
+      expect(next, f).not.toBe(last);
+      last = next;
+    }
+  });
+
+  it("follows the child modules of a #[path] module in the skipped consumer folder", () => {
+    const { crate: c } = crate();
+    mkdirSync(join(c, "consumer"));
+    writeFileSync(join(c, "consumer/rules.rs"), "mod child;\n");
+    writeFileSync(join(c, "consumer/child.rs"), "pub fn c() {}\n");
+    writeFileSync(join(c, "src/more.rs"), '#[path = "../consumer/rules.rs"]\nmod rules;\n');
+    const before = engineSourceHash(c);
+    writeFileSync(join(c, "consumer/child.rs"), "pub fn changed() {}\n");
+    expect(engineSourceHash(c)).not.toBe(before);
+  });
+
+  it("refuses a child module of an outside #[path] module that it cannot find", () => {
+    const { crate: c } = crate();
+    mkdirSync(join(dir, "shared"));
+    writeFileSync(join(dir, "shared/rules.rs"), "mod gone;\n");
+    writeFileSync(join(c, "src/more.rs"), '#[path = "../../shared/rules.rs"]\nmod rules;\n');
+    expect(() => engineSourceHash(c)).toThrow(/declares mod gone, and neither .*gone\.rs nor .*mod\.rs exists/);
+    // Inside the crate the walk already holds every file, so a module left
+    // out by cfg is not looked for.
+    writeFileSync(join(c, "src/more.rs"), '#[cfg(feature = "off")]\nmod gone;\n');
+    expect(() => engineSourceHash(c)).not.toThrow();
+  });
+
+  it("does not read a path attribute out of a comment or a string", () => {
+    const { crate: c } = crate();
+    writeFileSync(
+      join(c, "src/more.rs"),
+      '// #[path = "gone.rs"]\n/* #[path = "gone.rs"] /* nested */ */\npub const S: &str = "#[path = \\"gone.rs\\"]";\npub const R: &str = r#"\n#[path = "gone.rs"]\n"#;\npub const Q: char = \'"\';\n#[error("bad path = {0}")]\npub struct E;\npub const C: &core::ffi::CStr = cr#"\n#[path = "gone.rs"]\n"#;\n',
+    );
+    expect(() => engineSourceHash(c)).not.toThrow();
+  });
+
+  it.each([
+    ["a missing file", '#[path = "../../shared/gone.rs"]\nmod gone;\n', /gone\.rs, which does not exist/],
+    ["a raw string", '#[path = r"../../shared/rules.rs"]\nmod rules;\n', /path attribute .* cannot follow/],
+    ["an escape", '#[path = "..\\\\shared\\\\rules.rs"]\nmod rules;\n', /path attribute .* cannot follow/],
+  ])("refuses a #[path] with %s", (_, source, error) => {
+    const { crate: c } = crate();
+    writeFileSync(join(c, "src/more.rs"), source);
+    expect(() => engineSourceHash(c)).toThrow(error);
+  });
+
+  it("walks a Cargo path dependency outside the crate, build output aside (#978)", () => {
+    const { crate: c } = crate();
+    mkdirSync(join(dir, "helper/src"), { recursive: true });
+    mkdirSync(join(dir, "helper/target"));
+    writeFileSync(join(dir, "helper/Cargo.toml"), "[package]\n");
+    writeFileSync(join(dir, "helper/src/lib.rs"), "pub fn h() {}\n");
+    writeFileSync(
+      join(c, "Cargo.toml"),
+      '[package]\ndescription = "the path = \\"../gone\\" key"\n# path = "../gone"\n[package.metadata.x]\nreadme-path = "../gone"\npath = "../gone"\nnested = { path = "../gone" }\nnote = "a, path = \'../gone\'"\nother = \'b, path = "../gone"\'\nkeys = ["c", "path = \'../gone\'"] # path = "../gone"\n[workspace.metadata]\ntool.path = "../gone"\n[dependencies]\nhelper = { version = "1", path = \'../helper\' }\n',
+    );
+    let last = engineSourceHash(c);
+    const moves = (edit: () => void) => {
+      edit();
+      const next = engineSourceHash(c);
+      const moved = next !== last;
+      last = next;
+      return moved;
+    };
+    expect(moves(() => writeFileSync(join(dir, "helper/src/lib.rs"), "pub fn changed() {}\n"))).toBe(true);
+    expect(moves(() => writeFileSync(join(dir, "helper/Cargo.toml"), "[package]\nname = \"helper\"\n"))).toBe(true);
+    expect(moves(() => writeFileSync(join(dir, "helper/target/out.rlib"), "x"))).toBe(false);
+  });
+
+  it("walks a path dependency written as a dotted key", () => {
+    const { crate: c } = crate();
+    mkdirSync(join(dir, "helper/src"), { recursive: true });
+    writeFileSync(join(dir, "helper/src/lib.rs"), "pub fn h() {}\n");
+    writeFileSync(join(c, "Cargo.toml"), '[dependencies]\nhelper.path = "../helper"\n');
+    const before = engineSourceHash(c);
+    writeFileSync(join(dir, "helper/src/lib.rs"), "pub fn changed() {}\n");
+    expect(engineSourceHash(c)).not.toBe(before);
+  });
+
+  it("walks a path dependency whose key is quoted", () => {
+    const { crate: c } = crate();
+    const names = ["basic", "literal", "dotted", "spaced"];
+    for (const name of names) {
+      mkdirSync(join(dir, name, "src"), { recursive: true });
+      writeFileSync(join(dir, name, "src/lib.rs"), "pub fn h() {}\n");
+    }
+    writeFileSync(
+      join(c, "Cargo.toml"),
+      '[dependencies]\nbasic = { "path" = "../basic" }\nliteral = { \'path\' = "../literal" }\ndotted."path" = "../dotted"\n"spaced name".path = "../spaced"\n[package.metadata.x]\n"path" = "../gone"\n',
+    );
+    let last = engineSourceHash(c);
+    for (const name of names) {
+      writeFileSync(join(dir, name, "src/lib.rs"), "pub fn changed() {}\n");
+      const next = engineSourceHash(c);
+      expect(next, name).not.toBe(last);
+      last = next;
+    }
+  });
+
+  it("follows a path dependency's own path dependency", () => {
+    const { crate: c } = crate();
+    for (const name of ["a", "b"]) mkdirSync(join(dir, name, "src"), { recursive: true });
+    writeFileSync(join(dir, "a/Cargo.toml"), '[dependencies.b]\npath = "../b"\n');
+    writeFileSync(join(dir, "b/Cargo.toml"), "[package]\n");
+    writeFileSync(join(dir, "b/src/lib.rs"), "pub fn b() {}\n");
+    writeFileSync(join(c, "Cargo.toml"), '[dependencies]\na = { path = "../a" }\n');
+    const before = engineSourceHash(c);
+    writeFileSync(join(dir, "b/src/lib.rs"), "pub fn changed() {}\n");
+    expect(engineSourceHash(c)).not.toBe(before);
+  });
+
+  it.each([
+    ["a missing folder", '[dependencies]\nh = { path = "../gone" }\n', /names the path \.\.\/gone, which does not exist/],
+    ["a value it cannot read", "[dependencies]\nh = { path = concat }\n", /path key .* cannot follow/],
+    ["a multi-line literal string", "[dependencies]\nh = { path = '''../helper''' }\n", /path key .* cannot follow/],
+    ["a multi-line basic string", '[dependencies.h]\npath = """../helper"""\n', /path key .* cannot follow/],
+    ["an empty value", '[dependencies.h]\npath = ""\n', /path key .* cannot follow/],
+    ["a quoted key naming a missing folder", '[dependencies]\nh = { "path" = "../gone" }\n', /names the path \.\.\/gone, which does not exist/],
+    ["a dotted key naming a missing folder", '[dependencies]\nh.path = "../gone"\n', /names the path \.\.\/gone, which does not exist/],
+    ["a missing folder in a table that only starts like metadata", '[package.metadatax]\npath = "../gone"\n', /names the path \.\.\/gone, which does not exist/],
+    ["a missing folder under a target-specific dependency table", "[target.'cfg(unix)'.dependencies]\nh = { path = \"../gone\" }\n", /names the path \.\.\/gone, which does not exist/],
+  ])("refuses a Cargo path with %s", (_, manifest, error) => {
+    const { crate: c } = crate();
+    writeFileSync(join(c, "Cargo.toml"), manifest);
+    expect(() => engineSourceHash(c)).toThrow(error);
+  });
 });
