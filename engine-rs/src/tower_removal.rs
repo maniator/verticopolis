@@ -47,6 +47,19 @@ impl Tower {
         gone
     }
 
+    /// [`remove_units`](Self::remove_units) of `out`, then
+    /// [`insert_units_at`](Self::insert_units_at) of `inserts`, with one
+    /// reindex of the list's tail between the two for both (#1802): the
+    /// removals settle without reading an index, and the insert reindexes
+    /// from the first index either side touched. The same list, indexes and
+    /// revision as the two calls.
+    pub(crate) fn replace_units(&mut self, out: &[i64], inserts: Vec<(usize, Unit)>) {
+        let at = self.indexes_of(out);
+        let (first, gone) = self.take_out(at);
+        self.settle_removals(&gone);
+        self.insert_units_reindexing(inserts, first);
+    }
+
     /// What removing `gone` (in that order) changes besides the list: the
     /// indexes, the wedding hall flag, the express stops of each floor that
     /// lost its last lobby tile, synced in the order the one-by-one removals

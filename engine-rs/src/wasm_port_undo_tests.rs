@@ -33,9 +33,13 @@ fn an_undo_puts_the_tower_back_and_a_redo_puts_the_edit_back() {
     assert_eq!(units(&e), start + 1);
     assert_eq!(e.port_undo_depths(), vec![1.0, 0.0]);
 
-    let generation = e.generation;
+    let (generation, revision) = (e.generation, e.sim.tower.revision);
     let rec = e.port_undo();
-    assert_eq!(rec, vec![1.0, (generation + 1) as f64]);
+    // The same tower: the generation stays, and the revision a room's
+    // removal raises tells the readers the structure moved (#1802).
+    assert_eq!(rec, vec![1.0, generation as f64]);
+    assert_eq!(e.generation, generation);
+    assert!(e.sim.tower.revision > revision);
     assert_eq!(units(&e), start);
     assert_eq!(e.port_undo_notice().as_deref(), Some("Undid: Build Lobby"));
     assert_eq!(e.port_undo_depths(), vec![0.0, 1.0]);
@@ -222,4 +226,37 @@ fn every_tower_swap_forgets_the_steps() {
     let mut e = with_steps();
     assert_eq!(e.port_found(7.0, 0.0, 0.0, false)[0], 1.0);
     assert_eq!(e.port_undo_depths(), vec![0.0, 0.0], "a new tower");
+}
+
+/// A step that puts back only a room's settings (a name, a rent) raises no
+/// tower revision, as the edits it reverses raise none, and keeps the
+/// generation; the name reaches the readers through the meta log (#1802).
+#[test]
+fn a_settings_step_keeps_the_revision_and_the_generation() {
+    let mut e = engine();
+    e.sim.star = 3;
+    for x in 100..120 {
+        e.sim.tower.place(Kind::Lobby, 1, x);
+        e.sim.tower.place(Kind::Floor, 2, x);
+    }
+    let built = e.sim.build(Kind::Office, 2, 100);
+    assert!(built.ok, "{:?}", built.reason);
+    let id = e.sim.tower.rooms[&(2, 100)];
+    e.port_undo_capture("Rename");
+    assert!(e.sim.tower.set_label(id, "Penthouse"));
+    e.port_undo_commit();
+    e.port_undo_capture("Rent");
+    assert!(!e.port_set_rent(id as f64, 300_000.0)[0].is_nan());
+    e.port_undo_commit();
+    let (generation, revision) = (e.generation, e.sim.tower.revision);
+    for take in [Engine::port_undo, Engine::port_undo, Engine::port_redo] {
+        let meta = e.sim.tower.meta_revision;
+        assert_eq!(take(&mut e), vec![1.0, generation as f64]);
+        assert_eq!(e.sim.tower.revision, revision, "no structure moved");
+        assert!(
+            e.sim.tower.meta_revision > meta,
+            "the meta readers look again"
+        );
+    }
+    assert_eq!(e.sim.tower.get_unit(id).unwrap().label, "Penthouse");
 }

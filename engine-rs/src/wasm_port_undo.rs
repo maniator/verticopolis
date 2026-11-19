@@ -20,7 +20,8 @@ use crate::sim_undo::StepRefused;
 /// `undo` and `redo` answer `[status, generation]`, the shape `restore`
 /// answers. A step that was put back is `1` (as a done swap is), a step the
 /// restore refused is `0` (`lastReason()` says why), and nothing to step to
-/// is [`NOTHING_TO_STEP`].
+/// is [`NOTHING_TO_STEP`]. A step keeps the generation: it is the same
+/// tower, so a host follows it as it follows an edit (#1802).
 pub(crate) const NOTHING_TO_STEP: f64 = 2.0;
 
 /// The message when the undo stack is empty.
@@ -135,10 +136,12 @@ impl Engine {
                     }
                 };
                 self.undo_notice = Some(format!("{said}: {}", step.label));
-                // The same tower, changed under its readers: hosts treat the
-                // move like any swap and read it afresh.
+                // The same tower, changed as an edit changes it: the
+                // generation stays, so readers follow the step from the
+                // frame, whose structure follows the revision a step that
+                // moves rooms or shafts raises (#1802). The save mirror reads
+                // the whole tower again, since a step writes no save marks.
                 self.mirror = crate::save_delta::SaveMirror::default();
-                self.generation += 1;
                 self.swap_record(true)
             }
             Err(why) => {

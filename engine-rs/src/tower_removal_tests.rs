@@ -347,3 +347,45 @@ fn a_panic_inside_the_brush_still_ends_the_batch() {
     let lobby = id_at(&sim.tower, 15, 198);
     assert_eq!(sim.tower.units.last().map(|u| u.id), Some(lobby));
 }
+
+/// `replace_units` (an undo step's one walk of the list, #1802) ends as
+/// `remove_units` then `insert_units_at`: the same list, indexes, express
+/// stops, wedding hall flag and revision, with rooms going both ways, only
+/// out, and only back.
+#[test]
+fn replacing_ends_as_removing_then_inserting() {
+    for (goes_out, comes_back) in [(true, true), (false, true), (true, false)] {
+        let (mut batch, mut single) = (tower(), tower());
+        let hall = wedding_hall(&mut batch);
+        assert_eq!(wedding_hall(&mut single), hall);
+        let t = &batch.tower;
+        // Rooms that went out before, and come back at the places they left.
+        let back_ids = [id_at(t, 15, 161), id_at(t, 3, 170), hall, id_at(t, 31, 199)];
+        let out = [
+            id_at(t, 30, 160),
+            id_at(t, 2, 150),
+            id_at(t, 30, 163),
+            999_999,
+        ];
+        let out: &[i64] = if goes_out { &out } else { &[] };
+        let places: Vec<usize> = back_ids.iter().map(|id| t.by_id[id]).collect();
+        let mut gone = vec![];
+        for sim in [&mut batch, &mut single] {
+            gone = sim.tower.remove_units(&back_ids);
+        }
+        let back: Vec<(usize, crate::tower::Unit)> = match comes_back {
+            true => places.into_iter().zip(gone).collect(),
+            false => vec![],
+        };
+        let (b, s) = (&mut batch.tower, &mut single.tower);
+        b.replace_units(out, back.clone());
+        s.remove_units(out);
+        s.insert_units_at(back);
+        let ids = |t: &Tower| t.units.iter().map(|u| u.id).collect::<Vec<_>>();
+        assert_eq!(ids(b), ids(s));
+        assert_indexed(b);
+        assert_eq!(b.revision, s.revision);
+        assert_eq!(b.built_wedding_hall, s.built_wedding_hall);
+        assert_eq!(b.stops_of(&b.transports[0]), s.stops_of(&s.transports[0]));
+    }
+}
