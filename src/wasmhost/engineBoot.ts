@@ -23,7 +23,7 @@ export type BootStage = "load" | "start" | "host";
  * engine message can quote a tower name or a path.
  *
  * Boot sends the first six, plus `other` for a boot step outside the engine
- * that failed after the worker host started (the host is let go). The
+ * that failed after the host took the tower (the host is let go). The
  * runtime fallback (#874) sends the trap codes for a running engine's fault
  * in a command (the undo capture's save just before an edit included), a
  * tick, a frame sync or the event drain, or an undo or redo, and `other` for

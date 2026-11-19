@@ -17,7 +17,6 @@ describe("engine label", () => {
     const boot = { identity: JSON.stringify(IDENTITY_FIXTURE), binary: { state: "ok" as const, sourceHash: hash } };
     const v = IDENTITY_FIXTURE.crate.version;
     expect(engineSuffix({ __vcEngine: { status: { hosted: true } }, __vcEngineBoot: boot })).toBe(` · Rust engine ${v} (${shortId(hash)})`);
-    expect(engineSuffix({ __vcEngine: { status: { hosted: true, placement: "worker" } }, __vcEngineBoot: boot })).toBe(` · Rust engine ${v} (${shortId(hash)}, worker)`);
     expect(engineSuffix({ __vcEngine: { status: { hosted: true } }, __vcEngineBoot: { binary: { state: "missing" } } })).toBe(" · Rust engine");
   });
 
