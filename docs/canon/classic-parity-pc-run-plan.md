@@ -35,4 +35,4 @@ These need only real saves already in the repository (`conformance/fixtures/tdt-
 
 Build each remaining scenario's tower in code with the Rust engine, export it as `.TDT`, load it in the original, run it for the required game days (use a persistent container and save at the needed moments), and read results from the re-saved files and screenshots. Order: E1 to E4 with PK5, PK1 and PK2, T1 and T2, O1 to O3, R1 and R2, X1, S1, M1 to M3, then L1, C1 to C5, F1, PK3 to PK7 and PK9. Known limits of this route: the exporter does not reproduce the per-stall tail records or the parking connected list, so the PK scenarios that read those need the tower built in the game by a person.
 
-Tracked in issue [#1543](https://github.com/Verticopolis/web/issues/1543).
+Tracked in issue [Verticopolis/engine#22](https://github.com/Verticopolis/engine/issues/22).

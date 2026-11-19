@@ -37,7 +37,7 @@ test("Help > About opens About this game with its privacy link and no What's new
   await expect(about).toBeVisible();
   await expect(about.locator(".help-diagnostics")).toBeVisible();
   await expect(about.locator('a[data-act="privacy"]')).toHaveAttribute("href", "/help/privacy/?from=game&via=about");
-  await expect(about.locator('a[data-act="report"]')).toHaveAttribute("href", /^https:\/\/github\.com\/maniator\/verticopolis\/issues\/new\?template=bug_report\.yml&/);
+  await expect(about.locator('a[data-act="report"]')).toHaveAttribute("href", /^https:\/\/github\.com\/Verticopolis\/web\/issues\/new\?template=bug_report\.yml&/);
   // The old Help menu's What's new went away with #2063.
   await expect(about.locator('[data-act="whats-new"]')).toHaveCount(0);
 

@@ -30,11 +30,13 @@ const row = (gh: string, priority: string, notes = "n") =>
   `| 2026-10-15 | s | ${gh} | e | task | ${priority} | low | — | open | ${notes} |`;
 
 describe("parseBacklogPriorities", () => {
-  it("maps each row-cited issue to its priority and skips finished rows", () => {
+  it("maps each row-cited issue to its priority and skips finished rows and other repositories' issues", () => {
     const md = [
       ...HEAD,
       row("#10", "P1"),
       row("—", "P2"),
+      row("Verticopolis/engine#10", "P3"),
+      row("Verticopolis/components#7", "P3"),
       row("#11", "P3", "a \\| b"),
     ].join("\n");
     const { priorities, errors } = parseBacklogPriorities(md);
@@ -43,18 +45,6 @@ describe("parseBacklogPriorities", () => {
       [10, "P1"],
       [11, "P3"],
     ]);
-  });
-
-  it("leaves rows citing an issue in another repository to that repository", () => {
-    const md = [
-      ...HEAD,
-      row("Verticopolis/engine#5", "P1"),
-      row("#5", "P2"),
-      row("Verticopolis/components#7", "P3"),
-    ].join("\n");
-    const { priorities, errors } = parseBacklogPriorities(md);
-    expect(errors).toEqual([]);
-    expect([...priorities]).toEqual([[5, "P2"]]);
   });
 
   it("reads a CRLF file the same way", () => {

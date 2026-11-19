@@ -77,7 +77,7 @@ it in one step.
 The engine and the components were split out of this repository with their
 history. Until the game builds from their packages, their code still lives
 here too (`engine-rs/`, `src/render/`, `src/ui/` and the rest), and changes
-to those folders are on hold in every repository. Each repository has its own
+to those folders are on hold here until then. Each repository has its own
 issue forms; the organization-wide funding link, security policy and the
 shared PR template and issue form checks live in
 [Verticopolis/.github](https://github.com/Verticopolis/.github).
