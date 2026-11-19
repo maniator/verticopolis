@@ -25,6 +25,12 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.14.0
+
+- Modern: pick a look for each sky bridge. While the Sky Bridge tool is picked, a Bridge look strip offers Glass Skywalk, Steel Truss, Deco Arcade, Garden Walk and the plain Lobby look. A new bridge goes up in the picked look, and a click on a finished bridge changes its look for free (Undo puts the old one back). Each look is drawn whole across the bridge, with an underside below it. New bridges start as a glass skywalk; bridges in towers saved before this version keep the plain lobby look until you pick another.
+- Modern: the story right under a sky bridge stays open air. Floors may rise to two stories below a bridge, and the game asks you to bulldoze the bridge before building up to it, so floors never cut a bridge in two.
+- High Contrast now shows update notes, file lists and reports, and its links are yellow.
+
 ## 4.13.6
 
 - Opening a SimTower `.TDT` file whose reader fails to load (offline, say) now says the save couldn't be read, where before nothing happened.
