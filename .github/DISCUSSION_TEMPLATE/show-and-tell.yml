@@ -1,0 +1,19 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Show off your tower! A screenshot is great, and the `.vctower` file (**File > Save As…**) lets others open it too.
+  - type: textarea
+    id: tower
+    attributes:
+      label: Your tower
+      description: Drop in a screenshot or two, and say anything about it you like.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Classic
+        - Modern

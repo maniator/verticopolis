@@ -87,6 +87,9 @@ see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 name: you are welcome to copy, change and share the game under its
 licenses, but please give your copy a name of its own.
 
+Questions, ideas or a tower to show off? Come say hi in
+[Discussions](https://github.com/Verticopolis/web/discussions).
+
 Verticopolis is free to play and nothing in it is locked. If you would like to
 help keep it going, you can [sponsor it on GitHub](https://github.com/sponsors/maniator).
 
