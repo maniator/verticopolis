@@ -77,10 +77,10 @@ describe.skipIf(noEngine)("the storage code's saves on the engine", () => {
     const downloads: { filename: string; contents: string | Uint8Array }[] = [];
     const ui = {
       toast: () => {},
-      sayVisibly: () => {},
       downloadFile: (filename: string, contents: string | Uint8Array) => (downloads.push({ filename, contents }), true),
     };
-    await runExportFlow({ ui, reader: () => newViewReader(source) }, () => ({ file: SaveGame.export(source.serialize()), towerName }));
+    const file = await SaveGame.export(source.serialize());
+    runExportFlow({ ui, reader: () => newViewReader(source) }, () => ({ file, towerName }));
     expect(downloads.map((d) => d.filename)).toEqual([SaveGame.exportFilename(towerName)]);
     const back = engineFromSave(await SaveGame.importText(downloads[0]!.contents as string));
     expect(JSON.parse(back.serialize())).toMatchObject({ towerName });

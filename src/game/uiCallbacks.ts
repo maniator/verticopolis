@@ -109,7 +109,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onLoad: () => app.saveLoad.load(),
     onExport: () => {
       trackAppAction("export_save");
-      void app.saveLoad.exportGame();
+      app.saveLoad.exportGame();
     },
     onImport: (data, from) => {
       trackAppAction("import_save");

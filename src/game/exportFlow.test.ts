@@ -1,50 +1,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SaveGame } from "../storage/SaveGame";
-import { runExportFlow, runLegacyDownload, resetExportFlowForTests, EXPORT_WATCHDOG_MS } from "./exportFlow";
-import { trackFileExported } from "../analytics";
+import { runExportFlow } from "./exportFlow";
+import { ExportRefused } from "./portLifecycle";
+import { trackFileExported, trackFileFailure } from "../analytics";
 
 vi.mock("../analytics", async (importActual) => ({
   ...(await importActual<typeof import("../analytics")>()),
   trackFileExported: vi.fn(),
+  trackFileFailure: vi.fn(),
 }));
 
 /**
- * The export flow's single-flight latch and its watchdog (GH #760). A second
- * export fired while the first is still compressing must not stack a second
- * download, and a stuck export must not hold the latch forever.
+ * The .vctower export flow: the engine's file under the tower's name, the size
+ * line, and the analytics for a download that started or an export that
+ * failed. The flow is synchronous (#1655), so each run finishes before the next.
  */
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (err: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 /** `downloadStarts` is what each download reports, in call order (default:
  *  every download starts). A `false` stands in for `UI.downloadFile` having
  *  already toasted its own failure. */
-function fakeUi(downloadStarts: boolean[] = []) {
+function fakeUi(downloadStarts: boolean[] = [], onDownload: () => void = () => {}) {
   const toasts: { text: string; kind: string }[] = [];
-  // What reached the player through sayVisibly (which falls back to a toast in the real UI).
-  const said: { text: string; kind: string }[] = [];
   const downloads: { filename: string; contents: string | Uint8Array }[] = [];
   return {
     toasts,
-    said,
     downloads,
     ui: {
-      sayVisibly: (text: string, kind?: string) => {
-        said.push({ text, kind: kind ?? "bad" });
-      },
       toast: (text: string, kind?: string) => {
         toasts.push({ text, kind: kind ?? "info" });
       },
       downloadFile: (filename: string, contents: string | Uint8Array): boolean => {
         downloads.push({ filename, contents });
+        onDownload();
         return downloadStarts.shift() ?? true;
       },
     },
@@ -59,250 +46,91 @@ function flowDeps(ui: ReturnType<typeof fakeUi>["ui"]) {
 
 const FAKE_FILE = "VCTOWER1\nfake";
 
-/** The flow's save callback: the engine's `.vctower` text (or a promise of it,
- *  to hold an export open) and the tower's name. Whether the engine's text
- *  reads back as the same tower is checked on the Rust engine in
- *  `src/tests/integration/saveRepair.integration.test.ts`. */
-function saved(file: string | Promise<string> = FAKE_FILE, towerName = "Tower Seven") {
+/** The flow's save callback: the engine's `.vctower` file and the tower's
+ *  name. Whether the engine's file reads back as the same tower is checked on
+ *  the Rust engine in `src/tests/integration/saveRepair.integration.test.ts`. */
+function saved(file: string | Uint8Array = FAKE_FILE, towerName = "Tower Seven") {
   return () => ({ file, towerName });
 }
 
-const HUNG_TOAST = { text: "The export is not responding. You can try exporting again.", kind: "bad" };
 // The size line for the 13-byte file these tests save
 // ("VCTOWER1\nfake" rounds to 0.0 KB).
 const LIVE_TOAST = { text: "Tower exported (0.0 KB). Check your downloads.", kind: "good" };
-const LATE_TOAST = { text: "The earlier export finished after all (0.0 KB). Check your downloads.", kind: "good" };
 
 beforeEach(() => {
-  resetExportFlowForTests();
-  localStorage.clear();
+  vi.mocked(trackFileExported).mockClear();
+  vi.mocked(trackFileFailure).mockClear();
 });
 
 afterEach(() => {
-  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
-describe("export single-flight latch (GH #760)", () => {
-  it("hands the player the engine's file under the tower's name, and says how big it is", async () => {
+describe(".vctower export flow", () => {
+  it("hands the player the engine's file under the tower's name, and says how big it is", () => {
     const { ui, toasts, downloads } = fakeUi();
     const file = "VCTOWER1\n" + "x".repeat(2048 - 9);
-    await runExportFlow(flowDeps(ui), saved(file, "Skyline One"));
+    runExportFlow(flowDeps(ui), saved(file, "Skyline One"));
     expect(downloads).toEqual([{ filename: SaveGame.exportFilename("Skyline One"), contents: file }]);
     expect(toasts).toEqual([{ text: "Tower exported (2.0 KB). Check your downloads.", kind: "good" }]);
   });
 
-  it("reports a .vctower export once the download starts, and not for one that failed", async () => {
-    vi.mocked(trackFileExported).mockClear();
+  it("sizes a binary file by its bytes", () => {
+    const { ui, toasts, downloads } = fakeUi();
+    const file = new Uint8Array(3072);
+    runExportFlow(flowDeps(ui), saved(file));
+    expect(downloads[0]!.contents).toBe(file);
+    expect(toasts).toEqual([{ text: "Tower exported (3.0 KB). Check your downloads.", kind: "good" }]);
+  });
+
+  it("reports a .vctower export once the download starts, and not for one that failed", () => {
     const { ui } = fakeUi([false, true]);
-    await runExportFlow(flowDeps(ui), saved());
+    runExportFlow(flowDeps(ui), saved());
     expect(trackFileExported).not.toHaveBeenCalled();
-    await runExportFlow(flowDeps(ui), saved());
+    runExportFlow(flowDeps(ui), saved());
     expect(trackFileExported).toHaveBeenCalledExactlyOnceWith("vctower", expect.any(Function));
     expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toEqual(HEADER);
   });
 
-  it("reports the header the file was written from, even when the tower moves on before the download", async () => {
-    vi.mocked(trackFileExported).mockClear();
-    const { ui } = fakeUi([true]);
+  it("reports the header the file was written from, even when the tower moves on during the download", () => {
     let header = HEADER;
-    const later = { ...HEADER, population: 9999 };
-    const written = Promise.resolve(FAKE_FILE).then((file) => ((header = later), file));
-    await runExportFlow({ ui, reader: () => ({ header: header as never }) }, saved(written));
+    const { ui } = fakeUi([true], () => {
+      header = { ...HEADER, population: 9999 };
+    });
+    runExportFlow({ ui, reader: () => ({ header: header as never }) }, saved());
     expect(vi.mocked(trackFileExported).mock.calls[0][1]()).toEqual(HEADER);
   });
 
-  it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {
+  it("REGRESSION (GH #997): a download that failed gets no success toast, and the next export still runs", () => {
     const { ui, toasts, downloads } = fakeUi([false]);
-    await runExportFlow(flowDeps(ui), saved());
+    runExportFlow(flowDeps(ui), saved());
     expect(downloads).toHaveLength(1);
     // UI.downloadFile already toasted the failure; the flow adds nothing.
     expect(toasts).toEqual([]);
-    // The next export runs and succeeds normally.
-    await runExportFlow(flowDeps(ui), saved());
+    runExportFlow(flowDeps(ui), saved());
     expect(downloads).toHaveLength(2);
     expect(toasts).toEqual([LIVE_TOAST]);
   });
 
-  it("REGRESSION: a second export while the first is compressing is a quiet no-op", async () => {
-    const gate = deferred<string>();
-    let saves = 0;
-    const held = () => {
-      saves++;
-      return saved(gate.promise)();
-    };
+  it("says an engine refusal and reports its closed code (#2075)", () => {
     const { ui, toasts, downloads } = fakeUi();
-    const first = runExportFlow(flowDeps(ui), held);
-    await runExportFlow(flowDeps(ui), held);
-    expect(saves).toBe(1);
-    gate.resolve("VCTOWER1\nfake");
-    await first;
-    expect(downloads).toHaveLength(1);
-    expect(toasts).toEqual([LIVE_TOAST]);
+    runExportFlow(flowDeps(ui), () => {
+      throw new ExportRefused("The tower is too large to export.", "too_large");
+    });
+    expect(downloads).toEqual([]);
+    expect(toasts).toEqual([{ text: "Export failed: The tower is too large to export.", kind: "bad" }]);
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "save", "too_large");
+    expect(trackFileExported).not.toHaveBeenCalled();
   });
 
-  it("the latch releases on success and on failure, so the next export runs", async () => {
-    const { ui, toasts, downloads } = fakeUi();
-    await runExportFlow(flowDeps(ui), () => ({ file: Promise.reject(new Error("boom")), towerName: undefined }));
-    expect(toasts).toEqual([{ text: "Export failed: boom", kind: "bad" }]);
-    await runExportFlow(flowDeps(ui), saved());
-    await runExportFlow(flowDeps(ui), saved());
-    expect(downloads).toHaveLength(2);
-  });
-
-  it("the latch releases when stamping the view throws, and the failure is said", async () => {
+  it("says a throw while stamping the view, reports it as an error, and the next export runs", () => {
     const { ui, toasts } = fakeUi();
-    await runExportFlow(flowDeps(ui), () => {
+    runExportFlow(flowDeps(ui), () => {
       throw new Error("context lost");
     });
     expect(toasts).toEqual([{ text: "Export failed: context lost", kind: "bad" }]);
-    await runExportFlow(flowDeps(ui), saved());
+    expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "save", "error");
+    runExportFlow(flowDeps(ui), saved());
     expect(toasts[toasts.length - 1]).toEqual(LIVE_TOAST);
-  });
-
-  it("downloads the file the engine wrote, under the tower's name", async () => {
-    const { ui, downloads } = fakeUi();
-    await runExportFlow(flowDeps(ui), () => ({ file: "VCTOWER1\nwritten", towerName: "Skyline One" }));
-    expect(downloads).toEqual([{ filename: SaveGame.exportFilename("Skyline One"), contents: "VCTOWER1\nwritten" }]);
-  });
-
-  it("REGRESSION: the watchdog frees a latch held by a stuck export and says so", async () => {
-    vi.useFakeTimers();
-    const { ui, said } = fakeUi();
-    void runExportFlow(flowDeps(ui), saved(new Promise<string>(() => {})));
-    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS - 1);
-    expect(said).toEqual([]);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(said).toEqual([HUNG_TOAST]);
-  });
-
-  it("REGRESSION: a late settle never unlocks the export that took over the latch", async () => {
-    vi.useFakeTimers();
-    const slow = deferred<string>();
-    const retry = deferred<string>();
-    const { ui, toasts, said, downloads } = fakeUi();
-    const first = runExportFlow(flowDeps(ui), saved(slow.promise));
-    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
-    const second = runExportFlow(flowDeps(ui), saved(retry.promise));
-    // The first export lands late: its download still arrives, but the
-    // retry still holds the latch, so a third attempt stays a no-op.
-    slow.resolve("VCTOWER1\nfake");
-    await first;
-    await runExportFlow(flowDeps(ui), saved());
-    expect(downloads).toHaveLength(1);
-    retry.resolve("VCTOWER1\nfake");
-    await second;
-    expect(downloads).toHaveLength(2);
-    expect(toasts).toEqual([LIVE_TOAST]);
-    expect(said).toEqual([HUNG_TOAST, LATE_TOAST]);
-  });
-
-  it("REGRESSION (GH #997): an export that settles after the watchdog says it finished after all", async () => {
-    vi.useFakeTimers();
-    const slow = deferred<string>();
-    const { ui, toasts, said, downloads } = fakeUi();
-    const run = runExportFlow(flowDeps(ui), saved(slow.promise));
-    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
-    slow.resolve("VCTOWER1\nfake");
-    await run;
-    expect(downloads).toHaveLength(1);
-    // Both late lines go through sayVisibly, so a dialog opened in the
-    // meantime shows them instead of covering a toast (#785).
-    expect(said).toEqual([HUNG_TOAST, LATE_TOAST]);
-    expect(toasts).toEqual([]);
-  });
-
-  it("a late settle whose download fails ends on the failure alone, with no success line", async () => {
-    vi.useFakeTimers();
-    const slow = deferred<string>();
-    const { ui, toasts, said, downloads } = fakeUi([false]);
-    const run = runExportFlow(flowDeps(ui), saved(slow.promise));
-    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
-    slow.resolve("VCTOWER1\nfake");
-    await run;
-    expect(downloads).toHaveLength(1);
-    // The fake stands in for UI.downloadFile, which has already toasted its failure.
-    expect(said).toEqual([HUNG_TOAST]);
-    expect(toasts).toEqual([]);
-  });
-});
-
-describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", () => {
-  it("REGRESSION: a second legacy download while the first is open runs nothing, and the latch frees on settle", async () => {
-    const { ui, toasts, said } = fakeUi();
-    const gate = deferred<void>();
-    let downloads = 0;
-    const dl = () => {
-      downloads++;
-      return gate.promise;
-    };
-    const first = runLegacyDownload(ui, dl);
-    // A second legacy export fired while the first is still settling: no second
-    // download, and no message, since the player's own download is the one running.
-    expect(await runLegacyDownload(ui, dl)).toBe(false);
-    expect(downloads).toBe(1);
-    expect(said).toEqual([]);
-    expect(toasts).toEqual([]);
-    gate.resolve();
-    expect(await first).toBe(true);
-    // Latch freed on settle: the next legacy download runs.
-    await runLegacyDownload(ui, () => {
-      downloads++;
-      return Promise.resolve();
-    });
-    expect(downloads).toBe(2);
-  });
-
-  it("REGRESSION (GH #1012): a .TDT download clicked while a .vctower export runs says why nothing happened", async () => {
-    const slow = deferred<string>();
-    const { ui, toasts, said, downloads } = fakeUi();
-    const vctower = runExportFlow(flowDeps(ui), saved(slow.promise));
-    let legacy = 0;
-    const ran = await runLegacyDownload(ui, () => {
-      legacy++;
-    });
-    expect(ran).toBe(false);
-    expect(legacy).toBe(0);
-    // Through sayVisibly: closing the report dialog can reopen a queued one over a plain toast.
-    expect(said).toEqual([{ text: "Another export is still running. Try again when it finishes.", kind: "info" }]);
-    // The .vctower export that held the latch still finishes and announces itself.
-    slow.resolve("VCTOWER1\nfake");
-    await vctower;
-    expect(downloads).toHaveLength(1);
-    expect(toasts).toEqual([LIVE_TOAST]);
-  });
-
-  it("a legacy download and a .vctower export are mutually exclusive on the shared latch", async () => {
-    const { ui, downloads, said } = fakeUi();
-    const gate = deferred<void>();
-    let legacy = 0;
-    const held = runLegacyDownload(ui, () => {
-      legacy++;
-      return gate.promise;
-    });
-    // A .vctower export fired while the legacy download holds the latch bails
-    // before it serializes or opens anything.
-    await runExportFlow(flowDeps(ui), saved());
-    expect(legacy).toBe(1);
-    expect(downloads).toEqual([]);
-    // ...and quietly: the #1012 message is only for a .TDT click.
-    expect(said).toEqual([]);
-    gate.resolve();
-    await held;
-  });
-
-  it("the watchdog frees a latch held by a hung legacy download and says so", async () => {
-    vi.useFakeTimers();
-    const { ui, said } = fakeUi();
-    void runLegacyDownload(ui, () => new Promise<void>(() => {})); // never settles
-    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS + 1);
-    expect(said).toEqual([HUNG_TOAST]);
-    // The freed latch lets a fresh legacy download run.
-    let ran = false;
-    await runLegacyDownload(ui, () => {
-      ran = true;
-      return Promise.resolve();
-    });
-    expect(ran).toBe(true);
   });
 });
