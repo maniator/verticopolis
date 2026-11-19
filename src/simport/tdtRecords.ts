@@ -1,7 +1,6 @@
-import type { EncodeStats, ExportCounts, ExportReportFacts } from "../storage/tdtExportReport";
-import type { ImportCounts, ImportReportFacts } from "../storage/tdtImportReport";
 import type { EnginePort, PortRecord } from "./enginePort";
 import type { PortCodes } from "./portCodes";
+import type { EncodeStats, ExportCounts, ExportReportFacts, ImportCounts, ImportReportFacts } from "./tdtReportFacts";
 
 /**
  * The 1994 `.TDT` reports' numbers, read off the port's `loadTdt` and

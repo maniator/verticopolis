@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  exportReport,
-  type EncodeStats,
-  type ExportCounts,
-  type ExportReportFacts,
-} from "./tdtExportReport";
+import type { EncodeStats, ExportCounts, ExportReportFacts } from "../simport/tdtReportFacts";
+import { exportReport } from "./tdtExportReport";
 
 const COUNTS: ExportCounts = {
   rooms: 1234,

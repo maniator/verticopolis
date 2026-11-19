@@ -73,8 +73,8 @@ describe("engine label", () => {
 
   it("rewrites a mounted splash version line and ignores a page without one", () => {
     const el = { textContent: "v0.0.0" } as HTMLElement;
-    refreshSplashVersion({ querySelector: () => el } as unknown as Document);
+    refreshSplashVersion(APP_VERSION, { querySelector: () => el } as unknown as Document);
     expect(el.textContent).toBe(`v${APP_VERSION} · Rust engine`);
-    expect(() => refreshSplashVersion({ querySelector: () => null } as unknown as Document)).not.toThrow();
+    expect(() => refreshSplashVersion(APP_VERSION, { querySelector: () => null } as unknown as Document)).not.toThrow();
   });
 });

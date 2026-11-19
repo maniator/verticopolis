@@ -9,7 +9,7 @@ import { FALLBACK_STAGES } from "./wasmhost/engineBoot";
 import { MAX_BODY_BYTES, RATE_LIMIT_MAX } from "./analyticsIngest";
 import type { EngineChoice } from "./wasmhost/engineChoice";
 import { TDT_IMPORT_ANOMALIES, TDT_TRANSPORT_ANOMALIES, tdtImportReadProps, type TowerFileProps } from "./analyticsFiles";
-import type { ImportReportFacts } from "./storage/tdtImportReport";
+import type { ImportReportFacts } from "./simport/tdtReportFacts";
 
 /** Every engine a page life can ask for. Typed against `EngineChoice` both
  *  ways, so a new choice fails the typecheck here until the map lists it. */

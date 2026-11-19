@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ImportCounts, ImportReportFacts } from "./storage/tdtImportReport";
+import type { ImportCounts, ImportReportFacts } from "./simport/tdtReportFacts";
 import type { GameMode } from "./shared/types";
 
 const trackEvent = vi.fn();

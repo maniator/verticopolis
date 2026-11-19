@@ -1,6 +1,7 @@
 import { checkEvent } from "./events/gameplayCatalog";
 import { GAMEPLAY_EVENT_RULES } from "./events/gameplayEventRules";
 import type { GameplayEvent } from "./events/gameplayEvents";
+import type { GameplayEventSource } from "./simport/portEvents";
 import { RateLimiter } from "./analyticsRateLimit";
 import { gameplaySession } from "./analyticsSession";
 import { nextAnalyticsTower } from "./analyticsTower";
@@ -33,18 +34,6 @@ import { trackBombOutcome, trackEconomyAction, trackEconomyActionOnce, trackEmer
  * Nothing here reads the sim beyond the drain, and nothing names a vendor:
  * `trackEvent` stays the only send choke point.
  */
-
-/** What the bridge drains: the live `Simulation` (whose drain the WASM host
- *  overrides to answer with its engine's batch). `release` is the session's
- *  own flush (a hide, or a window closing): a host that holds a command's
- *  events back until its engine's state covers them (the WASM host, #874)
- *  lets them go then, so a page that closes keeps them. `release` is
- *  temporary, with that fallback (story-engine-retire-typescript.md). */
-export interface GameplayEventSource {
-  drainGameplayEvents(opts?: { release?: boolean }): GameplayEvent[];
-  readonly gameplayEventsDropped: number;
-  readonly gameplayEvents: { readonly discardOnHandOff: boolean };
-}
 
 /** Per-occurrence sends allowed per wire event per minute. A player founds a
  *  tower, climbs a star or answers an emergency a handful of times an hour, so

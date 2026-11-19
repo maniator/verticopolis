@@ -46,7 +46,10 @@ sequenceDiagram
 - **The catalogs.** `rustBootTower` (`src/wasmhost/rustEngine.ts`) reads the
   Classic and Modern catalogs before it builds an engine and refuses a
   package whose kinds or world this build cannot draw. Every price, size and
-  rule the UI shows comes from them (`src/catalog/`).
+  rule the UI shows comes from them (`src/catalog/`). It then hands the fresh
+  engine's port to the boot the game passes in (`bootTower` from
+  `src/game/bootTower.ts`, with `BOOT_SEED`), so `src/wasmhost/` never
+  imports the game's save code.
 - **Failure.** A failure is an `EngineBootError` with a reason from a closed
   list (`FALLBACK_REASONS` in `src/wasmhost/engineBoot.ts`), reported to
   analytics as `engine_status` and published on `window.__vcEngineBoot`. The

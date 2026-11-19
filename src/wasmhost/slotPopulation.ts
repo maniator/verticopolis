@@ -1,5 +1,4 @@
 import type { WasmModule } from "../engineBinding/binding";
-import type { SlotPopulationReader } from "../storage/slotCensus";
 import { runEach } from "./hostFault";
 
 /** How many saves' counts the reader remembers. The dialogs list the autosave
@@ -34,7 +33,7 @@ function hashText(text: string): number {
  * throw before it propagates, and boot hands it to the trap path the tick and
  * the save writer use (#1612); a plain refusal is not a trap and stops nothing.
  */
-export function populationReaderFromModule(mod: Pick<WasmModule, "Engine">, onThrow?: (error: unknown) => void): SlotPopulationReader {
+export function populationReaderFromModule(mod: Pick<WasmModule, "Engine">, onThrow?: (error: unknown) => void): (text: string) => number {
   const memo = new Map<string, number>();
   return (text) => {
     const key = `${text.length}:${hashText(text)}`;

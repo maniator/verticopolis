@@ -1,7 +1,6 @@
 import { checkBinding, type WasmModule } from "../engineBinding/binding";
 import { readCatalog } from "../engineBinding/catalog";
 import { useTowerCatalogSource } from "../catalog/towerCatalog";
-import { BOOT_SEED, bootTower, type BootTower } from "../game/bootTower";
 import type { EnginePort } from "../simport/enginePort";
 import { refuseForeignCatalogs } from "./catalogCheck";
 import { EngineBootError } from "./engineBoot";
@@ -36,12 +35,20 @@ export async function loadWasmEngine(url = enginePackageUrl(), signal?: AbortSig
   }
 }
 
-/** A fresh Rust engine with the stored tower loaded into it. Prices, sizes
- *  and build rules come from the engine's own catalogs, read first: a package
- *  whose catalogs this build cannot read, that list other kinds than this
- *  build draws, or whose two modes state different worlds, is a mismatched
- *  package and is refused before an engine is built. */
-export function rustBootTower(mod: WasmModule): BootTower {
+/** How the host starts its first tower: the seed of the fresh tower, and
+ *  `boot`, which loads the stored tower into that fresh engine's port (the
+ *  game passes `BOOT_SEED` and `bootTower`, `src/game/bootTower.ts`). */
+export interface RustBoot<T> {
+  seed: number;
+  boot: (port: EnginePort) => T;
+}
+
+/** A fresh Rust engine, handed to `host.boot` to load the stored tower into.
+ *  Prices, sizes and build rules come from the engine's own catalogs, read
+ *  first: a package whose catalogs this build cannot read, that list other
+ *  kinds than this build draws, or whose two modes state different worlds, is
+ *  a mismatched package and is refused before an engine is built. */
+export function rustBootTower<T>(mod: WasmModule, host: RustBoot<T>): T {
   let catalogs: Record<"classic" | "modern", ReturnType<typeof readCatalog>>;
   try {
     // Both modes: a Classic tower's patronage readout uses the Modern yardstick.
@@ -50,9 +57,9 @@ export function rustBootTower(mod: WasmModule): BootTower {
   } catch (e) {
     throw new EngineBootError("package-mismatch", e instanceof Error ? e.message : String(e));
   }
-  const port: EnginePort = mod.Engine.newGame(BOOT_SEED, "classic");
+  const port: EnginePort = mod.Engine.newGame(host.seed, "classic");
   useTowerCatalogSource(port, (mode) => catalogs[mode]);
-  return bootTower(port);
+  return host.boot(port);
 }
 
 /** What `window.__vcEngine` says while the Rust engine runs the game: the

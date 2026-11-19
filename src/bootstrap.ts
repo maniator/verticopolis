@@ -9,7 +9,7 @@ import { MISMATCH_RELOAD_LINE, claimMismatchReload, reloadForMatchingFiles } fro
 import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, markCrashReload, reloadSoon, tabStore } from "./engineCrash/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import { openSaves } from "./storage/SaveGame";
-import type { BootTower } from "./game/bootTower";
+import { BOOT_SEED, bootTower, type BootTower } from "./game/bootTower";
 import { setSlotPopulationReader } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { populationReaderFromModule } from "./wasmhost/slotPopulation";
@@ -21,6 +21,7 @@ import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
 import { bootFailureReason, deferEngineIdentity, engineFailureCopy, failBoot, loadBootEngine, publishBootState, settleEngineIdentity, type EngineBootState } from "./wasmhost/engineBoot";
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
+import { APP_VERSION } from "./appVersion";
 import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
 import { downloadEngineFailureArchive } from "./engineCrash/failureArchive";
 import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
@@ -337,7 +338,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // installed before the first screen that lists saves can draw.
       setSlotPopulationReader(populationReaderFromModule(wasmModule, (error) => void noteEngineThrow(error, "census")));
       try {
-        tower = rustBootTower(wasmModule);
+        tower = rustBootTower(wasmModule, { seed: BOOT_SEED, boot: bootTower });
       } catch (e) {
         tower = null;
         bootState = failBoot(bootState, "start", bootFailureReason(e), e instanceof Error ? e.message : String(e));
@@ -441,7 +442,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // title screen's version line is drawn again once it is read.
       afterFirstFrame(() => {
         settleEngineIdentity();
-        refreshSplashVersion();
+        refreshSplashVersion(APP_VERSION);
       });
     } catch (err) {
       // A non-Error throw (a string, say) has no `.message`, so derive the text

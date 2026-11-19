@@ -15,8 +15,8 @@ import {
   flushBeforeTowerSwap,
   forwardGameplayEvents,
   resetEngineBridge,
-  type GameplayEventSource,
 } from "./analyticsEngineBridge";
+import type { GameplayEventSource } from "./simport/portEvents";
 
 // The analytics engine bridge (#873 phase 2): the engine's drained gameplay
 // events, checked against the catalog and folded into today's wire events.
