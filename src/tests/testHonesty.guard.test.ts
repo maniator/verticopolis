@@ -56,7 +56,7 @@ const ENGINE_RUNNERS: readonly string[] = [
 const PACKAGE_PROBES: ReadonlySet<string> = new Set(["hasWasmPackage"]);
 
 /** Built engine packages, which only an integration test may load. */
-const ENGINE_PACKAGES = ["@verticopolis/engine/web/", "@verticopolis/engine-tooling/", "src/public/engine/"] as const;
+const ENGINE_PACKAGES = ["@verticopolis/engine/web/", "@verticopolis/engine/tooling/", "src/public/engine/"] as const;
 
 const isRunner = (rel: string): boolean => ENGINE_RUNNERS.includes(rel);
 const isUnitTest = (rel: string): boolean => /\.test\.tsx?$/.test(rel) && !/\.integration\.test\.tsx?$/.test(rel);
@@ -319,7 +319,7 @@ describe("unit tests mock the engine; integration tests run it", () => {
       "src/game/c.fixture.ts": 'import { newDraft } from "../tests/portKit/drafts";',
       "src/game/d.test.ts": 'import { boot } from "./boot";',
       "src/game/boot.ts": 'import { wasm } from "../tests/conformance/wasmEngine";',
-      "src/game/e.test.ts": 'const pkg = await import("@verticopolis/engine-tooling/node/verticopolis_engine.js");',
+      "src/game/e.test.ts": 'const pkg = await import("@verticopolis/engine/tooling/node/verticopolis_engine.js");',
       "src/game/f.test.ts": 'import { start } from "./f.fixture";',
       "src/game/f.fixture.ts": 'export { wasm as start } from "../tests/conformance/wasmEngine";',
       "src/game/g.test.ts": 'const { wasm } = await import("../tests/conformance/wasmEngine");',
@@ -330,7 +330,7 @@ describe("unit tests mock the engine; integration tests run it", () => {
     expect(reach("src/game/b.test.ts")).toBeNull();
     expect(reach("src/game/c.test.ts")).toBe("src/game/c.test.ts -> src/game/c.fixture.ts -> src/tests/portKit/drafts");
     expect(reach("src/game/d.test.ts")).toBeNull(); // production code is the code under test; the test mocks its boundary
-    expect(reach("src/game/e.test.ts")).toContain("@verticopolis/engine-tooling/");
+    expect(reach("src/game/e.test.ts")).toContain("@verticopolis/engine/tooling/");
     expect(reach("src/game/g.test.ts")).toBe("src/game/g.test.ts -> src/tests/conformance/wasmEngine");
     expect(reach("src/game/h.test.ts")).toBe("src/game/h.test.ts -> src/tests/conformance/wasmEngine");
     expect(reach("src/game/f.test.ts")).toBe("src/game/f.test.ts -> src/game/f.fixture.ts -> src/tests/conformance/wasmEngine");

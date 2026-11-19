@@ -13,7 +13,7 @@ import { ENGINE_TOOLING_ROOT, conformanceFile } from "../packagePaths";
 
 /**
  * The Rust engine behind the scenario surface, through its WASM binding: the
- * Node tree of the installed `@verticopolis/engine-tooling` package (the
+ * Node tree of the installed `@verticopolis/engine/tooling` package (the
  * engine's tooling build, with the tier 3 ops). Structured values cross the
  * binding as JSON text; this adapter parses them and nothing more.
  */

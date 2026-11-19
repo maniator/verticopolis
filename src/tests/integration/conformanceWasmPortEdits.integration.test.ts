@@ -23,7 +23,7 @@ import { PORT_EDITS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * passed, and it refuses to run in CI.
  */
 
-if (UPDATE && !hasWasmPackage()) throw new Error("the port-edit golden needs the engine package (VC_PORT_EDITS_UPDATE=1), and @verticopolis/engine-tooling is not installed; run npm install");
+if (UPDATE && !hasWasmPackage()) throw new Error("the port-edit golden needs the engine package (VC_PORT_EDITS_UPDATE=1), and @verticopolis/engine/tooling is not installed; run npm install");
 
 /** A fresh Rust engine; the case loads or founds its own tower over the
  *  placeholder it starts with. */

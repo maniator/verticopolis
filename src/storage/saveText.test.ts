@@ -6,7 +6,7 @@ import { decodeVctower } from "./vctowerContainer";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { stampText } from "./saveStamp";
 
-const FIXTURES = "node_modules/@verticopolis/engine-conformance/fixtures";
+const FIXTURES = "node_modules/@verticopolis/engine/conformance/fixtures";
 
 /** What the writers did before the text stamp: parse, set, print. */
 function parsedStamp(text: string, savedAt: number, appVersion: string): string {

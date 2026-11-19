@@ -6,7 +6,7 @@
  * Skips without the WASM package, like the rest of `npm run test:wasm`.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import towerFile from "@verticopolis/engine-conformance/fixtures/towerone_6.vctower?raw";
+import towerFile from "@verticopolis/engine/conformance/fixtures/towerone_6.vctower?raw";
 import { draftTower, type Draft } from "../portKit/drafts";
 import { SaveGame } from "../../storage/SaveGame";
 import { setSlotPopulationReader } from "../../storage/slotCensus";

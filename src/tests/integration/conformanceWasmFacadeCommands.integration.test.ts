@@ -31,9 +31,9 @@ type Start = { label: string; seed?: number; fixture?: string; mode: GameMode };
 const STARTS: Start[] = [
   { label: "new Classic game", seed: 7, mode: "classic" },
   { label: "new Modern game", seed: 7, mode: "modern" },
-  { label: "towerone_6 in Classic", fixture: "node_modules/@verticopolis/engine-conformance/fixtures/towerone_6.vctower", mode: "classic" },
-  { label: "sixseven-december in Modern", fixture: "node_modules/@verticopolis/engine-conformance/fixtures/sixseven-december.vctower", mode: "modern" },
-  { label: "towerone-star4 in Modern", fixture: "node_modules/@verticopolis/engine-conformance/fixtures/towerone-star4.vctower", mode: "modern" },
+  { label: "towerone_6 in Classic", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone_6.vctower", mode: "classic" },
+  { label: "sixseven-december in Modern", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven-december.vctower", mode: "modern" },
+  { label: "towerone-star4 in Modern", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone-star4.vctower", mode: "modern" },
 ];
 
 type SaveUnit = { id: number; kind: string; state?: string; rent?: number; noRate?: boolean; everOccupied?: boolean };

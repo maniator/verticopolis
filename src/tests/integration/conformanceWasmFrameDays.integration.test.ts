@@ -40,7 +40,7 @@ import { FRAME_DAYS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * the engine package is built.
  */
 
-if (UPDATE && !hasWasmPackage()) throw new Error("the frame-day golden needs the engine package (VC_FRAME_DAYS_UPDATE=1), and @verticopolis/engine-tooling is not installed; run npm install");
+if (UPDATE && !hasWasmPackage()) throw new Error("the frame-day golden needs the engine package (VC_FRAME_DAYS_UPDATE=1), and @verticopolis/engine/tooling is not installed; run npm install");
 
 /** A fresh Rust engine; the case loads or founds its own tower over the
  *  placeholder it starts with. The views are hashed in canonical form, as the

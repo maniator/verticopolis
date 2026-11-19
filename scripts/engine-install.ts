@@ -6,7 +6,7 @@
  *
  * `npm install` runs this (`postinstall`), and so does the Vercel build
  * (scripts/vercel-build.sh), whose cached install skips npm's scripts. The
- * tooling build (`@verticopolis/engine-tooling`, with the binding's tier 3
+ * tooling build (`@verticopolis/engine/tooling`, with the binding's tier 3
  * ops) is read in place from node_modules by vite.config.ts and the tests.
  */
 import { cpSync, existsSync, rmSync } from "node:fs";

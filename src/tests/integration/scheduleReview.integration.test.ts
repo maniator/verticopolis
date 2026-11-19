@@ -383,13 +383,13 @@ describe.skipIf(noEngine)("the review's notices, focus and copy (#1548)", () => 
   });
 
   it("recovers and undoes on split-tower's 5-car shaft too, and leaves both fixtures' bytes alone", async () => {
-    const before = readFileSync("node_modules/@verticopolis/engine-conformance/fixtures/split-tower.vctower");
+    const before = readFileSync("node_modules/@verticopolis/engine/conformance/fixtures/split-tower.vctower");
     const g = play(load("split-tower"));
     const saved = g.saved();
     g.review.recover(1139);
     expect(g.scheduleOf(1139)!.activeCars).toEqual({ weekday: Array(24).fill(5), weekend: Array(24).fill(5) });
     await g.history.undo();
     expect(diffPaths(saved, g.saved())).toEqual([]);
-    expect(readFileSync("node_modules/@verticopolis/engine-conformance/fixtures/split-tower.vctower").equals(before)).toBe(true);
+    expect(readFileSync("node_modules/@verticopolis/engine/conformance/fixtures/split-tower.vctower").equals(before)).toBe(true);
   });
 });

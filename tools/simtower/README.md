@@ -111,7 +111,7 @@ npx tsx tools/simtower/vctower-to-tdt.ts path/to/tower.vctower [...]
 
 Decodes the `.vctower` container and runs the Rust engine's `.TDT` exporter
 through its WASM package (`src/tests/conformance/tdtWasm.ts`), so it is the codec
-the game ships. `npm ci` installs the package (the `@verticopolis/engine-tooling`
+the game ships. `npm ci` installs the package (the `@verticopolis/engine/tooling`
 pin in `package.json`).
 
 ### Import a real `.TDT` into our engine (`tdt -> vctower`)

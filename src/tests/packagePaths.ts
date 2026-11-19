@@ -20,10 +20,10 @@ export const COMPONENT_FIXTURES = resolve(COMPONENTS_ROOT, "lib/simport/fixtures
 export const COMPONENT_STYLES = resolve(COMPONENTS_ROOT, "lib");
 /** `@verticopolis/engine`, the player build the game ships. */
 export const ENGINE_ROOT = root("@verticopolis/engine");
-/** `@verticopolis/engine-tooling`, the build with the tier 3 ops. */
-export const ENGINE_TOOLING_ROOT = root("@verticopolis/engine-tooling");
-/** `@verticopolis/engine-conformance`: scenarios, pinned hashes, fixtures. */
-export const CONFORMANCE_ROOT = root("@verticopolis/engine-conformance");
+/** `@verticopolis/engine/tooling`, the build with the tier 3 ops. */
+export const ENGINE_TOOLING_ROOT = resolve(ENGINE_ROOT, "tooling");
+/** `@verticopolis/engine/conformance`: scenarios, pinned hashes, fixtures. */
+export const CONFORMANCE_ROOT = resolve(ENGINE_ROOT, "conformance");
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 

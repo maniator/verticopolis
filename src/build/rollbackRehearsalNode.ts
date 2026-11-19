@@ -3,7 +3,7 @@
  * (`./rollbackRehearsal.ts` holds the logic): load a checkout's Node engine
  * package and read its records from it, and make the candidate-written saves
  * the previous build is rehearsed against. A checkout's engine is the tooling
- * build `npm ci` installs (`@verticopolis/engine-tooling`); a checkout from
+ * build `npm ci` installs (`@verticopolis/engine/tooling`); a checkout from
  * before the repository split built it into `engine-rs/pkg/` with
  * `npm run wasm:build`, and that place is still read. Node only and
  * ERASABLE, like its sibling.
@@ -11,12 +11,12 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, join, resolve } from "node:path";
-import type { Engine } from "@verticopolis/engine-tooling/node/verticopolis_engine";
+import type { Engine } from "@verticopolis/engine/tooling/node/verticopolis_engine";
 import type { BuildFacts, CompatRecord, EngineHandle, EnginePackage } from "./rollbackRehearsal.ts";
 
 /** Where a checkout keeps its Node engine package: installed, or built by a
  *  checkout from before the split. */
-export const NODE_PACKAGE_DIRS = ["node_modules/@verticopolis/engine-tooling/node", "engine-rs/pkg"] as const;
+export const NODE_PACKAGE_DIRS = ["node_modules/@verticopolis/engine/tooling/node", "engine-rs/pkg"] as const;
 
 const GLUE = "verticopolis_engine.js";
 const BINARY = "verticopolis_engine_bg.wasm";

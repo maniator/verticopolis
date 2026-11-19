@@ -28,7 +28,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Engine, encodeVctower } from "@verticopolis/engine-tooling/node/verticopolis_engine";
+import type { Engine, encodeVctower } from "@verticopolis/engine/tooling/node/verticopolis_engine";
 import type { SerializedGame } from "@verticopolis/components/shared/types";
 import { importTower } from "../fixtures/saveText";
 import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped, parseSaveJson } from "../../storage/saveCompression";

@@ -31,7 +31,7 @@ plumbing); it does not replace it.
 3. **TDT import and export are engine-data fidelity.** `src/storage/tdt*`
    hands 1994 tower bytes to the engine's TDT codec and back. Treat a change
    there as engine work (the `gds-code-review` lens), checked against the
-   real 1994 saves in `@verticopolis/engine-conformance`.
+   real 1994 saves in `@verticopolis/engine/conformance`.
 4. **The game asks the engine; it never decides.** Code that drives the
    engine through its port reads answers and sends commands. A rule, a cap, a
    price or a tuning value copied into TypeScript is a finding: it belongs in
