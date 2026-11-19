@@ -39,7 +39,6 @@ export function deskTaskResult(minimized: boolean, inFront: boolean): DeskTaskRe
 /** Where the Verticopolis menu was opened: over the title screen or a tower. */
 export type DeskScreen = "title" | "tower";
 
-
 /** The tray's buttons: the monitor (the Control Panel) and the speaker. */
 export type DeskTrayIcon = "display" | "sound";
 
