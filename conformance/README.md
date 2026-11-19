@@ -99,6 +99,16 @@ holiday window), `towerone-star4` (tower-one with `star` raised to four and
 Modern amenities), `towerone-vip-pending` (tower-one with `vipFavorable`
 cleared, `vipVisits` zeroed and `money` filled) and `towerone-star1`
 (tower-one with `star` set to one, so a star evaluation has a rung to climb).
+`late-game-classic` is built rather than edited, since no real save reaches
+the 15,000 people the TOWER inspection asks for:
+`scripts/derive-late-game-fixture.ts` loads the card-text golden's
+100-floor winning tower, sets `star` to four, lays sky lobbies, fills the
+elevator pool, adds a parking ramp and builds offices through the engine's
+own commands up to 3,000 and rebuilds the metro station, then leases every
+office in the saved game (18,000 workers). It holds at four stars until the
+station opens that afternoon. The five-star and TOWER scenarios start from
+it. Rerun the script
+to rebuild it; the run is deterministic.
 Derive a new one the same way, with `scripts/derive-fixture.ts <source>
 <target> '<json patch>'`, which merges the patch over the top level of the
 save and writes nothing else, and say what was edited in the scenario's

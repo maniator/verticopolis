@@ -1,0 +1,49 @@
+{
+  "id": "tower-inspection-classic",
+  "description": "The late-game Classic tower (late-game-classic, derived by scripts/derive-late-game-fixture.ts: the card-text winning tower with sky lobbies, a full elevator pool, a parking ramp and 3,000 leased offices, so 18,000 office workers, plus its medical center, two security offices, two suites, nine recycling centers and favorable VIP visit, at star 4 with its metro station rebuilt and still under construction) stays at four stars while the station is built and climbs to five once it opens. Floor 100 is then crowned with a wedding hall, which books the VIP's inspection three days out, and the tower runs five days at hour ticks: on day 3 the VIP is impressed and the tower becomes a TOWER.",
+  "start": {
+    "fixture": "conformance/fixtures/late-game-classic.vctower",
+    "mode": "classic"
+  },
+  "commands": [
+    {
+      "op": "evaluateStar"
+    },
+    {
+      "op": "checkpoint",
+      "label": "metro-building"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 9
+    },
+    {
+      "op": "evaluateStar"
+    },
+    {
+      "op": "checkpoint",
+      "label": "five-stars"
+    },
+    {
+      "op": "build",
+      "kind": "weddingHall",
+      "floor": 100,
+      "x": 150
+    },
+    {
+      "op": "checkpoint",
+      "label": "hall-built"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 120,
+      "checkpointEvery": 24
+    },
+    {
+      "op": "checkpoint",
+      "label": "inspected"
+    }
+  ]
+}
