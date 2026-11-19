@@ -88,8 +88,11 @@ test("the main-thread engine shows its record and the source hash BUILD.json rec
   expect(await state(page)).toBe("ok");
   const boot = await page.evaluate(() => (window as any).__vcEngineBoot);
   expect(boot.binary).toEqual({ state: "ok", sourceHash: record.sources });
+  // The crate and source hash match, so the dialog names them once, in the
+  // version line above the block; Copy diagnostics keeps both sides.
+  await expect(page.locator("#modal")).toContainText(`Rust engine ${record.crate.version} (${short(record.sources)})`);
   const block = page.locator("#modal .help-diagnostics");
-  await expect(block).toContainText(`${record.crate.name} ${record.crate.version}`);
+  await expect(block).not.toContainText(record.crate.name);
  
   const copied = await copyDiagnostics(page);
   expect(copied).toContain(`Engine crate: ${record.crate.name} ${record.crate.version}`);

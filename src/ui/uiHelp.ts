@@ -9,7 +9,7 @@ import { isInstalledStandalone } from "./standalone";
 import { trackAppAction } from "../analytics";
 import { engineSuffix, versionLine } from "@verticopolis/components/host/engineLabel";
 import { bugReportHref, isMobileDevice } from "./bugReport";
-import { liveDiagnostics } from "@verticopolis/components/host/engineDiagnosticsLive";
+import { gameDiagnostics } from "./aboutDiagnostics";
 import type { DiagnosticsReport } from "@verticopolis/components/host/engineDiagnostics";
 import { copyText } from "./copyText";
 import { announceLive } from "../game/liveRegion";
@@ -306,7 +306,7 @@ function openHelpTopic(ui: UI, link: HTMLAnchorElement, e?: MouseEvent): void {
 export function showAbout(ui: UI): void {
   trackAppAction("about_open");
   const onSplash = isSplashUp();
-  const diagnostics = liveDiagnostics();
+  const diagnostics = gameDiagnostics();
   let finishAbout = () => {};
   const { box, finish } = openHelpDialog(
     ui,

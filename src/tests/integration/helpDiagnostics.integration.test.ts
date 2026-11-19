@@ -56,6 +56,9 @@ describe("Help diagnostics", () => {
     expect(writeText).toHaveBeenCalledTimes(1);
     const copied = (writeText.mock.calls[0] as unknown as [string])[0];
     expect(copied).toContain("Engine crate: example-engine 9.8.7");
+    expect(__COMPONENTS_VERSION__).toMatch(/^\d+\.\d+\.\d+/);
+    expect(copied).toContain(`Components: ${__COMPONENTS_VERSION__}`);
+    expect(block.textContent).toContain(__COMPONENTS_VERSION__);
     expect(
       dialog().querySelector(".help-diagnostics-status")!.textContent,
     ).toBe("Copied.");

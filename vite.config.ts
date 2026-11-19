@@ -18,6 +18,16 @@ import { isPreviewDeploy } from "./src/build/previewDeploy";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
+/** The installed `@verticopolis/components` version, for the diagnostics in
+ *  About this game, or "" when the package is not installed. */
+function componentsVersion(): string {
+  try {
+    return JSON.parse(readFileSync(resolve(__dirname, "node_modules/@verticopolis/components/package.json"), "utf8")).version as string;
+  } catch {
+    return "";
+  }
+}
+
 /** Player-facing "What's new" lines for THIS build, read from the committed
  *  CHANGELOG.md section matching the package version (empty for an internal
  *  build with no player notes, or if the file is missing/unreadable). */
@@ -349,6 +359,8 @@ export default defineConfig(({ command }) => ({
   define: {
     __APP_VERSION__: JSON.stringify(pkgVersion),
     __APP_SHA__: JSON.stringify(gitShortSha()),
+    // The bundled components package, named in About this game's diagnostics.
+    __COMPONENTS_VERSION__: JSON.stringify(componentsVersion()),
     // `window.game` gate. Only the tooling pipelines (e2e, screenshots, perf)
     // build with VC_TOOLING=1; every other build, the Vercel deploy
     // included, gets `false` here and the publish in
