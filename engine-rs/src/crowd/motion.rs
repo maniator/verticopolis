@@ -10,19 +10,9 @@ use super::walk::{
     find_another_way, is_still_setting_out, reach_on_run, reroute, turn_back, walk_to, way_is_cut,
 };
 use super::workplace;
-use super::{
-    Crowd, PState, Person, StaffResult, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT,
-};
+use super::{Crowd, PState, StaffResult, GIVE_UP, STAFF_GIVE_UP, STRESS_WAIT};
 use crate::jsmath;
 use crate::tower::Tower;
-
-fn trip_floors(p: &Person) -> i64 {
-    let mut n = 0;
-    for i in 0..p.floors.len().saturating_sub(1) {
-        n += (p.floors[i + 1] - p.floors[i]).abs();
-    }
-    n
-}
 
 /// `advance(crowd, dtSec, tower)`.
 pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
@@ -32,19 +22,17 @@ pub fn advance(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower) {
     let room = super::expected_time::spare_lines(crowd);
     let mut lines = super::line_count::LineCount::new(tower, room);
     for i in 0..crowd.people.len() {
-        crowd.people[i].age += dt_sec;
+        // A trip's patience counts only the time spent waiting for a car
+        // (#2386): walking, climbing a flight and riding use none of it, so
+        // nobody runs out of patience on the stairs or in a cab, and a long
+        // route costs no more patience than a short one. `age` is that
+        // waiting time, from the trip's start.
+        if crowd.people[i].state == PState::Waiting {
+            crowd.people[i].age += dt_sec;
+        }
         let p = &crowd.people[i];
-        let patience = (if p.staff { STAFF_GIVE_UP } else { GIVE_UP })
-            + trip_floors(p) as f64 * RIDE_SECONDS_PER_FLOOR;
-        // Someone aboard a car rides it to their floor: giving up there would
-        // make them vanish from the cab (3.7.3). Only a wait or a walk can
-        // run out of patience.
-        if p.age > patience
-            && matches!(
-                p.state,
-                PState::Waiting | PState::ToShaft | PState::Climbing
-            )
-        {
+        let patience = if p.staff { STAFF_GIVE_UP } else { GIVE_UP };
+        if p.age > patience && p.state == PState::Waiting {
             if p.staff {
                 give_up(crowd, i, tower);
                 continue;
