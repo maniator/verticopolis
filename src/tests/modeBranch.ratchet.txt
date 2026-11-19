@@ -22,4 +22,3 @@ src/engineBinding/catalog.ts 2  # film keys ("classic" film), not the mode
 src/shared/types.ts 2
 src/storage/SaveGame.ts 1
 src/ui/uiDialogs.ts 2  # the new-game dialog reads the picked mode
-src/ui/uiStatus.ts 5

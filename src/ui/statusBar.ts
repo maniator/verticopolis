@@ -1,5 +1,6 @@
 import type { GameMode } from "../shared/types";
 import { appendMessageWithIcons } from "./icons";
+import { RULE_SET_NAME } from "./ruleSetName";
 
 /**
  * The Win95 status bar's two text boxes (index.html `#statusbar`): the tower
@@ -14,9 +15,6 @@ import { appendMessageWithIcons } from "./icons";
  * {@link showNewsInStatusBar} once per batch of new lines.
  */
 
-/** The rule set's name as the status bar shows it. */
-const RULES_NAME: Readonly<Record<GameMode, string>> = { classic: "Classic", modern: "Modern" };
-
 /** The cell last written and what it shows, so an unchanged pass is two
  *  compares with no lookup and no string built (the pump's per-pass budget). */
 let shown: { cell: HTMLElement; name: string; mode: GameMode } | undefined;
@@ -26,7 +24,7 @@ export function showTowerInStatusBar(name: string, mode: GameMode, doc: Document
   if (shown && shown.name === name && shown.mode === mode && shown.cell.ownerDocument === doc && shown.cell.isConnected) return;
   const cell = doc.getElementById("sb-tower");
   if (!cell) return;
-  const text = `${name} · ${RULES_NAME[mode]}`;
+  const text = `${name} · ${RULE_SET_NAME[mode]}`;
   if (cell.textContent !== text) cell.textContent = text;
   shown = { cell, name, mode };
 }

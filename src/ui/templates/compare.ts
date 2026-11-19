@@ -3,6 +3,7 @@ import * as classicVsModern from "../../../help-site/src/content/docs/classic-vs
 import type { GameMode } from "../../shared/types";
 import { fromGameHref } from "../fromGame";
 import { helpUrl } from "../../helpAddress";
+import { RULE_SET_NAME } from "../ruleSetName";
 
 /**
  * The Classic vs Modern comparison body: the Help site's Classic and Modern
@@ -48,9 +49,6 @@ export function compareModalTemplate(): TemplateResult {
     `;
 }
 
-/** The rule set's name as the rules dialog says it. */
-const RULES_NAME: Readonly<Record<GameMode, string>> = { classic: "Classic", modern: "Modern" };
-
 /**
  * Tower > This Tower's Rules: the same table as {@link compareTemplate}, cut
  * down to this tower's own column (`.tower-rules[data-rules]` in
@@ -58,7 +56,7 @@ const RULES_NAME: Readonly<Record<GameMode, string>> = { classic: "Classic", mod
  * names the tower and its rules. The name is lit-html text, never markup.
  */
 export function towerRulesModalTemplate(name: string, mode: GameMode): TemplateResult {
-  const rules = RULES_NAME[mode];
+  const rules = RULE_SET_NAME[mode];
   return html`
       <h2>This Tower's Rules</h2>
       <p class="tower-rules-lead">${name || "Your tower"} plays by <b>${rules}</b> rules, chosen when it was founded. Here is what that means.</p>
