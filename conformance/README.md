@@ -99,6 +99,16 @@ holiday window), `towerone-star4` (tower-one with `star` raised to four and
 Modern amenities), `towerone-vip-pending` (tower-one with `vipFavorable`
 cleared, `vipVisits` zeroed and `money` filled) and `towerone-star1`
 (tower-one with `star` set to one, so a star evaluation has a rung to climb).
+`late-game-classic` is built rather than edited, since no real save reaches
+the 15,000 people the TOWER inspection asks for:
+`scripts/derive-late-game-fixture.ts` loads the card-text golden's
+100-floor winning tower, sets `star` to four, lays sky lobbies, fills the
+elevator pool, adds a parking ramp and builds offices through the engine's
+own commands up to 3,000 and rebuilds the metro station, then leases every
+office in the saved game (18,000 workers). It holds at four stars until the
+station opens that afternoon. The five-star and TOWER scenarios start from
+it. Rerun the script
+to rebuild it; the run is deterministic.
 Derive a new one the same way, with `scripts/derive-fixture.ts <source>
 <target> '<json patch>'`, which merges the patch over the top level of the
 save and writes nothing else, and say what was edited in the scenario's
@@ -218,6 +228,7 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `build` | `kind`, `floor`, `x`, `expectFail?`, `reason?` | Build through the normal money-aware path. |
 | `buildRow` | `kind`, `floor`, `from`, `to` | `build` at every `x` from `from` to `to`, inclusive. |
 | `buildTransport` | `kind`, `x`, `bottom`, `top`, `expectFail?`, `reason?` | Build a shaft. |
+| `paintBrush` | `kind`, `floor`, `tiles`, `placed` | Run the floor and lobby brush (`paintBrush`) over the listed tiles of one floor in one call; an error unless it lays exactly `placed` tiles. A lobby brush also turns plain floor into a sky lobby. |
 | `sell` | `floor`, `x`, `kind?` | Sell the unit at that tile; with `kind`, an error unless that is what the tile holds. |
 | `adjustRent` | `floor`, `x`, `dir` (`1` or `-1`) | Step a unit's rent. |
 | `setNoRate` | `floor`, `x` | Set a unit to no rate (the Classic price ladder only). |
@@ -269,7 +280,9 @@ ill-typed:
 
 - `id` and `description`, `fixture`, and `label` are non-empty strings.
 - `seed` is a whole number from 0 to 4294967295, and the optional `star` is a
-  whole number from 1 to 5.
+  whole number from 1 to 5. A start at four or five stars has had its
+  favorable VIP visit (`vipFavorable` set, one VIP visit), as a played tower
+  at that star has.
 - `floor`, `x`, `from`, `to`, `bottom` and `top` are whole numbers, and a
   `buildRow`'s `from` is not past its `to`.
 - `dt`, `times`, `checkpointEvery` and `cars` are whole numbers above zero.
@@ -282,6 +295,8 @@ ill-typed:
   without the `transport` flag for `build` and `buildRow`, one with it for
   `buildTransport`.
 - `mode` is `classic` or `modern`.
+- a `paintBrush` `kind` is `floor` or `lobby`, its `tiles` a list of 1 to 32
+  whole numbers (the brush's own limit), and `placed` a whole number.
 
 Together these keep a scenario from quietly testing a different tower than the
 one it describes.

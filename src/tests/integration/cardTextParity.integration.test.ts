@@ -13,11 +13,13 @@ import {
   CARD_TEXT_MODES,
   cardTextFiles,
   expectRealLines,
+  kindsNoCaseBuilds,
   playCardTextCase,
   readCardTextFile,
   readCardTextGolden,
   textOf,
   writeCardTextGolden,
+  variantsPrintingAlike,
   type CardTextGolden,
 } from "../goldens/cardText";
 import { CARD_TEXT_WRITER, writeAfterPassingRun } from "../goldens/updateGate";
@@ -72,6 +74,14 @@ describe("the card-text golden's files", () => {
     expect(new Set(want).size, "two cases share a file name").toBe(want.length);
     expect(readdirSync(CARD_TEXT_DIR).sort()).toEqual([...want].sort());
   });
+
+});
+
+describe.skipIf(!hasWasmPackage())("the card-text sweep's kinds", () => {
+  it.each(CARD_TEXT_MODES)("%s: build every kind in the engine's catalog but the unswept ones", (mode) => {
+    const kinds = readCatalog(wasm(), mode).facilities.map((f) => f.key);
+    expect(kindsNoCaseBuilds(kinds, CARD_TEXT_CASES.map((n) => readCardTextGolden(mode, n)))).toEqual([]);
+  });
 });
 
 describe.skipIf(!hasWasmPackage())("the Rust card prints the lines the TypeScript card did", () => {
@@ -120,4 +130,12 @@ describe.skipIf(!hasWasmPackage())("the Rust card prints the lines the TypeScrip
       });
     }
   }
+});
+
+// After the sweep, so a refresh checks the lines it is about to write.
+describe("the card-text golden's lines", () => {
+  it("differ between each variant and its plain case", () => {
+    const goldens = WRITING ? fresh : CARD_TEXT_MODES.flatMap((m) => CARD_TEXT_CASES.map((n) => readCardTextGolden(m, n)));
+    expect(variantsPrintingAlike(goldens)).toEqual([]);
+  });
 });

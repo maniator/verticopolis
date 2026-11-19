@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadScenario, runScenario } from "./scenario";
-import { hasWasmPackage, startWasmEngine } from "./wasmEngine";
+import { hasWasmPackage, startWasmEngine, startWasmHandle } from "./wasmEngine";
 
 const dir = mkdtempSync(join(tmpdir(), "vc-scenario-star-"));
 
@@ -59,6 +59,18 @@ describe.skipIf(!hasWasmPackage())("a new game that opens at a higher star", () 
   it("survives a reload at four and five stars, whose milestones a load grants", () => {
     expect(() => run(4, [{ op: "reload" }])).not.toThrow();
     expect(() => run(5, [{ op: "reload" }])).not.toThrow();
+  });
+
+  // Four stars needs a favorable VIP visit in play, so a start at four or five
+  // has had one, as a `.TDT` import at that star does (#1288).
+  it.each([[1, false, 0], [3, false, 0], [4, true, 1], [5, true, 1]])("opens at %i stars with vipFavorable %s and %i VIP visits", (star, favorable, visits) => {
+    const w = startWasmHandle({ newGame: { seed: 1, mode: "classic", star } });
+    try {
+      const save = JSON.parse(w.serialize()) as { star: number; vipFavorable: boolean; vipVisits: number };
+      expect(save).toMatchObject({ star, vipFavorable: favorable, vipVisits: visits });
+    } finally {
+      w.free();
+    }
   });
 
   it.each([0, 6, 2.5, "3", null])("refuses a star of %j", (star) => {

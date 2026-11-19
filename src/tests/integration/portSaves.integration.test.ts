@@ -17,6 +17,7 @@ import { engineFromSave, look, noEngine } from "../portKit/rustEngine";
 
 /** Each conformance save's clock, as the header reads it. */
 const SAVES: [string, string, string][] = [
+  ["late-game-classic.vctower", "WD1 07:00", "1st WD/1Q/1st Year"],
   ["sixseven-december.vctower", "WE1 21:57", "1st WE/4Q/88th Year"],
   ["sixseven_2.vctower", "WD2 21:57", "2nd WD/3Q/74th Year"],
   ["split-tower-4.vctower", "Tue 23:20", "2nd WD/4Q/4th Year"],

@@ -65,6 +65,32 @@ export const CARD_TEXT_CASES: readonly string[] = [
   "winning tower, unhappy",
 ];
 
+/** The catalog kinds no case builds, each with the reason, so the sweep's
+ *  kinds can be held to the engine's catalog and a new kind joins a case. */
+export const CARD_TEXT_UNSWEPT_KINDS: ReadonlyMap<string, string> = new Map([
+  ["floor", "a slab, which has no card of its own"],
+  ["lobby", "a lobby tile, which has no card of its own"],
+  ["weddingHall", "the hall needs a five-star tower, and no case's tower is one"],
+]);
+
+/** The catalog kinds missing from every case of `mode`, apart from the
+ *  unswept ones, given each case's golden. */
+export function kindsNoCaseBuilds(catalogKinds: readonly string[], goldens: readonly CardTextGolden[]): string[] {
+  const built = new Set(goldens.flatMap((g) => [...g.units.map((u) => u.kind), ...g.transports.map((t) => t.kind)]));
+  return catalogKinds.filter((k) => !built.has(k) && !CARD_TEXT_UNSWEPT_KINDS.has(k));
+}
+
+/** The variants ("lobby distance, unhappy") that print the same room and
+ *  shaft lines as their plain case ("lobby distance") in the same mode, and
+ *  so add no coverage. */
+export function variantsPrintingAlike(goldens: readonly CardTextGolden[]): string[] {
+  const text = (g: CardTextGolden) => JSON.stringify([g.units.map((u) => [u.kind, u.floor, u.lines]), g.transports.map((t) => [t.kind, t.lines])]);
+  return goldens.flatMap((v) => {
+    const plain = goldens.find((g) => g.mode === v.mode && v.case.startsWith(`${g.case}, `));
+    return plain && text(plain) === text(v) ? [`${v.mode}: ${v.case}`] : [];
+  });
+}
+
 /** In-game minutes each card's engine plays after loading a case's tower and
  *  before the cards are read, in 10-minute ticks. A shaft's load line needs
  *  riders measured over time, and a save does not carry that measurement, so
@@ -146,10 +172,11 @@ export function expectRealLines(g: CardTextGolden): void {
   if (is("retail venues, rainy day")) expect(starting("Rain might"), `${label}: no venue printed the rain line`).toBeGreaterThan(0);
   // The unhappy towers charge a top rent, so a tenant has a cause to gripe
   // about even where no worse cause (crowded elevators) comes first. The
-  // unhappy service-room tower's office is unserved, so its gripe is access,
-  // which its own line says, and both cards leave "Main gripe" out.
-  if (is("service rooms, unhappy")) expect(starting("Main gripe:"), `${label}: the unserved office printed a gripe`).toBe(0);
-  else if (isOneOf(["lobby distance, unhappy", "winning tower, unhappy"])) expect(starting("Main gripe:"), `${label}: no tenant printed a gripe`).toBeGreaterThan(0);
+  // unhappy service-room tower has a stairway to its rooms (built on the
+  // loaded tower with the engine's `buildTransport`, #1816), so its office
+  // gripes about the rent where the plain tower's unserved office prints
+  // only its access line.
+  if (isOneOf(["service rooms, unhappy", "lobby distance, unhappy", "winning tower, unhappy"])) expect(starting("Main gripe:"), `${label}: no tenant printed a gripe`).toBeGreaterThan(0);
   // The crowded lift runs close to full in Classic. Riders stay aboard to
   // their floors since 3.7.3, so its one car stops for each of them and its
   // load peaks past the engine's near-capacity line; the faster Modern car,

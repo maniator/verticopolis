@@ -307,3 +307,54 @@ fn the_identity_record_shape_is_pinned() {
         "the identity record's shape changed: raise IDENTITY_SCHEMA and append the new pin\n{shape}"
     );
 }
+
+/// One pin per `CATALOG_VERSION` whose shape is pinned, oldest first: the
+/// version and the hash of the catalog's key paths. Versions before the first
+/// entry predate the pin (#1154). A field added, renamed or removed changes
+/// the hash and needs a new `CATALOG_VERSION`, with a pin for it.
+const CATALOG_SHAPE_PINS: &[(u32, &str)] = &[(26, "c453a51d79f2ac77")];
+
+/// The catalog's shape: every dotted key path in both modes' catalogs, with
+/// `[]` for an array's items, sorted and deduplicated, so a moved price leaves
+/// it alone and a new field changes it.
+#[test]
+fn the_catalog_shape_is_pinned() {
+    fn paths(prefix: &str, v: &Value, out: &mut Vec<String>) {
+        match v {
+            Value::Object(map) => {
+                for (k, inner) in map {
+                    let path = if prefix.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{prefix}.{k}")
+                    };
+                    paths(&path, inner, out);
+                }
+            }
+            Value::Array(items) => {
+                out.push(format!("{prefix}[]"));
+                for inner in items {
+                    paths(&format!("{prefix}[]"), inner, out);
+                }
+            }
+            _ => out.push(prefix.to_owned()),
+        }
+    }
+    let mut keys = Vec::new();
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        paths("", &crate::catalog::catalog_value(mode), &mut keys);
+    }
+    keys.sort_unstable();
+    keys.dedup();
+    let shape = keys.join("\n");
+    let (version, pin) = *CATALOG_SHAPE_PINS.last().unwrap();
+    assert_eq!(
+        version, CATALOG_VERSION,
+        "the newest catalog shape pin belongs to an older CATALOG_VERSION: append a pin for the current one"
+    );
+    assert_eq!(
+        pin,
+        hex16(shape.as_bytes()),
+        "the catalog's shape changed: raise CATALOG_VERSION and append a shape pin for it\n{shape}"
+    );
+}

@@ -134,6 +134,51 @@ describe("room details follow the room wherever it is painted (#915)", () => {
     expect(new Set(rooms.map(lit)).size).toBeGreaterThan(1);
   });
 
+  it("an empty sky bar lights different windows at the same building slot and height in different rooms", () => {
+    // The heights come from the room's seed too, so rooms differing in
+    // their windows proves little alone: a painter that kept the heights and
+    // dropped the room from the window pick would still differ. So compare
+    // the windows of one building slot at one height across rooms: some pair
+    // must light different windows. Read from the pixels: column `bx` of a
+    // building is solid (its windows sit one or three pixels in), so its
+    // height is the run of non-sky pixels there, and each window row is
+    // three pixels below the last from two below the roof.
+    const w = 12 * TILE;
+    const h = FLOOR;
+    const winTop = 3;
+    const winBot = h - Math.max(3, Math.round(h * 0.12)) - 9;
+    const lights = new Set(["#f0d070", "#f0a850", "#d0d0f0"].map((c) => parseColor(c).slice(0, 3).join(",")));
+    const windowsBySlot = new Map<string, Set<string>>();
+    for (const floor of [5, 12, 27, 43, 61]) {
+      for (const x of [17, 64, 131, 208]) {
+        const px = paintAt(unitOf("skyBar", { occupants: 0, width: 12, floor, x }), 0, 0, true);
+        const at = (cx: number, cy: number) => px.slice((cy * w + cx) * 4, (cy * w + cx) * 4 + 3).join(",");
+        const sky = at(2, winTop + 2);
+        for (let bx = 3, i = 0; bx + 4 < w - 3; bx += 6, i++) {
+          let bh = 0;
+          for (let cy = winBot - 1; cy > winTop && at(bx, cy) !== sky; cy--) bh++;
+          const lit: boolean[] = [];
+          for (let wy = winBot - bh + 2; wy < winBot - 1; wy += 3) lit.push(lights.has(at(bx + 1 + (wy & 1 ? 2 : 0), wy)));
+          const slot = `${i}@${bh}`;
+          windowsBySlot.set(slot, (windowsBySlot.get(slot) ?? new Set()).add(lit.join("")));
+        }
+      }
+    }
+    const looks = [...windowsBySlot.values()].map((set) => set.size);
+    expect(Math.max(...looks), "a building slot at one height lit the same windows in every room").toBeGreaterThan(1);
+  });
+
+  it("the raster checks a fill's color even when the clip hides the whole rect", () => {
+    // A bad color on a clipped draw would otherwise pass the invalid-fill
+    // check unseen.
+    const r = rasterCtx(10, 10);
+    r.ctx.fillStyle = "rgb(1, NaN, 3)";
+    expect(() => r.ctx.fillRect(20, 20, 4, 4)).toThrow("rasterCtx: bad color rgb(1, NaN, 3)");
+    r.ctx.fillStyle = "#123456";
+    r.ctx.fillRect(20, 20, 4, 4);
+    expect(r.data.every((v) => v === 0)).toBe(true);
+  });
+
   it("the comparison catches a detail that follows the draw origin", () => {
     // Controls. A paint that seeds a color from its absolute x must fail the
     // same comparison the rooms pass.

@@ -233,6 +233,80 @@ fn the_vip_crowns_a_finished_tower_and_returns_to_a_short_one() {
     }
 }
 
+/// A three-star Classic tower with one hotel suite on floor 2, served by an
+/// elevator, its guests asleep at `satisfaction`, and no parking.
+fn suite_tower(satisfaction: f64) -> Simulation {
+    let mut sim = Simulation::new(1, GameMode::Classic, CalendarKind::RealWorld, false);
+    sim.money = 1.0e9;
+    for x in 100..160 {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    assert!(sim.build_transport(Kind::ElevatorStandard, 100, 1, 2).ok);
+    let id = sim.tower.place(Kind::HotelSuite, 2, 120).unit_id.unwrap();
+    let suite = sim.tower.get_unit_mut(id).unwrap();
+    suite.state = UnitState::Asleep;
+    suite.satisfaction = satisfaction;
+    sim.star = 3;
+    sim.vip_favorable = false;
+    sim.last_vip_nag_day = -5;
+    sim
+}
+
+fn last_line(sim: &Simulation) -> &str {
+    sim.log.last().map_or("", |e| e.text.as_str())
+}
+
+/// The VIP's suite stay (`maybeVipStay`), whose words the conformance hash
+/// leaves out (#864): an unhappy suite gets the underwhelming line, a happy
+/// one with no parking gets the circled-the-block line, and either counts a
+/// visit and waits five days before the next. A tower below three stars, or
+/// one with its favorable review already, gets no visit.
+#[test]
+fn the_vip_suite_stay_reads_the_suites_and_waits_five_days() {
+    let underwhelming = "A VIP's suite stay was underwhelming. Improve suite access and try again.";
+    let mut sim = suite_tower(0.5);
+    let today = sim.clock.day();
+    sim.maybe_vip_stay();
+    assert_eq!(last_line(&sim), underwhelming);
+    assert_eq!((sim.vip_visits, sim.last_vip_nag_day), (1, today));
+    assert!(!sim.vip_favorable);
+    let lines = sim.log.len();
+    sim.maybe_vip_stay();
+    assert_eq!(sim.log.len(), lines, "no second visit within five days");
+    assert_eq!(sim.vip_visits, 1);
+    sim.last_vip_nag_day = today - 5;
+    sim.maybe_vip_stay();
+    assert_eq!(last_line(&sim), underwhelming, "back after five days");
+    assert_eq!(sim.vip_visits, 2);
+
+    let mut sim = suite_tower(0.7);
+    assert!(sim.suite_parking_short());
+    sim.maybe_vip_stay();
+    assert_eq!(
+        last_line(&sim),
+        "🚗 The VIP circled the block and left. Every hotel suite needs a working parking space (chained to a ramp)."
+    );
+    assert_eq!(sim.vip_visits, 1);
+    assert!(!sim.vip_favorable);
+
+    for (star, favorable) in [
+        (VIP_VISITS_FROM_STAR - 1, false),
+        (VIP_VISITS_FROM_STAR, true),
+    ] {
+        let mut sim = suite_tower(0.5);
+        sim.star = star;
+        sim.vip_favorable = favorable;
+        let lines = sim.log.len();
+        sim.maybe_vip_stay();
+        assert_eq!(
+            (sim.log.len(), sim.vip_visits),
+            (lines, 0),
+            "star {star}, favorable {favorable}"
+        );
+    }
+}
+
 /// A tower with a working recycling center in the basement, a shop on floor
 /// 3 and, in Modern, a nightclub on floor 2, every room open.
 fn venue_tower(mode: GameMode) -> Simulation {

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  EVENT_DAY_FIXTURE,
+  EVENT_DAY_FIXTURES,
   FIRST_FRAME_CHECKPOINT,
   FRAME_DAY_CASES,
   FRAME_DAY_FIXTURES,
@@ -44,13 +44,13 @@ describe("the frame-day golden's comparison", () => {
     const moving = (eventAt = SETUP_CHECKPOINTS, length = MIN_DAY_CHECKPOINTS) =>
       Array.from({ length }, (_, i): FrameDayCheckpoint => ({ minute: i * 60, state: `s${i}`, crowd: `c${i}`, events: "e", count: i === eventAt ? 1 : 0 }));
     const n = MIN_DAY_CHECKPOINTS;
-    expect(frameDayProblems(fixture(EVENT_DAY_FIXTURE), moving())).toEqual([]);
+    expect(frameDayProblems(fixture(EVENT_DAY_FIXTURES[0]), moving())).toEqual([]);
     expect(frameDayProblems(fixture("other.vctower"), moving().map((p) => ({ ...p, state: "s" })))).toEqual([`the state view has only 1 distinct hash over ${n} checkpoints`]);
     expect(frameDayProblems(fixture("other.vctower"), moving().map((p) => ({ ...p, crowd: "c" })))).toEqual([`the crowd view has only 1 distinct hash over ${n} checkpoints`]);
-    expect(frameDayProblems(fixture(EVENT_DAY_FIXTURE), moving().map((p) => ({ ...p, count: 0 })))).toEqual(["no event during play"]);
+    expect(frameDayProblems(fixture(EVENT_DAY_FIXTURES[0]), moving().map((p) => ({ ...p, count: 0 })))).toEqual(["no event during play"]);
     // An event in the first frame's checkpoint belongs to the setup, so it
     // does not count as play.
-    expect(frameDayProblems(fixture(EVENT_DAY_FIXTURE), moving(FIRST_FRAME_CHECKPOINT))).toEqual(["no event during play"]);
+    expect(frameDayProblems(fixture(EVENT_DAY_FIXTURES[0]), moving(FIRST_FRAME_CHECKPOINT))).toEqual(["no event during play"]);
     expect(frameDayProblems(fixture("other.vctower"), moving().slice(0, 3))).toEqual([`3 checkpoints, fewer than ${n}`, "spans 120 minutes, less than a day"]);
     expect(frameDayProblems(fixture("other.vctower"), moving().slice(0, n - 1))).toEqual([`${n - 1} checkpoints, fewer than ${n}`]);
     // The edges: a view distinct at only half the checkpoints is still thin
@@ -76,7 +76,7 @@ describe("the frame-day golden's comparison", () => {
 describe("the frame-day cases", () => {
   it("cover every fixture at every running speed, plus the dual run's own cases", () => {
     for (const file of FRAME_DAY_FIXTURES) {
-      const plain = (c: FrameDayCase) => c.start.kind === "fixture" && c.start.file === file && c.start.calendar === undefined && caseDays(c) === 1;
+      const plain = (c: FrameDayCase) => c.start.kind === "fixture" && c.start.file === file && c.start.calendar === undefined && c.start.minutes === undefined && c.reloadAfterMinutes === undefined && caseDays(c) === 1;
       const speeds = FRAME_DAY_CASES.filter((c) => plain(c) && !c.steadyClock && c.frameTimes.length > 1).map((c) => c.speed);
       expect(speeds, file).toEqual([1, 2, 3]);
     }
@@ -88,6 +88,11 @@ describe("the frame-day cases", () => {
     // A built tower on the canon calendar plays past a quarter's end.
     const canon = FRAME_DAY_CASES.filter((c) => c.start.kind === "fixture" && c.start.calendar === "canon");
     expect(canon.map((c) => [c.speed, caseDays(c)])).toEqual([[3, 4]]);
+    // A built Modern tower crosses a real-world quarter's end (day 270, also
+    // a 30-day maintenance period's), and one case reloads mid-day.
+    const moved = FRAME_DAY_CASES.filter((c) => c.start.kind === "fixture" && c.start.minutes !== undefined);
+    expect(moved.map((c) => (c.start.kind === "fixture" ? Math.floor(c.start.minutes! / (24 * 60)) + caseDays(c) : 0))).toEqual([270]);
+    expect(FRAME_DAY_CASES.filter((c) => c.reloadAfterMinutes !== undefined).map((c) => c.reloadAfterMinutes)).toEqual([300]);
     // The cases that name a fixture name one that is there.
     for (const c of FRAME_DAY_CASES) if (c.start.kind === "fixture") expect(FRAME_DAY_FIXTURES, c.id).toContain(c.start.file);
   });
@@ -98,7 +103,7 @@ describe("the frame-day cases", () => {
 
   it("pin a moving tower: a full day per case, a state and crowd that change over every fixture's day, and the event day's events", () => {
     const golden = readFrameDays();
-    expect(FRAME_DAY_FIXTURES, "the event day's fixture").toContain(EVENT_DAY_FIXTURE);
+    for (const file of EVENT_DAY_FIXTURES) expect(FRAME_DAY_FIXTURES, "an event day's fixture").toContain(file);
     for (const c of FRAME_DAY_CASES) expect(frameDayProblems(c, golden.cases[c.id]), c.id).toEqual([]);
   });
 });

@@ -5,7 +5,7 @@ import type { EnginePort } from "../../simport/enginePort";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import {
-  EVENT_DAY_FIXTURE,
+  EVENT_DAY_FIXTURES,
   FIRST_FRAME_CHECKPOINT,
   FRAME_DAY_CASES,
   FRAME_DAY_FIXTURES,
@@ -81,8 +81,8 @@ describe.skipIf(!hasWasmPackage())("the frame-day golden on the Rust engine", ()
   it("pins every case and nothing else", () => {
     const ids = FRAME_DAY_CASES.map((c) => c.id);
     expect(new Set(ids).size, "case ids are unique").toBe(ids.length);
-    // The event check names its fixture, so a refresh refuses when it is gone.
-    expect(FRAME_DAY_FIXTURES, "the event day's fixture").toContain(EVENT_DAY_FIXTURE);
+    // The event check names its fixtures, so a refresh refuses when one is gone.
+    for (const file of EVENT_DAY_FIXTURES) expect(FRAME_DAY_FIXTURES, "an event day's fixture").toContain(file);
     if (!UPDATE) expect(Object.keys(pinned.cases)).toEqual(ids);
   });
 

@@ -66,9 +66,11 @@ export const FIRST_FRAME_CHECKPOINT = 1;
  *  whose events are the load's or the founding's own. */
 export const SETUP_CHECKPOINTS = 2;
 
-/** The fixture whose day carries events during play. Today it is the only
- *  one, so the event check names it, and losing those events says so. */
-export const EVENT_DAY_FIXTURE = "towerone-star1.vctower";
+/** The fixtures whose day carries events during play, so the event hash
+ *  guards something: the event check names them, and losing a fixture's
+ *  events says so. `towerone-star1` climbs a star rung in its first hour,
+ *  and `late-game-classic` in the afternoon, when its metro station opens. */
+export const EVENT_DAY_FIXTURES: readonly string[] = ["late-game-classic.vctower", "towerone-star1.vctower"];
 
 /** Frames in a row the clock may stand still before the run calls it stuck:
  *  the slowest case (speed 1 at the lunch dilation, 120 Hz frames) moves it
@@ -80,11 +82,12 @@ const MAX_STILL_FRAMES = 10_000;
 const STEP_OWED_MINUTES = true;
 
 /** Where a case's tower comes from. A fixture with a `calendar` has its
- *  Modern calendar set to that one in its save before it loads, so it loads
- *  as a save (`loadSave`) and not as a file: a tower takes its calendar at
- *  founding, and no command changes it. */
+ *  Modern calendar set to that one in its save before it loads, and one with
+ *  `minutes` has its clock moved there, so it loads as a save (`loadSave`)
+ *  and not as a file: a tower takes its calendar at founding, and no command
+ *  changes it or moves the clock. */
 export type FrameDayStart =
-  | { readonly kind: "fixture"; readonly file: string; readonly calendar?: "canon" }
+  | { readonly kind: "fixture"; readonly file: string; readonly calendar?: "canon"; readonly minutes?: number }
   | { readonly kind: "found"; readonly seed: number; readonly mode: "classic" | "modern"; readonly calendar: "realWorld" | "canon"; readonly unbridged: boolean };
 
 export interface FrameDayCase {
@@ -96,6 +99,12 @@ export interface FrameDayCase {
   readonly frameTimes: readonly number[];
   /** Game days the case plays; one when left out. */
   readonly days?: number;
+  /** Save and reload the tower mid-day: after the first frame past this
+   *  many minutes of play that leaves the host owing minutes, the game is
+   *  serialized and loaded again (`serialize`, `loadSave`) while the host
+   *  keeps the minutes it owes, as a player's reload in the middle of a
+   *  catch-up would. */
+  readonly reloadAfterMinutes?: number;
 }
 
 /** The game days a case plays. */
@@ -152,6 +161,19 @@ export const FRAME_DAY_CASES: readonly FrameDayCase[] = [
   { id: "new Modern game on the canon calendar, unbridged, at speed 2", start: found(99, "modern", "canon", true), speed: 2, steadyClock: false, frameTimes: FRAME_TIMES_MS },
   { id: "split-tower at speed 3, one steady frame rate", start: { kind: "fixture", file: "split-tower.vctower" }, speed: 3, steadyClock: false, frameTimes: [1000 / 60] },
   { id: "towerone_6 at speed 3 on the steady clock", start: { kind: "fixture", file: "towerone_6.vctower" }, speed: 3, steadyClock: true, frameTimes: FRAME_TIMES_MS },
+  // A built Modern tower on the real-world calendar, its clock moved to the
+  // day before day 270, which ends a 90-day quarter and a 30-day
+  // maintenance period.
+  {
+    id: "split-tower across a real-world quarter, at speed 3",
+    start: { kind: "fixture", file: "split-tower.vctower", minutes: 269 * DAY + 278 },
+    speed: 3,
+    steadyClock: false,
+    frameTimes: FRAME_TIMES_MS,
+  },
+  // A reload at midday while the host still owes minutes from the long
+  // frames, so the step debt carries across the load.
+  { id: "towerone_6 at speed 2, reloaded at midday with minutes owed", start: { kind: "fixture", file: "towerone_6.vctower" }, speed: 2, steadyClock: false, frameTimes: FRAME_TIMES_MS, reloadAfterMinutes: 5 * 60 },
   // A built Modern tower on the canon calendar (three-day quarters) for four
   // days, so it crosses a quarter's end; the founded canon case above runs
   // one empty day. The dual run's day suite had it beside its day gate.
@@ -199,12 +221,13 @@ export function dumpRoot(value: string | undefined): string | undefined {
 export function startTower(port: EnginePort, start: FrameDayStart): void {
   if (start.kind === "fixture") {
     const text = readFileSync(resolve(FIXTURE_DIR, start.file), "utf8");
-    if (start.calendar === undefined) {
+    if (start.calendar === undefined && start.minutes === undefined) {
       swapDone(port, port.loadVctower(text));
       return;
     }
     const save = decodeVctower(text, start.file) as Record<string, unknown>;
-    swapDone(port, port.loadSave(JSON.stringify({ ...save, modernCalendar: start.calendar })));
+    const edits = { ...(start.calendar === undefined ? {} : { modernCalendar: start.calendar }), ...(start.minutes === undefined ? {} : { minutes: start.minutes }) };
+    swapDone(port, port.loadSave(JSON.stringify({ ...save, ...edits })));
     return;
   }
   const codes = new PortCodes(port);
@@ -271,12 +294,18 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
   let hour = Math.floor(from / 60);
   let now = from;
   let tookCheckpoint = true;
+  let reloaded = c.reloadAfterMinutes === undefined;
   while (now < from + caseDays(c) * DAY) {
     const dtMs = c.frameTimes[frames % c.frameTimes.length];
     // The answer is `[steps, owed]`.
     [, owed] = port.advance(owed, dtMs, minutesPerSecond, c.steadyClock, STEP_OWED_MINUTES);
     frames++;
     drain(batch);
+    if (!reloaded && clock() - from > c.reloadAfterMinutes! && owed > 0) {
+      swapDone(port, port.loadSave(port.serialize()));
+      drain(batch);
+      reloaded = true;
+    }
     const before = now;
     now = clock();
     if (choiceOpen()) throw new Error(`${c.id}: a choice opened at minute ${now}; the golden plays no choices`);
@@ -294,6 +323,7 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
   // The day rarely ends on the hour, so the minutes after the last hour get
   // their own checkpoint.
   if (!tookCheckpoint) checkpoint(now);
+  if (!reloaded) throw new Error(`${c.id}: no frame after minute ${c.reloadAfterMinutes} of play left minutes owed, so the tower never reloaded`);
   return out;
 }
 
@@ -313,7 +343,7 @@ export function frameDayProblems(c: FrameDayCase, points: readonly FrameDayCheck
       const distinct = new Set(points.map((p) => p[view])).size;
       if (distinct <= points.length / 2) problems.push(`the ${view} view has only ${distinct} distinct ${distinct === 1 ? "hash" : "hashes"} over ${points.length} checkpoints`);
     }
-    if (c.start.file === EVENT_DAY_FIXTURE && !points.slice(SETUP_CHECKPOINTS).some((p) => p.count > 0)) problems.push("no event during play");
+    if (EVENT_DAY_FIXTURES.includes(c.start.file) && !points.slice(SETUP_CHECKPOINTS).some((p) => p.count > 0)) problems.push("no event during play");
   }
   return problems;
 }

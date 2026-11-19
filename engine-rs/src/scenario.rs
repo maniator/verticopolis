@@ -76,14 +76,22 @@ fn start_sim(start: &Start, suite: &std::path::Path) -> Result<Simulation, RunEr
             })?;
             let sim = Simulation::new_game(new_game.seed, mode);
             // A start state, not a command. The founded game is saved, raised
-            // to the star and loaded back, the route all three runners take,
-            // so a load's milestones and boundary markers are the same
-            // everywhere. One star is the founded game itself.
+            // to the star and loaded back, the route both runners take (this
+            // one and `startWasmHandle` in wasmEngine.ts), so a load's
+            // milestones and boundary markers are the same everywhere. One
+            // star is the founded game itself.
             match new_game.star.filter(|&star| star > 1) {
                 None => Ok(sim),
                 Some(star) => {
                     let mut raw = sim.serialize();
                     raw["star"] = star.into();
+                    // A played tower reaches four stars only through a
+                    // favorable VIP visit, so a start at four or five has had
+                    // one, as a `.TDT` import at that star does (#1288).
+                    if star >= FAVORABLE_VIP_STAR {
+                        raw["vipFavorable"] = true.into();
+                        raw["vipVisits"] = 1.into();
+                    }
                     crate::load::deserialize(&raw).map_err(|e| RunError::Failed {
                         index: 0,
                         what: format!("star {star}: {e}"),
@@ -115,6 +123,9 @@ fn start_sim(start: &Start, suite: &std::path::Path) -> Result<Simulation, RunEr
         }
     }
 }
+
+/// The lowest star a played tower holds only after a favorable VIP visit.
+pub const FAVORABLE_VIP_STAR: i64 = 4;
 
 pub struct Run {
     pub checkpoints: Vec<Checkpoint>,

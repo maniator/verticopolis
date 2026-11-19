@@ -400,3 +400,7 @@ pub fn log_since(sim: &Simulation, seq: i64) -> Value {
 #[cfg(test)]
 #[path = "frame_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "frame_codes_tests.rs"]
+mod code_tests;

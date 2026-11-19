@@ -99,3 +99,21 @@ fn four_and_five_stars_open_at_four_and_five_now_and_after_a_step() {
     )
     .is_none());
 }
+
+/// Four stars needs a favorable VIP visit in play, so a start at four or five
+/// has had one, as a `.TDT` import at that star does (#1288). Below four the
+/// founded game's own VIP state stands.
+#[test]
+fn a_start_at_four_or_five_stars_has_had_a_favorable_vip_visit() {
+    use crate::scenario::run_scenario_until;
+    for (star, favorable, visits) in [(1, false, 0), (3, false, 0), (4, true, 1), (5, true, 1)] {
+        let s = Scenario::parse(&format!(
+            r#"{{"id":"t","description":"t","start":{{"newGame":{{"seed":1,"mode":"classic","star":{star}}}}},"commands":[{{"op":"checkpoint","label":"open"}}]}}"#
+        ))
+        .unwrap();
+        let sim = run_scenario_until(&s, Path::new("."), "open").unwrap();
+        assert_eq!(sim.star, star, "star {star}");
+        assert_eq!(sim.vip_favorable, favorable, "star {star}");
+        assert_eq!(sim.vip_visits, visits, "star {star}");
+    }
+}
