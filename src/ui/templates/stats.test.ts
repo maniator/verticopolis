@@ -3,7 +3,7 @@ import { nothing } from "lit-html";
 import { gateLabel, incomeSection, milestonesSection, nextStarSection, statsModalTemplate, statsTemplate, STAR_GATE_LABELS } from "./stats";
 import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
-import type { StarGateId } from "../../simport/panels";
+import type { StarGateId } from "@verticopolis/components/port/panels";
 import { LAYOUT } from "../../tests/portKit/mockPort";
 import { ledger, milestoneList, statsScreenFor, type ScreenParts } from "../../tests/fixtures/statsScreens";
 

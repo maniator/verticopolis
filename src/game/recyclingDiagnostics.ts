@@ -1,5 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
-import { groupDigits } from "../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * The recycling card's lines: current fill and the capacity/demand verdict.

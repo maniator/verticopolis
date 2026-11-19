@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { EnginePort } from "../../simport/enginePort";
-import { PortCodes } from "../../simport/portCodes";
-import type { SimView } from "../../simport/view";
-import type { ViewReader } from "../../simport/viewReader";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import type { SimView } from "@verticopolis/components/port/view";
+import type { ViewReader } from "@verticopolis/components/port/viewReader";
 import { newViewReader } from "../../game/portAccess";
 import { portOf } from "../../game/cardKit.fixture";
 import { draftTower } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
 import { catalogFor } from "../catalogFixture";
-import { catalogFacility } from "../../catalog/catalogTypes";
-import type { FacilityKind } from "../../shared/types";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 
 /**
  * The shared reader (contract section 5) over the Rust `Engine`: a reader

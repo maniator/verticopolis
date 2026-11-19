@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
-import { FLOOR, TILE } from "../render/scale";
-import { bandedExtent, viewPlacement } from "../render/overviewMap/extent";
-import { fitLayout } from "../render/overviewMap/geometry";
+import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
+import { FLOOR, TILE } from "@verticopolis/components/render/scale";
+import { bandedExtent, viewPlacement } from "@verticopolis/components/render/overviewMap/extent";
+import { fitLayout } from "@verticopolis/components/render/overviewMap/geometry";
 import { builtFloorCounts, mapSummary, viewSentence } from "./overviewMapText";
 
 const on = (centerFloor: number) => ({ outside: "none" as const, centerFloor });

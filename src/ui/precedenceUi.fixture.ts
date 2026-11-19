@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { ModalPrecedence, type ModalOpts } from "./modalPrecedence";
+import { ModalPrecedence, type ModalOpts } from "@verticopolis/components/windows/modalPrecedence";
 import type { UI } from "./UI";
 
 /**

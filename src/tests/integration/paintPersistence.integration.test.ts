@@ -3,10 +3,10 @@ import { LOT_WIDTH, newSeededDraft } from "../portKit/draftFixtures";
 import { draftFromSave, draftTower, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
 import { catalogFor } from "../catalogFixture";
-import { catalogFacility } from "../../catalog/catalogTypes";
-import { drawRoom, type RoomCtx } from "../../render/pixelSprites";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { drawRoom, type RoomCtx } from "@verticopolis/components/render/pixelSprites";
 import { buildTDT, describeWithCodec, parseTDT } from "../conformance/tdtWasm";
-import type { FacilityKind, Unit } from "../../shared/types";
+import type { FacilityKind, Unit } from "@verticopolis/components/shared/types";
 
 /** The engine catalog's facts for `kind` (the subtypes match in both modes). */
 const facts = (kind: FacilityKind) => catalogFacility(catalogFor("classic"), kind);

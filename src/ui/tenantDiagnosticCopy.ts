@@ -1,7 +1,7 @@
-import type { VacateReason } from "../shared/types";
-import { VACATE_REASON_TEXT } from "../shared/vacateReasonText";
+import type { VacateReason } from "@verticopolis/components/shared/types";
+import { VACATE_REASON_TEXT } from "@verticopolis/components/shared/vacateReasonText";
 import { floorLabel } from "./floorLabel";
-import { groupDigits } from "./format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * Player-facing language for facts already decided by the active engine.

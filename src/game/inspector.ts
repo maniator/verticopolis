@@ -1,8 +1,8 @@
-import { catalogFacility } from "../catalog/catalogTypes";
-import { clockOf } from "../simport/headerClock";
-import type { ViewReader } from "../simport/viewReader";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { clockOf } from "@verticopolis/components/port/headerClock";
+import type { ViewReader } from "@verticopolis/components/port/viewReader";
 import type { CardKit } from "./cardKit";
-import type { Picked } from "../render/excalibur/TowerEngine";
+import type { Picked } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import { unitInspectorTemplate, transportInspectorTemplate } from "../ui/templates/inspector";
 

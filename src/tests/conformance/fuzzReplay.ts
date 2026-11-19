@@ -55,7 +55,7 @@ export function replayCompare(file: string, rustDir: string = dirname(file), eng
   let start: EngineStart;
   if (engine) start = engine;
   else {
-    if (!hasWasmPackage()) return harness(`no WASM package at ${WASM_PKG} (npm run wasm:build)`);
+    if (!hasWasmPackage()) return harness(`no WASM package at ${WASM_PKG} (npm install)`);
     // A package that is present but will not load (a stale binding, a bad cache) is
     // the harness failing, not the engine disagreeing.
     try {

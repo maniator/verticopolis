@@ -1,21 +1,22 @@
+import { COMPONENT_FIXTURES } from "./packagePaths";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Catalog } from "../catalog/catalogTypes";
-import { readCatalog } from "../engineBinding/catalog";
-import type { GameMode } from "../shared/types";
+import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import { readCatalog } from "@verticopolis/components/binding/catalog";
+import type { GameMode } from "@verticopolis/components/shared/types";
 
 /**
  * The Rust engine's catalog for each mode, as its `catalog(mode)` export
  * answers it, for tests that price, size or lay out without an engine. The
  * catalog is the engine's published rule table (CONTRIBUTING.md, "What every
  * test must do": a pinned value comes from the catalog), so the fixtures
- * (`src/simport/fixtures/catalog.<mode>.json`) are written from the engine on
+ * (`catalog.<mode>.json` in the components package) are written from the engine on
  * purpose, as the catalog digests are: `portReads.integration.test.ts` holds
  * each to the engine's answer, and `VC_UPDATE_PORT_FIXTURES=1` rewrites it.
  * Each read passes the binding's own shape check (`readCatalog`).
  */
 
-const FIXTURES = resolve(__dirname, "../simport/fixtures");
+const FIXTURES = COMPONENT_FIXTURES;
 const read = new Map<GameMode, Catalog>();
 
 /** The fixture file of `mode`'s catalog. */

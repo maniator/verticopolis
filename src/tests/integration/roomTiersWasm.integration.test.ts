@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { floorsOfPort } from "../../game/portAccess";
-import type { GameMode, UnitState } from "../../shared/types";
-import type { EnginePort, PortRecord } from "../../simport/enginePort";
-import { EVAL_TIERS, RENT_TIERS, RoomTierReader, type EvalTier, type RentTier, type RoomTiers } from "../../simport/roomTiers";
-import { ViewReader } from "../../simport/viewReader";
+import type { GameMode, UnitState } from "@verticopolis/components/shared/types";
+import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
+import { EVAL_TIERS, RENT_TIERS, RoomTierReader, type EvalTier, type RentTier, type RoomTiers } from "@verticopolis/components/port/roomTiers";
+import { ViewReader } from "@verticopolis/components/port/viewReader";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**

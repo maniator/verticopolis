@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { compareTemplate } from "./compare";
-import { iconTemplate } from "../icons";
+import { iconTemplate } from "@verticopolis/components/windows/icons";
 
 /**
  * The Found a New Tower rule-set picker body. The dialog leads with the one

@@ -1,8 +1,8 @@
 import type { GameApp } from "../main";
-import { catalogFacility } from "../catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
 import { catalogOf } from "./portAccess";
 import { editorPlacedByPlayer, forgetEditorPlacement } from "./movableWindows";
-import { focusScreenRect } from "../render/excalibur/personFocus";
+import { focusScreenRect } from "@verticopolis/components/render/excalibur/personFocus";
 
 /**
  * World-anchoring for the DOM panels (selected-facility editor, hover

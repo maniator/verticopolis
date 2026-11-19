@@ -8,7 +8,7 @@ import { currentFileId, setCurrentFile } from "./currentFile";
 vi.mock("../bootstrap", () => ({ bootGame: vi.fn() }));
 vi.mock("../analyticsTower", async (original) => ({ ...(await original<typeof import("../analyticsTower")>()), nextAnalyticsTower: vi.fn() }));
 import { nextAnalyticsTower } from "../analyticsTower";
-import type { TrafficTier } from "../presentation/traffic";
+import type { TrafficTier } from "@verticopolis/components/presentation/traffic";
 
 /**
  * `GameApp.followSwap` restarts the traffic chip's hysteresis on a different

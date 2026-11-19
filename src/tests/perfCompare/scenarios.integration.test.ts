@@ -7,7 +7,7 @@ import { SCENARIO_NAMES, buildScenarios, loadFixtureSave } from "./scenarios";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 const needsEngine = !hasWasmPackage();
-// The served browser package (build output, written by wasm:build), which
+// The served browser package (copied from @verticopolis/engine by npm install), which
 // perf:compare's Node check loads.
 const WEB_PKG = resolve(import.meta.dirname, "../../public/engine");
 const hasWebPkg = ["verticopolis_engine_bg.wasm", "verticopolis_engine.js"].every((f) => existsSync(resolve(WEB_PKG, f)));
@@ -58,7 +58,7 @@ describe("the harnesses' scenarios", () => {
       const { people } = run(save, 720, (n) => (peak = Math.max(peak, n)));
       return { peak, end: people };
     };
-    expect(peakOverADay(JSON.stringify(loadFixtureSave("conformance/fixtures/split-tower.vctower")))).toEqual({ peak: 16, end: 0 });
+    expect(peakOverADay(JSON.stringify(loadFixtureSave("node_modules/@verticopolis/engine-conformance/fixtures/split-tower.vctower")))).toEqual({ peak: 16, end: 0 });
     expect(peakOverADay(buildScenarios(["small"])[0].save).peak).toBe(140);
   }, 120_000);
 

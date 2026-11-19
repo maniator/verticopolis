@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ImportCounts, ImportReportFacts } from "../simport/tdtReportFacts";
+import type { ImportCounts, ImportReportFacts } from "@verticopolis/components/port/tdtReportFacts";
 import { importReport } from "./tdtImportReport";
 
 const ZERO: ImportCounts = {

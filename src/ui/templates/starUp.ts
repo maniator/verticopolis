@@ -1,9 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { Catalog } from "../../catalog/catalogTypes";
-import type { StarDutyId } from "../../catalog/starDutyTypes";
-import type { NextStarView, StatsReport } from "../../simport/panels";
-import { groupDigits } from "../format";
-import { iconTemplate } from "../icons";
+import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import type { StarDutyId } from "@verticopolis/components/catalog/starDutyTypes";
+import type { NextStarView, StatsReport } from "@verticopolis/components/port/panels";
+import { groupDigits } from "@verticopolis/components/windows/format";
+import { iconTemplate } from "@verticopolis/components/windows/icons";
 import { nextStarSection } from "./stats";
 
 /**

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { buildToStar, expectEngineHosted } from "./helpers";
-import { SKY_HEADROOM_FLOORS } from "../src/render/cameraBounds";
-import { MAP_BAND_FLOORS } from "../src/render/overviewMap/extent";
+import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
+import { MAP_BAND_FLOORS } from "@verticopolis/components/render/overviewMap/extent";
 
 // Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));

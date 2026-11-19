@@ -1,42 +1,37 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildDiagnostics } from "../../wasmhost/engineDiagnostics";
+import { buildDiagnostics } from "@verticopolis/components/host/engineDiagnostics";
 import {
   parseEngineIdentity,
   readEngineIdentity,
-} from "../../wasmhost/engineIdentity";
+} from "@verticopolis/components/host/engineIdentity";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { ENGINE_TOOLING_ROOT } from "../packagePaths";
 
 /**
  * The real package's identity record (#963) read through the frontend's own
- * reader: it parses, it agrees with the checked-in compat record, and the
- * diagnostics report built from it is healthy when the page expects the same
- * crate and flags a mismatch when it expects another.
+ * reader: it parses, it names the crate version of the installed package
+ * (the engine repository checks the record against its compat record), and
+ * the diagnostics report built from it is healthy when the page expects the
+ * same crate and flags a mismatch when it expects another.
  */
 
-const record = JSON.parse(
-  readFileSync(
-    resolve(__dirname, "../../../engine-rs/src/compat-record.json"),
-    "utf8",
-  ),
-) as {
-  crateVersion: string;
-  lockDigest: string;
-  saveVersion: number;
-};
+const installed = (
+  JSON.parse(readFileSync(resolve(ENGINE_TOOLING_ROOT, "package.json"), "utf8")) as { version: string }
+).version;
 
 describe.skipIf(!hasWasmPackage())(
   "engineIdentity from the real package",
   () => {
     const text = () => readEngineIdentity(wasm());
 
-    it("parses and agrees with the compat record", () => {
+    it("parses and names the installed package's crate version", () => {
       const id = parseEngineIdentity(text());
       expect(id).not.toBeNull();
-      expect(id!.crate.version).toBe(record.crateVersion);
-      expect(id!.lockDigest).toBe(record.lockDigest);
-      expect(id!.saveVersion).toBe(record.saveVersion);
+      expect(id!.crate.version).toBe(installed);
+      expect(id!.lockDigest).toMatch(/^[0-9a-f]{16}$/);
+      expect(Number.isInteger(id!.saveVersion) && id!.saveVersion > 0).toBe(true);
     });
 
     it("gives a healthy report when the page expects this crate, and names the field when it expects another", () => {

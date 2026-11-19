@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { decodeVctower } from "../../storage/vctowerContainer";
-import type { SerializedGame } from "../../shared/types";
-import { scheduleFromSlots } from "../../simport/scheduleSlots";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
+import { scheduleFromSlots } from "@verticopolis/components/port/scheduleSlots";
 import { createAppHistory } from "../../game/appHistory";
 import { createCardKit } from "../../game/cardKit";
 import { newViewReader } from "../../game/portAccess";
@@ -16,7 +16,7 @@ import { engineFromSave } from "../portKit/rustEngine";
  * `scheduleReview.integration.test.ts` and `scheduleReviewClassic.integration.test.ts`.
  */
 
-export const load = (name: string) => decodeVctower(readFileSync(`conformance/fixtures/${name}.vctower`, "utf8")) as SerializedGame;
+export const load = (name: string) => decodeVctower(readFileSync(`node_modules/@verticopolis/engine-conformance/fixtures/${name}.vctower`, "utf8")) as SerializedGame;
 export const memory = () => {
   const data = new Map<string, string>();
   return {

@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { DiagnosticsReport } from "../../wasmhost/engineDiagnostics";
+import type { DiagnosticsReport } from "@verticopolis/components/host/engineDiagnostics";
 import { fromGameHref } from "../fromGame";
 import { diagnosticsBlock } from "./diagnostics";
 import { helpAboutBody } from "./helpContent";

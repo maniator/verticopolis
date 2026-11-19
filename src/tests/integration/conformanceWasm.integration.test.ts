@@ -3,25 +3,21 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint, type EngineStart } from "../conformance/scenario";
 import { hasWasmPackage, startWasmEngine, startWasmHandle, wasm, wasmEngine } from "../conformance/wasmEngine";
-import { CATALOG_VERSION, readCatalog } from "../../engineBinding/catalog";
+import { CATALOG_VERSION, readCatalog } from "@verticopolis/components/binding/catalog";
 import { catalogLockView } from "../conformance/catalogLockView";
 import { canonicalJson, digest } from "../conformance/canonical";
-import { done } from "../../simport/engineSubject.fixture";
+import { done } from "../engineFixtures/engineSubject.fixture";
 import { writeAfterPassingRun, writeGoldenFile } from "../goldens/updateGate";
 
 /**
- * Engine conformance suite (conformance/README.md): every scenario runs on
- * the Rust engine through the WASM binding in Node and must reproduce the
- * checkpoint hashes in conformance/expected.json exactly. Any engine change
- * that moves a hash is a simulation change: regenerate the lock from this run
- * with `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration
- * conformanceWasm` (the engine package built) and commit it with intent. The
- * native Rust runner (`cargo run --features conformance --bin conformance`)
- * checks the same lock and never writes it. The catalog lock
- * (`conformance/catalog-digests.json`) is written by the same run from the
- * binding's `catalog(mode)`, the only catalog the game reads. The binding is built by
- * `npm run wasm:build`; without it the suite skips (CI builds it first, so a
- * missing package fails the build step there).
+ * Engine conformance suite: every scenario of the installed
+ * `@verticopolis/engine-conformance` runs on the installed engine through the
+ * WASM binding in Node and must reproduce that package's checkpoint hashes
+ * (`expected.json`) and catalog digests (`catalog-digests.json`) exactly, so
+ * the engine the game pins is the one the lock describes. The lock is written
+ * in Verticopolis/engine, which owns it, so `VC_CONFORMANCE_UPDATE=1` refuses
+ * to run here. The binding is the installed `@verticopolis/engine-tooling`;
+ * without it the suite skips.
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
@@ -30,6 +26,7 @@ const CATALOG_LOCK = resolve(CONFORMANCE_DIR, "catalog-digests.json");
 const CATALOG_MODES = ["classic", "modern"] as const;
 const UPDATE = process.env.VC_CONFORMANCE_UPDATE === "1";
 if (UPDATE && process.env.CI) throw new Error("VC_CONFORMANCE_UPDATE is a local regeneration switch and never runs in CI");
+if (UPDATE) throw new Error("the conformance lock lives in Verticopolis/engine; regenerate it there (VC_CONFORMANCE_UPDATE=1 in that repository)");
 
 type Lock = { scenarios: Record<string, Checkpoint[]> };
 
@@ -49,7 +46,7 @@ function writeLock(l: Lock): void {
   writeGoldenFile(LOCK, `{\n  "scenarios": {\n${body.join(",\n")}\n  }\n}\n`);
 }
 
-if (UPDATE && !hasWasmPackage()) throw new Error("VC_CONFORMANCE_UPDATE=1 writes the lock from the Rust engine; run npm run wasm:build first");
+if (UPDATE && !hasWasmPackage()) throw new Error("VC_CONFORMANCE_UPDATE=1 writes the lock from the Rust engine; run npm install first");
 
 // An update writes the lock only from a run in which every test in this file
 // ran and passed, so a filtered (`-t`) or failing run never leaves a partial
@@ -134,7 +131,7 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
   for (const mode of CATALOG_MODES) {
     it(`catalog(${mode}) is canonical and matches the lock`, () => {
       const { catalog } = wasm();
-      if (typeof catalog !== "function") throw new Error("the WASM package predates catalog(mode); run npm run wasm:build");
+      if (typeof catalog !== "function") throw new Error("the WASM package predates catalog(mode); run npm install");
       const text = catalog(mode);
       const got = readCatalog(wasm(), mode);
       expect(canonicalJson(catalogLockView(JSON.parse(text)))).toBe(canonicalJson(catalogLockView(got)));
@@ -156,8 +153,8 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
   // for every scenario after it.
   it("refuses a scenario start it cannot honor with an error that leaves the module usable", () => {
     expect(() => startWasmEngine({ newGame: { seed: 1, mode: "arcade" as "classic" } })).toThrow(/classic or modern/);
-    expect(() => startWasmEngine({ fixture: "conformance/README.md" })).toThrow(/not a VCTOWER1 file/);
-    expect(() => startWasmEngine({ fixture: "conformance/fixtures/sixseven-december.vctower", mode: "arcade" as "classic" })).toThrow(/classic or modern/);
+    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine-conformance/README.md" })).toThrow(/not a VCTOWER1 file/);
+    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine-conformance/fixtures/sixseven-december.vctower", mode: "arcade" as "classic" })).toThrow(/classic or modern/);
     // The module still answers after the refusals: a fresh game founds and
     // hashes the same as the lock's starter.
     const want = pinned("starter-classic")?.[0];

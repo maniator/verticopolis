@@ -42,7 +42,7 @@ case "$mode" in
 esac
 
 # The renders run a VC_TOOLING=1 build, which serves the tooling package (#1057).
-[ -f src/public/engine/BUILD.json ] && [ -f engine-rs/pkg-web-tooling/BUILD.json ] || { echo "pinned.sh: no engine package (src/public/engine/ and engine-rs/pkg-web-tooling/); run bash tools/agent-env/setup.sh or npm run wasm:build first" >&2; exit 1; }
+[ -f src/public/engine/BUILD.json ] && [ -f node_modules/@verticopolis/engine-tooling/web/BUILD.json ] || { echo "pinned.sh: no engine package (src/public/engine/ and @verticopolis/engine-tooling); run npm ci on the host first" >&2; exit 1; }
 [ -d node_modules ] || { echo "pinned.sh: no node_modules; run npm ci on the host first" >&2; exit 1; }
 if (exec 3<>/dev/tcp/127.0.0.1/4173) 2>/dev/null; then
   echo "pinned.sh: something on the host already listens on port 4173; stop it, or the render would shoot the host's build" >&2

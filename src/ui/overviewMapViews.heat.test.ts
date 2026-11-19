@@ -1,11 +1,11 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import type { HeatmapMode } from "../shared/engineTypes";
-import type { FacilityKind } from "../shared/types";
-import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
-import { extentFloors, fitLayout, mapExtent } from "../render/overviewMap/geometry";
-import type { HeatCellView } from "../render/overviewMap/heatView";
-import type { MapPaintContext, PatternSource } from "../render/overviewMap/paint";
-import type { MapViewId } from "../render/overviewMap/views";
+import type { HeatmapMode } from "@verticopolis/components/shared/engineTypes";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
+import { extentFloors, fitLayout, mapExtent } from "@verticopolis/components/render/overviewMap/geometry";
+import type { HeatCellView } from "@verticopolis/components/render/overviewMap/heatView";
+import type { MapPaintContext, PatternSource } from "@verticopolis/components/render/overviewMap/paint";
+import type { MapViewId } from "@verticopolis/components/render/overviewMap/views";
 import { MINUTES_PER_GAME_HOUR, OverviewMapViews, type MapViewRoom } from "./overviewMapViews";
 import { disposeRigs, pickView, rig } from "./overviewMapWindow.fixture";
 

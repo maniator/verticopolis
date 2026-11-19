@@ -24,7 +24,7 @@ describe("choosePublicDir (#1057)", () => {
   it("refuses a VC_TOOLING=1 build that has the player package but no tooling one", () => {
     const choice = choosePublicDir({ ...base, tooling: true, hasToolingPackage: false });
     expect(choice.kind).toBe("missing-tooling");
-    expect(choice.kind === "missing-tooling" && choice.why).toContain("npm run wasm:build");
+    expect(choice.kind === "missing-tooling" && choice.why).toContain("npm ci");
   });
 
   it("lets a dev serve fall back to the player package, and a build with no engine at all through", () => {
@@ -52,6 +52,7 @@ describe("assembleToolingPublicDir", () => {
     mkdirSync(tooling);
     writeFileSync(join(tooling, "verticopolis_engine.js"), "tooling");
     writeFileSync(join(tooling, "BUILD.json"), "{}");
+    writeFileSync(join(tooling, "verticopolis_engine.d.ts"), "declare const x: number;");
     return { publicDir, tooling, out: join(dir, "out") };
   }
 
@@ -63,6 +64,9 @@ describe("assembleToolingPublicDir", () => {
     expect(readFileSync(join(out, "engine-notes.txt"), "utf8")).toBe("kept");
     expect(readFileSync(join(out, "engine", "verticopolis_engine.js"), "utf8")).toBe("tooling");
     expect(existsSync(join(out, "engine", "player-only.txt"))).toBe(false);
+    // The declarations stay in the package: the page serves only what BUILD.json describes.
+    expect(existsSync(join(out, "engine", "verticopolis_engine.d.ts"))).toBe(false);
+    expect(existsSync(join(tooling, "verticopolis_engine.d.ts"))).toBe(true);
     // The source folder is left as it was.
     expect(readFileSync(join(publicDir, "engine", "verticopolis_engine.js"), "utf8")).toBe("player");
   });

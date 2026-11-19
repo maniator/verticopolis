@@ -10,10 +10,9 @@ import { SKIPPED_PATHS, repoRel, sourceFiles } from "./guardFiles";
  * Oversized files hide the review gates this project depends on (sub-quadratic
  * hot paths, canon-cap fidelity, a DOM-free engine): nobody can hold a
  * 2,900-line god-object in their head, so regressions ride in under green
- * gates. This test walks `src/` and `scripts/` for TypeScript and `engine-rs/`
- * for Rust (the engine port follows the same source rules), and fails any code
- * file over {@link MAX_LINES} lines. A Rust file's inline `#[cfg(test)]` module
- * counts toward its file, the same as a TypeScript file's.
+ * gates. This test walks `src/` and `scripts/` for TypeScript and fails any
+ * code file over {@link MAX_LINES} lines. The engine's Rust is held to the same
+ * ceiling in Verticopolis/engine.
  *
  * The exemption set lives in `fileSize.ratchet.txt` (one path per line), NOT in
  * this file. That keeps it a ratchet, not a permanent exemption: it lists the
@@ -33,8 +32,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const SCANNED_DIRS: { dir: string; exts: readonly string[] }[] = [
   { dir: "src", exts: [".ts", ".tsx"] },
   { dir: "scripts", exts: [".ts", ".tsx"] },
-  { dir: "engine-rs", exts: [".rs"] },
-  { dir: "engine-bench", exts: [".rs"] },
 ];
 
 /**
@@ -61,11 +58,6 @@ function lineCount(absPath: string): number {
   return n;
 }
 
-/** Files a tool writes, which no one splits by hand: the binding's
- *  declaration is wasm-bindgen's output (`npm run wasm:build` refreshes it)
- *  and grows with every export the engine adds. */
-const GENERATED: ReadonlySet<string> = new Set(["src/engineBinding/engine.d.ts"]);
-
 function scanFiles(): { rel: string; lines: number }[] {
   return SCANNED_DIRS.flatMap(({ dir, exts }) => sourceFiles(dir, exts))
     .map((p) => ({ rel: repoRel(p), lines: lineCount(p) }))
@@ -75,15 +67,15 @@ function scanFiles(): { rel: string; lines: number }[] {
 describe("file-size guard", () => {
   const files = scanFiles();
 
-  it("scans the Rust engine as well as the TypeScript", () => {
-    // A guard that silently stopped finding .rs files would pass forever.
-    expect(files.some((f) => f.rel.startsWith("engine-rs/src/") && f.rel.endsWith(".rs"))).toBe(true);
+  it("scans the TypeScript and skips build output", () => {
+    // A guard that silently stopped finding files would pass forever.
+    expect(files.some((f) => f.rel.startsWith("src/") && f.rel.endsWith(".ts"))).toBe(true);
     expect(files.some((f) => [...SKIPPED_PATHS].some((skip) => f.rel.startsWith(`${skip}/`)))).toBe(false);
   });
 
   it("no un-exempted code file exceeds the line ceiling", () => {
     const offenders = files
-      .filter((f) => f.lines > MAX_LINES && !LEGACY_OVERSIZED.has(f.rel) && !GENERATED.has(f.rel))
+      .filter((f) => f.lines > MAX_LINES && !LEGACY_OVERSIZED.has(f.rel))
       .map((f) => `${f.rel} (${f.lines} lines)`);
     expect(offenders, `Files over ${MAX_LINES} lines must be split or added to the ratchet:\n${offenders.join("\n")}`).toEqual([]);
   });

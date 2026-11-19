@@ -1,7 +1,7 @@
 import { catalogFor } from "./catalogFixture";
-import { useFallbackCatalogSource } from "../catalog/towerCatalog";
-import { bindViewWorld } from "../presentation/viewWorld";
-import { bindViewKinds } from "../presentation/viewKinds";
+import { useFallbackCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
+import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
+import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
 
 // Unit and integration tests draw, place and lay out without a running scene,
 // so the view is bound to the Modern catalog's world up front, the same world

@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { iconTemplate } from "./icons";
-import { versionLine } from "../wasmhost/engineLabel";
+import { iconTemplate } from "@verticopolis/components/windows/icons";
+import { versionLine } from "@verticopolis/components/host/engineLabel";
 import { platformLabel } from "../analyticsEnrichment";
 import { trackAppAction } from "../analytics";
 

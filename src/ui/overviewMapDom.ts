@@ -1,4 +1,4 @@
-import { iconElement } from "./icons";
+import { iconElement } from "@verticopolis/components/windows/icons";
 
 /**
  * The overview MAP window's elements (#343): the window with its title bar,

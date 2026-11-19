@@ -23,7 +23,7 @@ const UNREADABLE_KEY = "simtower-clone-unreadable";
 /** A save slot from 4.2 or earlier: My Towers copies it in once and leaves the key alone. */
 const SLOT_1_KEY = "simtower-clone-slot-1";
 /** A save from save format version 1, in the file container. */
-const OLD_FILE = readFileSync(new URL("../conformance/fixtures/towerone-star1.vctower", import.meta.url), "utf8");
+const OLD_FILE = readFileSync(new URL("../node_modules/@verticopolis/engine-conformance/fixtures/towerone-star1.vctower", import.meta.url), "utf8");
 const OLD_SAVE = inflateRawSync(Buffer.from(OLD_FILE.split("\n")[1]!, "base64")).toString();
 
 /** Seed browser storage once, before the page's own scripts, so a reload keeps what the game wrote. */

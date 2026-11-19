@@ -1,5 +1,5 @@
-import { isEngineTrap } from "../wasmhost/hostFault";
-import type { FallbackReason } from "../wasmhost/engineBoot";
+import { isEngineTrap } from "@verticopolis/components/host/hostFault";
+import type { FallbackReason } from "@verticopolis/components/host/engineBoot";
 
 /**
  * A trap in the running Rust engine (#874), heard where the frame loop

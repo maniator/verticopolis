@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { JUMP_ZOOM, jumpFrame, jumpToTraffic, lineSpan, wireTrafficJump } from "./trafficHud";
-import { trafficSpotlightFloor } from "../render/excalibur/trafficSpotlight";
-import type { TransportView } from "../simport/view";
+import { trafficSpotlightFloor } from "@verticopolis/components/render/excalibur/trafficSpotlight";
+import type { TransportView } from "@verticopolis/components/port/view";
 import type { GameApp } from "../main";
 
 const track = vi.hoisted(() => vi.fn());
 vi.mock("../analytics", () => ({ trackAppAction: track }));
 const spot = vi.hoisted(() => vi.fn());
-vi.mock("../render/excalibur/trafficSpotlight", async (real) => {
-  const mod = await real<typeof import("../render/excalibur/trafficSpotlight")>();
+vi.mock("@verticopolis/components/render/excalibur/trafficSpotlight", async (real) => {
+  const mod = await real<typeof import("@verticopolis/components/render/excalibur/trafficSpotlight")>();
   return { ...mod, spotlightTraffic: vi.fn((...a: Parameters<typeof mod.spotlightTraffic>) => (spot(...a), mod.spotlightTraffic(...a))) };
 });
 

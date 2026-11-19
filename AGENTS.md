@@ -17,8 +17,8 @@ in the stats/editor panels. Existing `src/` code comments are grandfathered;
 don't sweep them, but don't add new em-dashes either. Skip the "X, not Y"
 emphatic-restatement pattern and AI marketing vocabulary. Keep copy plain,
 human, and grammatically correct.
-The Rust engine in `engine-rs/` follows these rules with no grandfathered
-comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
+The engine (Verticopolis/engine) and the components (Verticopolis/components)
+follow these rules in their own repositories.
 
 ## Agent environment: one setup for every agent
 
@@ -274,7 +274,8 @@ body it sends, so write it from the form:
   story id) in the fields; the forms' intro text stays in plain language for
   players. A parity issue names where the canon value lives, such as
   `engine-rs/src/facilities.rs` (build caps), `engine-rs/src/econ.rs`
-  (economy) or `engine-rs/src/rules/` (mode rules), and whether `PARITY.md`
+  (economy) or `engine-rs/src/rules/` (mode rules) in Verticopolis/engine,
+  and whether `PARITY.md`
   lists it.
 - Apply the form's own labels except `needs-triage` when a backlog row gives
   the priority (the P label replaces it), plus the area labels. Use a plain
@@ -377,8 +378,8 @@ layers, and build cache. Left unattended it balloons the WSL data disk
 
 ## Gameplay model notes
 
-- Facilities are defined in the Rust engine (`engine-rs/src/facilities.rs`,
-  published to the frontend through `engine-rs/src/catalog.rs`), the source of
+- Facilities are defined in the Rust engine (`engine-rs/src/facilities.rs` in
+  Verticopolis/engine, published to the frontend through its catalog), the source of
   truth for gameplay rules, caps and tuning. Each has a `width` (in
   tiles) and optional `floors` (height in stories; e.g. the cinema is 2).
 - `basement: true` facilities (parking, recycling, metro) may only be built

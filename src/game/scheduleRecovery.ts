@@ -1,5 +1,5 @@
-import type { FacilityKind } from "../shared/types";
-import type { ElevatorSchedule } from "../shared/engineTypes";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
 
 /**
  * Older towers can hold an elevator with more cars than its schedule runs:

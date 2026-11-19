@@ -1,6 +1,6 @@
-import { catalogFacility } from "../../catalog/catalogTypes";
-import type { StopRow, TransportDetail, UnitDetail } from "../../simport/panels";
-import type { FacilityKind, GameMode } from "../../shared/types";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import type { StopRow, TransportDetail, UnitDetail } from "@verticopolis/components/port/panels";
+import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
 import { unitPrice } from "../../ui/catalogPricing";
 import { catalogFor } from "../catalogFixture";
 

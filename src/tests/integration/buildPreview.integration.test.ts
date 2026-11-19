@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { catalogFor } from "../catalogFixture";
-import { useTowerCatalogSource } from "../../catalog/towerCatalog";
+import { useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
 import { snapX } from "../../ui/placement";
-import type { EnginePort } from "../../simport/enginePort";
-import { PortCodes } from "../../simport/portCodes";
-import type { GameMode } from "../../shared/types";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import type { GameMode } from "@verticopolis/components/shared/types";
 import type { GameApp } from "../../main";
 import { newViewReader, quoteShaft } from "../../game/portAccess";
 import { LOT_WIDTH } from "../portKit/draftFixtures";

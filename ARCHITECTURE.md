@@ -14,50 +14,51 @@ folder, the Help bar, CI) are indexed in
 
 ## Source layout
 
+Verticopolis is three repositories. The game (this one) installs the other two
+as npm packages and pins their versions in `package.json`:
+
+- **[Verticopolis/engine](https://github.com/Verticopolis/engine)**: the
+  simulation, a deterministic Rust engine (`engine-rs/`) compiled to
+  WebAssembly and published as `@verticopolis/engine`, with the conformance
+  suite (`conformance/`) it is held to and the engine docs site
+  (`docs/engine-site/`, served at docs.verticopolis.com). Its README maps every
+  engine module and how to build, test and change the engine.
+- **[Verticopolis/components](https://github.com/Verticopolis/components)**:
+  what draws and plays the game, published as `@verticopolis/components`: the
+  Excalibur.js scene, sprites and the overview Map (`src/render/`), the
+  Classic/Modern presentation rules (`src/presentation/`), audio
+  (`src/audio/`), the WASM binding (`src/engineBinding/`), the engine host
+  (`src/wasmhost/`), `EnginePort` (`src/simport/`), the catalog handle
+  (`src/catalog/`), shared types (`src/shared/`), the stylesheet and the
+  Win95 window chrome.
+- **Verticopolis/web** (this repository): the game itself.
+
 ```
-engine-rs/     # the simulation: a deterministic Rust engine, compiled to WebAssembly
-  src/
-    sim.rs, sim_loop.rs   # Simulation and its tick
-    rules.rs, rules/      # Classic vs Modern (impl GameMode), one file per domain
-    facilities.rs         # sizes, prices, build caps, transport pooling
-    catalog.rs            # everything a frontend shows
-    tower.rs, tower/      # placement and transports
-    crowd/, dispatch.rs   # people, routing, elevator cars
-    economy.rs, events*.rs, satisfaction.rs, star.rs   # money, events, mood, ratings
-    undo.rs, sim_undo*.rs # the undo history
-    sim_save.rs, load/    # saves, the loader and migrations
-    tdt/                  # the 1994 .TDT codec
-    frame.rs, view/, panels/   # what a host reads
-    wasm.rs, wasm_port*.rs     # the WASM binding and EnginePort
-    bin/                  # the conformance referee and tools
-  tests/       # integration tests (independence, read boundary, API, .TDT)
-  consumer/    # a small frontend-free host
 src/
   main.ts      # GameApp: the composition root, owns the game loop
+  bootstrap.ts # boot: WebGL probe, engine load, the app, the service worker
   game/        # controllers: build/editor actions, save/load, input, inspector, HUD wiring
-  simport/     # EnginePort: the one synchronous interface the game uses to talk to the engine
-  engineBinding/ # the WASM binding and its type declaration (engine.d.ts)
-  wasmhost/    # loading the engine package, its build metadata and catalog checks
-  render/      # Excalibur.js scene, procedural sprites, the overview Map
-  ui/          # DOM controls: menu bar, windows, dialogs, palette (lit-html templates); desk/ is the 1994 desktop
-  audio/       # location-based procedural soundtrack and effects (Tone.js)
-  storage/     # My Towers files and versions, the Auto-save, Open Recent, the linked folder
-  shared/      # types and small helpers shared across the game
-  tests/       # repository-wide guard tests (file sizes, prose, named flags, ...)
-conformance/   # the conformance lock and catalog digests the engine is held to
+  ui/          # the game's DOM controls: menus, dialogs, palette (lit-html templates); desk/ is the 1994 desktop
+  storage/     # My Towers files and versions, the Auto-save, Open Recent, the linked folder, TDT files
+  analytics*.ts # PostHog analytics
+  public/      # static files; public/engine/ is copied from @verticopolis/engine on npm install
+  tests/       # repository-wide tests and the integration fixtures
+api/           # Vercel functions (the analytics ingest)
 e2e/           # Playwright end-to-end specs
 help-site/     # the player manual (Astro + Starlight), served at help.verticopolis.com
-docs/          # contributor docs; docs/engine-site/ is the engine docs site
+docs/          # contributor docs
+scripts/       # build, release, screenshot and perf tooling
 ```
 
 CONTRIBUTING.md → **Where things live** is the full index of every `src/`
-directory, and [engine-rs/README.md](engine-rs/README.md) maps every engine
-module and how to build, test and change the engine.
+directory. Paths below under `engine-rs/` are in Verticopolis/engine, and
+`src/render/`, `src/audio/`, `src/simport/`, `src/wasmhost/`,
+`src/engineBinding/` and `src/catalog/` are in Verticopolis/components.
 
 ## The big picture: layers
 
 Verticopolis is a browser game with a **pure, deterministic simulation core**,
-the Rust engine in `engine-rs/`, compiled to WebAssembly. Everything that talks
+the Rust engine (`engine-rs/` in Verticopolis/engine), compiled to WebAssembly. Everything that talks
 to the browser (rendering, DOM UI, audio, input and storage) is TypeScript and
 reaches the engine only through `EnginePort`. The cardinal rule: **dependencies
 point inward toward the engine, never out.** The engine has no access to the
@@ -368,10 +369,10 @@ The full contract (every member, the input rules, the exceptions) is
   quality gates, testing & coverage, the architecture conventions in prose,
   versioning, and code review. Its **Where things live** table is the quick
   index of every `src/` directory.
-- **`engine-rs/src/facilities.rs`**: the source of truth for build caps,
+- **`engine-rs/src/facilities.rs`** (Verticopolis/engine): the source of truth for build caps,
   facility sizes and transport pooling. The Rust engine owns gameplay rules,
   caps and tuning.
 - **`engine-rs/src/sim_loop.rs`**: `Simulation::tick`, the loop the game runs;
   start here to follow a tick.
-- **[engine-rs/README.md](engine-rs/README.md)**: building the engine and its
-  toolchain.
+- **[Verticopolis/engine](https://github.com/Verticopolis/engine)**: building
+  the engine and its toolchain.

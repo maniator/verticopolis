@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit-html";
-import { iconTemplate } from "../icons";
-import { ordinal } from "../format";
+import { iconTemplate } from "@verticopolis/components/windows/icons";
+import { ordinal } from "@verticopolis/components/windows/format";
 
 /**
  * The TOWER-achieved congratulations modal body: the last dialog to migrate

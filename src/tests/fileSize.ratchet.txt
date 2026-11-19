@@ -5,11 +5,9 @@
 # guard then enforces the ceiling on that file. When this list is empty, delete
 # it and the stale-entry check in fileSize.guard.test.ts.
 #
-# engine
 # render
 # ui / app spine
 # storage
-# engine leaves
 # scripts
 # tests (split last; grouped by type, so colocated test paths may live outside src/tests/)
 src/tests/integration/uiDialogs.integration.test.ts
@@ -18,4 +16,3 @@ src/tests/integration/tdtImport.integration.test.ts
 src/tests/integration/tdtExport.integration.test.ts
 src/tests/integration/storage.integration.test.ts
 src/tests/integration/gameControllers.integration.test.ts
-# engine-rs (Rust, guarded from 2026-10-14; inline test modules count)

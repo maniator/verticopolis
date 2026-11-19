@@ -12,29 +12,15 @@ describe("pathKind", () => {
     ["package.json", "shared"],
     ["package-lock.json", "shared"],
     ["vite.config.ts", "shared"],
-    ["conformance/expected.json", "shared"],
     ["docs/screenshots/milestones/one-star.png", "shared"],
     [".github/workflows/test.yml", "shared"],
-    [".github/actions/engine-wasm/action.yml", "shared"],
-    ["engine-rs/Cargo.toml", "shared"],
-    ["engine-rs/Cargo.lock", "shared"],
-    ["engine-rs/consumer/Cargo.toml", "shared"],
-    ["engine-rs/consumer/Cargo.lock", "shared"],
-    ["engine-rs/src/wasm.rs", "shared"],
-    ["engine-rs/src/wasm/exports_port.rs", "shared"],
-    ["engine-rs/src/wasm_port_panels.rs", "shared"],
-    ["engine-rs/src/frame.rs", "shared"],
-    ["engine-rs/src/frame_tests.rs", "rust"],
-    ["engine-rs/src/events_bomb.rs", "rust"],
-    ["engine-rs/tests/independence.rs", "rust"],
-    ["engine-rs/consumer/src/main.rs", "rust"],
-    ["engine-rs/CHANGELOG.md", "rust"],
+    [".github/actions/some-action/action.yml", "shared"],
     ["docs/performance/hot-path-review.md", "prose"],
     ["_bmad-output/implementation-artifacts/backlog.md", "prose"],
     [".changes/claude-project-thread-aan2dj.md", "prose"],
     ["CHANGELOG.md", "prose"],
     ["README.md", "prose"],
-    [".github/workflows/engine-rs.yml", "meta"],
+    [".github/workflows/labels.yml", "meta"],
     [".github/ISSUE_TEMPLATE/bug.yml", "meta"],
     [".github/dependabot.yml", "meta"],
     [".pr_agent.toml", "meta"],
@@ -48,17 +34,6 @@ describe("pathKind", () => {
 describe("prLane", () => {
   it("runs everything for a UI change", () => {
     expect(prLane(["src/ui/templates/updatePrompt.ts", "src/styles.css", "CHANGELOG.md"])).toEqual(FULL_LANE);
-  });
-
-  it("takes the Rust lane for engine sources, tests and notes only", () => {
-    expect(
-      prLane(["engine-rs/src/events_bomb.rs", "engine-rs/src/events_bomb_tests.rs", ".changes/fix-bomb.md", "docs/notes.md"]),
-    ).toEqual({ code: true, tests: true, lane: "rust" });
-  });
-
-  it("runs everything when a Rust change also touches a Cargo file or the binding", () => {
-    expect(prLane(["engine-rs/src/events_bomb.rs", "engine-rs/Cargo.lock"])).toEqual(FULL_LANE);
-    expect(prLane(["engine-rs/src/events_bomb.rs", "engine-rs/src/wasm/exports_port.rs"])).toEqual(FULL_LANE);
   });
 
   it("takes the prose lane for docs and change notes", () => {

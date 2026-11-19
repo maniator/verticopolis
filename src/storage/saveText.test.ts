@@ -1,12 +1,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SerializedGame } from "../shared/types";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
 import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
 import { decodeVctower } from "./vctowerContainer";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { stampText } from "./saveStamp";
 
-const FIXTURES = "conformance/fixtures";
+const FIXTURES = "node_modules/@verticopolis/engine-conformance/fixtures";
 
 /** What the writers did before the text stamp: parse, set, print. */
 function parsedStamp(text: string, savedAt: number, appVersion: string): string {

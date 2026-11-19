@@ -2,9 +2,9 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, 
 import { basename, join, resolve } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
 import { readdirSync } from "node:fs";
-import { engineSourceHash } from "../../wasmhost/packageHash";
 import { buildTree, collectEnvironment, packageState, type Environment } from "../perfCompare/env";
 import { machineOf, packageErrors, stampErrors } from "../perfCompare/main";
+import { pinnedEngineSources } from "../perfCompare/pinnedEngine";
 import { incompleteTreeError } from "../perfCompare/treeRecord";
 import { gateBrowser, probeBrowser } from "../perfCompare/browserProbe";
 import { aaBaselineLimitation, baselineLimitation, rendererLimitation } from "../perfCompare/limitations";
@@ -256,7 +256,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
   const scenarios = buildScenarios(args.scenarios);
   const config = makeConfig(args, scenarios.map((s) => s.name));
-  const sourceHash = existsSync(join(repo, "engine-rs/src")) ? engineSourceHash(join(repo, "engine-rs")) : null;
+  const sourceHash = pinnedEngineSources(repo);
   const environment = collectEnvironment(repo, distPerf, sourceHash);
   const problems = packageErrors(packageState(distPerf), packageState(dist), sourceHash);
   if (problems.length) throw new Error(`the engine package cannot be tied to this tree:\n  - ${problems.join("\n  - ")}`);

@@ -2,8 +2,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "lit-html";
 import type { TemplateResult } from "lit-html";
-import type { TransportDetail, UnitDetail } from "../simport/panels";
-import type { GameMode } from "../shared/types";
+import type { TransportDetail, UnitDetail } from "@verticopolis/components/port/panels";
+import type { GameMode } from "@verticopolis/components/shared/types";
 import { catalogFor } from "../tests/catalogFixture";
 import { transportDetail, unitDetail } from "../tests/fixtures/detailCards";
 import { transportEditorTemplate, unitEditorTemplate } from "./templates/editor";

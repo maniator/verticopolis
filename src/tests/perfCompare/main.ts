@@ -1,6 +1,5 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
 import { BASELINE_DIST, buildBaseline, requireBaselineCommit, requireBaselineDist, startArmServers, TS_BASELINE, type BaselineRecord } from "./baseline";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
@@ -20,6 +19,7 @@ import type { CompareConfig, CompareResults, EngineName, NetworkLimit, ProcessRu
 import type { Environment as Env } from "./env";
 import { incompleteTreeError } from "./treeRecord";
 import { validateResults } from "./validate";
+import { pinnedEngineSources } from "./pinnedEngine";
 import { buildProduction, buildTooling } from "../perfWorker/build";
 
 /**
@@ -136,7 +136,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   for (const w of gateBrowser(probe, args.quick, launch, executablePath)) log(`perf:compare: warning: ${w}`);
   log(`perf:compare: ${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
   if (!existsSync(join(repo, "src/public/engine/verticopolis_engine_bg.wasm"))) {
-    throw new Error("the engine package src/public/engine/ is missing: build it first with `bash scripts/build-engine-wasm.sh` where that script exists (it installs the pinned toolchain), or `npm run wasm:build` (needs the wasm32 target and the pinned wasm-bindgen CLI)");
+    throw new Error("the engine package src/public/engine/ is missing: run npm install, which copies it from @verticopolis/engine");
   }
   // Which tree the builds came from, stamped beside them (gitignored), so a
   // --skip-build run can prove its builds are this commit's.
@@ -158,7 +158,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
   const scenarios = buildScenarios(args.scenarios);
   const config = makeConfig(args, scenarios.map((s) => s.name));
-  const sourceHash = existsSync(join(repo, "engine-rs/src")) ? engineSourceHash(join(repo, "engine-rs")) : null;
+  const sourceHash = pinnedEngineSources(repo);
   const environment = collectEnvironment(repo, distPerf, sourceHash);
   // Fail closed before measuring anything: a run on a package that cannot
   // be tied to these sources would spend hours on numbers that cannot pass.
@@ -301,13 +301,13 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
 
 /**
  * The engine package checks, all fail-closed. `perf` is dist-perf/ (the
- * timed build), `prod` is dist/ (the sizes), `sourceHash` the current
- * engine-rs sources' hash. Each build must hold the whole package, both
- * builds must serve the same bytes, and the timed build's BUILD.json must
- * record these sources. Besides the sources hash, BUILD.json (schema 2) records
+ * timed build), `prod` is dist/ (the sizes), `sourceHash` the sources hash
+ * the pinned `@verticopolis/engine` package records (`pinnedEngineSources`).
+ * Each build must hold the whole package, both builds must serve the same
+ * bytes, and the timed build's BUILD.json must record those sources. Besides the sources hash, BUILD.json (schema 2) records
  * the digest and size of the glue and the binary, but these checks do not
  * compare them yet, so they tie the package to the sources only as far as the
- * build that wrote it was honest. A checkout without engine-rs sources
+ * build that wrote it was honest. A checkout without the installed package
  * fails, since then nothing proves which engine ran. `recorded`, given after
  * the runs, is the package recorded before them.
  */
@@ -321,9 +321,9 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
     else if (missing.length) errors.push(`${name} serves an incomplete engine package (missing or unreadable: ${missing.join(", ")})`);
   }
   if (sorted(perf.files) !== sorted(prod.files)) errors.push(`dist/ and dist-perf/ serve different engine bytes (${sorted(prod.files)} vs ${sorted(perf.files)})`);
-  if (!sourceHash) errors.push("no engine-rs sources in this checkout, so the package's source hash cannot be checked; run from a full checkout");
+  if (!sourceHash) errors.push("no installed @verticopolis/engine records its sources hash, so the served package cannot be tied to the pinned engine; run npm install");
   if (!perf.buildHash) errors.push(`the served engine package (dist-perf/) ${why(perf)}, so which sources it came from is unknown`);
-  else if (sourceHash && perf.buildHash !== sourceHash) errors.push(`the served engine package (${perf.buildHash}) was not built from the current engine-rs sources (${sourceHash}); rebuild it with npm run wasm:build`);
+  else if (sourceHash && perf.buildHash !== sourceHash) errors.push(`the served engine package (${perf.buildHash}) is not the pinned @verticopolis/engine package (${sourceHash}); run npm install and rebuild`);
   if (!prod.buildHash && !perf.buildHash) errors.push(`the sizes build (dist/) ${why(prod)}${why(prod) === why(perf) ? " too" : ""}; rebuild without --skip-build`);
   if (prod.buildHash !== perf.buildHash) errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prod.buildHash ?? `none: dist/ ${why(prod)}`} vs ${perf.buildHash ?? `none: dist-perf/ ${why(perf)}`}); rebuild without --skip-build`);
   // After the runs: the timed build's package must still be the one recorded

@@ -1,4 +1,4 @@
-import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames.ts";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "@verticopolis/components/host/enginePackageNames";
 
 /**
  * The game page asks the browser for the engine package's three files as soon

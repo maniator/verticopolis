@@ -10,7 +10,7 @@
  * press (the map, or nothing), so a mouse or touch user keeps the game's keys
  * and a focused map keeps its arrow keys.
  */
-import { DEFAULT_MAP_VIEW, MAP_VIEWS, type MapViewEntry, type MapViewId } from "../render/overviewMap/views";
+import { DEFAULT_MAP_VIEW, MAP_VIEWS, type MapViewEntry, type MapViewId } from "@verticopolis/components/render/overviewMap/views";
 
 /** The ids the CSS and the tests name. */
 export const MAP_PICKER_DOM = {

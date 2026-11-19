@@ -1,8 +1,10 @@
 # Copilot Instructions
 
 Verticopolis is a browser-native clone of SimTower (1994): a TypeScript app
-(Excalibur.js, Vite, Vitest) over a Rust/WASM simulation engine (`engine-rs/`),
-which is the engine the shipped game runs on.
+(Excalibur.js, Vite, Vitest) over a Rust/WASM simulation engine
+(`@verticopolis/engine`, from Verticopolis/engine), which is the engine the
+shipped game runs on. The renderer, sprites and audio come from
+`@verticopolis/components` (Verticopolis/components).
 [`CONTRIBUTING.md`](../CONTRIBUTING.md) is the contributor guide and
 [`AGENTS.md`](../AGENTS.md) adds the agent layer. When this file disagrees with
 them, they win.
@@ -13,12 +15,12 @@ This file is the review method. Do these steps on every PR, in order:
 
 1. **Activate one review skill first, before any other tool call.** Use
    `gds-code-review` when the diff touches gameplay or engine code
-   (`engine-rs/`, `src/render/`, `conformance/`, `src/storage/tdt*`,
+   (the engine or components pins in `package.json`, `src/storage/tdt*`,
    economy, ratings, events, elevators, facilities, RNG). Use `bmad-code-review`
    for everything else (other storage, tooling, build/CI, UI plumbing, docs). A mixed
    diff uses `gds-code-review`. Both are in `.agents/skills/`.
-2. **Then, only if the diff touches `engine-rs/`, `conformance/`
-   or the save loaders (`src/storage/`), also activate `engine-review`** (`.github/skills/`)
+2. **Then, only if the diff moves the engine pins
+   or touches the save loaders (`src/storage/`), also activate `engine-review`** (`.github/skills/`)
    as a checklist. So a review activates one skill, or two when this step
    applies, and never any other skill.
 3. **Run the skill's layers inline.** Read its `SKILL.md` and `steps/*.md` from
@@ -47,7 +49,7 @@ npm run typecheck && npm run lint && npm test && npm run build
 ```
 
 All four pass before pushing. `npm run build` needs the engine package
-(`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a build that cannot run the
+(`npm install` copies it from `@verticopolis/engine`), or `VC_ALLOW_NO_ENGINE=1` for a build that cannot run the
 game. Copilot reviews are one-shot snapshots, so re-request one after pushing
 fixes for its findings.
 
@@ -72,5 +74,5 @@ fixes for its findings.
   source's own, or the readout says where they differ and why (`CLAUDE.md`
   non-negotiables, #977).
 - A new facility starts in the Rust engine (`engine-rs/src/facilities.rs` and
-  its catalog), never as a render-layer special case. The Rust engine is the
+  its catalog, in Verticopolis/engine), never as a render-layer special case. The Rust engine is the
   source of truth for gameplay rules, caps and tuning.

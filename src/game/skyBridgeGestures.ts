@@ -1,8 +1,8 @@
 import type { GameApp } from "../main";
 import { updateBuildPreview } from "./buildPreview";
 import { BRIDGE_LOOK_STEP, quoteSkyBridge, quotedTiles, SKY_BRIDGE_STEP, tapLays, type ArmedSkyBridge, type SkyBridgeClick } from "./skyBridgeTool";
-import { finishedSkyBridgeAt } from "../simport/skyBridgeView";
-import { groupDigits } from "../ui/format";
+import { finishedSkyBridgeAt } from "@verticopolis/components/port/skyBridgeView";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * The Sky Bridge tool's gestures (Modern): a mouse click, a phone's two taps

@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
-import { statsReport } from "../simport/statsSheet";
+import { statsReport } from "@verticopolis/components/port/statsSheet";
 import { starUpScreen } from "../ui/templates/starUp";
 import { showStarUp } from "../ui/uiStarUp";
 import { dialogHoldsWork, hasBlockingModal } from "./interactionState";

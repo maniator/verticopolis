@@ -12,7 +12,7 @@
  * Cost: nothing runs until someone opens a menu or picks an item.
  */
 
-import { MenuBar } from "./menuBar";
+import { MenuBar } from "@verticopolis/components/windows/menuBar";
 
 /** The looks Starlight's theme switch offers. */
 export type HelpTheme = "light" | "dark" | "auto";

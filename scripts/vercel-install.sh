@@ -16,11 +16,6 @@
 # Vercel's post-build install (for the api/ functions) reports two changed
 # packages on every build but leaves the hidden lockfile as it was, so a warm
 # preview keeps both the root tree and the help site's.
-#
-# `npm ci` would also delete the preview's engine package cache, which lives
-# in node_modules/.cache/vc-engine (scripts/vercel-engine-cache.ts) because
-# node_modules is what Vercel's build cache carries; it is set aside for the
-# install and put back.
 set -euo pipefail
 
 dir="${1:-.}"
@@ -44,22 +39,9 @@ if [ "${VERCEL_ENV:-}" = "preview" ] && [ -f "$stamp" ] && [ "$(cat "$stamp")" =
   exit 0
 fi
 
-kept=""
-engine_cache="$dir/node_modules/.cache/vc-engine"
-if [ "${VERCEL_ENV:-}" = "preview" ] && [ -d "$engine_cache" ]; then
-  kept="$(mktemp -d)"
-  mv "$engine_cache" "$kept/vc-engine"
-fi
-
 # The stamp goes before the install, so a failed or interrupted `npm ci` never
 # leaves one behind (npm ci also deletes node_modules, stamp included, first).
 rm -f "$stamp"
 npm ci --prefix "$dir" --no-audit --no-fund
 printf '%s\n%s' "$inputs" "$(tree_hash)" > "$stamp"
-
-if [ -n "$kept" ]; then
-  mkdir -p "$dir/node_modules/.cache"
-  mv "$kept/vc-engine" "$engine_cache"
-  rmdir "$kept"
-fi
 echo "vercel-install: installed $dir from its lockfile"

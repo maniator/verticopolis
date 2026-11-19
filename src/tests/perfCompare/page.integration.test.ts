@@ -40,7 +40,7 @@ describe("digestStashed", () => {
   });
 
   it.skipIf(needsEngine)("equals it for a player fixture with a pending choice and log prose", async () => {
-    const data = loadFixtureSave("conformance/fixtures/sixseven_2.vctower") as unknown as { events: { pending: unknown }; log?: unknown[] };
+    const data = loadFixtureSave("node_modules/@verticopolis/engine-conformance/fixtures/sixseven_2.vctower") as unknown as { events: { pending: unknown }; log?: unknown[] };
     data.events.pending = { kind: "bombThreat", message: "Pay $1,000?", cost: 1000 };
     data.log = [...(data.log ?? []), { minute: 1, text: "prose that stays out", kind: "info" }];
     const loaded = engineOn(JSON.stringify(data));

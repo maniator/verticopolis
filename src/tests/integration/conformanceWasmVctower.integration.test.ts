@@ -24,7 +24,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { Engine, encodeVctower, exportTdt } from "../../engineBinding/engine";
+import type { Engine, encodeVctower, exportTdt } from "@verticopolis/engine-tooling/node/verticopolis_engine";
 import { SaveGame } from "../../storage/SaveGame";
 import { fromBase64, inflateCapped, parseSaveJson, STORE_MAGIC } from "../../storage/saveCompression";
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
@@ -33,8 +33,9 @@ import { decodeVctower } from "../../storage/vctowerContainer";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { saveOf, importTower } from "../fixtures/saveText";
 import type { Draft } from "../portKit/drafts";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
-const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
+const FIXTURES = resolve(CONFORMANCE_ROOT, "fixtures");
 const fixtures = readdirSync(FIXTURES)
   .filter((f) => f.endsWith(".vctower"))
   .sort();

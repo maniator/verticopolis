@@ -34,21 +34,17 @@ permissions:
 jobs:
   # Which jobs a change needs, from the paths it changes (src/build/prLane.ts
   # holds the rules and their tests). `code` is whether application inputs
-  # changed (the WASM, browser and parity checks need them); `tests` is
-  # whether the test job has anything to run; `lane` narrows the test job:
+  # changed (the engine package, browser and parity checks need them); `tests`
+  # is whether the test job has anything to run; `lane` narrows the test job:
   #   full:  everything (any shared, UI or tooling path).
-  #   rust:  only engine-rs/ sources and prose. The Rust engine workflow tests
-  #          the crate, and the browser, parity and integration checks still
-  #          run here; the plain unit run (the unit leg repeats it with the
-  #          engine package), lint, typecheck and the build are skipped.
   #   prose: docs, planning files and .changes notes only. The guard tests
   #          and the build still run, without coverage, lint or typecheck.
-  # Cargo files, the binding (engine-rs/src/wasm*, frame.rs), package and
-  # lock files, the conformance suite and this workflow always take the full
-  # lane. The required job names keep reporting via no-op successes, never
-  # missing statuses. Main pushes, release branches, unknown paths and failed
-  # file lookups run full validation. Old rename paths count too, so moving
-  # code cannot bypass these gates.
+  # Package and lock files (which pin the engine and components packages) and
+  # this workflow always take the full lane. The required job names keep
+  # reporting via no-op successes, never missing statuses. Main pushes,
+  # release branches, unknown paths and failed file lookups run full
+  # validation. Old rename paths count too, so moving code cannot bypass these
+  # gates.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -118,38 +114,27 @@ jobs:
           [ "$(grep -c '^F ' "$list" || true)" -lt "$limit" ] || full "listing limit reached"
           node scripts/pr-lane.ts "$list" || full "classifier failed"
 
-  # The Rust engine's WASM packages (the player build in src/public/engine/
-  # and engine-rs/pkg-player/, the tooling build in engine-rs/pkg/ and
-  # engine-rs/pkg-web-tooling/, #1057) are build output and are not checked in. This job restores it from the Actions cache,
-  # keyed on the engine's source hash, or builds and caches it on a miss (an
-  # engine change), then hands the browser packages to the e2e jobs as a run
-  # artifact: their VC_TOOLING=1 build serves the tooling one to the browser
-  # projects, and its container has no Rust toolchain to
-  # build it. The test job needs no package (its hash test skips without one),
-  # so lint, typecheck and the unit tests never wait on a Rust build.
-  engine-wasm:
+  # The tooling app (a VC_TOOLING=1 build, which serves the
+  # @verticopolis/engine-tooling package to the browser projects, #1057),
+  # built once and handed to the e2e jobs as a run artifact. npm ci installs
+  # both engine packages, so nothing here compiles Rust.
+  tooling-app:
     needs: changes
     # Skipped only on a successful "false" from the filter (prose-only change).
     if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
-    # A cache miss compiles the crate (a few minutes); anything near this is a hang.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # The npm cache matters here: the browser jobs wait on this job, and
-      # its uncached install took most of its minute and a half.
+      # The npm cache matters here: the browser jobs wait on this job.
       - name: Use Node.js (from .nvmrc)
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
-
-      - uses: ./.github/actions/engine-wasm
-        with:
-          artifact-name: engine-wasm
 
       # Build the tooling app once and share it with both browser jobs.
       # This artifact carries checksums and source SHA so consumers verify
@@ -210,14 +195,14 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm ci
 
-      # Lint and typecheck read only TypeScript, which the rust and prose
-      # lanes leave unchanged. An empty lane (a failed classifier) runs them.
+      # Lint and typecheck read only TypeScript, which the prose lane leaves
+      # unchanged. An empty lane (a failed classifier) runs them.
       - name: Lint
-        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' && needs.changes.outputs.lane != 'prose' }}
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
         run: npm run lint
 
       - name: Typecheck
-        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' && needs.changes.outputs.lane != 'prose' }}
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
         run: npm run typecheck
 
       # Two long port-kit suites are excluded here and run without coverage on
@@ -228,16 +213,8 @@ jobs:
       # engine conformance suite runs on the Rust engine (conformanceWasm, in
       # test:wasm:host on the test-engine (host) shards).
       - name: Run tests
-        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' && needs.changes.outputs.lane != 'prose' }}
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
         run: npm run test:coverage -- --run --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
-
-      # A Rust-only change (src/build/prLane.ts): no TypeScript changed, so
-      # coverage cannot move, and the unit leg runs the unit project with
-      # the engine package. The integration project still runs here, minus the
-      # two suites that leg runs.
-      - name: Integration tests (Rust-only change, no coverage)
-        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane == 'rust' }}
-        run: npx vitest run --project integration --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
 
       # Docs, planning files and .changes notes only: the guard tests that read
       # them (the backlog mirror, the changelog, the change notes) are unit
@@ -249,14 +226,12 @@ jobs:
       # The two excluded suites run without coverage on the unit leg of
       # test-engine, beside this job instead of after it.
 
-      # This job only proves the bundle builds, with no engine package (the e2e
-      # job below builds with one), so it opts out of the engine requirement
-      # scripts/verify-precache.ts puts on every build. The build reads
-      # CHANGELOG.md, so the prose lane builds too; the rust lane does not,
-      # since the bundle reads nothing under engine-rs/ (the e2e-general
-      # job's player build covers the engine package).
+      # This job only proves the bundle builds, so it opts out of the engine
+      # requirement scripts/verify-precache.ts puts on every build (the
+      # e2e-general job's player build covers the engine package). The build
+      # reads CHANGELOG.md, so the prose lane builds too.
       - name: Build
-        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'rust' }}
+        if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm run build
         env:
           VC_ALLOW_NO_ENGINE: "1"
@@ -273,18 +248,13 @@ jobs:
           git fetch --no-tags --quiet --depth=2 origin "$GITHUB_SHA"
           node scripts/version-check.ts --base HEAD^1 --branch "$HEAD_REF"
 
-  # The suites that need the Rust/WASM engine package. The engine-wasm step
-  # fails when a package file is missing, so no suite can skip for want of it.
-  # The unit leg runs the unit tests, which include the engine package's own
+  # The suites that need the engine package, which npm ci installs. The unit
+  # leg runs the unit tests, which include the engine package's own
   # (they skip in the plain unit job); the port-kit leg runs the port-kit
   # suites, and the host suites run in the engine-host job below, in three
   # shards.
   test-engine:
     name: test-engine (${{ matrix.leg }})
-    # The legs restore the engine package from the Actions cache themselves
-    # (and build it on a miss, which fails the leg if the build fails), so
-    # they start beside the engine-wasm job instead of waiting about a minute
-    # and a half for it.
     needs: changes
     # A matrix job that is skipped as a whole reports under its unexpanded
     # name, and the required checks are named per leg. So the legs always
@@ -318,9 +288,6 @@ jobs:
         if: ${{ needs.changes.outputs.code != 'false' }}
         run: npm ci
 
-      - uses: ./.github/actions/engine-wasm
-        if: ${{ needs.changes.outputs.code != 'false' }}
-
       - name: Unit tests with the engine package required
         if: ${{ needs.changes.outputs.code != 'false' && matrix.leg == 'unit' }}
         env:
@@ -339,9 +306,8 @@ jobs:
         run: npm exec --no -- vitest run --project integration condoRelocationEngine roomCountsEngine
 
   # The suites that start the Rust engine themselves (conformance, the
-  # goldens, perf comparison), run once per PR; the Rust workflow does not
-  # repeat this test:wasm script, and its test:port half runs on the
-  # port-kit leg. Vitest splits the files across three shards, so a slow
+  # goldens, perf comparison), run once per PR; the test:wasm script's
+  # test:port half runs on the port-kit leg. Vitest splits the files across three shards, so a slow
   # runner no longer pushes the whole set past its timeout, and the
   # engine-host-result job reports them as the one required
   # test-engine (host) check. Like the other legs, the shards always run
@@ -376,9 +342,6 @@ jobs:
       - name: Install dependencies
         if: ${{ needs.changes.outputs.code != 'false' }}
         run: npm ci
-
-      - uses: ./.github/actions/engine-wasm
-        if: ${{ needs.changes.outputs.code != 'false' }}
 
       # Logs each test start (#1152), so a step that hits its timeout names
       # the test it was in.
@@ -431,7 +394,7 @@ jobs:
   # in its own job so the container pull never slows the fast lint/test lane.
   e2e-serial:
     name: e2e-serial
-    needs: [changes, resolve-image, engine-wasm]
+    needs: [changes, resolve-image, tooling-app]
     # Skipped only for a prose-only change; a skipped job counts as passed for
     # the required check. With code changed, a failed engine package or image
     # lookup fails this job instead of skipping it.
@@ -520,7 +483,7 @@ jobs:
     # third 3. The e2e-general-result job below reports the six shards as one
     # e2e-general check, which is required.
     name: e2e-general (shard ${{ matrix.shard }} of 6)
-    needs: [changes, resolve-image, engine-wasm]
+    needs: [changes, resolve-image, tooling-app]
     # As the e2e-serial job: skipped only for a prose-only change.
     if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
@@ -545,10 +508,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - uses: ./.github/actions/engine-wasm-download
-        with:
-          artifact-name: engine-wasm
 
       # The player build, exactly as a deploy would make it, with every
       # postbuild check (the engine bundle guard among them). The tests run

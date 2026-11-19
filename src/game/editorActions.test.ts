@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   MAX_TEXT,
   NOT_ENOUGH_MONEY,
-} from "../simport/request";
+} from "@verticopolis/components/port/request";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import { catalogFor } from "../tests/catalogFixture";
 import {
@@ -14,7 +14,7 @@ import {
   setup,
 } from "./editorActions.fixture";
 
-vi.mock("../simport/headerClock", () => ({
+vi.mock("@verticopolis/components/port/headerClock", () => ({
   clockOf: () => ({ hour: 9, isWeekend: true }),
 }));
 

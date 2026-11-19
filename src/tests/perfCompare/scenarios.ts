@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { SerializedGame } from "../../shared/serializedGame";
+import type { SerializedGame } from "@verticopolis/components/shared/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 
 /** Every tower the harnesses can run, small to large by people with the
@@ -64,7 +64,7 @@ const TOWERS: Record<ScenarioName, { file: string; description: string }> = {
   small: { file: "src/tests/perfCompare/towers/small.vctower", description: "synthetic 15-floor tower (towers/small.vctower)" },
   "bracket-a": { file: "src/tests/perfCompare/towers/bracket-a.vctower", description: "bracket tower: 26 floors, about 1,150 people (towers/bracket-a.vctower)" },
   "bracket-b": { file: "src/tests/perfCompare/towers/bracket-b.vctower", description: "bracket tower: 48 floors, about 1,800 people (towers/bracket-b.vctower)" },
-  medium: { file: "conformance/fixtures/sixseven_2.vctower", description: "player fixture conformance/fixtures/sixseven_2.vctower" },
+  medium: { file: "node_modules/@verticopolis/engine-conformance/fixtures/sixseven_2.vctower", description: "player fixture conformance/fixtures/sixseven_2.vctower" },
   large: { file: "src/tests/perfCompare/towers/large.vctower", description: "Tier-1 win tower (towers/large.vctower)" },
   "many-unit": { file: "src/tests/perfCompare/towers/many-unit.vctower", description: "many units, few people: the large tower's shell with about 500 people (towers/many-unit.vctower)" },
   "hotel-heavy": { file: "src/tests/perfCompare/towers/hotel-heavy.vctower", description: "Modern hotel tower: 852 rooms, 24 housekeeping units, a split staff network and a wing no crew can route to (towers/hotel-heavy.vctower)" },

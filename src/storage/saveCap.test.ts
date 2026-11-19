@@ -15,6 +15,7 @@ import {
 import { toTowerFile } from "./towerFileCodec";
 import { loadStored } from "../game/portLifecycle";
 import { mockPort } from "../tests/portKit/mockPort";
+import { CONFORMANCE_ROOT } from "../tests/packagePaths";
 
 /**
  * The one 32 MiB cap at its edge, on a real tower: a save whose JSON is
@@ -28,7 +29,7 @@ import { mockPort } from "../tests/portKit/mockPort";
 const CAP = MAX_SAVE_INFLATED_BYTES;
 // SaveGame's autosave key, the slot `loadResult` reads first.
 const AUTO_KEY = "verticopolis-save";
-const FIXTURE = resolve(__dirname, "../../conformance/fixtures/split-tower.vctower");
+const FIXTURE = resolve(CONFORMANCE_ROOT, "fixtures/split-tower.vctower");
 
 /** The JSON text inside a VCZ1 store value or a `.vctower` file. */
 function jsonOf(packed: string): string {

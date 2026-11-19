@@ -12,8 +12,8 @@
  *   node scripts/rollback-rehearsal.ts verify    --origin <url> --profile <folder> --saves <folder> [--play-seconds 65]
  *                                                --expect-sha <sha7> [--churn <churn.json>] [--out <folder>] [--headed]
  *
- * `engine` needs the Node engine package built in both checkouts
- * (`npm run wasm:build`). `prepare` makes the previous checkout. Nothing here
+ * `engine` needs the Node engine package in both checkouts (`npm ci`
+ * installs it; a checkout from before the split builds it). `prepare` makes the previous checkout. Nothing here
  * deploys, rolls back or changes any hosting setting; `seed` and `verify` only
  * open the origin they are given in a throwaway browser profile.
  *
@@ -31,7 +31,7 @@ import { seedProfile, verifyProfile, AUTOSAVE_WAIT_SECONDS } from "./rollback-re
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_ALLOWED = join(root, "scripts", "rollback-allowed-losses.json");
 const DEFAULT_HOURS = 24;
-const FIXTURE_DIRS = ["conformance/fixtures", "conformance/fixtures/tdt-reddit"];
+const FIXTURE_DIRS = ["node_modules/@verticopolis/engine-conformance/fixtures", "node_modules/@verticopolis/engine-conformance/fixtures/tdt-reddit"];
 
 const fail = (message: string): never => {
   console.error(`rollback-rehearsal: ${message}`);
@@ -103,10 +103,14 @@ if (command === "prepare") {
   if (!existsSync(dir)) run("git", ["worktree", "add", "--detach", dir, "FETCH_HEAD"], root);
   // A folder that is already there must be exactly the requested commit, or the rehearsal would run against a stale build.
   else if (capture("git", ["rev-parse", "HEAD"], dir) !== capture("git", ["rev-parse", "FETCH_HEAD^{commit}"], root)) fail(`${dir} exists but is not at ${ref}; remove it or choose another --dir`);
+  // npm ci installs the engine packages a checkout pins. A checkout from
+  // before the repository split builds its engine from engine-rs/ instead.
   run("npm", ["ci"], dir);
-  // The script installs the pinned toolchain (Linux x64 only); elsewhere the toolchain is the owner's, as in the benchmark protocol.
-  if (process.platform === "linux" && process.arch === "x64") run("bash", ["scripts/build-engine-wasm.sh"], dir);
-  else run("npm", ["run", "wasm:build"], dir);
+  if (existsSync(join(dir, "engine-rs"))) {
+    // The script installs the pinned toolchain (Linux x64 only); elsewhere the toolchain is the owner's, as in the benchmark protocol.
+    if (process.platform === "linux" && process.arch === "x64") run("bash", ["scripts/build-engine-wasm.sh"], dir);
+    else run("npm", ["run", "wasm:build"], dir);
+  }
   console.log(`prepared ${dir}; use it as --previous`);
 } else if (command === "preflight") {
   if (resolve(need(f, "previous")) === resolve(f.get("candidate") ?? root)) fail("--previous and --candidate are the same folder; the rehearsal needs two different builds");

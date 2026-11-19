@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { expect, type Page } from "@playwright/test";
-import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets";
+import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "@verticopolis/components/audio/audioAssets";
 
 /**
  * Shared steps for the offline specs (#985): installing the service worker,

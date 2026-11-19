@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { shellProblems } from "../src/build/enginePackageBuild";
-import { engineBuildRecord } from "../src/wasmhost/enginePackageRecord";
-import { ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames";
+import { engineBuildRecord } from "@verticopolis/components/host/enginePackageRecord";
+import { ENGINE_GLUE, ENGINE_WASM } from "@verticopolis/components/host/enginePackageNames";
 
 /**
  * Two deployments of the game behind one origin (#985). The first is the

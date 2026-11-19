@@ -1,11 +1,11 @@
-import type { FacilityKind, Unit, UnitState } from "./shared/types";
-import { fitAtGameScale } from "./render/catalogScale";
-import { FLOOR, TILE } from "./render/scale";
-import { drawRoom, type RoomCtx } from "./render/pixelSprites";
-import { bindViewWorld } from "./presentation/viewWorld";
-import { bindViewKinds, findViewKind } from "./presentation/viewKinds";
-import { readCatalog } from "./engineBinding/catalog";
-import { loadWasmEngine } from "./wasmhost/rustEngine";
+import type { FacilityKind, Unit, UnitState } from "@verticopolis/components/shared/types";
+import { fitAtGameScale } from "@verticopolis/components/render/catalogScale";
+import { FLOOR, TILE } from "@verticopolis/components/render/scale";
+import { drawRoom, type RoomCtx } from "@verticopolis/components/render/pixelSprites";
+import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
+import { bindViewKinds, findViewKind } from "@verticopolis/components/presentation/viewKinds";
+import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { loadWasmEngine } from "@verticopolis/components/host/rustEngine";
 
 interface Entry {
   label: string;

@@ -32,7 +32,7 @@ export function siteHref(href, base = HELP_BASE, gameOrigin = GAME_ORIGIN) {
   return base + rest;
 }
 
-/** The engine developer docs (docs/engine-site), for players who want the
+/** The engine developer docs (docs/engine-site in Verticopolis/engine), for players who want the
  *  rules as code. */
 export const ENGINE_DOCS = "https://docs.verticopolis.com/";
 

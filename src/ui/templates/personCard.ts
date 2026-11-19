@@ -1,10 +1,10 @@
 import { html, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
-import { catalogFacility, type Catalog } from "../../catalog/catalogTypes";
-import { isHotelKind } from "../../presentation/viewKinds";
-import type { FacilityKind } from "../../shared/types";
-import type { PersonDetail, PersonPurpose, ShiftStep, TripPlace } from "../../simport/personCards";
-import { floorTag } from "../format";
+import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import { isHotelKind } from "@verticopolis/components/presentation/viewKinds";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { PersonDetail, PersonPurpose, ShiftStep, TripPlace } from "@verticopolis/components/port/personCards";
+import { floorTag } from "@verticopolis/components/windows/format";
 
 /**
  * The person card (#2092): who a walking person is, why they are out, where

@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
-import { MovableWindow, type Spot } from "../ui/movableWindow";
+import { MovableWindow, type Spot } from "@verticopolis/components/windows/movableWindow";
 
 /**
  * The facility card and the dialogs move by their title bars

@@ -1,6 +1,6 @@
 <!--
 Thanks for contributing to Verticopolis! Fill in the sections below.
-Keep the engine (engine-rs/) free of DOM/rendering, and use American English.
+Simulation rules belong in Verticopolis/engine, and use American English.
 Keep every ## heading and write something under each one: "None" or
 "n/a: <reason>" where a section does not apply. The PR template check
 (.github/workflows/pr-template.yml) fails a description that drops a heading.
@@ -52,13 +52,13 @@ instead of ticking a box.
 ## Versioning
 
 <!--
-Do not edit a version. Add .changes/<branch-slug>.md with the app and crate tiers
-(major / minor / patch / none) and the Player and Engine lines; the release PR
-raises the versions. See .changes/README.md.
+Do not edit a version. Add .changes/<branch-slug>.md with the app tier
+(major / minor / patch / none) and the Player lines; the release PR raises the
+version. The engine and the components are versioned in their own
+repositories. See .changes/README.md.
 -->
 
-- [ ] Added a `.changes` note with the right `app:` and `crate:` levels, **or** this PR changes no deployed path
-- [ ] Engine change: updated `packages/verticopolis-engine/README.md` and/or `engine-rs/CRATE_README.md`, **or** read both and put `readmes: unchanged` in the note, **or** this PR changes no engine source
+- [ ] Added a `.changes` note with the right `app:` level, **or** this PR changes no deployed path
 
 ## Complexity
 

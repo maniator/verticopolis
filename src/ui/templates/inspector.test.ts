@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { TemplateResult } from "lit-html";
-import type { TransportDetail, UnitDetail } from "../../simport/panels";
-import type { FacilityKind } from "../../shared/types";
+import type { TransportDetail, UnitDetail } from "@verticopolis/components/port/panels";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { catalogFor } from "../../tests/catalogFixture";
 import { transportDetail, unitDetail } from "../../tests/fixtures/detailCards";
 import { buildRefusalTemplate, transportInspectorTemplate, unitInspectorTemplate } from "./inspector";

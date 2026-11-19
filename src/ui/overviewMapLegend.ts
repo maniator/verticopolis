@@ -5,8 +5,8 @@
  * pointer, so a press on it lands on the map. The Hotel, Eval and Pricing
  * views each have one; only the selected view's legend shows.
  */
-import type { MapViewId } from "../render/overviewMap/views";
-import type { MapKindStyle } from "../render/overviewMap/style";
+import type { MapViewId } from "@verticopolis/components/render/overviewMap/views";
+import type { MapKindStyle } from "@verticopolis/components/render/overviewMap/style";
 
 /** What a legend entry shows: its label and its swatch. */
 export interface LegendEntry {

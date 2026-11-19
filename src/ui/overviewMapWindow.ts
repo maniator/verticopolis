@@ -11,17 +11,17 @@
  * from the view, the bound world and the camera; moves go through the
  * renderer's own clamp (`moveCamera`).
  */
-import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
-import type { ViewPlacement } from "../render/overviewMap/extent";
-import { dragCenter, mapPointToCenter, rectContains, type MapLayout, type MapRect } from "../render/overviewMap/geometry";
-import { OverviewMapModel, type MapFrameInput } from "../render/overviewMap/model";
-import { createPatternSource, paintGapsAndShafts, paintMapMarks, type PatternSource } from "../render/overviewMap/paint";
-import { MAP_MIN_GAP_CSS_PX } from "../render/overviewMap/gaps";
-import { MAP_BACKDROP, groundShare, paintViewMark, viewMarkBand } from "../render/overviewMap/viewMark";
+import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
+import type { ViewPlacement } from "@verticopolis/components/render/overviewMap/extent";
+import { dragCenter, mapPointToCenter, rectContains, type MapLayout, type MapRect } from "@verticopolis/components/render/overviewMap/geometry";
+import { OverviewMapModel, type MapFrameInput } from "@verticopolis/components/render/overviewMap/model";
+import { createPatternSource, paintGapsAndShafts, paintMapMarks, type PatternSource } from "@verticopolis/components/render/overviewMap/paint";
+import { MAP_MIN_GAP_CSS_PX } from "@verticopolis/components/render/overviewMap/gaps";
+import { MAP_BACKDROP, groundShare, paintViewMark, viewMarkBand } from "@verticopolis/components/render/overviewMap/viewMark";
 import { buildMapDom, ContextWatch } from "./overviewMapDom";
 import { MapKeyKeeper, PointerFocusClaim } from "./overviewMapKeys";
 import { WorldPress } from "./overviewMapWorldPress";
-import { cameraCenter, clientToMap, grabRect, isKeyboardClick, isPrimaryPress, keyTarget, MAP_KEY, type MapPress, MAP_MOUSE_TARGET_CSS, MAP_TOUCH_TARGET_CSS, noButtonHeld, passesMapKey, pastTapSlop, pixelRatio } from "./overviewMapInput";
+import { cameraCenter, clientToMap, grabRect, isKeyboardClick, isPrimaryPress, keyTarget, MAP_KEY, type MapPress, MAP_MOUSE_TARGET_CSS, MAP_TOUCH_TARGET_CSS, noButtonHeld, passesMapKey, pastTapSlop, pixelRatio } from "@verticopolis/components/windows/overviewMapInput";
 import { mapStartsOpen, rememberMapOpen, type MapLayoutClass } from "./overviewMapPrefs";
 import { mapSummary } from "./overviewMapText";
 import type { MutableMapCamera, OverviewMapDeps } from "./overviewMapDeps";

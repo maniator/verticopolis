@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { MAP_VIEWS, type MapViewId } from "../render/overviewMap/views";
+import { MAP_VIEWS, type MapViewId } from "@verticopolis/components/render/overviewMap/views";
 import { MAP_PICKER_DOM, MapViewPicker } from "./overviewMapPicker";
 
 function build(): { picker: MapViewPicker; chosen: MapViewId[] } {

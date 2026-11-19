@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { html } from "lit-html";
-import type { ServiceDiagnosticFacts } from "../simport/enginePort";
+import type { ServiceDiagnosticFacts } from "@verticopolis/components/port/enginePort";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { portServiceSections } from "./portServiceDiagnostics";
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { draftFromSave, type Draft } from "../portKit/drafts";
-import type { Unit, Transport } from "../../shared/types";
+import type { Unit, Transport } from "@verticopolis/components/shared/types";
 import { portOf } from "../../game/cardKit.fixture";
-import { PortCodes } from "../../simport/portCodes";
-import type { FacilityKind, SerializedGame } from "../../shared/types";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import type { FacilityKind, SerializedGame } from "@verticopolis/components/shared/types";
 import {
   TDT_HEADER_SIZE,
   TDT_MAX_FILE_BYTES,
@@ -15,7 +15,7 @@ import { LegacyImportError, describeWithCodec, parseTDT, parseTdtBinary } from "
 import { looksLikeLegacyTower } from "../../storage/tdtImportHelpers";
 import type { TdtSpec } from "../fixtures/tdtBuilder";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
-import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
 import { catalogFor } from "../catalogFixture";
 
 /** The Classic catalog, the engine's published table for the 1994 mode. */

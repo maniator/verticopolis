@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { srcFile } from "./packagePaths";
 
 /**
  * The title screen's skyline is drawn twice: inline by the game's splash
@@ -10,8 +9,7 @@ import { dirname, resolve } from "node:path";
  * The two have to show the same buildings in the same colors.
  */
 
-const src = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (rel: string): string => readFileSync(resolve(src, rel), "utf8");
+const read = (rel: string): string => readFileSync(srcFile(rel), "utf8");
 
 const template = read("ui/splashTemplate.ts");
 const image = read("public/splash-skyline.svg");

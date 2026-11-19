@@ -4,12 +4,12 @@
  * test files.
  */
 import { vi } from "vitest";
-import { FLOOR, TILE } from "../render/scale";
-import type { MapCameraCenter, MapExtent } from "../render/overviewMap/geometry";
+import { FLOOR, TILE } from "@verticopolis/components/render/scale";
+import type { MapCameraCenter, MapExtent } from "@verticopolis/components/render/overviewMap/geometry";
 import { MAP_OPEN_STORAGE_KEY } from "./overviewMapPrefs";
 import { MAP_DOM_ID, OverviewMapWindow, WORLD_PRESS_CLASS, type MutableMapCamera, type OverviewMapDeps, type OverviewMapSource } from "./overviewMapWindow";
 import type { OverviewMapViews } from "./overviewMapViews";
-import type { MapViewId } from "../render/overviewMap/views";
+import type { MapViewId } from "@verticopolis/components/render/overviewMap/views";
 import { MAP_PICKER_DOM } from "./overviewMapPicker";
 
 /** A fake world: a 375-tile lot, floors -9 to 100, a ten-floor tower. */

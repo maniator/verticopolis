@@ -39,16 +39,16 @@
  * Switching views never pauses the game (the original's tinted views do;
  * whether ours should is a check on the PC reference, parity plan item 7).
  */
-import type { FacilityKind } from "../shared/types";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { NO_GESTURE } from "../game/appHistory";
-import { NO_ROOM_TIERS, type RoomTiers } from "../simport/roomTiers";
-import type { MapLayout } from "../render/overviewMap/geometry";
-import { buildHotelMarks, HOTEL_LEGEND, HotelWatch, paintHotelMarks, type HotelRoom } from "../render/overviewMap/hotelView";
-import type { MapPaintContext, PatternSource } from "../render/overviewMap/paint";
-import { EVAL_LEGEND, paintTierMarks, PRICING_LEGEND, TierMarks, type TierRoom, type TierViewId } from "../render/overviewMap/tierView";
-import { DEFAULT_MAP_VIEW, type MapViewId } from "../render/overviewMap/views";
-import { HEAT_MODE_OF_VIEW, HeatMarks, OCCUPANCY_LEGEND, paintHeatMarks, TRAFFIC_LEGEND, type HeatCellView, type HeatViewId } from "../render/overviewMap/heatView";
-import type { HeatmapMode } from "../shared/engineTypes";
+import { NO_ROOM_TIERS, type RoomTiers } from "@verticopolis/components/port/roomTiers";
+import type { MapLayout } from "@verticopolis/components/render/overviewMap/geometry";
+import { buildHotelMarks, HOTEL_LEGEND, HotelWatch, paintHotelMarks, type HotelRoom } from "@verticopolis/components/render/overviewMap/hotelView";
+import type { MapPaintContext, PatternSource } from "@verticopolis/components/render/overviewMap/paint";
+import { EVAL_LEGEND, paintTierMarks, PRICING_LEGEND, TierMarks, type TierRoom, type TierViewId } from "@verticopolis/components/render/overviewMap/tierView";
+import { DEFAULT_MAP_VIEW, type MapViewId } from "@verticopolis/components/render/overviewMap/views";
+import { HEAT_MODE_OF_VIEW, HeatMarks, OCCUPANCY_LEGEND, paintHeatMarks, TRAFFIC_LEGEND, type HeatCellView, type HeatViewId } from "@verticopolis/components/render/overviewMap/heatView";
+import type { HeatmapMode } from "@verticopolis/components/shared/engineTypes";
 import type { MapDom } from "./overviewMapDom";
 import { MapLegend } from "./overviewMapLegend";
 import { MapViewPicker } from "./overviewMapPicker";

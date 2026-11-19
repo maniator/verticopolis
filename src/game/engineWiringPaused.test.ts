@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
-import type { GameMode } from "../shared/types";
+import type { GameMode } from "@verticopolis/components/shared/types";
 import { wireEngine } from "./engineWiring";
 import { placeSimpleBuild, isPaintTool, isTransportTool } from "./buildPreview";
 import { NO_GESTURE } from "./appHistory";
@@ -27,7 +27,7 @@ vi.mock("./buildPreview", () => ({
 
 vi.mock("./frameLoop", () => ({ runFrame: vi.fn(), SPEEDS: [0, 3, 15, 50] }));
 // No walking figure under any tap here, so Inspect falls through to the room (#2092).
-vi.mock("../render/excalibur/personFocus", () => ({ pickPersonAt: vi.fn(() => null) }));
+vi.mock("@verticopolis/components/render/excalibur/personFocus", () => ({ pickPersonAt: vi.fn(() => null) }));
 
 interface Hooks {
   classifyDown?: (button: number, touch: boolean, panKey: boolean) => string;

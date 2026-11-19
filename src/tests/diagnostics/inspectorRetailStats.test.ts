@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { html } from "lit-html";
 import { retailDisplayLines } from "../../game/portServiceDiagnostics";
-import type { ServiceDiagnosticFacts } from "../../simport/enginePort";
+import type { ServiceDiagnosticFacts } from "@verticopolis/components/port/enginePort";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
-import { groupDigits } from "../../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * The commercial venue's patronage block on the inspector card. The engine

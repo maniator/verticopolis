@@ -1,5 +1,5 @@
 import { trackEvent } from "./analyticsCore";
-import type { MenuDismissHow, MenuOpenVia } from "./ui/menuBar";
+import type { MenuDismissHow, MenuOpenVia } from "@verticopolis/components/windows/menuBar";
 
 /**
  * The menu bar's events (owner, 2026-11-14: "analytics for every single part

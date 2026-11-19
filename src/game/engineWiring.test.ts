@@ -5,7 +5,7 @@ import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, tou
 import { runFrame } from "./frameLoop";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 import { flush, makeApp } from "./engineWiring.fixture";
-import { pickPersonAt } from "../render/excalibur/personFocus";
+import { pickPersonAt } from "@verticopolis/components/render/excalibur/personFocus";
 
 /** Headless wireEngine callback tests; rebuildEngine has separate tests. */
 
@@ -18,7 +18,7 @@ vi.mock("./buildPreview", () => ({
   clearBuildRefusal: vi.fn(),
 }));
 
-vi.mock("../render/excalibur/personFocus", () => ({
+vi.mock("@verticopolis/components/render/excalibur/personFocus", () => ({
   pickPersonAt: vi.fn(() => null),
 }));
 vi.mock("./frameLoop", () => ({

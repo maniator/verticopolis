@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { compareTemplate, towerRulesModalTemplate } from "./compare";
 import { renderToFragment } from "../testing/litTestUtils";
-import type { CatalogRules } from "../../catalog/catalogTypes";
+import type { CatalogRules } from "@verticopolis/components/catalog/catalogTypes";
 import { catalogFor } from "../../tests/catalogFixture";
 
 /**

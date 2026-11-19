@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
-import { bandedExtent } from "../render/overviewMap/extent";
-import { FLOOR } from "../render/scale";
+import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
+import { bandedExtent } from "@verticopolis/components/render/overviewMap/extent";
+import { FLOOR } from "@verticopolis/components/render/scale";
 import { MAP_OPEN_STORAGE_KEY, MAP_OPEN_VALUE } from "./overviewMapPrefs";
 import type { OverviewMapDeps } from "./overviewMapWindow";
 import { MAP_DOM_ID } from "./overviewMapDom";

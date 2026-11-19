@@ -1,6 +1,6 @@
 import { strToU8, zipSync } from "fflate";
-import type { EnginePort } from "../simport/enginePort";
-import type { SimView } from "../simport/view";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { SimView } from "@verticopolis/components/port/view";
 import { SaveGame } from "../storage/SaveGame";
 
 /**

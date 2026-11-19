@@ -1,38 +1,25 @@
 #!/usr/bin/env bash
-# The Vercel build. The Rust engine's WASM package (src/public/engine/) is
-# build output and is not checked in, so every deploy builds it (or, on a
-# preview, restores it; see below) before Vite runs
-# (scripts/build-engine-wasm.sh installs the pinned toolchain).
-# A failed engine build fails the deploy: the app would otherwise ship without
-# the engine it runs on.
+# The Vercel build. The engine's WASM package (src/public/engine/) is the
+# browser build of the pinned @verticopolis/engine package, copied in before
+# Vite runs; nothing here compiles Rust (the engine is built and published from
+# Verticopolis/engine). A missing package fails the deploy: the app would
+# otherwise ship without the engine it runs on.
 set -euo pipefail
 
-# The old emergency switch skipped the rebuild and served the committed
-# package; there is none to serve now, so say plainly that it does nothing.
+# Old switches from when the deploy built the engine; say plainly that they
+# do nothing.
 if [ -n "${VC_ENGINE_REBUILD:-}" ]; then
-  echo "vercel-build: VC_ENGINE_REBUILD is no longer honored (the engine package is not committed, so it is always built); remove it from the project settings" >&2
+  echo "vercel-build: VC_ENGINE_REBUILD is no longer honored (the engine comes from npm); remove it from the project settings" >&2
 fi
 
 if [ -n "${VC_ENGINE:-}" ]; then
   echo "vercel-build: VC_ENGINE is no longer honored (every build is the Rust-only build); remove it from the project settings" >&2
 fi
 
-# A preview reuses the engine package an earlier deployment built from the
-# same Rust sources and build scripts (scripts/vercel-engine-cache.ts keeps one
-# in Vercel's build cache), so a push that leaves the engine alone skips
-# installing Rust and compiling it. The script uses the cache only when
-# VERCEL_ENV is preview: for production (or anything else) restore is a miss
-# and save does nothing, so the engine is built from source.
-# Every Vercel build compiles the player package alone (--player-only): no
+# npm ci copies the engine in (postinstall), but a cached install
+# (scripts/vercel-install.sh) skips npm's scripts, so copy it again here. No
 # deploy ships the tooling package (vite.config.ts refuses VC_TOOLING=1 here).
-if node scripts/vercel-engine-cache.ts restore; then
-  # The engine build also writes these from the event catalog; a restore
-  # writes them the same way so the bundle cannot differ from a full build.
-  npm run gen:events
-else
-  bash scripts/build-engine-wasm.sh --player-only
-  node scripts/vercel-engine-cache.ts save
-fi
+node scripts/engine-install.ts
 
 # Where the player's manual is served. Production puts it at the root of its
 # own host, help.verticopolis.com (vercel.json serves that host from

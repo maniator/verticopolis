@@ -8,8 +8,10 @@ How Verticopolis makes noise, what each sound is for, and how to add one.
 
 Sources, and which one wins when they disagree:
 
-- **The code** in `src/audio/` and `src/game/` is the truth about what plays
-  today.
+- **The code** in `src/audio/` (in
+  [Verticopolis/components](https://github.com/Verticopolis/components),
+  shipped to the game as `@verticopolis/components/audio`) and `src/game/`
+  (here) is the truth about what plays today.
 - **The SPEC** (`_bmad-output/specs/spec-human-audio-theme/`) and the
   crowd-din-ambience GDD (`_bmad-output/planning-artifacts/gdds/`) are the
   design record for the intended note data.
@@ -56,7 +58,7 @@ sound, ask whether it thickens that soundscape or merely announces an event.
 - Every sound is original to Verticopolis, UI effects included: synthesized in
   code, rendered from the project's code, or recorded by the owner. No
   third-party sample or sound pack ships, free or paid (audio plan, principle 9).
-- The engine (`engine-rs/`) owns gameplay
+- The engine (`engine-rs/` in Verticopolis/engine) owns gameplay
   outcomes and emits gameplay events. It never plays, schedules, or mixes
   sound. Everything audible lives in `src/audio/`, with the call sites in
   `src/game/`.

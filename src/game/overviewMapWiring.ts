@@ -15,19 +15,19 @@
  * kept per layout class (`ui/overviewMapSpot.ts`).
  */
 import type { GameApp } from "../main";
-import type { FacilityKind } from "../shared/types";
-import { findViewKind } from "../presentation/viewKinds";
-import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "../simport/roomTiers";
-import type { HallRun } from "../render/lobbyHalls";
-import { FLOOR, TILE } from "../render/scale";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { findViewKind } from "@verticopolis/components/presentation/viewKinds";
+import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "@verticopolis/components/port/roomTiers";
+import type { HallRun } from "@verticopolis/components/render/lobbyHalls";
+import { FLOOR, TILE } from "@verticopolis/components/render/scale";
 import { browserStorage, type MapLayoutClass } from "../ui/overviewMapPrefs";
 import { rememberMapSpot, storedMapSpot } from "../ui/overviewMapSpot";
-import { MovableWindow, WITHIN_PARENT } from "../ui/movableWindow";
+import { MovableWindow, WITHIN_PARENT } from "@verticopolis/components/windows/movableWindow";
 import { DESK_CHANGE_EVENT, deskActive } from "../ui/desk/deskController";
 import { MOVABLE_TITLE, wireMapWindowAnalytics } from "./movableWindows";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
 import { OverviewMapViews, type MapHeatSource } from "../ui/overviewMapViews";
-import { viewWorld, viewWorldBound } from "../presentation/viewWorld";
+import { viewWorld, viewWorldBound } from "@verticopolis/components/presentation/viewWorld";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 import { isEngineStopped } from "./interactionState";
 

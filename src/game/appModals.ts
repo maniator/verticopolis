@@ -6,12 +6,12 @@ import { scheduleReviewEntry } from "../ui/templates/scheduleReview";
 import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction, trackEconomyAction } from "../analytics";
 import type { ExterminatorSurface } from "../analyticsCore";
-import { outcome } from "../simport/portCodes";
-import { statsReport } from "../simport/statsSheet";
+import { outcome } from "@verticopolis/components/port/portCodes";
+import { statsReport } from "@verticopolis/components/port/statsSheet";
 import { catalogOf } from "./portAccess";
 import { NEWER_SAVE_REFUSAL, loadStored, newerSaveRefused } from "./portLifecycle";
 import { flushBeforeTowerSwap } from "../analyticsEngineBridge";
-import { groupDigits } from "../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * The tower-statistics modal, its exterminator action, and the Auto-save

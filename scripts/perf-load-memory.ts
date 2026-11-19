@@ -26,10 +26,10 @@
  * (`tdtExport`) in the second, recording the memory and the time of that
  * write, since each export has its own peak (#1338, #1431).
  *
- * It measures the player build's Node package, which `npm run wasm:build`
- * writes to `engine-rs/pkg-player/` (the build players run, without the
- * binding's tier 3 ops, #1057), and falls back to `engine-rs/pkg/` in a
- * checkout from before that split. It names the package by the source hash the same build stamps into the package's
+ * It measures the player build's Node package, the `node/` build of the
+ * installed `@verticopolis/engine` (the build players run, without the
+ * binding's tier 3 ops, #1057). A checkout from before the repository split
+ * has it in `engine-rs/pkg-player/`, or `engine-rs/pkg/` before #1057. It names the package by the source hash the same build stamps into the package's
  * `.wasm` (the `verticopolis.build` section, which `BUILD.json`'s `sources`
  * repeats); it stops when the `.wasm` carries no readable stamp.
  * `--engine <checkout>` measures another checkout's build instead (its own
@@ -37,8 +37,7 @@
  * after pair is taken:
  *
  *   git worktree add --detach ../vc-before <base commit>
- *   (cd ../vc-before && npm ci && npm run wasm:build)
- *   npm run wasm:build
+ *   (cd ../vc-before && npm ci)
  *   npm run perf:load-memory -- --engine ../vc-before --json before.json
  *   npm run perf:load-memory -- --json after.json
  *
@@ -55,13 +54,14 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUILD_SECTION, customSectionsOf, parseBuildMetadata } from "../src/wasmhost/buildSection";
+import { BUILD_SECTION, customSectionsOf, parseBuildMetadata } from "@verticopolis/components/host/buildSection";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const REPO = resolve(dirname(SCRIPT), "..");
-/** The player build's Node package, then the one package a checkout from
- *  before the player and tooling split (#1057) has. */
-const PACKAGE_DIRS = ["engine-rs/pkg-player", "engine-rs/pkg"];
+/** The player build's Node package: installed, then where a checkout from
+ *  before the repository split built it, then the one package a checkout
+ *  from before the player and tooling split (#1057) has. */
+const PACKAGE_DIRS = ["node_modules/@verticopolis/engine/node", "engine-rs/pkg-player", "engine-rs/pkg"];
 const GLUE = "verticopolis_engine.js";
 const BINARY = "verticopolis_engine_bg.wasm";
 const MIB = 1024 * 1024;
@@ -340,11 +340,11 @@ async function main(args: string[]): Promise<void> {
   const jsonOut = option(args, "--json");
   const engineRoot = resolve(option(args, "--engine") ?? REPO);
   const pkgDir = PACKAGE_DIRS.map((d) => resolve(engineRoot, d)).find((d) => existsSync(join(d, BINARY)));
-  if (!pkgDir) throw new Error(`${engineRoot} has no Node engine package (${PACKAGE_DIRS.join(" or ")}); run npm run wasm:build there`);
+  if (!pkgDir) throw new Error(`${engineRoot} has no Node engine package (${PACKAGE_DIRS.join(" or ")}); run npm ci there`);
   const pkgPath = join(pkgDir, GLUE);
   const wasmPath = join(pkgDir, BINARY);
   const stamp = parseBuildMetadata(customSectionsOf(readFileSync(wasmPath), BUILD_SECTION));
-  if (stamp.state !== "ok") throw new Error(`${wasmPath} carries no readable ${BUILD_SECTION} stamp (${stamp.state === "malformed" ? stamp.why : "missing"}); run npm run wasm:build there`);
+  if (stamp.state !== "ok") throw new Error(`${wasmPath} carries no readable ${BUILD_SECTION} stamp (${stamp.state === "malformed" ? stamp.why : "missing"}); run npm ci there`);
   const sources = stamp.sourceHash;
   const { buildScenarios, unknownScenarios } = await import("../src/tests/perfCompare/scenarios");
   if (only && unknownScenarios([only]).length > 0) throw new Error(`no scenario named ${only}`);

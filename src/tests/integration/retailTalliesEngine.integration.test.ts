@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
-import type { FacilityKind } from "../../shared/types";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { PortSim, describeEngines, type Leg, type Draft } from "../portKit/portSim";
 
 /**

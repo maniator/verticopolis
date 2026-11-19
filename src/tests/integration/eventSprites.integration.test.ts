@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../../render/sprites/events";
+import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "@verticopolis/components/render/sprites/events";
 
 /**
  * Smoke coverage for the event visuals added for parity: they are immediate-mode

@@ -1,5 +1,5 @@
-import type { GameMode } from "../shared/types";
-import { PortCodes } from "../simport/portCodes";
+import type { GameMode } from "@verticopolis/components/shared/types";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { mockPort, record } from "../tests/portKit/mockPort";
 import type { UI } from "./UI";
 import { showTower, type HudSource } from "./uiStatus";

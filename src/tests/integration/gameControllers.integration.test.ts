@@ -1,13 +1,13 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { withPorts } from "../fixtures/saveText";
 import { catalogFor } from "../catalogFixture";
-import { catalogFacility } from "../../catalog/catalogTypes";
-import type { FacilityKind, Transport, Unit } from "../../shared/types";
-import { PortEvents } from "../../simport/portEvents";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import type { FacilityKind, Transport, Unit } from "@verticopolis/components/shared/types";
+import { PortEvents } from "@verticopolis/components/port/portEvents";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { draftTower, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
-import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
+import type { Picked, TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
 import { kitOf, portOf, unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
 import { announceForPlacement, snapX, type PlaceOutcome } from "../../ui/placement";

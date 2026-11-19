@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
-import { stablePointerId } from "../render/pinchTracker";
-import { cancelPress } from "../render/excalibur/pressLifecycle";
+import { stablePointerId } from "@verticopolis/components/render/pinchTracker";
+import { cancelPress } from "@verticopolis/components/render/excalibur/pressLifecycle";
 
 /**
  * End a tower press whose release lands off the canvas (#1014, #824).

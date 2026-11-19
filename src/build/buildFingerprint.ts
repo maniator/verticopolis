@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import type { BuildFingerprint } from "../pwaUpdateInfo";
-import type { ExpectedEnginePackage } from "../wasmhost/enginePackageRecord";
+import type { ExpectedEnginePackage } from "@verticopolis/components/host/enginePackageRecord";
 
 /**
  * The build's two parts for the update prompt's "Game update / Engine update /

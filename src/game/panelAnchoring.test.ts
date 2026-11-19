@@ -3,7 +3,7 @@ import { kindFacts } from "../tests/catalogKinds";
 import { positionPanels, selectedScreenRect } from "./panelAnchoring";
 import type { GameApp } from "../main";
 import * as moves from "./movableWindows";
-import * as personFocus from "../render/excalibur/personFocus";
+import * as personFocus from "@verticopolis/components/render/excalibur/personFocus";
 
 /**
  * Unit coverage for the world-anchoring of the DOM panels. Both functions are

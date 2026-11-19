@@ -1,5 +1,5 @@
-import { catalogFacility, catalogResidents } from "../../catalog/catalogTypes";
-import { isPresent, isTenanted, type FacilityKind, type Unit } from "../../shared/types";
+import { catalogFacility, catalogResidents } from "@verticopolis/components/catalog/catalogTypes";
+import { isPresent, isTenanted, type FacilityKind, type Unit } from "@verticopolis/components/shared/types";
 import { catalogFor } from "../catalogFixture";
 
 /** The facility facts the walk reads (population, household, commercial,

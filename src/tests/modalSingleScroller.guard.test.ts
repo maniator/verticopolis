@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { gameStylesheet } from "./gameStylesheet.ts";
+import { srcFile } from "./packagePaths";
 
 /**
  * Shift-left guard: ONE scroll container per dialog (GH #717).
@@ -38,7 +39,7 @@ function stripComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 function readCss(rel: string): string {
-  return stripComments(readFileSync(resolve(HERE, "..", rel), "utf8"));
+  return stripComments(readFileSync(srcFile(rel), "utf8"));
 }
 
 /* The game page's whole cascade: styles.css plus the shared-chrome imports the

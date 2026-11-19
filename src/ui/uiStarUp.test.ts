@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render } from "lit-html";
 import { showStarUp } from "./uiStarUp";
 import type { UI } from "./UI";
-import type { ModalOpts } from "./modalPrecedence";
+import type { ModalOpts } from "@verticopolis/components/windows/modalPrecedence";
 
 /**
  * The star-up box's close paths: OK, Esc and the title-bar ✕ (both the

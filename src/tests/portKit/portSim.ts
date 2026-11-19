@@ -1,13 +1,13 @@
 import { afterEach, describe } from "vitest";
-import type { Person } from "../../shared/engineTypes";
-import type { FacilityKind, UnitState, VacateReason, WeatherKind } from "../../shared/types";
-import type { HeatCell, HeatmapMode } from "../../shared/engineTypes";
-import type { EnginePort } from "../../simport/enginePort";
-import type { StatsReport } from "../../simport/panels";
-import { PortCodes } from "../../simport/portCodes";
-import { statsReport } from "../../simport/statsSheet";
+import type { Person } from "@verticopolis/components/shared/engineTypes";
+import type { FacilityKind, UnitState, VacateReason, WeatherKind } from "@verticopolis/components/shared/types";
+import type { HeatCell, HeatmapMode } from "@verticopolis/components/shared/engineTypes";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { StatsReport } from "@verticopolis/components/port/panels";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { statsReport } from "@verticopolis/components/port/statsSheet";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../engineBinding/binding";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
 import { rustTooling, type ToolingSetters } from "./tooling";
 import { Snapshot, draftFromSave, releaseDrafts, type Draft, type Leg } from "./drafts";
 

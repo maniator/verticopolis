@@ -1,8 +1,8 @@
-import type { FacilityKind, Unit } from "../shared/types";
+import type { FacilityKind, Unit } from "@verticopolis/components/shared/types";
 import { kindFacts } from "./catalogKinds";
-import { paintSettledUnit } from "../render/regionPaint";
-import { FLOOR, TILE } from "../render/scale";
-import type { DrawCtx } from "../render/sprites";
+import { paintSettledUnit } from "@verticopolis/components/render/regionPaint";
+import { FLOOR, TILE } from "@verticopolis/components/render/scale";
+import type { DrawCtx } from "@verticopolis/components/render/sprites";
 
 /**
  * The shared harness for the room-origin tests (`render/originSeeds.test.ts`

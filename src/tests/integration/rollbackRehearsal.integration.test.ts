@@ -10,13 +10,13 @@ import { hasWasmPackage } from "../conformance/wasmEngine";
  * checkout stands in for both builds, so a tower the engine wrote must load,
  * play and save on the "previous" engine with no loss, and a previous engine
  * that does lose a field must be caught. The real previous build is a second
- * checkout (`npm run wasm:build` in it); the procedure is
+ * checkout (`npm ci` in it); the procedure is
  * `_bmad-output/planning-artifacts/release-3.0-rollback-rehearsal.md`.
  */
 
 const last = <T,>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 const HOURS = 2;
-const FIXTURE_DIRS = ["conformance/fixtures", "conformance/fixtures/tdt-reddit"].map((d) => join(REPO_ROOT, d));
+const FIXTURE_DIRS = ["node_modules/@verticopolis/engine-conformance/fixtures", "node_modules/@verticopolis/engine-conformance/fixtures/tdt-reddit"].map((d) => join(REPO_ROOT, d));
 const ONLY = ["towerone-vip-pending.vctower", "split-tower.vctower", "TOWER5.TDT", "TOWER8.TDT"];
 
 describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () => {

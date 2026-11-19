@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
 /**
  * Save integrity after play (gate 1, the 3.0 priorities plan's layer 2): a
@@ -39,7 +40,7 @@ function resave(save: string): string {
 
 describe.runIf(hasWasmPackage())("save handoff: a played tower's save opens again unchanged", () => {
   it.each(FIXTURES)("%s: the engine plays a day, and a new engine opens its save", (name) => {
-    const engine = wasm().Engine.fromVctower(readFileSync(resolve(__dirname, "../../../conformance/fixtures", name), "utf8"));
+    const engine = wasm().Engine.fromVctower(readFileSync(resolve(CONFORMANCE_ROOT, "fixtures", name), "utf8"));
     let saved: string;
     try {
       for (let m = 0; m < DAY_MINUTES; m++) engine.tick(1);

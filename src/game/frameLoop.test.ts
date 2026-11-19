@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { SPEEDS, runFrame, applySpeed } from "./frameLoop";
-import { MAX_STEP_MS } from "../render/excalibur/crowdLook";
+import { MAX_STEP_MS } from "@verticopolis/components/render/excalibur/crowdLook";
 import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
 import { makeApp, makeSim } from "./frameLoop.fixture";
-import { CROWD_CULL_ZOOM } from "../render/excalibur/crowdCull";
-import { NO_PEOPLE } from "../render/excalibur/peopleWindow";
+import { CROWD_CULL_ZOOM } from "@verticopolis/components/render/excalibur/crowdCull";
+import { NO_PEOPLE } from "@verticopolis/components/render/excalibur/peopleWindow";
 import { TOAST_SHOWN_MS } from "../ui/uiStatus";
 import { maybeShowStarUp, noteStarUp } from "./starUpFlow";
 

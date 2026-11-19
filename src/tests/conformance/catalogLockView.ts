@@ -1,5 +1,5 @@
-import type { Catalog } from "../../catalog/catalogTypes";
-import type { FacilityKind } from "../../shared/types";
+import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 
 /**
  * The kinds whose footprint (`width` and `floors`) the catalog lock does not

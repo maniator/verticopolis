@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
 import { mockPort } from "../tests/portKit/mockPort";
-import { PortEvents } from "../simport/portEvents";
+import { PortEvents } from "@verticopolis/components/port/portEvents";
 import { runBootFlow } from "./appBoot";
 
 // Same module stubs runBootFlow needs as appBoot.test.ts.

@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { EnginePort, EnginePortCommands, PortRecord } from "../../simport/enginePort";
-import { PortCodes, type CodeTable } from "../../simport/portCodes";
+import type { EnginePort, EnginePortCommands, PortRecord } from "@verticopolis/components/port/enginePort";
+import { PortCodes, type CodeTable } from "@verticopolis/components/port/portCodes";
 import { canonicalJson, digestText } from "../conformance/canonical";
 import { GOLDEN_SPEEDS } from "./goldenSpeeds";
 import { FRAME_TIMES_MS, freshDumpDir, startTower, type FrameDayStart } from "./frameDays";

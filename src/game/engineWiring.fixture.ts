@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import type { GameApp } from "../main";
-import { PortCodes } from "../simport/portCodes";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { mockPort, record } from "../tests/portKit/mockPort";
 
 /** The fake app `engineWiring.test.ts` wires: every hook the engine callbacks

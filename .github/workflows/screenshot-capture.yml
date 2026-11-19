@@ -97,8 +97,7 @@ jobs:
   # since this job never renders.
   resolve-image:
     runs-on: ubuntu-latest
-    # A cache miss compiles the engine (a few minutes); anything near this is a hang.
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -121,15 +120,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      # The gallery renders on the Rust engine, whose WASM package is build
-      # output, not checked in: restore it from the cache (or build it on an
-      # engine change) and hand it to the shard jobs, whose container has no Rust
-      # toolchain. The name holds no "shots-", so a shots download never picks it
-      # up.
-      - uses: ./.github/actions/engine-wasm
-        with:
-          artifact-name: engine-wasm-package
 
       - name: Verify shard coverage
         run: node scripts/screenshot-shards.ts verify
@@ -187,10 +177,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - uses: ./.github/actions/engine-wasm-download
-        with:
-          artifact-name: engine-wasm-package
 
       # Render the shard TWICE from two independent builds and byte-compare the
       # renders (the whole determinism guard). The logic lives in a standalone

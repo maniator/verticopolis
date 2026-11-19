@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
-import type { EnginePort } from "../../simport/enginePort";
-import { scheduleSlots } from "../../simport/scheduleSlots";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
 import { canonicalJson } from "../conformance/canonical";
 import { dumpRoot, type FrameDayStart } from "./frameDays";
 import type { PortEditLine } from "./portEditLines";

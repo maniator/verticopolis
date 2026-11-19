@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, relative } from "node:path";
+import { COMPONENT_STYLES, srcFile } from "./packagePaths";
 
 /**
  * Single-source guard for the retro palette (CAP-6).
@@ -38,9 +39,14 @@ function stylesheetsAndPages(dir: string): string[] {
 
 describe("retro palette single source (--r-face declared once)", () => {
   it("declares --r-face only in retro-tokens.css", () => {
-    const offenders = stylesheetsAndPages(srcRoot)
-      .filter((file) => DECLARES_R_FACE.test(readFileSync(file, "utf8")))
-      .map((file) => relative(srcRoot, file).replace(/\\/g, "/"))
+    // The game's own pages and sheets, and the components' sheets the game
+    // imports (the token file lives there now), each named from its own root.
+    const offenders = [srcRoot, COMPONENT_STYLES]
+      .flatMap((root) =>
+        stylesheetsAndPages(root)
+          .filter((file) => DECLARES_R_FACE.test(readFileSync(file, "utf8")))
+          .map((file) => relative(root, file).replace(/\\/g, "/")),
+      )
       .filter((rel) => rel !== TOKEN_FILE);
     expect(
       offenders,
@@ -49,7 +55,7 @@ describe("retro palette single source (--r-face declared once)", () => {
   });
 
   it("still finds the declaration in the token file (guard is wired to real content)", () => {
-    const tokens = readFileSync(resolve(srcRoot, TOKEN_FILE), "utf8");
+    const tokens = readFileSync(srcFile(TOKEN_FILE), "utf8");
     expect(DECLARES_R_FACE.test(tokens)).toBe(true);
   });
 });

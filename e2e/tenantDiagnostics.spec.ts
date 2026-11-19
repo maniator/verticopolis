@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { lobbyDistanceFixture } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import type { Unit } from "../src/shared/types";
+import type { Unit } from "@verticopolis/components/shared/types";
 import { buildInPage, expectEngineHosted } from "./helpers";
 
 /**
@@ -16,7 +16,7 @@ import { buildInPage, expectEngineHosted } from "./helpers";
  * tests. A second, built tower covers the No Rate, shoppers-too-far and
  * notice lines.
  */
-const TOWER = readFileSync(new URL("../conformance/fixtures/split-tower-4.vctower", import.meta.url), "utf8");
+const TOWER = readFileSync(new URL("../node_modules/@verticopolis/engine-conformance/fixtures/split-tower-4.vctower", import.meta.url), "utf8");
 const PHONE = { width: 390, height: 844 };
 
 // A 75-floor tower on a software-rendered page draws slowly.

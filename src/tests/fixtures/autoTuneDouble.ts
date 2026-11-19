@@ -1,7 +1,7 @@
-import type { HourlyByDay } from "../../shared/engineTypes";
-import { scheduleSlots } from "../../simport/scheduleSlots";
+import type { HourlyByDay } from "@verticopolis/components/shared/engineTypes";
+import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
-import { telemetryDocument } from "../../wasmhost/telemetry";
+import { telemetryDocument } from "@verticopolis/components/host/telemetry";
 import { wasm } from "../conformance/wasmEngine";
 
 type DoubleCtx = Pick<ScheduleDialogCtx, "cars" | "bottom" | "top" | "stops" | "origins" | "isExpress"> & {

@@ -22,9 +22,7 @@
 *.TDT binary
 *.tdt binary
 
-# Save fixtures are single-line text (a VCTOWER1 header and base64), but the
-# conformance digests pin their exact bytes, so git must never rewrite their
-# line endings, in either direction. -text keeps them diffable.
+# Save fixtures are single-line text (a VCTOWER1 header and base64), and tests
+# pin their exact bytes, so git must never rewrite their line endings, in
+# either direction. -text keeps them diffable.
 *.vctower -text
-# Binary tower files (VCTOWER2), committed byte for byte.
-conformance/fixtures/binary/*.vctower binary

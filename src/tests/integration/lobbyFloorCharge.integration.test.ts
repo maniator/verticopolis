@@ -1,21 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WasmEngine } from "../../engineBinding/binding";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
 import type { GameApp } from "../../main";
-import type { EnginePort } from "../../simport/enginePort";
-import { PortCodes } from "../../simport/portCodes";
-import { ViewReader } from "../../simport/viewReader";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { ViewReader } from "@verticopolis/components/port/viewReader";
 import { floorsOfPort } from "../../game/portAccess";
-import type { FacilityKind, GameMode } from "../../shared/types";
-import { catalogFacility, catalogTileCost, type Catalog } from "../../catalog/catalogTypes";
+import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
+import { catalogFacility, catalogTileCost, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
 import { catalogOf, isUnlocked, quoteBuild } from "../../game/portAccess";
 import { BuildActions } from "../../game/buildActions";
 import { updateBuildPreview } from "../../game/buildPreview";
 import { brushTiles } from "../../ui/placement";
 import { toolInfoFor } from "../../ui/templates/toolInfo";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
-import { groupDigits } from "../../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 import { decodeVctower } from "../../storage/vctowerContainer";
-import { kind, money, must, slot } from "../../simport/engineSubject.fixture";
+import { kind, money, must, slot } from "../engineFixtures/engineSubject.fixture";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**

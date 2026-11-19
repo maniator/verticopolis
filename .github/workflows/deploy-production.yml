@@ -5,9 +5,9 @@ name: Deploy production
 # the previews for every other branch. Production moves only here:
 #
 # - release-tag.yml dispatches this run when a release PR merges, with the
-#   app tag (v<x.y.z>) it just created, or the crate tag (engine-v<x.y.z>)
-#   when a release raised only the engine crate version. A tag created with
-#   the workflow token starts no tag-push workflow, hence the dispatch;
+#   app tag (v<x.y.z>) it just created. A tag created with the workflow token
+#   starts no tag-push workflow, hence the dispatch. The engine is pinned in
+#   package.json, so a new engine reaches production in an app release;
 # - a maintainer can run it from the Actions tab with a release tag to
 #   redeploy it. A run for an older release than the one on main deploys
 #   nothing unless `rollback` is ticked, so a slow automatic dispatch can never
@@ -17,8 +17,8 @@ name: Deploy production
 # is a release commit by the same gate the Vercel build step uses
 # (scripts/vercel-ignore-build.sh with VERCEL_ENV=production), then builds and
 # deploys with the Vercel CLI. `vercel build` runs vercel.json's install and
-# build commands, so scripts/vercel-build.sh builds the WASM engine with its
-# pinned toolchain exactly as a Vercel build does. The run passes only once
+# build commands, so scripts/vercel-build.sh installs the pinned engine
+# package exactly as a Vercel build does. The run passes only once
 # the production domain points at the new deployment and its /version.json
 # reports the tag's commit.
 #
@@ -32,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to deploy: v<x.y.z> or engine-v<x.y.z>"
+        description: "Release tag to deploy: v<x.y.z>"
         required: true
       rollback:
         description: "Deploy it even when main has a newer release (a rollback)"
@@ -61,8 +61,8 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
         run: |
-          if ! printf '%s' "$TAG" | grep -Eq '^(engine-)?v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::$TAG is not a release tag (v<x.y.z> or engine-v<x.y.z>)."
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::$TAG is not a release tag (v<x.y.z>)."
             exit 1
           fi
 
@@ -84,15 +84,8 @@ jobs:
           sha="$(git rev-parse HEAD)"
           tagged="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
           if [ "$sha" != "$tagged" ]; then echo "::error::HEAD $sha is not tag $TAG ($tagged)."; exit 1; fi
-          case "$TAG" in
-            engine-v*)
-              version="$(awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }' engine-rs/Cargo.toml)"
-              want="engine-v$version"; file="engine-rs/Cargo.toml" ;;
-            *)
-              version="$(node -p "require('./package.json').version")"
-              want="v$version"; file="package.json" ;;
-          esac
-          if [ "$TAG" != "$want" ]; then echo "::error::Tag $TAG does not match $file version $version (expected $want)."; exit 1; fi
+          version="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v$version" ]; then echo "::error::Tag $TAG does not match package.json version $version (expected v$version)."; exit 1; fi
           # "identical" or "ahead": main is this commit or contains it.
           status="$(gh api "repos/$GH_REPO/compare/$sha...main" --jq .status)"
           case "$status" in
@@ -126,16 +119,15 @@ jobs:
           ROLLBACK: ${{ inputs.rollback }}
         run: |
           set -euo pipefail
-          crate_of() { awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }'; }
-          here="$(node -p "require('./package.json').version") $(crate_of < engine-rs/Cargo.toml)"
-          main="$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/package.json?ref=main" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)') $(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/engine-rs/Cargo.toml?ref=main" | crate_of)"
+          here="$(node -p "require('./package.json').version")"
+          main="$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/package.json?ref=main" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)')"
           if [ "$here" = "$main" ]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           elif [ "$ROLLBACK" = "true" ]; then
-            echo "::notice::Rolling back: main is at app and crate $main, this release is $here."
+            echo "::notice::Rolling back: main is at app $main, this release is $here."
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::Not deploying: main has a newer release (app and crate $main) than this one ($here). Run again with rollback ticked to deploy it anyway."
+            echo "::notice::Not deploying: main has a newer release (app $main) than this one ($here). Run again with rollback ticked to deploy it anyway."
             echo "deploy=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -182,11 +174,15 @@ jobs:
             exit 1
           fi
 
+      # No npm cache here: this job holds the production secrets and builds a
+      # tag's commit, so it neither reads a cache another run could have
+      # written nor writes one for later runs (cache poisoning). `vercel build`
+      # runs a clean npm ci of the tag's lockfile.
       - name: Use Node.js (from .nvmrc)
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
+          package-manager-cache: false
 
       # Exact, so the CLI that holds the token changes only in a reviewed PR.
       - name: Install the Vercel CLI
@@ -220,9 +216,8 @@ jobs:
       - name: Record the web build's checksums
         run: (cd dist && find . -type f -printf '%P\0' | LC_ALL=C sort -z | xargs -0 sha256sum) > web-SHA256SUMS
 
-      # Kept for the release's archive job. Only an app tag gets one.
+      # Kept for the release's archive job.
       - name: Keep the web build for the release
-        if: ${{ startsWith(inputs.tag, 'v') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-build
@@ -249,25 +244,16 @@ jobs:
           # The check job's newer-release test, again just before going live,
           # in case a newer release merged while this run built.
           if [ "$ROLLBACK" != "true" ]; then
-            crate_of() { awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }'; }
-            here="$(node -p "require('./package.json').version") $(crate_of < engine-rs/Cargo.toml)"
-            main="$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/package.json?ref=main" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)') $(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/engine-rs/Cargo.toml?ref=main" | crate_of)"
+            here="$(node -p "require('./package.json').version")"
+            main="$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/package.json?ref=main" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)')"
             if [ "$here" != "$main" ]; then
               # This run may have displaced the newest release's pending
-              # deploy from the queue, so start that deploy again. Of main's
-              # app and crate tags, the newest release is the later commit.
-              read -r app crate <<< "$main"
-              newest=""
-              for t in "v$app" "engine-v$crate"; do
-                if gh api "repos/$GH_REPO/git/ref/tags/$t" > /dev/null 2>&1; then
-                  if [ -z "$newest" ] || [ "$(gh api "repos/$GH_REPO/compare/$newest...$t" --jq .status)" = "ahead" ]; then newest="$t"; fi
-                fi
-              done
-              if [ -n "$newest" ]; then
-                gh workflow run deploy-production.yml --ref main -f tag="$newest"
-                echo "::error::A newer release (app and crate $main) reached main while this run built $here; not deploying over it. Started a deploy of $newest in case this run displaced it. Run again with rollback ticked to deploy $TAG anyway."
+              # deploy from the queue, so start that deploy again.
+              if gh api "repos/$GH_REPO/git/ref/tags/v$main" > /dev/null 2>&1; then
+                gh workflow run deploy-production.yml --ref main -f tag="v$main"
+                echo "::error::A newer release (app $main) reached main while this run built $here; not deploying over it. Started a deploy of v$main in case this run displaced it. Run again with rollback ticked to deploy $TAG anyway."
               else
-                echo "::error::A newer release (app and crate $main) reached main while this run built $here; not deploying over it. Neither v$app nor engine-v$crate is tagged yet, so its own deploy is still to come."
+                echo "::error::A newer release (app $main) reached main while this run built $here; not deploying over it. v$main is not tagged yet, so its own deploy is still to come."
               fi
               exit 1
             fi
@@ -346,11 +332,9 @@ jobs:
   # after a successful deploy and apart from the Vercel secrets. The release is
   # published by github-release.yml, dispatched just before this run, so this
   # waits for it. An archive already attached (a redeploy or a rollback) is
-  # left alone. A crate-only release has its own engine package zip
-  # (release-tag.yml) and no web zip.
+  # left alone.
   archive:
     needs: [check, deploy]
-    if: ${{ startsWith(inputs.tag, 'v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

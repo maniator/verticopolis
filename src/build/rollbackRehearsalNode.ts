@@ -1,19 +1,22 @@
 /**
  * The file and engine-package side of the rollback rehearsal
- * (`./rollbackRehearsal.ts` holds the logic): read a build's records from a
- * checkout, load its Node engine package (`engine-rs/pkg/`, written by
- * `npm run wasm:build`), and make the candidate-written saves the previous
- * build is rehearsed against. Node only and ERASABLE, like its sibling.
+ * (`./rollbackRehearsal.ts` holds the logic): load a checkout's Node engine
+ * package and read its records from it, and make the candidate-written saves
+ * the previous build is rehearsed against. A checkout's engine is the tooling
+ * build `npm ci` installs (`@verticopolis/engine-tooling`); a checkout from
+ * before the repository split built it into `engine-rs/pkg/` with
+ * `npm run wasm:build`, and that place is still read. Node only and
+ * ERASABLE, like its sibling.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, join, resolve } from "node:path";
-import type { Engine } from "../engineBinding/engine";
-import { COMPAT_RECORD_PATH, type CompatRecord } from "./engineCompat.ts";
-import type { BuildFacts, EngineHandle, EnginePackage } from "./rollbackRehearsal.ts";
+import type { Engine } from "@verticopolis/engine-tooling/node/verticopolis_engine";
+import type { BuildFacts, CompatRecord, EngineHandle, EnginePackage } from "./rollbackRehearsal.ts";
 
-/** Where `npm run wasm:build` leaves the Node package inside a checkout. */
-export const NODE_PACKAGE_DIR = "engine-rs/pkg";
+/** Where a checkout keeps its Node engine package: installed, or built by a
+ *  checkout from before the split. */
+export const NODE_PACKAGE_DIRS = ["node_modules/@verticopolis/engine-tooling/node", "engine-rs/pkg"] as const;
 
 const GLUE = "verticopolis_engine.js";
 const BINARY = "verticopolis_engine_bg.wasm";
@@ -24,34 +27,63 @@ interface NodeBinding {
   engineIdentity(): string;
 }
 
-/** Read a checkout's compatibility record and app version. */
+/** The engine's own record of the formats it reads and writes. */
+function compatOf(binding: NodeBinding): CompatRecord {
+  const id = JSON.parse(binding.engineIdentity()) as {
+    crate: { version: string };
+    saveVersion: number;
+    oldestSaveVersion: number;
+    frameLayoutVersion: number;
+    catalogVersion: number;
+    schema: number;
+  };
+  const engine = binding.Engine.newGame(1, "classic");
+  try {
+    const view = JSON.parse(engine.viewLayout()) as { version: number };
+    return {
+      crateVersion: id.crate.version,
+      saveVersion: id.saveVersion,
+      oldestSaveVersion: id.oldestSaveVersion,
+      frameLayoutVersion: id.frameLayoutVersion,
+      viewLayoutVersion: view.version,
+      catalogVersion: id.catalogVersion,
+      identitySchema: id.schema,
+    };
+  } finally {
+    engine.free();
+  }
+}
+
+/** Read a checkout's engine records and app version. */
 export function buildFactsOf(tree: string, label: string): BuildFacts {
-  const root = resolve(tree);
-  const compatPath = join(root, COMPAT_RECORD_PATH);
-  if (!existsSync(compatPath)) throw new Error(`${label}: ${compatPath} does not exist; is this an engine checkout?`);
-  const compat = JSON.parse(readFileSync(compatPath, "utf8")) as CompatRecord;
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version?: string };
-  return { label, appVersion: pkg.version ?? "unknown", compat };
+  const pkg = JSON.parse(readFileSync(join(resolve(tree), "package.json"), "utf8")) as { version?: string };
+  return { label, appVersion: pkg.version ?? "unknown", compat: compatOf(loadBinding(tree, label)) };
+}
+
+/** The Node package folder of a checkout, or the reason it has none. */
+function nodePackageDir(tree: string): { dir: string } | { problem: string } {
+  for (const rel of NODE_PACKAGE_DIRS) {
+    const dir = join(resolve(tree), rel);
+    if ([GLUE, BINARY, MARKER].every((f) => existsSync(join(dir, f)))) return { dir };
+  }
+  return { problem: `${tree} has no Node engine package (${NODE_PACKAGE_DIRS.join(" or ")}); run npm ci in that checkout` };
 }
 
 /** The Node package of a checkout, or the reason it cannot be loaded. */
 export function nodePackageProblem(tree: string): string | undefined {
-  const dir = join(resolve(tree), NODE_PACKAGE_DIR);
-  for (const f of [GLUE, BINARY, MARKER]) {
-    if (!existsSync(join(dir, f))) return `${join(dir, f)} is missing; run npm run wasm:build in that checkout`;
-  }
-  return undefined;
+  const found = nodePackageDir(tree);
+  return "problem" in found ? found.problem : undefined;
+}
+
+function loadBinding(tree: string, label: string): NodeBinding {
+  const found = nodePackageDir(tree);
+  if ("problem" in found) throw new Error(`${label}: ${found.problem}`);
+  return createRequire(import.meta.url)(join(found.dir, GLUE)) as NodeBinding;
 }
 
 /** A build's engine, started from save text. The package is CommonJS inside an ESM repository, so it loads through `require`. */
 export function loadEnginePackage(tree: string, label: string): EnginePackage & { binding: NodeBinding } {
-  const problem = nodePackageProblem(tree);
-  if (problem) throw new Error(`${label}: ${problem}`);
-  const binding = createRequire(import.meta.url)(join(resolve(tree), NODE_PACKAGE_DIR, GLUE)) as NodeBinding;
-  // A package built from another commit than the checkout's records would make the rehearsal test the wrong engine.
-  const built = (JSON.parse(binding.engineIdentity()) as { crate?: { version?: string } }).crate?.version;
-  const recorded = buildFactsOf(tree, label).compat.crateVersion;
-  if (built !== recorded) throw new Error(`${label}: the engine package in ${tree} is crate ${String(built)} but the checkout's compat record says ${recorded}; run npm run wasm:build there`);
+  const binding = loadBinding(tree, label);
   return {
     label,
     binding,

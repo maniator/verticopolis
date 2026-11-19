@@ -82,9 +82,11 @@ export const INJECTED_CODE: ReadonlyArray<{
   { pkg: "vite", codeMarker: "vite:preloadError" },
   // Vite's modulepreload polyfill (its chunk's sourcemap has no sources).
   { pkg: "vite", codeMarker: 'link[rel="modulepreload"]', wholeChunk: true },
-  // Path data that scripts/gen-icon-paths.ts copies from pixelarticons into a
-  // source file of our own, so its sourcemap entry is not under node_modules.
-  { pkg: "pixelarticons", sourcePattern: /(^|\/)src\/ui\/iconPaths\.generated\.ts$/ },
+  // Path data that the components package's icon generator copies from
+  // pixelarticons into its own module, so the sourcemap lists that module
+  // under the components package. pixelarticons stays a dev dependency here
+  // so the notices can read its license.
+  { pkg: "pixelarticons", sourcePattern: /(^|\/)node_modules\/@verticopolis\/components\/lib\/ui\/iconPaths\.generated\.js$/ },
   // workbox-build's service worker template (its AMD loader); the sourcemap
   // lists it as a temporary file outside the repository.
   // `from` names the package that resolves it, so a nested copy is the one read.
@@ -129,15 +131,21 @@ export function isWholeInjectedChunk(code: string, marker: string): boolean {
 
 /**
  * True when a module id or file path lies inside a `node_modules` folder, with
- * either separator. A `?query` suffix is ignored, so a query that mentions
- * `node_modules` does not count. With `extension`, the path (query stripped)
- * must also match it. The generator and the `no-unlisted-package-files` plugin
- * in vite.config.ts share this, so their idea of a package file cannot drift.
+ * either separator, and outside the project's own `@verticopolis` packages
+ * (the engine and the components, which are this game's own code and art
+ * under its own licenses, ASSETS-LICENSE.md, so they are not third-party). A
+ * `?query` suffix is ignored, so a query that mentions `node_modules` does not
+ * count. With `extension`, the path (query stripped) must also match it. The
+ * generator and the `no-unlisted-package-files` plugin in vite.config.ts
+ * share this, so their idea of a package file cannot drift.
  */
 export function isPackagePath(id: string, extension?: RegExp): boolean {
   const path = id.replace(/\?.*$/s, "");
-  return /(^|[\\/])node_modules[\\/]/.test(path) && (extension === undefined || extension.test(path));
+  return /(^|[\\/])node_modules[\\/]/.test(path) && !FIRST_PARTY.test(path) && (extension === undefined || extension.test(path));
 }
+
+/** The project's own packages, as the last `node_modules` segment names them. */
+const FIRST_PARTY = /(^|[\\/])node_modules[\\/]@verticopolis[\\/][^\\/]+[\\/](?!(?:.*[\\/])?node_modules[\\/])/;
 
 /** A stylesheet extension that ends the path or a query part (`?vue&type=style&lang.css&inline`). */
 export const PACKAGE_STYLESHEET = /\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(?=$|[?&#])/;

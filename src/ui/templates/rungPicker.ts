@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { PriceRung } from "../../shared/engineTypes";
-import { groupDigits } from "../format";
+import type { PriceRung } from "@verticopolis/components/shared/engineTypes";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * The shared Classic rung picker row: a color chip plus a native `<select>` of

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ElevatorSchedule } from "../shared/engineTypes";
-import { scheduleSlots } from "../simport/scheduleSlots";
-import type { ViewReader } from "../simport/viewReader";
+import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
+import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
+import type { ViewReader } from "@verticopolis/components/port/viewReader";
 import { catalogFor } from "../tests/catalogFixture";
 import { mockPort } from "../tests/portKit/mockPort";
 import { keepAct, recoverAct, reviewAct } from "../ui/templates/scheduleReview";

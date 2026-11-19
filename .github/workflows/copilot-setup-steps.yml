@@ -8,26 +8,16 @@ on:
     paths:
       - .github/workflows/copilot-setup-steps.yml
       - tools/agent-env/pinned.sh
-      - .github/actions/engine-wasm/**
-      - scripts/build-engine-wasm.sh
-      - scripts/wasm-build.ts
-      - scripts/engine-third-party.ts
-      - scripts/license-files.ts
-      - src/build/thirdPartyNotices.ts
-      - src/build/rustNotices.ts
-      - src/wasmhost/packageHash.ts
+      - package.json
+      - package-lock.json
+      - scripts/engine-install.ts
   pull_request:
     paths:
       - .github/workflows/copilot-setup-steps.yml
       - tools/agent-env/pinned.sh
-      - .github/actions/engine-wasm/**
-      - scripts/build-engine-wasm.sh
-      - scripts/wasm-build.ts
-      - scripts/engine-third-party.ts
-      - scripts/license-files.ts
-      - src/build/thirdPartyNotices.ts
-      - src/build/rustNotices.ts
-      - src/wasmhost/packageHash.ts
+      - package.json
+      - package-lock.json
+      - scripts/engine-install.ts
 
 # Least privilege at the workflow level too (the job below restates it): setup
 # only checks out and builds, so read access to contents is all it ever needs.
@@ -60,28 +50,10 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
-      # The engine's WASM packages (src/public/engine/, engine-rs/pkg/ and the
-      # others .github/actions/engine-wasm names) are build output, not checked in: restore it from the Actions cache, or build it,
-      # so the game, the e2e projects and the WASM test
-      # suites work for the agent. continue-on-error for the same reason as the
-      # Rust steps below: the TypeScript side must still start (without the
-      # package, npm test skips the package's hash test).
-      - name: Engine WASM package
-        id: engine
-        continue-on-error: true
-        uses: ./.github/actions/engine-wasm
-
-      # Only when the engine step failed: the opt-in lets this build and the
-      # agent's own later builds go without the engine (CONTRIBUTING.md). With
-      # the engine in place, builds keep the strict check.
-      - name: Allow builds without the engine (engine step failed)
-        if: steps.engine.outcome == 'failure'
-        # A step that failed partway can leave part of the package, which the
-        # build refuses even with the opt-in, and a Node package (engine-rs/pkg)
-        # that would run the WASM test suites against a failed build; clear them all.
-        run: |
-          rm -rf src/public/engine engine-rs/pkg engine-rs/pkg-player engine-rs/pkg-web-tooling
-          echo "VC_ALLOW_NO_ENGINE=1" >> "$GITHUB_ENV"
+      # npm ci installs the engine packages from npm (its postinstall copies
+      # the browser build into src/public/engine/, scripts/engine-install.ts),
+      # so the game, the e2e projects and the engine test suites work for the
+      # agent with nothing to compile.
 
       # A tooling build, so an agent that runs `npm run e2e` against this dist
       # gets the `window.game` handle the specs depend on (production builds
@@ -98,22 +70,3 @@ jobs:
       - name: Pull the pinned Playwright image
         continue-on-error: true
         run: docker pull "$(bash tools/agent-env/pinned.sh --image)"
-
-      # The Rust engine (engine-rs/) builds on the same toolchain engine-rs.yml
-      # pins, with the conformance referee compiled in release so an agent can
-      # run `cargo run --release --features conformance --bin conformance` at once. Each step is
-      # continue-on-error: a toolchain hiccup must not keep the agent from
-      # starting on the TypeScript side.
-      - name: Rust toolchain (pinned to engine-rs.yml)
-        continue-on-error: true
-        run: |
-          rustup toolchain install 1.97.0 --profile minimal --component rustfmt,clippy
-          rustup default 1.97.0
-
-      - name: Build Rust engine and referee
-        continue-on-error: true
-        working-directory: engine-rs
-        run: |
-          cargo build --locked --all-targets
-          cargo build --locked --all-targets --features conformance
-          cargo build --locked --release --features conformance --bin conformance --bin dump

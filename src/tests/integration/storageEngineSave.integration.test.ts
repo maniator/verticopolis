@@ -2,9 +2,9 @@ import { expect, it } from "vitest";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
 import { catalogFor } from "../catalogFixture";
 import { wasm } from "../conformance/wasmEngine";
-import { parseEngineIdentity, readEngineIdentity } from "../../wasmhost/engineIdentity";
+import { parseEngineIdentity, readEngineIdentity } from "@verticopolis/components/host/engineIdentity";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
-import { unfoldFloorRuns } from "../../shared/floorRuns";
+import { unfoldFloorRuns } from "@verticopolis/components/shared/floorRuns";
 
 /**
  * Save fields the engine reads and writes back, through the port on both

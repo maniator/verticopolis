@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { LAYOUT } from "../portKit/mockPort";
-import type { FacilityKind, GameMode } from "../../shared/types";
+import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
 import { PortSim, describeEngines, draftTower, type Leg, type Draft } from "../portKit/portSim";
 
 /**

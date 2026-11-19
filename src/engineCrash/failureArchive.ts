@@ -1,6 +1,6 @@
 import { strToU8, zipSync } from "fflate";
 import { APP_VERSION } from "../appVersion";
-import type { EngineBootFailure } from "../wasmhost/engineBoot";
+import type { EngineBootFailure } from "@verticopolis/components/host/engineBoot";
 import { readRecoveryText } from "../storage/recoveryCopy";
 import { downloadFile } from "../ui/downloadFile";
 

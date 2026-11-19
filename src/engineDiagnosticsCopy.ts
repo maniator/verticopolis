@@ -1,4 +1,4 @@
-import { liveDiagnostics } from "./wasmhost/engineDiagnosticsLive";
+import { liveDiagnostics } from "@verticopolis/components/host/engineDiagnosticsLive";
 import { copyText } from "./ui/copyText";
 
 /** Copy the engine diagnostics from the stop screen, where Help cannot be

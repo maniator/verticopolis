@@ -31,20 +31,21 @@
  *
  * Every shaft, car and office goes through the engine's own commands, so
  * each placement is one the engine accepts; steps 1 and 4 are the only edits
- * to a saved game. Usage (the engine package built with `npm run wasm:build`):
+ * to a saved game. Usage (the engine package installed with `npm install`):
  *   npx tsx scripts/derive-late-game-fixture.ts
  * The run is deterministic, so a rerun writes the same file.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MAX_BRUSH_TILES } from "../src/simport/request";
+import { MAX_BRUSH_TILES } from "@verticopolis/components/port/request";
 import { deflate } from "../src/storage/saveCompression";
 import { wasm } from "../src/tests/conformance/wasmEngine";
+import { CONFORMANCE_ROOT } from "../src/tests/packagePaths";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = resolve(ROOT, "src/tests/goldens/card-text/classic-winning-tower.vctower");
-const TARGET = resolve(ROOT, "conformance/fixtures/late-game-classic.vctower");
+const TARGET = resolve(CONFORMANCE_ROOT, "fixtures/late-game-classic.vctower");
 
 const { Engine, catalog } = wasm();
 type Facility = { key: string; width: number; maxCars: number | null };

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { UNDO_DONE, UNDO_NOTHING_TO_STEP, UNDO_REFUSED } from "../simport/enginePort";
+import { UNDO_DONE, UNDO_NOTHING_TO_STEP, UNDO_REFUSED } from "@verticopolis/components/port/enginePort";
 import { mockPort } from "../tests/portKit/mockPort";
 import { createAppHistory, NO_GESTURE } from "./appHistory";
 

@@ -4,7 +4,7 @@
  * crop (a sighted player sees the edge band and its chevron). DOM-free,
  * so it is unit-tested on its own.
  */
-import type { BuiltFloors, ViewPlacement } from "../render/overviewMap/extent";
+import type { BuiltFloors, ViewPlacement } from "@verticopolis/components/render/overviewMap/extent";
 import { floorLabel } from "./floorLabel";
 
 function count(n: number, one: string, many: string): string {

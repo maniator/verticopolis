@@ -3,12 +3,12 @@
 // looks here exactly as it does in a tower. Each picture is a
 // <canvas data-sprite> that src/components/Sprite.astro writes; the catalog
 // comes from /help/catalog.json (src/pages/catalog.json.ts).
-import type { Catalog, CatalogFacility } from "../../../src/catalog/catalogTypes";
-import { bindViewKinds } from "../../../src/presentation/viewKinds";
-import { bindViewWorld } from "../../../src/presentation/viewWorld";
-import { drawRoomPortrait, drawTransportPortrait } from "../../../src/render/roomPortrait";
-import type { DrawCtx } from "../../../src/render/sprites";
-import type { FacilityKind, UnitState } from "../../../src/shared/types";
+import type { Catalog, CatalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
+import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
+import { drawRoomPortrait, drawTransportPortrait } from "@verticopolis/components/render/roomPortrait";
+import type { DrawCtx } from "@verticopolis/components/render/sprites";
+import type { FacilityKind, UnitState } from "@verticopolis/components/shared/types";
 
 /** The most a picture magnifies the world: three whole game pixels per CSS
  *  pixel, as the gallery did, stepping down for a room too big for its box. */

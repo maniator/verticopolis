@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../analyticsActions", () => ({ trackAppAction: vi.fn(), trackAppActionOnce: vi.fn() }));
 
 import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
-import { DESK_MINIMIZED_CLASS } from "./deskWindow";
+import { DESK_MINIMIZED_CLASS } from "@verticopolis/components/windows/desk/deskWindow";
 import { DESK_ANY_SCREEN, DESK_ANY_SCREEN_MQ, DESK_CLASS, DESK_KEY, DESK_MQ, DeskController, deskActive, wireDesk } from "./deskController";
 
 /** The page the desk works on: the game's own elements, in their usual places. */

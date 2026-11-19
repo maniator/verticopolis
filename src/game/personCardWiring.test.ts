@@ -13,10 +13,10 @@ const person = vi.hoisted(() => vi.fn());
 const waitMood = vi.hoisted(() => vi.fn(() => "impatient"));
 const catalog = vi.hoisted(() => ({ rules: { fedUpWait: 120 } }));
 
-vi.mock("../render/excalibur/personFocus", () => focus);
-vi.mock("../render/excalibur/crowdLook", () => ({ waitMood }));
+vi.mock("@verticopolis/components/render/excalibur/personFocus", () => focus);
+vi.mock("@verticopolis/components/render/excalibur/crowdLook", () => ({ waitMood }));
 vi.mock("./portAccess", () => ({ catalogOf: () => catalog }));
-vi.mock("../simport/personCards", () => ({
+vi.mock("@verticopolis/components/port/personCards", () => ({
   PersonCards: class {
     person = person;
   },

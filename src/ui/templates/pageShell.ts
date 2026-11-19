@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { iconTemplate, type IconName } from "../icons";
+import { iconTemplate, type IconName } from "@verticopolis/components/windows/icons";
 import { BACK_NOTE_ID, backToOpenGame } from "../fromGame";
 
 /** A sibling-page link in the title-bar nav (e.g. the Sprite Gallery). */

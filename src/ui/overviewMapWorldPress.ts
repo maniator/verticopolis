@@ -5,7 +5,7 @@
  * canvas. A touch needs none, since the browser keeps a touch on the element
  * it pressed.
  */
-import { noButtonHeld } from "./overviewMapInput";
+import { noButtonHeld } from "@verticopolis/components/windows/overviewMapInput";
 
 /** The class the window and its button wear while a world press is held (the
  *  CSS lets such pointers through). */

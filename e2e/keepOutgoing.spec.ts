@@ -17,7 +17,7 @@ test.use({ storageState: { cookies: [], origins: [] }, serviceWorkers: "block" }
 
 const OLD: Record<string, string> = JSON.parse(readFileSync(new URL("./fixtures/storage-4.2.json", import.meta.url), "utf8"));
 /** A player's tower, as a `.vctower` file. */
-const SPLIT_TOWER = readFileSync(new URL("../conformance/fixtures/split-tower.vctower", import.meta.url), "utf8");
+const SPLIT_TOWER = readFileSync(new URL("../node_modules/@verticopolis/engine-conformance/fixtures/split-tower.vctower", import.meta.url), "utf8");
 
 async function seed(page: Page): Promise<void> {
   await page.addInitScript((seeded) => {

@@ -17,6 +17,7 @@ import {
   SUMMARIES,
   SUMMARY_CLAUSES,
   SURFACES,
+  IN_OTHER_REPO,
 } from "./hotPathReview.rules";
 
 /**
@@ -159,9 +160,13 @@ describe("hot-path review guard", () => {
     expect(from >= 0 && to > from, "not-hot-path list bounds").toBe(true);
     expect(spans(prose.slice(from, to))).toEqual(NOT_HOT);
 
+    // Paths in another repository cannot be checked here; that repository's
+    // own rows name them.
     const paths = [
-      ...Object.values(SURFACES).flat(),
-      ...NOT_HOT.filter((p) => p.includes("/")),
+      ...Object.entries(SURFACES)
+        .filter(([surface]) => !IN_OTHER_REPO(surface))
+        .flatMap(([, rows]) => rows),
+      ...NOT_HOT.filter((p) => p.includes("/") && !p.startsWith("engine-rs/")),
     ];
     expect(paths.filter((rel) => !pathExists(rel))).toEqual([]);
   });

@@ -1,11 +1,11 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import type { FacilityKind } from "../shared/types";
-import type { EvalTier, RentTier } from "../simport/roomTiers";
-import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
-import { extentFloors, fitLayout, mapExtent } from "../render/overviewMap/geometry";
-import type { MapPaintContext, PatternSource } from "../render/overviewMap/paint";
-import { tiersOf } from "../render/overviewMap/tierView.fixture";
-import type { MapViewId } from "../render/overviewMap/views";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { EvalTier, RentTier } from "@verticopolis/components/port/roomTiers";
+import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
+import { extentFloors, fitLayout, mapExtent } from "@verticopolis/components/render/overviewMap/geometry";
+import type { MapPaintContext, PatternSource } from "@verticopolis/components/render/overviewMap/paint";
+import { tiersOf } from "../tests/engineFixtures/tierView.fixture";
+import type { MapViewId } from "@verticopolis/components/render/overviewMap/views";
 import { MINUTES_PER_GAME_HOUR, OverviewMapViews, type MapViewRoom } from "./overviewMapViews";
 import { disposeRigs, pickView, rig } from "./overviewMapWindow.fixture";
 

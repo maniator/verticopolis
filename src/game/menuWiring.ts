@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
-import { MenuBar } from "../ui/menuBar";
-import { MovableWindow, WITHIN_PARENT } from "../ui/movableWindow";
+import { MenuBar } from "@verticopolis/components/windows/menuBar";
+import { MovableWindow, WITHIN_PARENT } from "@verticopolis/components/windows/movableWindow";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../ui/paletteCollapse";
 import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";

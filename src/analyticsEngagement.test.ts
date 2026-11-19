@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { GAMEPLAY_COMMANDS, PLAY_SECONDS, createEngagementDetector, watchGameplayCommands, type PlaySample } from "./analyticsEngagement";
-import type { EnginePortCommands } from "./simport/enginePort";
+import type { EnginePortCommands } from "@verticopolis/components/port/enginePort";
 
 const playing = (clock: number): PlaySample => ({ visible: true, blocked: false, clock });
 

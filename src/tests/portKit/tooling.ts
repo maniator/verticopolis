@@ -1,5 +1,5 @@
-import type { WasmEngine } from "../../engineBinding/binding";
-import type { UnitState, VacateReason, WeatherKind } from "../../shared/types";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import type { UnitState, VacateReason, WeatherKind } from "@verticopolis/components/shared/types";
 
 /** The tooling setters (binding tier 3) a test reaches mid-run. Each that
  *  can refuse answers false, changing nothing. */

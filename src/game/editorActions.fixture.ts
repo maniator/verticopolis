@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { PortCodes } from "../simport/portCodes";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { catalogFor } from "../tests/catalogFixture";
 import { LAYOUT, mockPort } from "../tests/portKit/mockPort";
 import type { CardKit } from "./cardKit";

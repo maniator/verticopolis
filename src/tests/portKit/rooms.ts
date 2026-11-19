@@ -1,6 +1,6 @@
 import { floorsOfPort } from "../../game/portAccess";
-import type { FacilityKind } from "../../shared/types";
-import { ViewReader } from "../../simport/viewReader";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { ViewReader } from "@verticopolis/components/port/viewReader";
 import type { PortSim } from "./portSim";
 
 /** One room's live visit counters, which no save carries. */

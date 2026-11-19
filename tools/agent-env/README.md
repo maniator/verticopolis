@@ -1,12 +1,12 @@
 # Agent environment
 
 One setup for every coding agent's Linux sandbox, so an agent can run the four
-quality gates, the Rust gates, the engine build, e2e, and the screenshot
+quality gates, e2e, and the screenshot
 gallery in the pinned Playwright image without waiting on CI.
 
 | File | What it does |
 | --- | --- |
-| `setup.sh` | Installs Node at the `.nvmrc` version, runs `npm ci`, installs Rust at the engine's `rust-version` (rustfmt, clippy, wasm32) as the default, builds the engine WASM package through `scripts/build-engine-wasm.sh` (pinned, checksummed wasm-bindgen), installs the Playwright and Chrome DevTools MCP servers (pinned), starts `dockerd` and pulls the pinned Playwright image in the background. Each step skips work already done. |
+| `setup.sh` | Installs Node at the `.nvmrc` version, runs `npm ci` (which installs the engine packages the game pins), installs the Playwright and Chrome DevTools MCP servers (pinned), starts `dockerd` and pulls the pinned Playwright image in the background. Each step skips work already done. |
 | `pinned.sh` | Runs the screenshot gallery (`screenshots`), the visual baselines (`baselines`) or any command (`run '<cmd>'`) inside the pinned image, the way CI does. |
 | `playwright-mcp.mjs` | Starts the Playwright MCP server for `.mcp.json`: inside the pinned image with its Chromium when Docker has the image (starting `dockerd` first when it is down), otherwise on the host. |
 | `chrome-devtools-mcp.mjs` | Starts the Chrome DevTools MCP server for `.mcp.json` on the host, with every outbound report turned off. |
@@ -25,8 +25,8 @@ Logs go to `$TMPDIR/vc-agent-setup/`.
   It does nothing in a local session. `.mcp.json` adds the Playwright and
   Chrome DevTools MCP servers, and `enabledMcpjsonServers` in the same
   settings file approves them.
-  The first start in a fresh container takes two to four minutes (most of it
-  the engine build); a resume takes about a second.
+  The first start in a fresh container takes a minute or two (most of it
+  `npm ci`); a resume takes about a second.
 - **Claude Code project threads** start in the folder above the checkouts, so
   they never read this repository's `.claude/` or `.mcp.json`. Set the
   environment's setup script (Project settings, Cloud environment) to
@@ -76,8 +76,7 @@ The image is `mcr.microsoft.com/playwright:v<lockfile version>-jammy`, the one
 `screenshot-capture.yml` and `update-visual-baselines.yml` resolve. The
 checkout is mounted at its own path: the build's source-map check resolves
 paths against it, and a short mount such as `/work` fails the build. The
-engine package and `node_modules` come from the host, since the image has no
-Rust toolchain, and the host's `.nvmrc` Node is mounted in. Output from this
+engine package and `node_modules` come from the host, and the host's `.nvmrc` Node is mounted in. Output from this
 image is equivalent to CI's and may be committed (CLAUDE.md, Screenshots).
 Nothing on the host may listen on port 4173 during a render.
 
@@ -136,8 +135,7 @@ them changed today:
 
 - **Network.** The default "trusted" access with package managers allowed is
   enough. `setup.sh` reaches `nodejs.org`, `registry.npmjs.org`,
-  `static.rust-lang.org`, `index.crates.io`, `github.com` (the wasm-bindgen
-  release) and `mcr.microsoft.com` (the image). The Playwright browser CDN
+  `github.com` (the engine's tooling and conformance release tarballs) and `mcr.microsoft.com` (the image). The Playwright browser CDN
   (`cdn.playwright.dev`, `playwright.download.prss.microsoft.com`) is blocked,
   so `npx playwright install` fails; nothing here needs it. Allow those two
   hosts only if you want host e2e on Playwright's own browser build.

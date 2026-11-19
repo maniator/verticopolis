@@ -7,20 +7,15 @@ import { repoRel, sourceFiles } from "./guardFiles";
 /**
  * Shift-left guard: a Classic or Modern difference is a named rule.
  *
- * The engine keeps its mode rules as named methods on `GameMode` in
- * `engine-rs/src/rules/` (`room_is_permanent`, `ransom_needs_security`,
- * `quarterly_rent_scale`, ...), and every other file asks those rules by name.
- * A bare `if self.mode == GameMode::Classic` somewhere else hides which rule it
- * means, lets two copies of one rule drift apart, and is the pattern the
- * 2026-11-12 audit found about 25 of. This guard keeps new ones out.
+ * The engine keeps its mode rules as named methods on `GameMode`
+ * (Verticopolis/engine), and the catalog publishes the ones a frontend needs,
+ * so the web asks those rules by name. A bare `mode === "modern"` hides which
+ * rule it means and lets two copies of one rule drift apart. This guard keeps
+ * new ones out.
  *
- * It counts direct mode checks in production code: in Rust, a
- * `GameMode::Classic`/`GameMode::Modern` value, `.is_modern()`, or a
- * `modern`/`classic` boolean standing in for a rule; in TypeScript, a
- * comparison against the `"classic"`/`"modern"` mode names or an
- * `isModern`/`isClassic` flag. Tests are not counted (they run each rule in
- * both modes on purpose), nor are the rule hub itself and the mode's own
- * definition, parse and serialize in `clock.rs`.
+ * It counts direct mode checks in production TypeScript: a comparison against
+ * the `"classic"`/`"modern"` mode names or an `isModern`/`isClassic` flag.
+ * Tests are not counted (they run each rule in both modes on purpose).
  *
  * Files that already held checks when the guard landed are listed with their
  * count in `modeBranch.ratchet.txt`. That list only shrinks: a file's count
@@ -30,23 +25,8 @@ import { repoRel, sourceFiles } from "./guardFiles";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** Where a direct mode check belongs: the rule hub (`rules.rs` and its
- *  `rules/` submodules, one per domain) and the enum's own file. */
-const RULE_HOMES: readonly RegExp[] = [/^engine-rs\/src\/rules\.rs$/, /^engine-rs\/src\/rules\//, /^engine-rs\/src\/clock\.rs$/];
-
-/** Rust paths that are tests or tools, not rules: rule tests, `*_tests.rs`
- *  modules, and the `src/bin/` harnesses that pick a mode to run. */
-const RUST_SKIPPED: readonly RegExp[] = [/\/tests_[^/]*\.rs$/, /^engine-rs\/src\/bin\//, /\/rule_tests\//, /\/tests?\//, /_tests?\.rs$/, /\/tests\.rs$/];
-
 /** TypeScript paths that are tests, fixtures or generated declarations. */
 const TS_SKIPPED: readonly RegExp[] = [/^src\/tests\//, /\.test\.tsx?$/, /\.spec\.tsx?$/, /\.fixture\.ts$/, /^src\/engineBinding\/engine\.d\.ts$/];
-
-const RUST_CHECKS: readonly RegExp[] = [
-  /\bGameMode::(?:Classic|Modern)\b/g,
-  /\.is_modern\(\)/g,
-  /\b(?:modern|classic)\s*:\s*bool\b/g,
-  /\blet\s+(?:mut\s+)?(?:modern|classic)\s*=/g,
-];
 
 const TS_CHECKS: readonly RegExp[] = [
   /[!=]==?\s*["'](?:classic|modern)["']/g,
@@ -63,34 +43,6 @@ function isCommentLine(trimmed: string): boolean {
   return trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*");
 }
 
-/** Direct mode checks in one Rust file's production code. Comment lines are
- *  skipped, and counting stops at an inline `#[cfg(test)] mod name {`, which
- *  closes the file by convention. A `#[cfg(test)]` on any other item (a
- *  test-only helper method, a `mod name;` declaration) does not stop the
- *  count, so production code after it is still read. */
-function rustModeChecks(text: string): number {
-  const lines = text.split("\n");
-  let n = 0;
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed.startsWith("#[cfg(test)]") && opensInlineModule(lines, i + 1)) break;
-    if (isCommentLine(trimmed)) continue;
-    n += countIn(lines[i], RUST_CHECKS);
-  }
-  return n;
-}
-
-/** Whether the item starting at `from` (past blank lines and attributes) is
- *  an inline module, `mod name {`. */
-function opensInlineModule(lines: readonly string[], from: number): boolean {
-  for (let i = from; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed.length === 0 || trimmed.startsWith("#[")) continue;
-    return /^(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{/.test(trimmed);
-  }
-  return false;
-}
-
 /** Direct mode checks in one TypeScript file, comment lines skipped. */
 function tsModeChecks(text: string): number {
   let n = 0;
@@ -101,24 +53,15 @@ function tsModeChecks(text: string): number {
   return n;
 }
 
-function scan(): { counts: Map<string, number>; scanned: { rust: number; ts: number } } {
+function scan(): { counts: Map<string, number>; scanned: number } {
   const counts = new Map<string, number>();
-  const scanned = { rust: 0, ts: 0 };
-  const add = (abs: string, count: (text: string) => number): void => {
-    const rel = repoRel(abs);
-    if (rel.endsWith(".rs")) scanned.rust++;
-    else scanned.ts++;
-    const n = count(readFileSync(abs, "utf8"));
-    if (n > 0) counts.set(rel, n);
-  };
-  for (const abs of sourceFiles("engine-rs/src", [".rs"])) {
-    const rel = repoRel(abs);
-    if (RULE_HOMES.some((re) => re.test(rel)) || RUST_SKIPPED.some((re) => re.test(rel))) continue;
-    add(abs, rustModeChecks);
-  }
+  let scanned = 0;
   for (const abs of sourceFiles("src", [".ts", ".tsx"])) {
-    if (TS_SKIPPED.some((re) => re.test(repoRel(abs)))) continue;
-    add(abs, tsModeChecks);
+    const rel = repoRel(abs);
+    if (TS_SKIPPED.some((re) => re.test(rel))) continue;
+    scanned++;
+    const n = tsModeChecks(readFileSync(abs, "utf8"));
+    if (n > 0) counts.set(rel, n);
   }
   return { counts, scanned };
 }
@@ -136,16 +79,7 @@ function readRatchet(): Map<string, number> {
 }
 
 describe("mode-branch guard", () => {
-  it("counts the shapes a stray mode check takes, and skips comments and tests", () => {
-    expect(rustModeChecks("if self.mode == GameMode::Classic {")).toBe(1);
-    expect(rustModeChecks("let fix = if self.mode.is_modern() {")).toBe(1);
-    expect(rustModeChecks("fn holds(&self, modern: bool) -> bool {")).toBe(1);
-    expect(rustModeChecks("let modern = self.mode.is_modern();")).toBe(2);
-    expect(rustModeChecks("/// let sim = Simulation::new_game(1, GameMode::Classic);")).toBe(0);
-    expect(rustModeChecks("if self.mode.room_is_permanent(kind) {")).toBe(0);
-    expect(rustModeChecks("fn a() {}\n#[cfg(test)]\nmod t { const M: GameMode = GameMode::Modern; }")).toBe(0);
-    expect(rustModeChecks("#[cfg(test)]\nfn helper() {}\nfn b(modern: bool) {}")).toBe(1);
-    expect(rustModeChecks("#[cfg(test)]\nmod tests;\nfn b(modern: bool) {}")).toBe(1);
+  it("counts the shapes a stray mode check takes, and skips comments", () => {
     expect(tsModeChecks('const isModern = mode === "modern";')).toBe(2);
     expect(tsModeChecks('if ("classic" !== mode) return;')).toBe(1);
     expect(tsModeChecks('  case "modern":')).toBe(1);
@@ -156,11 +90,10 @@ describe("mode-branch guard", () => {
   const { counts, scanned } = scan();
   const ratchet = readRatchet();
 
-  it("reads the engine and the web sources, so a broken scan cannot pass", () => {
-    // The engine and the app each hold hundreds of production files; a walk
-    // that silently found none would pass the ratchet forever.
-    expect(scanned.rust).toBeGreaterThan(100);
-    expect(scanned.ts).toBeGreaterThan(100);
+  it("reads the web sources, so a broken scan cannot pass", () => {
+    // The app holds hundreds of production files; a walk that silently found
+    // none would pass the ratchet forever.
+    expect(scanned).toBeGreaterThan(100);
   });
 
   it("each file holds exactly the mode checks its ratchet entry allows", () => {
@@ -171,7 +104,7 @@ describe("mode-branch guard", () => {
         const found = counts.get(rel) ?? 0;
         const allowed = ratchet.get(rel) ?? 0;
         return found > allowed
-          ? `${rel}: ${found} direct mode checks, ${allowed} allowed. Ask a named rule on GameMode (engine-rs/src/rules/) or a catalog rule instead.`
+          ? `${rel}: ${found} direct mode checks, ${allowed} allowed. Ask a catalog rule (or a named rule the engine publishes) instead.`
           : `${rel}: ${found} direct mode checks, ratchet says ${allowed}. Lower its entry in modeBranch.ratchet.txt${found === 0 ? " (delete the line)" : ""}.`;
       });
     expect(wrong, wrong.join("\n")).toEqual([]);

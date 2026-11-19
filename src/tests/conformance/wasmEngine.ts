@@ -3,29 +3,29 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { digest } from "./canonical";
 import type { CheckpointDetail, FxSlot } from "./checkpointDetail";
-import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine, type Start } from "./scenario";
+import { type EngineStart, type Outcome, type ScenarioEngine, type Start } from "./scenario";
 import type { ChargeOutcome } from "./chargeOps";
-import { decodeHeader } from "../../wasmhost/frameView";
-import { checkBinding, type WasmEngine, type WasmModule } from "../../engineBinding/binding";
-import { readCatalog } from "../../engineBinding/catalog";
-import type { GameMode } from "../../shared/types";
+import { decodeHeader } from "@verticopolis/components/host/frameView";
+import { checkBinding, type WasmEngine, type WasmModule } from "@verticopolis/components/binding/binding";
+import { readCatalog } from "@verticopolis/components/binding/catalog";
+import type { GameMode } from "@verticopolis/components/shared/types";
+import { ENGINE_TOOLING_ROOT, conformanceFile } from "../packagePaths";
 
 /**
- * The Rust engine behind the scenario surface, through its WASM binding
- * (`engine-rs/src/wasm.rs` and `wasm/`, built by `npm run wasm:build` into
- * `engine-rs/pkg/`). Structured values cross the binding as JSON text; this
- * adapter parses them and nothing more.
+ * The Rust engine behind the scenario surface, through its WASM binding: the
+ * Node tree of the installed `@verticopolis/engine-tooling` package (the
+ * engine's tooling build, with the tier 3 ops). Structured values cross the
+ * binding as JSON text; this adapter parses them and nothing more.
  */
 
-export const WASM_PKG = resolve(REPO_ROOT, "engine-rs/pkg/verticopolis_engine.js");
-const WASM_BYTES = resolve(REPO_ROOT, "engine-rs/pkg/verticopolis_engine_bg.wasm");
-const WASM_MARKER = resolve(REPO_ROOT, "engine-rs/pkg/package.json");
+const NODE_DIR = resolve(ENGINE_TOOLING_ROOT, "node");
+export const WASM_PKG = resolve(NODE_DIR, "verticopolis_engine.js");
+const WASM_BYTES = resolve(NODE_DIR, "verticopolis_engine_bg.wasm");
+const WASM_MARKER = resolve(NODE_DIR, "package.json");
 
-/** True once the binding has been built by the script (the glue, the module
- *  and the CommonJS marker it writes, without which the glue loads as ESM). The
- *  suite skips itself otherwise; the CI legs that run it put the package in
- *  place first (`.github/actions/engine-wasm` fails the step when a file is
- *  missing), so a skip cannot hide a missing package there. */
+/** True when the installed tooling package holds the glue, the module and the
+ *  CommonJS marker (without which the glue loads as ESM). `npm ci` installs
+ *  it, so a skip only happens in a tree installed without dev dependencies. */
 export const hasWasmPackage = (): boolean => [WASM_PKG, WASM_BYTES, WASM_MARKER].every((f) => existsSync(f));
 
 let loaded: WasmModule | undefined;
@@ -248,5 +248,5 @@ export function startWasmHandle(start: Start): WasmEngine {
       founded.free();
     }
   }
-  return checked(Engine.fromVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.mode ?? null), start.mode, `${start.fixture} loaded`);
+  return checked(Engine.fromVctower(readFileSync(conformanceFile(start.fixture), "utf8"), start.mode ?? null), start.mode, `${start.fixture} loaded`);
 }

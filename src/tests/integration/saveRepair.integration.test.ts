@@ -9,6 +9,7 @@ import { engineSaveText } from "../../storage/saveTextRead";
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
 import { runExportFlow } from "../../game/exportFlow";
 import { engineFromSave, newEngine, noEngine } from "../portKit/rustEngine";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
 /**
  * The storage code's saves on the Rust engine: what the engine makes of the
@@ -16,7 +17,7 @@ import { engineFromSave, newEngine, noEngine } from "../portKit/rustEngine";
  * (`src/storage/`) check the text itself, without an engine.
  */
 
-const FIXTURE = resolve(__dirname, "../../../conformance/fixtures/split-tower.vctower");
+const FIXTURE = resolve(CONFORMANCE_ROOT, "fixtures/split-tower.vctower");
 
 /** A save packed as `SaveGame.saveTo` stores it. */
 const storeValue = (text: string): string => STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(text), { level: 1 }));

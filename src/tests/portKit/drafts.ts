@@ -1,9 +1,9 @@
-import type { SerializedGame, Transport, Unit } from "../../shared/types";
-import type { NextStarView, StatsReport } from "../../simport/panels";
-import type { EnginePort } from "../../simport/enginePort";
+import type { SerializedGame, Transport, Unit } from "@verticopolis/components/shared/types";
+import type { NextStarView, StatsReport } from "@verticopolis/components/port/panels";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { ToolingTower, type ToolingEngine } from "../../game/toolingTower";
 import { wasm } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../engineBinding/binding";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
 
 /**
  * The port kit's drafts (a fixture's authoring copy on an engine of its own)

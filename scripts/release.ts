@@ -5,17 +5,11 @@
  *
  *   npm run release                    the levels the notes ask for
  *   npm run release -- --app 3.0.0     a named app version (a headline release)
- *   npm run release -- --date 2026-11-10   the engine changelog's date (default today, UTC)
  *
  * It raises the app version with `npm version` (package.json and the lockfile
- * together) and writes the `CHANGELOG.md` section from the notes' Player lines;
- * when a note has a crate level it raises the crate in `engine-rs/Cargo.toml`
- * and the three `Cargo.lock` files that pin it (the crate, its consumer check
- * and the bench), writes the `engine-rs/CHANGELOG.md` section from the Engine
- * lines, moves the engine guides' example pins to the new crate release
- * (`ENGINE_PIN_DOCS`, #2080) and runs `npm run engine:compat`. The notes'
- * Contributors lines go under a `### Contributors` heading in each section it
- * writes. Then it deletes the notes.
+ * together) and writes the `CHANGELOG.md` section from the notes' Player
+ * lines, with their Contributors lines under a `### Contributors` heading.
+ * Then it deletes the notes. The engine is released from Verticopolis/engine.
  * The rules are in `src/build/changeNotes.ts`; CI checks the result with
  * `scripts/version-check.ts`.
  *
@@ -33,13 +27,9 @@ import {
   headlineFirst,
   highestLevel,
   insertSection,
+  isSemverIncrease,
   readNotes,
-  setCargoVersion,
-  setEnginePins,
-  setLockVersion,
-  ENGINE_PIN_DOCS,
 } from "../src/build/changeNotes.ts";
-import { cargoPackage, isSemverIncrease } from "../src/build/engineCompat.ts";
 import { MAX_NOTE_LEN, MAX_NOTES } from "../src/pwaUpdateInfo.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,7 +38,6 @@ const read = (rel: string) => readFileSync(path(rel), "utf8");
 const write = (rel: string, text: string) => writeFileSync(path(rel), text);
 const npm = (args: string[]) =>
   execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", args, { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
-const node = (args: string[]) => execFileSync(process.execPath, args, { cwd: root, stdio: "inherit" });
 
 const refuse = (message: string): never => {
   console.error(`release: ${message}`);
@@ -76,10 +65,7 @@ const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd:
 if (!branch.startsWith("release/")) console.warn(`release: on ${branch}; CI checks a release only on a release/ branch`);
 
 const credits = contributorLines(pending);
-// The engine changelog thanks only the people whose notes moved the crate.
-const engineCredits = contributorLines(pending.filter((n) => n.crate !== "none"));
 const appLevel = highestLevel(pending.map((n) => n.app));
-const crateLevel = highestLevel(pending.map((n) => n.crate));
 const appWas = (JSON.parse(read("package.json")) as { version: string }).version;
 const named = arg("--app");
 let app = bumpVersion(appWas, appLevel);
@@ -100,22 +86,9 @@ if (app !== appWas) {
   if (long > 0) console.warn(`release: ${long} player line(s) over ${MAX_NOTE_LEN} characters; the update prompt would cut them, so split them in CHANGELOG.md`);
 }
 
-const crate = cargoPackage(read("engine-rs/Cargo.toml"));
-const crateNow = bumpVersion(crate.version, crateLevel);
-if (crateNow !== crate.version) {
-  const date = arg("--date") ?? new Date().toISOString().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) refuse(`--date ${date} is not YYYY-MM-DD`);
-  write("engine-rs/Cargo.toml", setCargoVersion(read("engine-rs/Cargo.toml"), crateNow));
-  for (const lock of ["engine-rs/Cargo.lock", "engine-rs/consumer/Cargo.lock", "engine-bench/Cargo.lock"]) write(lock, setLockVersion(read(lock), crate.name, crateNow));
-  const changelog = "engine-rs/CHANGELOG.md";
-  write(changelog, insertSection(read(changelog), `${crateNow} (${date})`, pending.flatMap((n) => n.engine), engineCredits));
-  for (const guide of ENGINE_PIN_DOCS) write(guide, setEnginePins(read(guide), crateNow));
-  node(["scripts/engine-compat.ts"]);
-}
-
 const kept = new Set(notesKeptForCredits(pending, app !== appWas).map((n) => n.file));
 if (kept.size > 0) console.warn(`release: the app does not move, so ${[...kept].join(", ")} stay for the next app release, which credits their Contributors lines`);
 for (const n of pending) if (!kept.has(n.file)) unlinkSync(path(`${CHANGES_DIR}/${n.file}`));
 console.log(
-  `release: app ${appWas} -> ${app} (${named ? "named" : appLevel}), crate ${crate.version} -> ${crateNow} (${crateLevel}), ${pending.length - kept.size} notes consumed (${pending.filter((n) => !kept.has(n.file)).map((n) => n.file).join(", ")}). Review the changelogs, commit, and open the PR from release/${app}.`,
+  `release: app ${appWas} -> ${app} (${named ? "named" : appLevel}), ${pending.length - kept.size} notes consumed (${pending.filter((n) => !kept.has(n.file)).map((n) => n.file).join(", ")}). Review the changelog, commit, and open the PR from release/${app}.`,
 );

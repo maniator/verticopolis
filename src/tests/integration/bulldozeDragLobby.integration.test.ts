@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import * as ex from "excalibur";
 import type { GameApp } from "../../main";
-import type { GameMode } from "../../shared/types";
+import type { GameMode } from "@verticopolis/components/shared/types";
 import { BuildActions } from "../../game/buildActions";
 import { BulldozeDragChoice } from "../../game/bulldozeDrag";
 import { wireEngine } from "../../game/engineWiring";
 import { NO_GESTURE } from "../../game/appHistory";
 import { catalogOf, isUnlocked, newRenderSim, newViewReader } from "../../game/portAccess";
-import { PortCodes } from "../../simport/portCodes";
-import { pickEntityAt } from "../../render/excalibur/towerInputCamera";
-import type { TowerEngine } from "../../render/excalibur/TowerEngine";
-import { FLOOR, TILE } from "../../render/scale";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { pickEntityAt } from "@verticopolis/components/render/excalibur/towerInputCamera";
+import type { TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
+import { FLOOR, TILE } from "@verticopolis/components/render/scale";
 import { look, must, newEngine, noEngine } from "../portKit/rustEngine";
 
 /**

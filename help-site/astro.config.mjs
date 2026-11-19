@@ -2,8 +2,9 @@
 // in src/content/docs/. The game shows one of its pages itself, the Classic and
 // Modern summary when you found a tower (src/ui/templates/compare.ts, compiled by
 // src/build/helpMarkdown.ts), so the two never disagree. The look is the
-// engine docs site's Windows 3.1 theme over the game's retro-tokens.css, with a
-// few help-only rules in src/styles/help.css.
+// engine docs site's Windows 3.1 theme (src/styles/theme.css) over the game's
+// retro-tokens.css from @verticopolis/components, with a few help-only rules
+// in src/styles/help.css.
 //
 // It builds into the game's dist/help/ (scripts/vercel-build.sh runs it after
 // the game's own build), so the manual ships with every deploy of the game.
@@ -18,11 +19,12 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import { satteri } from "@astrojs/markdown-satteri";
-import { GITHUB } from "../docs/engine-site/title-bar.mjs";
+import { GITHUB } from "./title-bar.mjs";
 import { HELP_BASE, OLD_ANCHORS, SITE_ORIGIN, oldAnchorRedirects, schemeBootScript, sharedHead, sidebar, siteHref } from "./site.mjs";
 
 const site = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(site, "..");
+const components = join(repo, "node_modules/@verticopolis/components");
 
 
 /** The same compile-time constants the game's Vite build defines, for the
@@ -85,10 +87,12 @@ export default defineConfig({
         Hero: "./src/components/TitleScreen.astro",
       },
       customCss: [
-        join(repo, "src/styles/retro-tokens.css"),
-        join(repo, "docs/engine-site/src/styles/theme.css"),
-        join(repo, "docs/engine-site/src/styles/title-bar.css"),
-        join(repo, "src/styles/menu-bar.css"),
+        // The game's chrome tokens and menu bar, from the components package
+        // the game installs (the help site builds after the game's npm ci).
+        join(components, "lib/styles/retro-tokens.css"),
+        "./src/styles/theme.css",
+        "./src/styles/title-bar.css",
+        join(components, "lib/styles/menu-bar.css"),
         "./src/styles/help.css",
         "./src/styles/help-schemes.css",
       ],
