@@ -55,6 +55,11 @@ export const SURFACES: Record<string, string[]> = {
     "src/render/",
     "src/ui/",
   ],
+  "Runtime dependencies and toolchain": [
+    "package.json",
+    "package-lock.json",
+    ".nvmrc",
+  ],
 };
 
 /**

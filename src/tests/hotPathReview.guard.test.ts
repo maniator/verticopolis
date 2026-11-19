@@ -146,7 +146,7 @@ describe("hot-path review guard", () => {
       .map((line) => line.split("|").map((cell) => cell.trim()));
     // A path is a span with a slash or a file extension; `GameApp` and the like are names.
     const isPath = (span: string) =>
-      span.includes("/") || /\.(rs|ts|sh|toml|lock)$/.test(span);
+      span.includes("/") || /\.(rs|ts|sh|toml|lock|json|nvmrc)$/.test(span);
     const table = Object.fromEntries(
       rows.map((cells) => [cells[1], spans(cells[2]).filter(isPath)]),
     );

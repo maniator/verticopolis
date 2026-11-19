@@ -197,7 +197,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   record of `docs/performance/hot-path-review.md` for the final commit on the
   PR and a completed independent review of that commit, which the PR's author
   requests; the page's section 6 says when a record and a verdict carry to a
-  later commit. A reviewer that is still running has not
+  later commit, on a hot-path PR or any other (a screenshot refresh, a
+  version bump, or a rebase with an identical range-diff). A reviewer that is
+  still running has not
   signed off. Do not arm auto-merge before sign-off. Once the PR is signed off,
   arm auto-merge with a merge commit (never a squash-merge, per the
   merge-commits-only rule above) without asking again, even while checks are

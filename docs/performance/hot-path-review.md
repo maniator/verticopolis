@@ -34,7 +34,8 @@ from these, which are not hot paths even inside a listed path:
 
 The build files in the table do count: they set the cost of every engine path
 at once (HP-11). A Rust toolchain or Cargo configuration file added later
-(`rust-toolchain.toml`, `.cargo/config.toml`) joins the engine build row.
+(`rust-toolchain.toml`, `.cargo/config.toml`) joins the engine build row, and
+the PR that adds one adds it to the table too (owner, 2026-11-19, #1203).
 
 | Surface | Paths |
 | --- | --- |
@@ -46,6 +47,7 @@ at once (HP-11). A Rust toolchain or Cargo configuration file added later
 | Rendering, frame loop and UI | `src/render/`, `src/presentation/`, `src/game/`, `src/ui/`, `src/catalog/` |
 | Per-frame and periodic services | `src/analytics*.ts`, `src/audio/` |
 | App shell | `src/main.ts` (`GameApp`, read on every HUD refresh) and any other root `src/*.ts` module that `src/game/`, `src/render/` or `src/ui/` imports |
+| Runtime dependencies and toolchain | `package.json`, `package-lock.json`, `.nvmrc` |
 
 A port or a rewrite changes every line it adds, so all of it is in scope,
 including algorithms copied unchanged. A diff that touches no hot-path surface
@@ -140,7 +142,13 @@ another loop or at a hot tier. The multipliers are per person, per unit, per
 room, per floor, per segment, per transport, per car, per candidate, per
 step, per chunk and per frame; every other document refers to this list. Work inside a helper counts: a
 helper that scans is a scan, and a route search, reachability check or flood
-fill is a walk over the route graph. The idioms below are examples and the
+fill is a walk over the route graph. People are routed every step by design,
+so the expected shape for a route asked per person per step is a cache kept
+per revision, as `StaffRoutes` (`engine-rs/src/crowd/staff_routes.rs`) is for
+staff: a hit is a lookup and fine at any tier, and only a miss runs a search,
+bounded by the cache's cap and its clear rule. A route search with no such
+cache in front of it at the step or chunk tier stays a finding (owner,
+2026-11-19, #1203). The idioms below are examples and the
 list is open:
 
 - TypeScript: `.find`, `.findIndex`, `.filter`, `.some`, `.every`, `.reduce`,
@@ -177,9 +185,26 @@ may cost depends on the tier:
   search, unless the section 4 estimate puts the whole pass under about 50,000
   visits on the large tower, about what the one linear pass over its 43,358
   units that this tier allows already costs.
+- Loads and attaches: a load, an open or an attach (which runs on every undo,
+  redo and fault restore) makes several linear passes by nature (serialize,
+  parse, deserialize, the index builds and the first frame view), so it has
+  its own budget: about 250,000 visits on the large tower, all its passes
+  together, a handful of linear passes over the 43,358 units. A pass per item
+  of another collection inside a load is still a finding.
 - Wall clock: the HUD and panel refresh follows HP-12 (it scales with what is
   on screen), audio follows the per-step budget, and autosave may make one
-  linear pass.
+  linear pass. Analytics capture may spend about 1 ms of main-thread time per
+  event, measured on the large tower, building the event included.
+
+Every budget here is per occurrence of the tier, summed over all the passes
+that occurrence makes: a command that makes three passes counts all three
+against its 50,000 visits, and the small-collection allowance below counts
+every pass in one occurrence together (owner, 2026-11-19, #1203). A
+per-person multiplier counts the most people the pass can visit, never a
+typical count: the whole population (17,322 on the large tower) for a pass over
+the census or the residents, and for the drawn crowd its cap, 140 trip
+spawns plus every housekeeper the tower can field (up to 144 housekeepers on
+the hotel-heavy tower, so up to 284 people in all there).
 
 A pass over a small collection (the 110 floors, the shafts and their cars,
 the stair and escalator links, the drawn crowd) is fine at any tier while
@@ -410,8 +435,9 @@ chunk is not.
 A PR that touches a hot-path surface (section 1) fills in this note under the
 Complexity heading of the pull request template, or writes "n/a" there with a
 reason. A significant change must give every field: one that adds, ports,
-moves or rewrites code on a per-frame, per-step, per-chunk, per-hour or
-wall-clock path in the engine, the binding, a host or rendering; adds,
+moves or rewrites code on a per-frame, per-step, per-chunk, per-hour, per-day,
+load or wall-clock path in the engine, the binding, a host or rendering
+(the load path includes attach); adds,
 changes or removes a cache, index or counter; changes what crosses the WASM
 boundary or the engine build; or adds per-command work that grows with the
 units placed or removed.
@@ -468,6 +494,13 @@ item, and Copilot and Codex are asked to:
   review split into file groups across runs posts one record per group, each
   naming its group. A "no hot-path surface" line counts only when it covers the
   whole diff of the PR, or when the group records together cover it.
+- A review runs on a commit. A diff with no commit behind it (a patch file, or
+  an uncommitted tree handed over for review) is committed and pushed on a
+  branch first, and the record names that commit. When a run cannot post to the PR, it saves
+  its record under `_bmad-output/implementation-artifacts/` and the thread or
+  person that asked for the review posts it on the PR as a comment; a record
+  pasted into the PR description under Complexity counts too (owner,
+  2026-11-19, #1203).
 - A port, rewrite, move, addition or removal of more than about 1,000 changed
   lines (added plus removed) of hot-path code, counted over the whole diff even
   when the review runs one file group at a time, adds an appendix to the
@@ -480,7 +513,12 @@ item, and Copilot and Codex are asked to:
   outside its chunk. Each returns its table and its appendix lines, and the
   run that launched them merges them into one record. The review is not
   complete, and gives no GO or CONDITIONAL GO, until every chunk has its table
-  and every changed function its appendix line.
+  and every changed function its appendix line. When the run cannot launch
+  subagents, it writes one prompt file per chunk under
+  `_bmad-output/implementation-artifacts/`, each holding the auditor prompt,
+  its chunk and the list of changed files and functions, and runs each in a
+  separate session. A chunk whose result is missing or does not follow the
+  prompt is run once more; a second failure halts the review for a person.
 - A review without the record is incomplete, and an independent reviewer
   cannot give a GO or a CONDITIONAL GO on it. When a Copilot or Codex review
   of a hot-path diff leaves the table out, its findings still count, but its
@@ -500,6 +538,20 @@ item, and Copilot and Codex are asked to:
   screenshot refresh or a version bump, say), and the independent reviewer
   confirms that on the PR. A review that is still running is not complete, and
   auto-merge stays off until both hold (`CLAUDE.md`).
+- When a merge of `main` or a rebase carries the record and the verdict, the
+  reviewer who confirms the carry also searches the commits it brought in for
+  new callers of the functions the PR changed. A new caller that puts a
+  changed function at a hotter tier needs a new record row and verdict for that
+  function.
+- The same carry holds for a review on a PR with no hot-path surface: a
+  requested verdict carries to a later commit that only refreshes screenshots,
+  raises a version or regenerates a changelog, or that rebases onto `main`
+  with an identical range-diff of the PR's own commits, once the reviewer
+  confirms it on the PR.
+- Nothing mechanical checks for the record or the verdict (owner, 2026-11-19,
+  #1203). Agents post with the owner's account, so a label or a status check
+  would prove no more than the comments do; the PR's author and the
+  independent reviewer confirm both on the PR before auto-merge.
 
 ## 7. Resolving a finding
 
@@ -526,7 +578,8 @@ collection under about 1,000 item visits per occurrence, or an hourly, daily
 or per-command pass under about 50,000 visits, counted per occurrence on the
 large tower with the work per item included. A pass HP-2 rules out at its tier
 (a per-step route search, a per-frame walk over rooms) is a finding whatever
-its count. "The collection is bounded" is not enough on its own, since every
+its count. A route answered from a cache kept per revision is a lookup, not
+a search (HP-2). "The collection is bounded" is not enough on its own, since every
 collection here is.
 
 Two kinds are always `patch`, even when an open issue already lists them:
@@ -538,7 +591,11 @@ Two kinds are always `patch`, even when an open issue already lists them:
   (HP-8).
 
 The false-positive test above does not apply to these two: a new id scan that
-bypasses an index is `patch` even when its pass fits the tier. Section 1's list
+bypasses an index is `patch` even when its pass fits the tier. When such a
+finding has more than one fix that meets HP-2's budget at its tier and keeps
+results identical (HP-10), an index or an event-driven update, say, the
+author picks; the reviewer can ask for the other one only by showing that the
+author's fails one of those tests (owner, 2026-11-19, #1203). Section 1's list
 of code that is not a hot path still comes first: code it excludes raises no
 hot-path finding.
 
@@ -551,7 +608,9 @@ another item, since that points a call at another helper, and so does a `use`
 or `import` line that does. Moved code is reviewed as new
 (HP-7), and its findings count as pre-existing: deferred by reference when an
 open issue lists them, otherwise with a new issue and row. Any other change to
-a moved function makes it a rewrite.
+a moved function makes it a rewrite. An edit in place that changes more than
+half of a function's lines (added plus removed, against its length before the
+edit) is a rewrite of that function too, reviewed as new (HP-7).
 
 Deferring an always-`patch` finding needs the explicit acceptance of the
 repository owner (maniator), on top of the evidence and issue above. The PR
@@ -597,7 +656,9 @@ fixes `patch` findings as it goes, halts for the human first instead (section
   prompt, the overrides themselves (each fact once, with its load-bearing
   phrases, and the gds and bmad copies identical) and the step anchors they
   name. It checks phrases, so a reworded or removed clause fails it, while an
-  added exception does not: that is the review's job. For the summaries it
+  added exception does not: that is the review's job. Its phrase pins are
+  not extended to newer clauses (owner, 2026-11-19, #1203), in line with the
+  rule against new guard tests. For the summaries it
   checks that each one links here (inside `AGENTS.md`'s Review guidelines and
   the template's Complexity section too) and that `CLAUDE.md` keeps its
   auto-merge rule; it does not check their other wording.
