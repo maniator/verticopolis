@@ -55,7 +55,8 @@ export function hasEnginePackage(dir: string): boolean {
 
 /**
  * Copy `base` (the repository's `src/public`) to `out`, with its `engine/`
- * folder replaced by the package in `toolingPackage`, and return `out`. The
+ * folder replaced by the package in `toolingPackage` (less its `.d.ts`
+ * declarations), and return `out`. The
  * copy is rebuilt on every call, so a stale package from an earlier run never
  * survives in it.
  */
@@ -65,7 +66,10 @@ export function assembleToolingPublicDir(base: string, toolingPackage: string, o
     recursive: true,
     filter: (src) => relative(base, src).split(sep)[0] !== ENGINE_FOLDER,
   });
-  cpSync(toolingPackage, join(out, ENGINE_FOLDER), { recursive: true });
+  // The type declarations stay in the package, as scripts/engine-install.ts
+  // leaves them out of the player package: the page serves only the files
+  // the engine's record describes.
+  cpSync(toolingPackage, join(out, ENGINE_FOLDER), { recursive: true, filter: (src) => !src.endsWith(".d.ts") });
   return out;
 }
 
