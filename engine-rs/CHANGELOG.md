@@ -15,6 +15,14 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.56.0 (2026-11-19)
+
+- Dragging an elevator, stairs or escalator reads only the built shafts in the dragged columns, from an index kept per edit, and checks the floors once, so a drag on a tower with many shafts answers far faster (68 us to 0.3 us per move with 1,358 shafts). A build cap check also counts the shafts once per edit. The answers are unchanged (#1261).
+- The package's `THIRD-PARTY.json` now carries fflate's MIT notice, since the engine's `.vctower` writer ports fflate's deflate (#1356).
+- The gameplay event catalog's `about` line names `src/events/gameplayEvents.d.ts`, the file `npm run gen:events` writes, which moves the lock digest. Comments that name the retired TypeScript engine's files say so, and `engine-rs/README.md` gives the commit where they can still be read (#1957).
+- `tdtFilename()` on the binding answers the file name a `.TDT` export of the tower downloads as (A to Z and 0 to 9 from its name, upper-cased, 8 characters at most, `TOWER1.TDT` for a name with none or a DOS device name), so the web game no longer keeps its own copy of the rule (#1676).
+- `Simulation::build_skybridge_as` lays a bridge in a look, `Simulation::restyle_skybridge` dresses a whole finished bridge in one (free, one undo step; a half bridge is refused until it is finished), and `Tower::skybridge_looks` lists every bridge with its look. The look is each bridge tile's lobby subtype (`SKYBRIDGE_LOOKS`), so the save format and version do not change: an older save loads its bridges plain, and an older build drops the subtype. `build_skybridge` now lays the glass skywalk. Placement refuses a floor or lobby tile right under a bridge tile (`UNDER_A_BRIDGE`), so floors never split a bridge. The catalog's `rules.skyBridge` gains `looks` (catalog 26). The binding adds `restyleSkyBridge(floor, x, look)` and `skyBridgeLooks()`, and `buildSkyBridge` takes the look as a third argument. The view layout moves to 34 for the new `restyleSkyBridge` record, and the conformance lock moved for the catalog only.
+
 ## 1.55.0 (2026-11-18)
 
 - `lastRefusalCode()` names why the last tower file read or write was refused with one closed word (`too_large`, `not_tower`, `damaged`, `newer_version`, `not_save`, `unreadable`, `modern` or `refused`), so a host can count refusals without sending the player's sentence, which can quote the file. `loadVctower`, `loadVctowerBytes`, `loadTdt`, `exportVctower`, `exportVctowerBytes` and `tdtExport` set it on a refusal and clear it when they work (#2075).
