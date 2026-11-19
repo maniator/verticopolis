@@ -9,7 +9,10 @@ name: Backlog priority labels
 # any other P label and `needs-triage` (a row means the issue has been triaged).
 # Issues no row cites (a community report, say) keep the P label triage gave
 # them, and every other label stays. The weekly run puts back any P label
-# someone changed by hand on a mirrored issue.
+# someone changed by hand on a mirrored issue. After the labels sync, the run
+# fails when a row cites a number that is not an open issue (#2081): a finished
+# row clears its GH cell and an unfinished row needs a live issue, so a red run
+# means the backlog needs a sync.
 #
 # The job writes issues, so it only ever runs from main in this repository:
 # never on pull_request or pull_request_target (a fork could otherwise write

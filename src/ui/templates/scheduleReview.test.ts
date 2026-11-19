@@ -75,9 +75,9 @@ describe("the Tower Statistics entry", () => {
   it("counts the elevators and is not a footer row the dialog would pin over the stats", () => {
     const box = document.createElement("div");
     render(scheduleReviewEntry(1), box);
-    expect(box.textContent).toContain("1 elevator with idle cars");
+    expect(box.textContent).toContain("1 elevator to look at");
     render(scheduleReviewEntry(3), box);
-    expect(box.textContent).toContain("3 elevators with idle cars");
+    expect(box.textContent).toContain("3 elevators to look at");
     expect(box.querySelector(".modal-actions")).toBeNull();
     expect(box.querySelector("[data-act='reviewSchedules']")).not.toBeNull();
   });

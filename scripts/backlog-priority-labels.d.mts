@@ -58,4 +58,6 @@ export declare function run(options: {
   plan: LabelChange[];
   failures: number[];
   errors: string[];
+  /** Row-cited numbers that are not open issues; the CLI exits 1 on any. */
+  stale: number[];
 }>;

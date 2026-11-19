@@ -36,6 +36,8 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   if (follow !== "step") {
     // Later first-tower funnel events belong to this tower (#2392).
     nextAnalyticsTower();
+    // The elevator schedule review mentions this tower once, as it did the last (#1556).
+    app.scheduleReview.towerArrived();
     // It is not the My Towers file the last tower was: File > Save writes
     // only the Auto-save until it is opened from or saved to one.
     forgetCurrentFile();

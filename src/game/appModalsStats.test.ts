@@ -54,9 +54,9 @@ describe("showStats", () => {
     expect(ui.showStats.mock.calls[0][1]).not.toHaveProperty("reviewSchedules");
   });
 
-  it("adds the elevator schedule review entry, and wires it, when some elevator runs short (#1548)", async () => {
+  it("adds the elevator schedule review entry, and wires it, while a short schedule waits on the player (#1548, #1556)", async () => {
     const { app, ui, scheduleReview } = makeApp(makeSim());
-    scheduleReview.findings.mockReturnValue([{}, {}]);
+    scheduleReview.undecided.mockReturnValue([{}, {}]);
     await showStats(app);
     expect(ui.showStats.mock.calls[0][0]).not.toBe("STATS_BODY");
     const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;

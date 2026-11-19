@@ -47,7 +47,12 @@ function harness(answer = Float64Array.of(1, 0), reason?: string) {
     engine: () => engine,
     reader: () => reader as unknown as ViewReader,
     kit: () => kit as unknown as CardKit,
-    ui: { toast: vi.fn(), sayVisibly: vi.fn(), showScheduleReview: vi.fn() },
+    // Each draw is a fresh dialog box, as `openModalTemplate` makes one per open.
+    ui: {
+      toast: vi.fn(),
+      sayVisibly: vi.fn(),
+      showScheduleReview: vi.fn((_rows: unknown, _handlers?: unknown, _focus?: string): HTMLElement => document.createElement("div")),
+    },
     audio: { sfx: vi.fn() },
     captureUndo: vi.fn(),
     commitUndo: vi.fn(),
@@ -93,6 +98,59 @@ describe("ScheduleReview", () => {
       "info",
     );
     expect([...decisions]).toEqual([["classic:42:7:elevatorStandard:10", "told"]]);
+  });
+
+  it("does not mention a schedule set after the look when an Undo or Redo changes the generation, but does on the next tower (#1556)", () => {
+    const { review, deps, engine, schedules, decisions } = harness();
+    review.tick();
+    expect(deps.ui.toast).toHaveBeenCalledOnce();
+    // The player sets a short flat schedule on another shaft on purpose, then steps back and forth.
+    schedules.set(9, FLAT);
+    vi.mocked(engine.generation).mockReturnValue(4);
+    review.tick();
+    expect(deps.ui.toast).toHaveBeenCalledOnce();
+    expect(decisions.has("classic:42:9:elevatorStandard:20")).toBe(false);
+    review.towerArrived(); // a load, an import or New Tower
+    review.tick();
+    expect(deps.ui.toast).toHaveBeenCalledTimes(2);
+    expect(decisions.get("classic:42:9:elevatorStandard:20")).toBe("told");
+  });
+
+  it("counts for the Tower Statistics entry only the flat short schedules not kept", () => {
+    const { review, schedules } = harness();
+    schedules.set(11, FLAT); // stairs: never an elevator finding
+    expect(review.undecided().map((f) => f.shaft.id), "the staggered shaft 9 is left out").toEqual([7]);
+    review.keep(7);
+    expect(review.undecided()).toEqual([]);
+    expect(review.findings().map((f) => f.shaft.id), "both still listed in the dialog").toEqual([7, 9]);
+  });
+
+  it("redraws an open review when an Undo or Redo changes the tower under it, keeping the focused button", () => {
+    const { review, deps, engine } = harness();
+    const box = document.createElement("div");
+    box.innerHTML = `<button data-act="${reviewAct(9)}"></button>`;
+    document.body.appendChild(box);
+    deps.ui.showScheduleReview.mockReturnValueOnce(box);
+    review.open();
+    box.querySelector<HTMLElement>("button")!.focus();
+    vi.mocked(isDialogOpen).mockReturnValue(true);
+    review.tick();
+    expect(deps.ui.showScheduleReview, "same generation: no redraw").toHaveBeenCalledOnce();
+    vi.mocked(engine.generation).mockReturnValue(4);
+    review.tick();
+    expect(deps.ui.showScheduleReview).toHaveBeenCalledTimes(2);
+    expect(deps.ui.showScheduleReview.mock.lastCall![2]).toBe(reviewAct(9));
+    review.tick();
+    expect(deps.ui.showScheduleReview, "the redrawn box is not on screen, so nothing more").toHaveBeenCalledTimes(2);
+    box.remove();
+  });
+
+  it("leaves a closed review alone when the generation moves", () => {
+    const { review, deps, engine } = harness();
+    review.open(); // the harness's box is never attached: the dialog has closed
+    vi.mocked(engine.generation).mockReturnValue(4);
+    review.tick();
+    expect(deps.ui.showScheduleReview).toHaveBeenCalledOnce();
   });
 
   it("opens the dialog with a row per short elevator and the actions each one offers", () => {

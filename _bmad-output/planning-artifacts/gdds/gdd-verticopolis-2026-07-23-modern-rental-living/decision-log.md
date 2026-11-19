@@ -137,3 +137,23 @@ The build surfaced three facts against the real engine, resolved as follows:
   mirrors the same predicate). D16's carve-outs are obsolete and must not be
   restored. The Studio stays the forgiving tier: its residents feed the pool,
   but `isUnmetDemandKind` excludes it, so it never feels the drain on any path.
+- **D21. The "Ground floor" badge shipped with this branch (recorded 2026-11-19, #682).**
+  PR #633 added a 2.0 recognition for players who built before 2.0: a small gold
+  "Ground floor" badge on the title screen and a one-time welcome toast. The code
+  cited a party ruling of 2026-07-23 ("status over stuff, no cash, no nag") that
+  was never committed to the repository, so this entry is the record of it now.
+  As built: the status is detected once at load from a pre-2.0 `appVersion` and
+  then persisted in the save (`sim.founder`), so it travels with the tower and a
+  tower started on 2.0 or later never carries it; the welcome is a per-browser
+  moment latched in localStorage (`src/founder.ts`); the badge grants no money,
+  item or rule, and nothing asks the player to act. The label was re-picked on
+  2026-07-28 ("Ground floor"). Player-facing copy is the 2.0.0 CHANGELOG line.
+- **D22. The release was 2.0.0, a major bump, with three player notes (recorded
+  2026-11-19, #682).** Epic 8 and the Technical Specifications asked for a minor
+  bump and one CHANGELOG line. The branch shipped 2.0.0 instead, under the
+  CLAUDE.md rule that a headline milestone is a major release: Modern rentals plus
+  the Ground floor recognition were the 2.0 milestone, and the badge's own
+  definition ("built before 2.0") needs a 2.0 to exist. It shipped three player
+  notes (rentals, the vacancy reason card, the badge), the most the update prompt
+  showed then, plus a fourth documentation-only Privacy line (see the comment in
+  CHANGELOG.md under 2.0.0).

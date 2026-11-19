@@ -424,8 +424,8 @@ export class UI {
     dialogs.showStats(this, body, handlers);
   }
 
-  showScheduleReview(rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): void {
-    dialogs.showScheduleReview(this, rows, handlers, focus);
+  showScheduleReview(rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): HTMLElement {
+    return dialogs.showScheduleReview(this, rows, handlers, focus);
   }
 
   showBatchPricingDialog(ctx: dialogs.BatchPricingDialogCtx, cb: dialogs.BatchPricingDialogCb): void {

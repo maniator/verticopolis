@@ -1,6 +1,7 @@
 import type { LogEntry } from "../shared/types";
 import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { FacilityKind, GameMode } from "../shared/types";
+import { RULE_SET_NAME } from "./ruleSetName";
 import { showNewsInStatusBar, showTowerInStatusBar } from "./statusBar";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
@@ -265,11 +266,15 @@ export function setMode(ui: UI, mode: GameMode): void {
   const badge = ui.el.modeBadge;
   if (badge.dataset.mode === mode) return;
   badge.dataset.mode = mode;
-  const isModern = mode === "modern";
-  badge.textContent = `This tower: ${isModern ? "Modern" : "Classic"}`;
-  badge.classList.toggle("is-modern", isModern);
-  badge.classList.toggle("is-classic", !isModern);
+  badge.textContent = `This tower: ${RULE_SET_NAME[mode]}`;
+  for (const [each, cls] of MODE_BADGE_CLASSES) badge.classList.toggle(cls, each === mode);
 }
+
+/** The badge's color class per rule set (`editor-sidebar.css`). */
+const MODE_BADGE_CLASSES: ReadonlyArray<readonly [GameMode, string]> = [
+  ["classic", "is-classic"],
+  ["modern", "is-modern"],
+];
 
 function renderLog(ui: UI, src: HudSource): void {
   const logSeq = src.reader.header.logSeq;

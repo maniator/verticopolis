@@ -324,6 +324,85 @@ describe("category tabs", () => {
     matchMedia.mockRestore();
   });
 
+  it("links each tab to its section and gives only the selected tab a Tab stop", () => {
+    const { ui, palette, tabs } = stubUI();
+    buildPalette(ui);
+    const leisure = tabs.querySelector<HTMLElement>('.pal-tab[data-group="Leisure"]')!;
+    const panel = palette.querySelector<HTMLElement>('.pal-group[data-group="Leisure"]')!;
+    expect(leisure.getAttribute("aria-controls")).toBe(panel.id);
+    expect(panel.id).toBe("pal-panel-leisure");
+    const stops = () => [...tabs.querySelectorAll<HTMLElement>(".pal-tab")].filter((t) => t.tabIndex === 0).map((t) => t.dataset.group);
+    expect(stops()).toEqual(["Structure"]);
+    selectGroup(ui, "Leisure");
+    expect(stops()).toEqual(["Leisure"]);
+  });
+
+  it("moves between visible tabs with Left, Right, Home and End, wrapping, and keeps the key from the game", () => {
+    const { ui, palette, tabs } = stubUI();
+    document.body.append(tabs, palette);
+    buildPalette(ui);
+    setLocked(palette, "Leisure", true);
+    syncPaletteTabs(ui);
+    const gameKey = vi.fn();
+    window.addEventListener("keydown", gameKey);
+    const press = (key: string): KeyboardEvent => {
+      const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      (document.activeElement as HTMLElement).dispatchEvent(e);
+      return e;
+    };
+    const open = () => tabs.querySelector<HTMLElement>('.pal-tab[aria-selected="true"]')?.dataset.group;
+    tabs.querySelector<HTMLElement>('.pal-tab[data-group="Structure"]')!.focus();
+    const left = press("ArrowLeft");
+    expect(open()).toBe("Special");
+    expect((document.activeElement as HTMLElement).dataset.group).toBe("Special");
+    expect(left.defaultPrevented).toBe(true);
+    press("Home");
+    expect(open()).toBe("Structure");
+    press("End");
+    expect(open()).toBe("Special");
+    selectGroup(ui, "Living");
+    tabs.querySelector<HTMLElement>('.pal-tab[data-group="Living"]')!.focus();
+    press("ArrowRight"); // Leisure is hidden, so the next visible tab is Services
+    expect(open()).toBe("Services");
+    expect(palette.querySelector(".pal-group.tab-active")?.getAttribute("data-group")).toBe("Services");
+    expect(gameKey).not.toHaveBeenCalled();
+    // Any other key, and a modified arrow, still reach the game.
+    press("ArrowDown");
+    const shifted = new KeyboardEvent("keydown", { key: "ArrowRight", shiftKey: true, bubbles: true, cancelable: true });
+    document.activeElement!.dispatchEvent(shifted);
+    expect(open()).toBe("Services");
+    expect(gameKey).toHaveBeenCalledTimes(2);
+    window.removeEventListener("keydown", gameKey);
+    tabs.remove();
+    palette.remove();
+  });
+
+  it("makes the sections tab panels only where the tabs show", () => {
+    const watched = new Map<string, { matches: boolean; onChange?: () => void }>();
+    const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation((query: string) => {
+      const mq = { matches: query.startsWith("(max-width: 767px)"), onChange: undefined as (() => void) | undefined };
+      watched.set(query, mq);
+      return {
+        get matches() {
+          return mq.matches;
+        },
+        addEventListener: (_: string, fn: () => void) => (mq.onChange = fn),
+        removeEventListener: vi.fn(),
+      } as unknown as MediaQueryList;
+    });
+    const { ui, palette } = stubUI();
+    buildPalette(ui);
+    const transport = palette.querySelector<HTMLElement>('.pal-group[data-group="Transport"]')!;
+    expect(transport.getAttribute("role")).toBe("tabpanel");
+    expect(transport.getAttribute("aria-labelledby")).toBe("pal-tab-transport");
+    const phone = [...watched.entries()].find(([q]) => q.startsWith("(max-width: 767px)"))![1];
+    phone.matches = false; // rotated or resized to the docked desktop layout
+    phone.onChange!();
+    expect(transport.hasAttribute("role")).toBe(false);
+    expect(transport.hasAttribute("aria-labelledby")).toBe(false);
+    matchMedia.mockRestore();
+  });
+
   it("clicking a tab button activates its group (the path onboarding uses to reveal a hidden tool)", () => {
     const { ui, palette, tabs } = stubUI();
     buildPalette(ui);

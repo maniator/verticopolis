@@ -48,8 +48,14 @@ export interface ScheduleReviewDeps {
 }
 
 export class ScheduleReview {
-  /** The engine generation last offered the notice, so a tower is looked at once per load. */
-  private offeredAt = -1;
+  /** Whether the tower in play still has its one look coming: true from boot and after
+   *  every load, import or New Tower (`towerArrived`), never set by an Undo or Redo,
+   *  which is the same tower. */
+  private lookPending = true;
+
+  /** The review dialog on screen and the engine generation it was drawn from, so an
+   *  Undo or Redo under it redraws it. */
+  private shown: { box: HTMLElement; generation: number } | null = null;
 
   private readonly acks: Acknowledgements;
 
@@ -78,14 +84,26 @@ export class ScheduleReview {
     return acknowledgementKey({ seed: sceneSeed, mode }, finding.shaft);
   }
 
+  /** Another tower is in play (a load, an import, New Tower): it gets its own look. */
+  towerArrived(): void {
+    this.lookPending = true;
+  }
+
+  /** The flat, short schedules the player has not chosen to keep: what the Tower Statistics entry counts. Kept
+   *  schedules and staggered ones (a deliberate preset) stay in the dialog but do not raise the entry on their own. */
+  undecided(): ShortFleet[] {
+    return this.findings().filter((f) => f.flatAt !== null && this.acks.get(this.keyOf(f)) !== "kept");
+  }
+
   /** Once per loaded tower, say that some elevators run fewer cars than they have, if any flat schedule has not
    *  been mentioned or decided on yet. Called from the ~6 Hz UI pass; it waits until the title screen and any dialog are
-   *  gone, since a toast cannot be seen behind either. */
+   *  gone, since a toast cannot be seen behind either. It also redraws an open review whose tower an Undo or Redo
+   *  changed under it. */
   tick(): void {
+    this.redrawIfStale();
     if (isSplashUp() || isDialogOpen()) return;
-    const generation = this.deps.engine().generation();
-    if (generation === this.offeredAt) return;
-    this.offeredAt = generation;
+    if (!this.lookPending) return;
+    this.lookPending = false;
     const unmentioned = this.findings().filter((f) => f.flatAt !== null && this.acks.get(this.keyOf(f)) === undefined);
     if (unmentioned.length === 0) return;
     for (const f of unmentioned) this.acks.set(this.keyOf(f), "told");
@@ -112,11 +130,26 @@ export class ScheduleReview {
       handlers[recoverAct(id)] = () => this.recover(id);
       if (this.acks.get(this.keyOf(f)) !== "kept") handlers[keepAct(id)] = () => this.keep(id);
     }
-    this.deps.ui.showScheduleReview(
+    const box = this.deps.ui.showScheduleReview(
       found.map((f) => this.rowOf(f)),
       handlers,
       focus,
     );
+    this.shown = { box, generation: this.deps.engine().generation() };
+  }
+
+  /** Redraw the review when the tower under it moved to another generation (an Undo or Redo; the dialog blocks
+   *  Ctrl+Z, but the tooling handle does not), keeping the focused button where it is still listed. */
+  private redrawIfStale(): void {
+    const shown = this.shown;
+    if (!shown) return;
+    if (!shown.box.isConnected) {
+      this.shown = null;
+      return;
+    }
+    if (shown.generation === this.deps.engine().generation()) return;
+    const focused = document.activeElement;
+    this.open(focused instanceof HTMLElement && shown.box.contains(focused) ? focused.dataset.act : undefined);
   }
 
   private rowOf(f: ShortFleet): ReviewRow {

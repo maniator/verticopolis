@@ -48,8 +48,22 @@ function standIn(tier: TrafficTier, stepRaises = true, won = false) {
     reader: { update: vi.fn(() => void (tower.revision += stepRaises ? 1 : 0)), tower, rooms: [{}], structure: [], crowd: { people: [] }, header: { star: 1 } },
     keyboard: { followTower: vi.fn() },
     ui: { resetLog: vi.fn(), update: vi.fn(), showInspector: vi.fn() },
+    scheduleReview: { towerArrived: vi.fn() },
   };
 }
+
+describe("followSwap and the elevator schedule review", () => {
+  it("gives another tower its one look, and an undo or redo step none (#1556)", () => {
+    for (const follow of ["swap", "restore"] as const) {
+      const app = standIn(0);
+      GameApp.prototype.followSwap.call(app as unknown as GameApp, follow);
+      expect(app.scheduleReview.towerArrived, follow).toHaveBeenCalledOnce();
+    }
+    const stepped = standIn(0);
+    GameApp.prototype.followSwap.call(stepped as unknown as GameApp, "step");
+    expect(stepped.scheduleReview.towerArrived).not.toHaveBeenCalled();
+  });
+});
 
 describe("followSwap and the Bulletin's first line", () => {
   it("opens another tower's Bulletin with the game's arrival line, and keeps the log as it is on a step or a restore", () => {

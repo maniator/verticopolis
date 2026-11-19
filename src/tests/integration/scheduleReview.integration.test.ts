@@ -1,89 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { decodeVctower } from "../../storage/vctowerContainer";
 import type { SerializedGame } from "../../shared/types";
-import { scheduleFromSlots, scheduleSlots } from "../../simport/scheduleSlots";
-import { createAppHistory } from "../../game/appHistory";
-import { createCardKit } from "../../game/cardKit";
-import { newViewReader } from "../../game/portAccess";
-import { ScheduleReview } from "../../game/scheduleReview";
-import { browserAcknowledgements } from "../../game/scheduleRecovery";
-import { keepAct, recoverAct, reviewAct, type ReviewRow } from "../../ui/templates/scheduleReview";
-import { engineFromSave, look, noEngine } from "../portKit/rustEngine";
-
-const load = (name: string) => decodeVctower(readFileSync(`conformance/fixtures/${name}.vctower`, "utf8")) as SerializedGame;
-const memory = () => {
-  const data = new Map<string, string>();
-  return {
-    getItem: (k: string) => data.get(k) ?? null,
-    setItem: (k: string, v: string) => void data.set(k, v),
-  };
-};
-
-/** The paths at which two JSON values differ, so a test can say exactly what a command touched. */
-function diffPaths(a: unknown, b: unknown, path = ""): string[] {
-  if (a === b) return [];
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return [path];
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  return [...keys].flatMap((k) => diffPaths((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}/${k}`));
-}
-
-/** The game's own pieces around one tower: the port, the view, the card kit, real Undo, and the review. */
-function play(raw: SerializedGame, store: Parameters<typeof browserAcknowledgements>[0] = memory()) {
-  const port = engineFromSave(JSON.stringify(raw));
-  const reader = newViewReader(port);
-  reader.update();
-  const kit = createCardKit({ enginePort: port, reader });
-  const toasts: string[] = [];
-  const opened: number[] = [];
-  const said: string[] = [];
-  const order: string[] = [];
-  const announced: string[] = [];
-  const shown: { rows: readonly ReviewRow[]; handlers: Record<string, () => void>; focus?: string }[] = [];
-  const history = createAppHistory({
-    enginePort: port,
-    ui: { toast: (t) => void toasts.push(t) },
-    followSwap: () => reader.update(),
-    showSteps: () => {},
-  });
-  const review = new ScheduleReview({
-    engine: () => port,
-    reader: () => reader,
-    kit: () => kit,
-    ui: {
-      toast: (t) => void toasts.push(t),
-      sayVisibly: (t) => void (said.push(t), order.push("say")),
-      showScheduleReview: (rows, handlers, focus) => void (shown.push({ rows, handlers: handlers ?? {}, focus }), order.push("open")),
-    },
-    audio: { sfx: () => {} },
-    captureUndo: (label) => history.capture(label),
-    commitUndo: () => history.commit(),
-    refreshEditor: () => {},
-    announce: (m) => void announced.push(m),
-    openSchedule: (id) => void opened.push(id),
-    acknowledgements: browserAcknowledgements(store),
-  });
-  const saved = () => JSON.parse(port.serialize()) as unknown;
-  const scheduleOf = (id: number) => scheduleFromSlots(port.shaftSchedule(id));
-  const dialog = () => shown[shown.length - 1]!;
-  return {
-    port,
-    reader,
-    kit,
-    review,
-    history,
-    toasts,
-    said,
-    order,
-    announced,
-    opened,
-    shown,
-    dialog,
-    saved,
-    scheduleOf,
-    store,
-  };
-}
+import { scheduleSlots } from "../../simport/scheduleSlots";
+import { keepAct, recoverAct, reviewAct } from "../../ui/templates/scheduleReview";
+import { diffPaths, load, memory, play } from "./scheduleReview.fixture";
+import { look, noEngine } from "../portKit/rustEngine";
 
 /** A staggered day: off through the small hours, two cars until noon, five after. */
 function hoursOnShift(hour: number): number {
@@ -234,6 +155,7 @@ describe.skipIf(noEngine)("what the player is told, and what they decide (#1548)
     expect(g.toasts).toEqual([]);
     g.port.restore(JSON.stringify(load("split-tower"))); // an import or a load
     g.reader.update();
+    g.review.towerArrived(); // what the app's followSwap does on every arrival
     g.review.tick();
     expect(g.toasts).toHaveLength(1);
     expect(g.toasts[0]).toMatch(/^An elevator has more cars/);

@@ -218,6 +218,21 @@ describe("run", () => {
     expect(fake.writes).toEqual(["#1 POST P1", "#1 DELETE P3"]);
   });
 
+  it("reports rows whose issue is not open as stale, after syncing the rest, and none when all are open", async () => {
+    const lines: string[] = [];
+    const sync = (issues: Record<number, string[]>) =>
+      run({ markdown, repo: "o/r", gh: fakeGh(issues).gh, pauseMs: 0, sleep: noWait, log: (l) => lines.push(l) });
+    const fake = fakeGh({ 2: [] });
+    const result = await run({ markdown, repo: "o/r", gh: fake.gh, pauseMs: 0, sleep: noWait, log: (l) => lines.push(l) });
+    expect(result.stale).toEqual([1, 3]);
+    expect(fake.writes).toEqual(["#2 POST P2"]);
+    expect(lines).toContain(
+      "::error::backlog rows cite numbers that are not open issues (closed, or a pull request); true the rows up: #1 #3",
+    );
+    const clean = await sync({ 1: ["P1"], 2: ["P2"], 3: ["P3"] });
+    expect([clean.ok, clean.stale]).toEqual([true, []]);
+  });
+
   it("keeps going past a failed issue and reports it", async () => {
     const fake = fakeGh({ 1: [], 2: [], 3: [] }, { failOn: 2 });
     const result = await run({

@@ -46,11 +46,12 @@ export function showStats(ui: UI, body: TemplateResult, handlers: Record<string,
 }
 
 /** The elevator schedule review (#1548). Handlers are keyed by the template's `data-act` values; `focus` names the button to focus. */
-export function showScheduleReview(ui: UI, rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): void {
+export function showScheduleReview(ui: UI, rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): HTMLElement {
   const box = ui.openModalTemplate(scheduleReviewTemplate(rows), { displaceable: true });
   ui.wireActions(box, handlers);
   // A redraw after a choice replaces the button that was pressed; keep the player's place.
   if (focus) box.querySelector<HTMLElement>(`[data-act="${focus}"]`)?.focus();
+  return box;
 }
 
 /** Open the Add-to-Home-Screen how-to (SPEC-pwa-install CAP-3 / CAP-5). The

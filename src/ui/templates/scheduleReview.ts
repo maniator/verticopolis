@@ -63,10 +63,11 @@ export function scheduleReviewTemplate(rows: readonly ReviewRow[]): TemplateResu
     </div>`;
 }
 
-/** The Tower Statistics entry: a button that opens the review, shown only when some elevator qualifies. It is not a
- *  `.modal-actions` row, which the dialog would pin over the sections being scrolled as it does the footer. */
+/** The Tower Statistics entry: a button that opens the review, shown only while a flat short schedule waits on the
+ *  player's choice. It is not a `.modal-actions` row, which the dialog would pin over the sections being scrolled as
+ *  it does the footer. */
 export function scheduleReviewEntry(count: number): TemplateResult {
-  const label = `Review elevator schedules (${count} elevator${count === 1 ? "" : "s"} with idle cars)`;
+  const label = `Review elevator schedules (${count} elevator${count === 1 ? "" : "s"} to look at)`;
   return html`<div class="sched-review-entry">
     <button type="button" class="btn" data-act="reviewSchedules">${label}</button>
   </div>`;

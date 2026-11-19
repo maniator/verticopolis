@@ -327,7 +327,9 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     // heard on the New Tower path, where the splash stays up through the
     // rule-set modal while the audio chunk loads and then crossfades to the
     // bed. An instant Continue dismiss has no pre-dismiss gesture to sound
-    // under, so it lands straight on the bed (tracked in the backlog).
+    // under, so it lands straight on the bed. That is by design: browsers
+    // block audio until a gesture, and Continue's own click dismisses the
+    // splash.
     setMusicProgram: (onSplash) => app.audio.setProgram(onSplash ? "splash" : "game"),
   });
   // The title screen loads on every boot, so its branding, the attribution
