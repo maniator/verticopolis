@@ -45,11 +45,12 @@ export async function showStats(app: GameApp): Promise<void> {
       ? { exterminate: () => void confirmExterminate(app) }
       : {};
     // Older towers can hold elevators that run fewer cars than they have (#1548); the
-    // entry to the review exists only then, so a tower without any reads as before.
-    const idleCars = app.scheduleReview.findings().length;
-    if (idleCars > 0) handlers.reviewSchedules = () => app.scheduleReview.open();
+    // entry to the review exists only while one of those waits on the player's choice,
+    // so a tower whose short schedules are kept or staggered on purpose reads as before (#1556).
+    const undecided = app.scheduleReview.undecided().length;
+    if (undecided > 0) handlers.reviewSchedules = () => app.scheduleReview.open();
     const body = statsTemplate(statsScreen(report, app.reader, catalog));
-    app.ui.showStats(idleCars > 0 ? html`${body}${scheduleReviewEntry(idleCars)}` : body, handlers);
+    app.ui.showStats(undecided > 0 ? html`${body}${scheduleReviewEntry(undecided)}` : body, handlers);
   } catch (e) {
     app.ui.toast("Tower Statistics could not be shown.", "bad");
     throw e;
