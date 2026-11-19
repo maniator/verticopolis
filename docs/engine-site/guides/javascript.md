@@ -305,7 +305,7 @@ catalog, the identity record, or the binding's declarations. A change that
 keeps all of these, such as a speed-up, does not raise the version on its
 own; it ships with the next release.
 
-To pin exactly, depend on an exact version (`"1.57.0"`, not `"^1.57.0"`): see
+To pin exactly, depend on an exact version (`"1.57.1"`, not `"^1.57.1"`): see
 [Stability](#stability).
 
 ## Stability

@@ -25,6 +25,11 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.14.2
+
+- People and staff now run out of patience only while waiting for a car. Walking to a shaft, climbing stairs or an escalator and riding never use any of it, so a housekeeper on a long stair route no longer gives up halfway up (#2386).
+- Medical centers staff a wider mix of nurses and doctors, so neighboring clinics no longer show the same two people.
+
 ## 4.14.1
 
 - A recycling center's card shows the population its verdict counts, so the numbers and "demand met" always agree (#1745).
