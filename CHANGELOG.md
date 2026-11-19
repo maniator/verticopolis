@@ -25,6 +25,10 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.14.3
+
+- The game's links to its code, its issue tracker and the bug report form now go to its new home on GitHub, Verticopolis/web.
+
 ## 4.14.2
 
 - People and staff now run out of patience only while waiting for a car. Walking to a shaft, climbing stairs or an escalator and riding never use any of it, so a housekeeper on a long stair route no longer gives up halfway up (#2386).
