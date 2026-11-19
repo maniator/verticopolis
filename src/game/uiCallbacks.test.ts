@@ -39,7 +39,7 @@ function makePorts() {
     saveLoad: {
       save: vi.fn(),
       load: vi.fn(),
-      exportGame: vi.fn(async () => {}),
+      exportGame: vi.fn(),
       importGame: vi.fn(async () => {}),
       importLegacy: vi.fn(),
       exportLegacy: vi.fn(),

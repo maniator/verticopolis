@@ -6,7 +6,7 @@ import { SaveFailureNotice, type SaveWarningSurface } from "./saveFailureNotice"
 import { headerNow, refusalCode, trackAppAction, trackAppActionOnce, trackFileExported, trackFileFailure, trackFileImported, trackTdtImportRead, type FileFailureCode } from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";
 import { importReport } from "../storage/tdtImportReport";
-import { runExportFlow, runLegacyDownload } from "./exportFlow";
+import { runExportFlow } from "./exportFlow";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
@@ -368,12 +368,10 @@ export class SaveLoad {
   /** Hand the player their tower as a compressed .vctower file download.
    *  Only ever called from the export confirm dialog — the tower is not
    *  serialized or packed until the player has actually clicked Export. The
-   *  flow body (stored-byte vs live path, plus the single-flight latch and
-   *  its watchdog, GH #760) lives in ./exportFlow, split out at the 500-line
-   *  guard; delegating keeps the latch on the one choke point every export
-   *  entry converges on. */
-  exportGame(): Promise<void> {
-    return runExportFlow(this.deps, () => {
+   *  flow body (download, toast and analytics) lives in ./exportFlow, split
+   *  out at the 500-line guard. */
+  exportGame(): void {
+    runExportFlow(this.deps, () => {
       const port = this.deps.enginePort();
       return { file: exportFile(port, this.deps.getView(), currentStamp()), towerName: port.towerName() };
     });
@@ -415,12 +413,11 @@ export class SaveLoad {
     const file = bytes;
     const header = headerNow(() => this.deps.reader().header); // the tower the file was written from
     this.deps.ui.showExportReport(report, {
-      // Through the shared export latch (GH #760 follow-on), so a .TDT download
-      // and a .vctower export can never run at once.
-      onDownload: () =>
-        void runLegacyDownload(this.deps.ui, () => {
-          if (this.deps.ui.downloadFile(report.filename, file)) trackFileExported("tdt", header);
-        }),
+      // The browser download is one synchronous click, and so is a .vctower
+      // export (#1655), so the two can never overlap.
+      onDownload: () => {
+        if (this.deps.ui.downloadFile(report.filename, file)) trackFileExported("tdt", header);
+      },
     });
   }
 

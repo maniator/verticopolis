@@ -30,12 +30,6 @@ vi.mock("./interactionState", () => ({
 }));
 vi.mock("../ui/Onboarding", () => ({ shouldArm: vi.fn(() => true) }));
 vi.mock("./legacyImportAdopt", () => ({ adoptConfirmedLegacyImport: vi.fn() }));
-vi.mock("./exportFlow", async (importActual) => ({
-  ...(await importActual<typeof import("./exportFlow")>()),
-  runLegacyDownload: vi.fn(
-    (_ui: unknown, download: () => void) => (download(), Promise.resolve()),
-  ),
-}));
 vi.mock("../simport/tdtRecords", () => ({
   exportFacts: vi.fn(() => ({})),
   importFacts: vi.fn(() => ({})),
