@@ -11,6 +11,7 @@ use super::byte_writer::ByteWriter;
 use super::format::{
     TDT_FLOOR_INDEX_ENTRIES, TDT_ROUTING_TAIL_SIZE, TDT_STAIR_RECORD_SIZE, TDT_STAIR_SLOTS,
 };
+use super::tables::TDT_METRO_TUNNEL;
 use super::venues::{
     OutVenueHalf, EMPTY_RECORD, NO_FILM, TDT_VENUE_RECORD_SIZE, TDT_VENUE_SLOTS,
     TDT_VENUE_TABLE_FROM_STAIRS,
@@ -70,7 +71,8 @@ pub const NO_LOGICAL_ID: u8 = 0xFF;
 
 /// Each record's logical unit id on one floor, in record order (#1932). The
 /// original numbers its tenants and gives a plain floor tile none (`FF` in
-/// the record's byte 12, and no entry in the index map), so a venue record
+/// the record's byte 12, and no entry in the index map), nor the metro
+/// tunnel beside a station (#1503), so a venue record
 /// or a retail row names a tenant by that id. A tenant past the map's 94
 /// ids gets none.
 pub fn logical_ids(type_ids: &[i64]) -> Vec<Option<usize>> {
@@ -78,7 +80,8 @@ pub fn logical_ids(type_ids: &[i64]) -> Vec<Option<usize>> {
     type_ids
         .iter()
         .map(|&type_id| {
-            let numbered = type_id != PLAIN_FLOOR_TYPE && next < TDT_FLOOR_INDEX_ENTRIES;
+            let paving = type_id == PLAIN_FLOOR_TYPE || type_id == TDT_METRO_TUNNEL;
+            let numbered = !paving && next < TDT_FLOOR_INDEX_ENTRIES;
             numbered.then(|| {
                 next += 1;
                 next - 1
