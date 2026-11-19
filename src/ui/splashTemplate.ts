@@ -144,8 +144,8 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
     </div>
     <p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>
     <p class="splash-version">${versionLine(APP_VERSION)}</p>
-    <!-- The 2.0 "Ground floor" badge (SPEC/party 2026-07-23, label re-picked
-         2026-07-28): a quiet, permanent thank-you shown only when the loaded tower
+    <!-- The 2.0 "Ground floor" badge (decision D21 in the Modern rental living
+         GDD decision log, label re-picked 2026-07-28): a quiet, permanent thank-you shown only when the loaded tower
          predates 2.0 (you got in on the ground floor). A new user never sees it.
          No title tooltip: .splash-founder is pointer-events:none so it never
          hit-tests, and a tooltip that can never open is worse than none. The
