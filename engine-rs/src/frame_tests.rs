@@ -12,7 +12,7 @@ fn at(id: &str, label: &str) -> Simulation {
 }
 
 /// A tower with guests in it and shafts.
-fn busy() -> Simulation {
+pub(super) fn busy() -> Simulation {
     at("hotel-exterminator-modern", "booked")
 }
 
