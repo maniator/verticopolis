@@ -179,8 +179,9 @@ class GameApp implements GameAppPorts {
   /** True only on the PHONE tier: MUST mirror the phone `@media` query in
    *  styles.css (`max-width: 767px`, or short landscape `max-width: 1023px and
    *  max-height: 599px`); the refusal-card opacity gate ending styles.css
-   *  section 5 encodes its COMPLEMENT, so a breakpoint change lands in all
-   *  three places. The tablet tier uses the docked desktop-style layout, so it
+   *  section 5 encodes its COMPLEMENT, and `TAB_LAYOUT_MQ` in ui/uiPalette.ts
+   *  repeats it for the Tools tabs' panel roles, so a breakpoint change lands in
+   *  all four places. The tablet tier uses the docked desktop-style layout, so it
    *  must read as NON-mobile here (world-anchored editor/inspector popovers,
    *  desktop splash) to stay consistent with the CSS. Cached so per-frame
    *  anchoring doesn't construct a MediaQueryList each tick. @internal */

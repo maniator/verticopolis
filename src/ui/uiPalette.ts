@@ -45,9 +45,13 @@ const GROUPS: { title: string; cats: FacilityCategory[] }[] = [
   { title: "Special", cats: ["special"] },
 ];
 
+/** Where the CSS shows the category tabs (`media-phone.css`), the same query
+ *  as `Game.mobileMq` in `main.ts`. Only there are the sections tab panels. */
+const TAB_LAYOUT_MQ = "(max-width: 767px), (max-width: 1023px) and (max-height: 599px)";
+
 const ONE_ROW_TAB_LAYOUT_MQ = "(max-width: 1023px) and (max-height: 339.98px) and (orientation: landscape), (max-width: 539.98px) and (orientation: landscape)";
 
-type TabLayoutWatch = { mq: MediaQueryList; onChange: () => void };
+type TabLayoutWatch = { mq: MediaQueryList; onChange: () => void }[];
 const tabLayoutWatch = new WeakMap<UI, TabLayoutWatch>();
 
 export function buildPalette(ui: UI): void {
@@ -101,6 +105,7 @@ function buildPaletteFrom(ui: UI, catalog: Catalog): void {
     const section = document.createElement("section");
     section.className = "pal-group";
     section.dataset.group = group.title;
+    section.id = panelId(group.title);
     section.appendChild(groupTitle(group.title, group.title));
     // The catalog lists every kind in the engine's order, both modes' kinds
     // included, and these fields read the same in both modes, so one layout
@@ -163,13 +168,57 @@ function buildTabs(ui: UI, bar: HTMLElement): void {
     tab.className = "pal-tab";
     tab.dataset.group = group.title;
     tab.dataset.ucount = "-1"; // set on the first scan so the initial unlock never pips
+    tab.id = tabId(group.title);
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-selected", "false");
+    tab.setAttribute("aria-controls", panelId(group.title));
+    tab.tabIndex = -1; // roving: selectGroup gives the selected tab the one stop
     tab.textContent = group.title;
     tab.addEventListener("click", () => selectGroup(ui, group.title));
+    tab.addEventListener("keydown", (e) => onTabKey(ui, bar, tab, e));
     bar.appendChild(tab);
   }
-  watchOneRowTabLayout(ui, bar);
+  watchTabLayouts(ui, bar);
+}
+
+/** A group's tab and panel ids (the titles are single words). */
+const tabId = (title: string): string => `pal-tab-${title.toLowerCase()}`;
+const panelId = (title: string): string => `pal-panel-${title.toLowerCase()}`;
+
+/** The WAI-ARIA tablist keys: Left and Right step to the previous and next
+ *  visible tab (wrapping), Home and End jump to the first and last, and the
+ *  tab reached is selected as well as focused. A handled key stops here, so
+ *  the arrow does not also move the build cursor behind the palette. */
+function onTabKey(ui: UI, bar: HTMLElement, tab: HTMLElement, e: KeyboardEvent): void {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const tabs = [...bar.querySelectorAll<HTMLElement>(".pal-tab:not([hidden])")];
+  const at = tabs.indexOf(tab);
+  if (at < 0) return;
+  let next: HTMLElement | undefined;
+  if (e.key === "ArrowLeft") next = tabs[(at - 1 + tabs.length) % tabs.length];
+  else if (e.key === "ArrowRight") next = tabs[(at + 1) % tabs.length];
+  else if (e.key === "Home") next = tabs[0];
+  else if (e.key === "End") next = tabs[tabs.length - 1];
+  if (!next) return;
+  e.preventDefault();
+  e.stopPropagation();
+  selectGroup(ui, next.dataset.group ?? "");
+  next.focus();
+}
+
+/** Give the sections their tab panel roles where the tabs show, and take them
+ *  off where every section stacks (desktop and tablet), so a screen reader
+ *  never meets a panel whose tab is hidden. */
+function setPanelRoles(ui: UI, tabsShown: boolean): void {
+  for (const sec of ui.el.palette.querySelectorAll<HTMLElement>(".pal-group")) {
+    if (tabsShown) {
+      sec.setAttribute("role", "tabpanel");
+      sec.setAttribute("aria-labelledby", tabId(sec.dataset.group ?? ""));
+    } else {
+      sec.removeAttribute("role");
+      sec.removeAttribute("aria-labelledby");
+    }
+  }
 }
 
 /** Make the named group the visible one on mobile: mark its section `.tab-active`,
@@ -180,6 +229,7 @@ export function selectGroup(ui: UI, title: string): void {
   if (!tab) return;
   bar!.querySelectorAll<HTMLElement>(".pal-tab").forEach((t) => {
     t.setAttribute("aria-selected", t === tab ? "true" : "false");
+    t.tabIndex = t === tab ? 0 : -1;
   });
   ui.el.palette.querySelectorAll<HTMLElement>(".pal-group").forEach((sec) => {
     sec.classList.toggle("tab-active", sec.dataset.group === title);
@@ -210,19 +260,30 @@ function revealTabInStrip(bar: HTMLElement, tab: HTMLElement): void {
   else if (shown && box.right > strip.right) bar.scrollLeft += Math.ceil(box.right - strip.right);
 }
 
-function watchOneRowTabLayout(ui: UI, bar: HTMLElement): void {
-  const prev = tabLayoutWatch.get(ui);
-  if (prev) prev.mq.removeEventListener("change", prev.onChange);
+/** Follow the two layouts the tabs care about: where they show at all (the
+ *  sections become tab panels) and where they are one sideways-scrolling row
+ *  (the open tab is kept in view). A rebuild replaces the previous watches. */
+function watchTabLayouts(ui: UI, bar: HTMLElement): void {
+  for (const prev of tabLayoutWatch.get(ui) ?? []) prev.mq.removeEventListener("change", prev.onChange);
+  tabLayoutWatch.delete(ui);
   if (typeof window.matchMedia !== "function") return;
-  const mq = window.matchMedia(ONE_ROW_TAB_LAYOUT_MQ);
-  const onChange = () => {
-    if (!mq.matches) return;
+  const shown = window.matchMedia(TAB_LAYOUT_MQ);
+  const onShownChange = () => setPanelRoles(ui, shown.matches);
+  const oneRow = window.matchMedia(ONE_ROW_TAB_LAYOUT_MQ);
+  const onOneRowChange = () => {
+    if (!oneRow.matches) return;
     const selected = bar.querySelector<HTMLElement>('.pal-tab[aria-selected="true"]');
     if (selected) revealTabInStrip(bar, selected);
   };
-  mq.addEventListener("change", onChange);
-  tabLayoutWatch.set(ui, { mq, onChange });
-  onChange();
+  const watches: TabLayoutWatch = [
+    { mq: shown, onChange: onShownChange },
+    { mq: oneRow, onChange: onOneRowChange },
+  ];
+  for (const w of watches) {
+    w.mq.addEventListener("change", w.onChange);
+    w.onChange();
+  }
+  tabLayoutWatch.set(ui, watches);
 }
 
 /** Unlocked (visible) facility count in a group, read from the classes the lock
