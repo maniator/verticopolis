@@ -1,6 +1,7 @@
 import { trackAppAction } from "../../analyticsActions";
 import type { DeskWindowId } from "./deskGeometry";
 import type { DeskChange } from "./deskWindow";
+import type { WindowMenuFrom } from "./deskWindowMenu";
 
 /**
  * The 1994 desk's analytics codes (docs/ui/desk-windows.md and the data map's
@@ -37,10 +38,6 @@ export function deskTaskResult(minimized: boolean, inFront: boolean): DeskTaskRe
 
 /** Where the Verticopolis menu was opened: over the title screen or a tower. */
 export type DeskScreen = "title" | "tower";
-
-/** Where a window menu was opened: a right-click (or Shift+F10) on a taskbar
- *  button, or a right-click on a window's title bar. */
-export type WindowMenuFrom = "taskbar" | "title_bar";
 
 /** The tray's buttons: the monitor (the Control Panel) and the speaker. */
 export type DeskTrayIcon = "display" | "sound";

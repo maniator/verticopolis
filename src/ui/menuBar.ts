@@ -30,7 +30,12 @@
  * a trip is neither.
  */
 
-import type { MenuDismissHow, MenuOpenVia } from "../analyticsMenus";
+/** How a trip into the menus began: a click on a title, the keyboard on a
+ *  focused title, or Alt with a title's underlined letter. */
+export type MenuOpenVia = "click" | "keys" | "alt";
+/** How a trip ended without a pick: a press outside the menus, Escape, Tab,
+ *  a click on the open menu's own title, or the window losing focus. */
+export type MenuDismissHow = "outside" | "escape" | "tab" | "title" | "blur";
 
 /** How long a press that closed a menu keeps swallowing its own pointerup and
  *  click, in milliseconds: long enough for a slow tap, short enough that the

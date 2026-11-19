@@ -3,6 +3,7 @@
  * {@link ImportReport} shown before the tower is adopted, built from the
  * numbers the Rust codec counts while it decodes (the `loadTdt` record).
  */
+import type { ImportReportFacts } from "../simport/tdtReportFacts";
 import { groupDigits } from "../ui/format";
 
 /** What the fidelity-report modal shows before the player adopts the tower. */
@@ -24,62 +25,6 @@ export interface ImportReport {
   broughtOver: string[];
   /** One honest sentence per approximation, divergence, or loss. */
   couldNotBring: string[];
-}
-
-/** The running tally the Rust codec fills while decoding the floor map. */
-export interface ImportCounts {
-  rooms: number;
-  offices: number;
-  occupiedOffices: number;
-  condos: number;
-  soldCondos: number;
-  hotelRooms: number;
-  hotelAsleep: number;
-  hotelDirty: number;
-  hotelBooked: number;
-  asleepConverted: number;
-  infested: number;
-  venues: number; // food, retail, entertainment
-  services: number; // security/medical/housekeeping/recycling/parking/ramp/metro/weddingHall
-  parkingStalls: number;
-  construction: number;
-  rentsApplied: number;
-  twinRooms: number;
-  secom: number;
-  cathedral: number;
-  burned: number;
-  unknown: number;
-  droppedFloors: number;
-  offLot: number;
-  overlapping: number;
-  misplaced: number;
-  clamped: number;
-  widthMismatch: number;
-  /** People placed in offices, condos and hotel rooms from the file's own counts. */
-  residentsSeeded: number;
-}
-
-/** The numbers an import report reads: the engine port answers them as the
- *  `loadTdt` record, with the notes from `tdtNote`. */
-export interface ImportReportFacts {
-  towerName: string;
-  counts: ImportCounts;
-  decoded: boolean;
-  decodeStats: { droppedShafts: number; adjustedShafts: number; droppedFlights: number };
-  /** The save's connected-stall and roster counts, null when it had none. */
-  parkingConnected: number | null;
-  peopleCount: number | null;
-  /** The highest floor built and the basement levels. */
-  floors: number;
-  basements: number;
-  minutes: number;
-  /** Elevator shafts, and stairway and escalator flights. */
-  shafts: number;
-  flights: number;
-  star: number;
-  money: number;
-  /** The header's notes, then the walk's warnings, said as they are. */
-  notes: readonly string[];
 }
 
 /** The fidelity report from its numbers. */

@@ -1,4 +1,3 @@
-import { APP_VERSION } from "../appVersion";
 import { settleEngineIdentity, type EngineBootState } from "./engineBoot";
 import { parseEngineIdentity } from "./engineIdentity";
 import { shortId } from "./enginePackageRecord";
@@ -51,11 +50,11 @@ function suffixOf(g: LabelSource): string {
   return ` · Rust engine${version ? ` ${version}` : ""}${extras.length > 0 ? ` (${extras.join(", ")})` : ""}`;
 }
 
-/** The full version line: the app version, then the engine (`engineSuffix`).
- *  The title screen draws it while the game starts, so it does not read a
+/** The full version line: the app's `version` (the host passes its own,
+ *  `APP_VERSION`), then the engine (`engineSuffix`). The title screen draws it while the game starts, so it does not read a
  *  deferred identity record: boot rewrites it once the record is read
  *  (`refreshSplashVersion`). */
-export function versionLine(version = APP_VERSION, g: LabelSource = pageSource()): string {
+export function versionLine(version: string, g: LabelSource = pageSource()): string {
   return `v${version}${suffixOf(g)}`;
 }
 
@@ -63,8 +62,8 @@ export function versionLine(version = APP_VERSION, g: LabelSource = pageSource()
  *  record is read after the first frame (#1254): the title screen mounts
  *  inside `create()`, before the record is read, so its template cannot name
  *  the engine's version at render time. Dialogs render later and read the
- *  suffix themselves. */
-export function refreshSplashVersion(doc: Pick<Document, "querySelector"> = document): void {
+ *  suffix themselves. `version` is the app's, as `versionLine` takes it. */
+export function refreshSplashVersion(version: string, doc: Pick<Document, "querySelector"> = document): void {
   const el = doc.querySelector<HTMLElement>(".splash-version");
-  if (el) el.textContent = versionLine();
+  if (el) el.textContent = versionLine(version);
 }

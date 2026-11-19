@@ -1,6 +1,17 @@
-import type { GameplayEventSource } from "../analyticsEngineBridge";
 import type { GameplayEvent } from "../events/gameplayEvents";
 import type { EnginePort } from "./enginePort";
+
+/** What the analytics bridge drains: the live `Simulation` (whose drain
+ *  the WASM host overrides to answer with its engine's batch). `release` is the session's
+ *  own flush (a hide, or a window closing): a host that holds a command's
+ *  events back until its engine's state covers them (the WASM host, #874)
+ *  lets them go then, so a page that closes keeps them. `release` is
+ *  temporary, with that fallback (story-engine-retire-typescript.md). */
+export interface GameplayEventSource {
+  drainGameplayEvents(opts?: { release?: boolean }): GameplayEvent[];
+  readonly gameplayEventsDropped: number;
+  readonly gameplayEvents: { readonly discardOnHandOff: boolean };
+}
 
 /**
  * The engine's gameplay events through the port (`drainEvents`, `eventText`),

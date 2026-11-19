@@ -1,3 +1,4 @@
+import type { ExportReportFacts } from "../simport/tdtReportFacts";
 import { groupDigits } from "../ui/format";
 
 /** The elevator slots a `.TDT` file holds. */
@@ -8,41 +9,6 @@ const TDT_ELEVATOR_SLOTS = 24;
  * the 1994 format can and cannot carry. Reads the export tally and the encode
  * stats the Rust codec counts (the `tdtExport` record), invents nothing.
  */
-
-/** Loss/quirk tally of an export. */
-export interface ExportCounts {
-  rooms: number;
-  rentsSnapped: number;
-  namesDropped: number;
-  hotelStates: number;
-  occupied: number;
-  construction: number;
-  parkingStalls: number;
-  burnedOut: number;
-  vacancyHistoryLost: number;
-  outOfRange: number;
-  /** Shops, restaurants and fast food past the 512 style rows a 1994 file holds. */
-  retailRowsDropped: number;
-}
-
-/** Numbers the report reads from the encode pass (header money/star + the
- *  transport drops counted while writing the tables). */
-export interface EncodeStats {
-  balance: number;
-  money: number;
-  star: number;
-  shaftsDropped: number;
-  shaftsColliding: number;
-  flightsDropped: number;
-  transportsDropped: number;
-  /** Elevator/walkway counts BEFORE the table caps, for the report's tallies. */
-  elevatorsLen: number;
-  walkwaysLen: number;
-  /** Express shafts written. Every one is sized the way the game sizes it
-   *  (doc §8), so none is lost; the count stays in the record for the report
-   *  facts. */
-  expressLen: number;
-}
 
 /** What the reverse fidelity modal shows before the player downloads. */
 export interface ExportReport {
@@ -60,19 +26,6 @@ export interface ExportReport {
   comesAlong: string[];
   /** One honest sentence per thing 1994 cannot represent. */
   staysBehind: string[];
-}
-
-/** The numbers an export report reads: the engine port answers them as the
- *  `tdtExport` record, with the tower's name. */
-export interface ExportReportFacts {
-  towerName: string;
-  /** The download's name, from the engine (`tdtFilename`). */
-  filename: string;
-  counts: ExportCounts;
-  stats: EncodeStats;
-  /** The highest floor and the basement levels the file can contain. */
-  topFloor: number;
-  basements: number;
 }
 
 /** The reverse fidelity report from its numbers. */

@@ -8,8 +8,11 @@
  * Cost: one menu built once with the taskbar; each opening sets four items.
  */
 
-import type { WindowMenuFrom } from "./deskAnalytics";
 import type { DeskWindow } from "./deskWindow";
+
+/** Where a window menu was opened: a right-click (or Shift+F10) on a taskbar
+ *  button, or a right-click on a window's title bar. */
+export type WindowMenuFrom = "taskbar" | "title_bar";
 
 /** A window menu command. */
 export type WindowCommand = "restore" | "minimize" | "maximize" | "close";

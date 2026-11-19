@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  importReport,
-  type ImportCounts,
-  type ImportReportFacts,
-} from "./tdtImportReport";
+import type { ImportCounts, ImportReportFacts } from "../simport/tdtReportFacts";
+import { importReport } from "./tdtImportReport";
 
 const ZERO: ImportCounts = {
   rooms: 0,

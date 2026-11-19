@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { finishModal, type ModalDeps } from "./uiModal";
 
-const deps = (): ModalDeps => ({
+const deps = (stopped = false): ModalDeps => ({
   titleBarClose: () => document.createElement("button"),
   closeModal: vi.fn(),
   drainNotice: vi.fn(),
+  engineStopped: vi.fn(() => stopped),
 });
 
 describe("finishModal", () => {
@@ -20,9 +21,11 @@ describe("finishModal", () => {
   });
 
   it("never opens behind a wasm-only engine-failure message, whose Reload button the top layer would cover", () => {
-    document.body.innerHTML = `<div id="engine-failure"></div><dialog id="modal"><div class="box"><h2>Import report</h2></div></dialog>`;
+    document.body.innerHTML = `<dialog id="modal"><div class="box"><h2>Import report</h2></div></dialog>`;
     const dialog = document.getElementById("modal") as HTMLDialogElement;
-    finishModal(dialog, dialog.querySelector(".box") as HTMLElement, deps());
+    const stopped = deps(true);
+    finishModal(dialog, dialog.querySelector(".box") as HTMLElement, stopped);
+    expect(stopped.engineStopped).toHaveBeenCalled();
     expect(dialog.open).toBe(false);
   });
 });

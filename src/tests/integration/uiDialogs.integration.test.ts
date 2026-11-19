@@ -508,6 +508,23 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
     expect(document.querySelectorAll(`#${secondId}`).length).toBe(1); // never two elements sharing the id
   });
 
+  it("opens no modal over the engine-failure message, through the real UI wiring", () => {
+    // UI hands finishModal `isEngineStopped`; a late modal (an import report
+    // finishing after the stop) would cover the message's Reload button.
+    const { ui } = makeUI();
+    const failure = document.createElement("div");
+    failure.id = "engine-failure";
+    document.body.appendChild(failure);
+    try {
+      ui.openModalTemplate(html`<h2>Import report</h2><p>body</p>`);
+      expect(dialog().open).toBe(false);
+    } finally {
+      failure.remove();
+    }
+    ui.openModalTemplate(html`<h2>Import report</h2><p>body</p>`);
+    expect(dialog().open).toBe(true);
+  });
+
   it("stays idempotent if finishModal ever ran twice over the same rendered title bar, without wiping the DOM in between", () => {
     // Regression guard (Copilot review on #405): finishModal's `while
     // (h2.firstChild) …` used to move EVERY child of the h2, including a ✕
@@ -526,6 +543,7 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
       titleBarClose: (cls, onClick) => ui.titleBarClose(cls, onClick),
       closeModal: () => ui.closeModal(),
       drainNotice: () => {},
+      engineStopped: () => false,
     });
 
     const titleId = MODAL_TITLE_ID;

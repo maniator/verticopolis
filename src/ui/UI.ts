@@ -24,6 +24,7 @@ import { buildPalette } from "./uiPalette";
 import { wireBulletinReadBack } from "./bulletinReadBack";
 import { ModalPrecedence, routeNotice, type ModalOpts, type NoticeKind } from "./modalPrecedence";
 import { finishModal } from "./uiModal";
+import { isEngineStopped } from "../game/interactionState";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" } | { type: "skyBridge" };
 
@@ -259,6 +260,7 @@ export class UI {
       titleBarClose: (cls, onClick) => this.titleBarClose(cls, onClick),
       closeModal: () => this.closeModal(),
       drainNotice: (b) => this.precedence.drainNotice(b),
+      engineStopped: isEngineStopped,
     });
   }
 

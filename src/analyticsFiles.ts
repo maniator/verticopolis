@@ -1,7 +1,7 @@
 import { trackEvent } from "./analyticsCore";
 import type { GameMode } from "./shared/types";
 import type { HeaderView } from "./simport/view";
-import type { ImportReportFacts } from "./storage/tdtImportReport";
+import type { ImportReportFacts } from "./simport/tdtReportFacts";
 
 /**
  * Tower file analytics (owner, 2026-11-13): whether an import or export
