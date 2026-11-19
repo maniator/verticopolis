@@ -39,7 +39,10 @@ impl Simulation {
         }
         let tax_rate = self.mode.condo_hold_tax_rate();
         let overhead = self.mode.operating_overhead_per_unit();
-        for i in 0..self.tower.units.len() {
+        // Rooms only: a floor or lobby tile owes no upkeep, tax or overhead
+        // (`structural_tiles_owe_nothing`), and tiles are most of the units.
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
             let u = &self.tower.units[i];
             if let Some(m) = service_maintenance_monthly(u.kind) {
                 if u.state != UnitState::Gutted {
@@ -89,7 +92,9 @@ impl Simulation {
         let mut by_cat: IndexMap<&'static str, f64> = IndexMap::new();
         let mut sum = 0.0;
         let mut n = 0;
-        for i in 0..self.tower.units.len() {
+        // Rooms only: a rental is never a floor or lobby tile.
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
             let (kind, floor, x, rent, no_rate, tenanted) = {
                 let u = &self.tower.units[i];
                 (u.kind, u.floor, u.x, u.rent, u.no_rate, u.is_tenanted())
@@ -217,3 +222,23 @@ impl Simulation {
 #[cfg(test)]
 #[path = "upkeep_audience_tests.rs"]
 mod upkeep_audience_tests;
+
+/// The monthly passes walk rooms only, which holds while no floor or lobby
+/// tile owes upkeep, condo tax, overhead or a DJ, or pays rent. A rule that
+/// charges a tile must walk the tiles again.
+#[cfg(test)]
+#[test]
+fn structural_tiles_owe_nothing() {
+    let tiles: Vec<Kind> = crate::facilities::FACILITIES
+        .iter()
+        .map(|f| f.kind)
+        .filter(|k| k.is_structural())
+        .collect();
+    assert!(tiles.contains(&Kind::Floor) && tiles.contains(&Kind::Lobby));
+    for kind in tiles {
+        assert_eq!(service_maintenance_monthly(kind), None, "{kind:?}");
+        assert!(!is_overhead_kind(kind), "{kind:?}");
+        assert!(!matches!(kind, Kind::Condo | Kind::Nightclub), "{kind:?}");
+        assert!(!kind.is_rental(), "{kind:?}");
+    }
+}
