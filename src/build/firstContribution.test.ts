@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   WELCOME_MARKER,
+  contributionKind,
+  isRecent,
   WELCOME_MESSAGES,
   renderWelcome,
   welcomeFirstContribution,
@@ -240,3 +242,29 @@ describe.each(Object.entries(WELCOME_MESSAGES))(
     });
   },
 );
+
+describe("contributionKind", () => {
+  it("maps the two events the workflow sends", () => {
+    expect(contributionKind("pull_request")).toBe("pull request");
+    expect(contributionKind("issues")).toBe("issue");
+  });
+
+  it("throws on any other event instead of guessing", () => {
+    expect(() => contributionKind("pull_request_target")).toThrow(
+      "unexpected event 'pull_request_target'",
+    );
+  });
+});
+
+describe("isRecent", () => {
+  const now = Number(new Date("2026-11-20T12:00:00Z"));
+
+  it("keeps a pull request opened inside the sweep window", () => {
+    expect(isRecent("2026-11-17T12:00:00Z", now)).toBe(true);
+  });
+
+  it("drops one opened before it, and an unreadable date", () => {
+    expect(isRecent("2026-11-17T11:59:59Z", now)).toBe(false);
+    expect(isRecent("not a date", now)).toBe(false);
+  });
+});

@@ -43,6 +43,29 @@ export interface WelcomeOutcome {
   reason: string;
 }
 
+/**
+ * The kind of item a GitHub event name opened. The workflow's issue step sends
+ * `issues`; the hourly sweep sets the kind itself. `pull_request` is accepted
+ * so one pull request can be run by hand with the same variables. Anything
+ * else is a wiring mistake, so it throws rather than guess.
+ */
+export function contributionKind(eventName: string): ContributionKind {
+  if (eventName === "pull_request") return "pull request";
+  if (eventName === "issues") return "issue";
+  throw new Error(`unexpected event '${eventName}'`);
+}
+
+/** How far back the hourly sweep looks for new pull requests. */
+export const SWEEP_DAYS = 3;
+
+/** Whether a pull request opened at `createdAt` is recent enough to sweep. */
+export function isRecent(createdAt: string, now: number): boolean {
+  const opened = Number(new Date(createdAt));
+  return (
+    Number.isFinite(opened) && now - opened <= SWEEP_DAYS * 24 * 60 * 60 * 1000
+  );
+}
+
 /** The first line of every message, which marks a thread as welcomed. */
 export const WELCOME_MARKER = "<!-- first-contribution-welcome -->";
 
