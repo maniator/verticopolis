@@ -88,6 +88,18 @@ pub struct Memo {
         crate::tower_index::IndexKey,
         crate::tower_stop_bits::StopBits,
     )>,
+    /// How many transports of each kind the tower has, indexed by `Kind`,
+    /// keyed like `shaft_columns`, so a build cap check counts them once per
+    /// edit rather than once per kind it asks about.
+    pub transport_kinds: Option<((i64, usize), std::sync::Arc<[i64]>)>,
+    /// The shafts sorted by column for the overlap probe
+    /// (`Tower::shaft_floor_refusal`), keyed on the revision and the shaft
+    /// count. `None` beside the key means one probe ran at that key, so the
+    /// second builds it (#1261).
+    pub shaft_columns: Option<(
+        (i64, usize),
+        Option<std::sync::Arc<crate::tower::ShaftColumns>>,
+    )>,
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------

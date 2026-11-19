@@ -26,6 +26,7 @@ mod unit_save;
 pub use lobby_halls::HallRun;
 pub(crate) use skybridge::{OverAir, Row as BridgeRow, PEOPLE_CROSSING, SKYBRIDGE_PRICE_FACTOR};
 pub use skybridge::{SkybridgeSpan, SKYBRIDGE_MAX_SPAN, SKYBRIDGE_MIN_STAR};
+pub(crate) use transport_reach::ShaftColumns;
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
 pub(crate) use unit_save::SavedUnit;
 
@@ -237,7 +238,7 @@ impl Tower {
         } else {
             self.census().kinds[kind as usize]
         };
-        placed + self.transports.iter().filter(|t| t.kind == kind).count() as i64
+        placed + self.transport_kind_count(kind)
     }
 
     fn span_every(

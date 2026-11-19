@@ -110,26 +110,10 @@ impl Tower {
                 }
             }
         }
-        for fl in bottom..=top {
-            if !self.shaft_has_structure_at(fl, x, f.width) {
-                return PlaceResult::fail(NEEDS_FLOORS);
-            }
-            for t in &self.transports {
-                let overlaps =
-                    fl >= t.bottom && fl <= t.top && x < t.x + t.width && x + f.width > t.x;
-                if overlaps {
-                    let stacked = kind.is_fixed_span()
-                        && t.kind.is_fixed_span()
-                        && t.x == x
-                        && t.width == f.width
-                        && (bottom == t.top || top == t.bottom);
-                    if !stacked {
-                        return PlaceResult::fail(SHAFT_OVERLAP);
-                    }
-                }
-            }
+        match self.shaft_floor_refusal(kind, x, f.width, bottom, top) {
+            Some(r) => PlaceResult::fail(r),
+            None => PlaceResult::ok(),
         }
-        PlaceResult::ok()
     }
 
     pub fn place_transport(&mut self, kind: Kind, x: i64, bottom: i64, top: i64) -> PlaceResult {
