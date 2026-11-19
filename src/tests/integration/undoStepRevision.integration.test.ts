@@ -7,8 +7,10 @@ import { releaseDrafts } from "../portKit/drafts";
 /**
  * The renderer keeps its scene through an undo or redo step and finds the
  * change by the tower revision (towerScene `followStep`). That holds only if
- * every done step raises the revision above every revision the tower had, so
- * the Rust engine is held to it here, step after step.
+ * every done step that moves rooms or shafts raises the revision above every
+ * revision the tower had, so the Rust engine is held to it here, step after
+ * step. A step that puts back only settings raises none (#1802,
+ * `undoFollow.integration.test.ts`).
  */
 
 type RustEngine = EnginePort & { free(): void };

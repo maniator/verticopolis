@@ -139,4 +139,39 @@ describe("InspectorController", () => {
     inspector.inspectPicked(onCondo);
     expect(shown(), "a tower swap clears the latch").toBe(5);
   });
+
+  it("reads the card again after an undo or redo step that left its facility (#1802)", () => {
+    const { inspector, deps, cards } = setup();
+    inspector.inspectPicked(onCondo);
+    cards.unit.mockClear();
+    inspector.followStep(() => true);
+    expect(cards.unit, "the card asks the port again").toHaveBeenCalledWith(condo.id);
+    expect(deps.ui.showInspector.mock.lastCall?.[0]).toEqual({ unit: condo.id, hour: 14, diag: ["unit facts"] });
+  });
+
+  it("hides the card when the step took its facility away, and does nothing with no card up", () => {
+    const { inspector, deps, cards } = setup();
+    inspector.followStep(() => false);
+    expect(deps.ui.showInspector).not.toHaveBeenCalled();
+    inspector.inspectPicked(onLift);
+    inspector.followStep((t) => t.type !== "transport");
+    expect(deps.ui.showInspector.mock.lastCall).toEqual([null]);
+    expect(deps.setAnchor.mock.lastCall).toEqual([null]);
+    cards.shaft.mockClear();
+    inspector.followStep(() => true);
+    expect(cards.shaft, "a hidden card stays hidden").not.toHaveBeenCalled();
+  });
+
+  it("keeps the ✕-latch through a step for a facility that stands, and drops it for one gone", () => {
+    const { inspector, deps } = setup();
+    const shown = () => deps.ui.showInspector.mock.calls.filter(([c]) => c !== null).length;
+    inspector.inspectPicked(onCondo);
+    inspector.dismiss();
+    inspector.followStep(() => true);
+    inspector.inspectPicked(onCondo);
+    expect(shown(), "still dismissed").toBe(1);
+    inspector.followStep(() => false);
+    inspector.inspectPicked(onCondo);
+    expect(shown(), "a facility the step took and a redo put back opens again").toBe(2);
+  });
 });

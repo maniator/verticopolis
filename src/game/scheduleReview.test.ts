@@ -34,7 +34,7 @@ function harness(answer = Float64Array.of(1, 0), reason?: string) {
   const reader = {
     update: vi.fn(),
     header: { sceneSeed: 42, mode: "classic" },
-    tower: { transports: [shaft(7, 10), shaft(9, 20), { ...shaft(11, 30), kind: "stairs" }] },
+    tower: { revision: 5, transports: [shaft(7, 10), shaft(9, 20), { ...shaft(11, 30), kind: "stairs" }] },
   };
   const kit = {
     catalog: () => catalogFor("classic"),
@@ -142,6 +142,21 @@ describe("ScheduleReview", () => {
     expect(deps.ui.showScheduleReview.mock.lastCall![2]).toBe(reviewAct(9));
     review.tick();
     expect(deps.ui.showScheduleReview, "the redrawn box is not on screen, so nothing more").toHaveBeenCalledTimes(2);
+    box.remove();
+  });
+
+  it("redraws an open review when an Undo or Redo raises the tower revision under the same generation (#1802)", () => {
+    const { review, deps, reader } = harness();
+    const box = document.createElement("div");
+    document.body.appendChild(box);
+    deps.ui.showScheduleReview.mockReturnValueOnce(box);
+    review.open();
+    vi.mocked(isDialogOpen).mockReturnValue(true);
+    review.tick();
+    expect(deps.ui.showScheduleReview, "same generation and revision: no redraw").toHaveBeenCalledOnce();
+    reader.tower.revision = 6; // the step put a shaft back or changed its cars
+    review.tick();
+    expect(deps.ui.showScheduleReview, "a raised revision redraws").toHaveBeenCalledTimes(2);
     box.remove();
   });
 

@@ -233,8 +233,9 @@ export interface EnginePortLifecycle {
   undoClear(): void;
   /** Step back or forward: `[status, generation]` as `restore` answers, with
    *  `UNDO_NOTHING_TO_STEP` as the status when there is no step. A done step
-   *  has already changed the tower and moved the generation, as a done swap
-   *  does, and the host then follows it. Time is not rewound: the cash a step
+   *  has already changed the tower and keeps the generation, since it is the
+   *  same tower (#1802): the host follows it as it follows an edit, and the
+   *  tower revision moves only when the step moved rooms or shafts. Time is not rewound: the cash a step
    *  moves is exactly what its edit moved. A step that time can make apply
    *  is refused (status 0, `lastReason()` says why) and stays available:
    *  the balance cannot pay for it yet, or a room it would take out is

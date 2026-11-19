@@ -79,7 +79,7 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
       const generation = s.port.generation();
 
       const back = s.port.undo();
-      expect([back[0], back[1]]).toEqual([1, generation + 1]);
+      expect([back[0], back[1]], "a step keeps the generation (#1802)").toEqual([1, generation]);
       expect(s.port.undoNotice()).toBe("Undid: Build Office");
       expect(Array.from(s.port.undoDepths())).toEqual([0, 1]);
       expect(offices()).toBe(0);

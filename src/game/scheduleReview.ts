@@ -55,7 +55,7 @@ export class ScheduleReview {
 
   /** The review dialog on screen and the engine generation it was drawn from, so an
    *  Undo or Redo under it redraws it. */
-  private shown: { box: HTMLElement; generation: number } | null = null;
+  private shown: { box: HTMLElement; generation: number; revision: number } | null = null;
 
   private readonly acks: Acknowledgements;
 
@@ -135,11 +135,13 @@ export class ScheduleReview {
       handlers,
       focus,
     );
-    this.shown = { box, generation: this.deps.engine().generation() };
+    this.shown = { box, generation: this.deps.engine().generation(), revision: this.deps.reader().tower.revision };
   }
 
-  /** Redraw the review when the tower under it moved to another generation (an Undo or Redo; the dialog blocks
-   *  Ctrl+Z, but the tooling handle does not), keeping the focused button where it is still listed. */
+  /** Redraw the review when the tower under it changed: another generation (a swap) or a raised tower revision (an
+   *  Undo or Redo keeps the generation since #1802, and every step that can change the findings moves a shaft, so it
+   *  raises the revision; the dialog blocks Ctrl+Z, but the tooling handle does not). Keeps the focused button where
+   *  it is still listed. */
   private redrawIfStale(): void {
     const shown = this.shown;
     if (!shown) return;
@@ -147,7 +149,7 @@ export class ScheduleReview {
       this.shown = null;
       return;
     }
-    if (shown.generation === this.deps.engine().generation()) return;
+    if (shown.generation === this.deps.engine().generation() && shown.revision === this.deps.reader().tower.revision) return;
     const focused = document.activeElement;
     this.open(focused instanceof HTMLElement && shown.box.contains(focused) ? focused.dataset.act : undefined);
   }
