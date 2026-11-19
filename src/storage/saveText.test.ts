@@ -36,6 +36,25 @@ describe("stampText", () => {
     expect(JSON.parse(json)).toMatchObject({ savedAt: stamp.savedAt, appVersion: stamp.appVersion });
   });
 
+  it("keeps the splice when a string only spells a stamp key (#1443)", () => {
+    // serde_json's `1.0` survives the splice, and a parse would print `1`.
+    for (const name of ['My "savedAt', "savedAt", 'appVersion":1', 'x\\"appVersion']) {
+      const body = `{"minutes":1.0,"towerName":${JSON.stringify(name)},"units":[]}`;
+      const { json, stamp } = stampText(body);
+      expect(json, name).toBe(`${body.slice(0, -1)},"savedAt":${stamp.savedAt},"appVersion":${JSON.stringify(stamp.appVersion)}}`);
+    }
+    // A key that ends in the word: its opening quote is escaped.
+    const keyed = `{"minutes":1.0,"labels":{${JSON.stringify('My "savedAt')}:1}}`;
+    expect(stampText(keyed).json.startsWith(keyed.slice(0, -1))).toBe(true);
+  });
+
+  it("restamps through a parse when a stamp key sits after an escaped backslash or before spaced colon", () => {
+    for (const body of ['{"minutes":1.0,"towerName":"a\\\\","savedAt":5}', '{"minutes":1.0,"appVersion" : "old"}', '{"minutes":1.0,"view":{"savedAt":5}}']) {
+      const { json, stamp } = stampText(body);
+      expect(json, body).toBe(parsedStamp(body, stamp.savedAt, stamp.appVersion));
+    }
+  });
+
   it("stamps an empty object through a parse", () => {
     const { json, stamp } = stampText("{ }");
     expect(JSON.parse(json)).toEqual({ savedAt: stamp.savedAt, appVersion: stamp.appVersion });
