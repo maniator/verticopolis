@@ -3,7 +3,7 @@
 The developer's checklist of how a **Classic** tower matches the 1994 game,
 one line per mechanic. Players read the same story in the manual:
 **[Differences from the 1994 game](https://help.verticopolis.com/differences/)**.
-The rules themselves live in the Rust engine (`engine-rs/`), and its catalog
+The rules themselves live in the Rust engine (`engine-rs/` in Verticopolis/engine), and its catalog
 publishes the prices, sizes and caps, so this page names mechanics and issues
 rather than copying numbers. Status: ✅ implemented · ◑ a faithful
 abstraction · ⬜ not present.
@@ -88,8 +88,10 @@ shipped (#393, #395 to #401); the review is
 `_bmad-output/planning-artifacts/design/gdd-simtower-optimization-gaps-2026-07-15.md`.
 
 ## Verification
-`npm test` runs the web game's unit and integration tests, and `cargo test`
-in `engine-rs/` runs the engine's own: placement, economy, rating gates, the
-events, dispatch, crowd routing, save and load, and the TOWER award. The
+`npm test` runs the web game's unit and integration tests against the pinned
+engine package. The engine's own tests live in
+[Verticopolis/engine](https://github.com/Verticopolis/engine): `cargo test`
+in `engine-rs/` covers placement, economy, rating gates, the events,
+dispatch, crowd routing, save and load, and the TOWER award, and the
 conformance suite replays every scenario in `conformance/scenarios/` and
 checks each checkpoint hash against `conformance/expected.json`.

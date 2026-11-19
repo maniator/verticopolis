@@ -20,7 +20,7 @@ describe("pathKind", () => {
     [".changes/claude-project-thread-aan2dj.md", "prose"],
     ["CHANGELOG.md", "prose"],
     ["README.md", "prose"],
-    [".github/workflows/engine-rs.yml", "meta"],
+    [".github/workflows/labels.yml", "meta"],
     [".github/ISSUE_TEMPLATE/bug.yml", "meta"],
     [".github/dependabot.yml", "meta"],
     [".pr_agent.toml", "meta"],

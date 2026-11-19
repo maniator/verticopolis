@@ -35,8 +35,8 @@ merge rules (who arms, when) stay where they are.
 Use the rule in steps 1 and 2 of `.github/copilot-instructions.md`:
 `gds-code-review` for gameplay and engine paths, `bmad-code-review` for the
 rest, gds for a mixed diff, and `engine-review` as a checklist on top
-when the diff touches `engine-rs/`, `conformance/` or the save
-loaders. Run its three lenses yourself: Blind Hunter on the diff alone, Edge
+when the diff moves the engine pins in `package.json` or touches the
+save loaders. Run its three lenses yourself: Blind Hunter on the diff alone, Edge
 Case Hunter with the repository open, and Acceptance Auditor against the PR
 body and its issue. If you already ran that skill on this head commit, reuse
 its lens output here rather than running it a second time.
@@ -90,10 +90,9 @@ surface" note from the author does not replace it when a surface is touched.
 3. Check the history (logical commits, no fixup or merge-from-main commits)
    and the version, as `CLAUDE.md` and CONTRIBUTING.md (Versioning) set it: a
    player-facing change takes the next app version above `main`'s just before
-   merge, internal-only work takes none, and an engine contract change (the
-   binding, the save, frame layout or catalog, the conformance lock) also
-   raises the crate version in `engine-rs/Cargo.toml` and both lockfiles,
-   checked with `npm run engine:compat`.
+   merge, and internal-only work takes none. The engine and the components
+   are versioned in their own repositories, so a note here has no crate
+   level.
 4. End with a verdict that names the head SHA: GO, CONDITIONAL GO with each
    condition listed, or NO-GO. Then the closing line
    `Reviewed against Verticopolis conventions (.github/copilot-instructions.md).`

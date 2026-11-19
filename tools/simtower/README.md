@@ -111,7 +111,8 @@ npx tsx tools/simtower/vctower-to-tdt.ts path/to/tower.vctower [...]
 
 Decodes the `.vctower` container and runs the Rust engine's `.TDT` exporter
 through its WASM package (`src/tests/conformance/tdtWasm.ts`), so it is the codec
-the game ships. Build the package first with `npm run wasm:build`.
+the game ships. `npm ci` installs the package (the `@verticopolis/engine-tooling`
+pin in `package.json`).
 
 ### Import a real `.TDT` into our engine (`tdt -> vctower`)
 
@@ -125,14 +126,16 @@ npx tsx tools/simtower/tdt-to-vctower.ts saves/TSTSAVE.TDT [--diff-empty]
 
 ### Fixtures for the exporter's fidelity questions (#920, #740, #1629)
 
+The fixture builder is part of the engine, so run these from a
+[Verticopolis/engine](https://github.com/Verticopolis/engine) checkout, with
+the save paths pointing at this repository's `tools/simtower/saves/`.
+
 ```bash
 cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin tdt_fixtures -- claim1     tools/simtower/saves/TOWER5.TDT
 cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin tdt_fixtures -- claim7     tools/simtower/saves/TOWER4.TDT
 cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin tdt_fixtures -- express740 tools/simtower/saves/TOWER2.TDT
 cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin tdt_fixtures -- infested1629 tools/simtower/saves/TOWER2.TDT
 ```
-
-Run them from the repository root.
 
 Each command reads a real save you supply (the ones you made in the game land in `tools/simtower/saves/`), re-exports it through the shipped Rust codec, edits one
 part and writes DOS 8.3-named files into the same folder as the save, so keep the save in `tools/simtower/saves/` (only our own output; the input is not copied and is never overwritten).
@@ -147,7 +150,7 @@ prints under "READ". The owner's PC run of 2026-11-04 answered all four question
 | `express740` | `EXPLAST`, `EXPFIRST` | Does the game keep every shaft when an express shaft is written first, as our exporter never does? |
 | `infested1629` | `INFCTL`, `INFFLAG`, `INFVAC`, `INFDIRTY` | Does the game treat the hotel status flag 64 as an infested room? The files hold three hotel rooms as vacant and clean (control), infested (0x40), infested and vacant (0x58) and infested and dirty (0x60); the game's own saves have never shown the flag. |
 
-The edits live in `engine-rs/src/tdt/fixtures.rs`, next to the encoder, and reuse its layout constants. The byte positions they rely on are pinned by `engine-rs/src/tdt/fixtures_tests.rs`, so an encoder change fails a `cargo test` and not a run on the PC.
+The edits live in `engine-rs/src/tdt/fixtures.rs` (Verticopolis/engine), next to the encoder, and reuse its layout constants. The byte positions they rely on are pinned by `engine-rs/src/tdt/fixtures_tests.rs`, so an encoder change fails a `cargo test` and not a run on the PC.
 
 ### Independently verify a `.TDT`
 

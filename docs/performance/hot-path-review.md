@@ -686,7 +686,7 @@ fixes `patch` findings as it goes, halts for the human first instead (section
   verdict. GO and CONDITIONAL GO need every row filled, and the appendix on a
   large port, rewrite, move or addition; GO also needs every finding fixed or
   deferred under section 7.
-- **`.github/skills/engine-review/SKILL.md`** item 10 points here for
+- **`.github/skills/engine-review/SKILL.md`** item 5 points here for
   changes on the engine seam.
 
 The Hot-Path Auditor's prompt:

@@ -16,7 +16,6 @@ on:
       - "api/**"
       - "scripts/**"
       - "e2e/**"
-      - "conformance/**"
       - "package.json"
       - "package-lock.json"
       - ".nvmrc"

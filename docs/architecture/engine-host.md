@@ -1,10 +1,16 @@
 # The engine host
 
 How the web game loads the Rust engine, runs it each frame and reads it back.
-The engine itself (`engine-rs/`) is described in
-[engine-rs/README.md](../../engine-rs/README.md) and on the docs site; this
-page covers the browser side, `src/wasmhost/`, `src/engineBinding/` and
-`src/simport/`.
+The engine itself is built and published from
+[Verticopolis/engine](https://github.com/Verticopolis/engine) and described on
+the docs site; this page covers the browser side. `src/wasmhost/`,
+`src/engineBinding/`, `src/simport/` and `src/catalog/` live in
+[Verticopolis/components](https://github.com/Verticopolis/components) at the
+same paths, and the game imports them from `@verticopolis/components`.
+`src/bootstrap.ts` and `src/game/` are in this repository. The engine version
+the game runs is the `@verticopolis/engine` pin in `package.json`;
+`scripts/engine-install.ts` copies its browser build into `src/public/engine/`
+on `npm install`.
 
 The engine runs on the page's main thread, inside the WASM module. There is
 one engine: the game holds the binding's `Engine` object as its `EnginePort`
@@ -41,8 +47,8 @@ sequenceDiagram
   skips the byte check.
 - **The binding check.** `checkBinding` (`src/engineBinding/binding.ts`)
   refuses a package that lacks a method the shell calls. `engine.d.ts` is
-  written by `npm run wasm:build` from `engine-rs/src/wasm.rs` and
-  `engine-rs/src/wasm/`, so a renamed method fails the typecheck first.
+  generated from the Rust binding in Verticopolis/engine and checked in
+  beside `checkBinding` in Verticopolis/components, so a renamed method fails the typecheck first.
 - **The catalogs.** `rustBootTower` (`src/wasmhost/rustEngine.ts`) reads the
   Classic and Modern catalogs before it builds an engine and refuses a
   package whose kinds or world this build cannot draw. Every price, size and
@@ -109,7 +115,7 @@ The engine writes and reads every save; the host only keeps the bytes. See
 | `src/engineBinding/` | The binding's declaration (`engine.d.ts`), the method lists and their tiers |
 | `src/simport/` | `EnginePort`, the view reader, typed reads (cards, panels, schedules) |
 | `src/catalog/` | The catalog handle the UI reads prices, sizes and rules from |
-| `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/wasm_port*.rs` | The Rust side of the binding |
+| `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/wasm_port*.rs` in Verticopolis/engine | The Rust side of the binding |
 
 A worker host was tried and not adopted; its record is
 [wasm-worker-host.md](./wasm-worker-host.md).
