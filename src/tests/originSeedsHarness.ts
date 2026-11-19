@@ -143,8 +143,10 @@ export function rasterCtx(w: number, h: number): Raster {
       const y0 = Math.max(Math.min(ay, by), st.clip[1]);
       const x1 = Math.min(Math.max(ax, bx), st.clip[2]);
       const y1 = Math.min(Math.max(ay, by), st.clip[3]);
-      if (x1 <= x0 || y1 <= y0) return;
+      // The color is read before the clip test, so a bad fill fails even
+      // where the clip hides the whole rect.
       const rgba = parseColor(st.fill);
+      if (x1 <= x0 || y1 <= y0) return;
       for (let py = Math.floor(y0); py < Math.ceil(y1); py++) {
         const cy = cover(Math.min(y1, py + 1) - Math.max(y0, py));
         for (let px = Math.floor(x0); px < Math.ceil(x1); px++) {
@@ -196,12 +198,14 @@ export function unitOf(kind: FacilityKind, over: Partial<Unit> = {}): Unit {
 }
 
 /** The game's region paint of `u` with the room at (ox, oy) inside a region
- *  that leaves the same margin on every side, cropped back to the room. */
-export function paintAt(u: Unit, ox: number, oy: number, lit: boolean, hour = 20, dead = false): number[] {
+ *  that leaves the same margin on every side, cropped back to the room.
+ *  `extra` sets the scene inputs a `DrawCtx` may carry (parking use,
+ *  recycling fill, staffing, animation time). */
+export function paintAt(u: Unit, ox: number, oy: number, lit: boolean, hour = 20, dead = false, extra: Partial<DrawCtx> = {}): number[] {
   const w = u.width * TILE;
   const h = kindFacts(u.kind).floors * FLOOR;
   const r = rasterCtx(w + 2 * ox, h + 2 * oy);
-  const d: DrawCtx = { ctx: r.ctx, lit, anim: 0, hour };
+  const d: DrawCtx = { ctx: r.ctx, lit, anim: 0, hour, ...extra };
   paintSettledUnit(d, u, ox, oy, w, h, dead);
   return crop(r, ox, oy, w, h);
 }
@@ -209,11 +213,11 @@ export function paintAt(u: Unit, ox: number, oy: number, lit: boolean, hour = 20
 /** The game's region paint of `u` with the room's left and top edges at
  *  (-dx, -dy), as in the second region of a room that straddles a seam: the
  *  canvas holds only the part past the seam, cropped from (0, 0). */
-export function paintPastSeam(u: Unit, dx: number, dy: number, lit: boolean): number[] {
+export function paintPastSeam(u: Unit, dx: number, dy: number, lit: boolean, hour = 20, extra: Partial<DrawCtx> = {}): number[] {
   const w = u.width * TILE;
   const h = kindFacts(u.kind).floors * FLOOR;
   const r = rasterCtx(w - dx, h - dy);
-  const d: DrawCtx = { ctx: r.ctx, lit, anim: 0, hour: 20 };
+  const d: DrawCtx = { ctx: r.ctx, lit, anim: 0, hour, ...extra };
   paintSettledUnit(d, u, -dx, -dy, w, h, false);
   return crop(r, 0, 0, w - dx, h - dy);
 }
