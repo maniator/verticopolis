@@ -6,19 +6,30 @@ name: Welcome first-time contributors
 # rules are in src/build/firstContribution.ts (with its tests), and the
 # messages are in .github/welcome/.
 #
-# pull_request_target runs from the base branch with a write token, so the
-# checkout below takes the base branch's own commit (actions/checkout's
-# default for this event), never the pull request's head, and nothing from
-# the pull request runs. Event values reach the script only through
-# environment variables, never interpolated into it.
+# An opened issue runs from the default branch with a write token, so it is
+# welcomed at once. A first pull request almost always comes from a fork,
+# whose pull_request run gets a read-only token, and GitHub blocks
+# pull_request_target on public repositories from 2026-12-02, so pull
+# requests are welcomed by an hourly sweep from main over those opened in the
+# last few days instead. The checkout is the default branch's own commit,
+# never a pull request's head, and nothing from a pull request runs. Event
+# values reach the script only through environment variables or the API,
+# never interpolated into it.
 on:
-  pull_request_target:
-    types: [opened]
   issues:
     types: [opened]
+  schedule:
+    # Hourly at minute 23.
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the welcomes without posting any"
+        type: boolean
+        default: false
 
 concurrency:
-  group: first-contribution-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: first-contribution-${{ github.event.issue.number || 'sweep' }}
   cancel-in-progress: false
 
 # Commenting on a pull request goes through the issues endpoint, but GitHub
@@ -30,8 +41,9 @@ permissions:
 
 jobs:
   welcome:
+    if: github.repository == 'Verticopolis/web'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,13 +54,22 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - name: Welcome the author if this is their first
+      - name: Welcome the author if this is their first issue
+        if: github.event_name == 'issues'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
-          NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
-          AUTHOR: ${{ github.event.pull_request.user.login || github.event.issue.user.login }}
-          AUTHOR_TYPE: ${{ github.event.pull_request.user.type || github.event.issue.user.type }}
-          ASSOCIATION: ${{ github.event.pull_request.author_association || github.event.issue.author_association }}
+          NUMBER: ${{ github.event.issue.number }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+          AUTHOR_TYPE: ${{ github.event.issue.user.type }}
+          ASSOCIATION: ${{ github.event.issue.author_association }}
         run: node scripts/first-contribution.ts
+
+      - name: Welcome the authors of new first pull requests
+        if: github.event_name != 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: node scripts/first-contribution.ts --sweep $DRY_RUN

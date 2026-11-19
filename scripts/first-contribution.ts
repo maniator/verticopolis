@@ -5,11 +5,17 @@
  * through `gh` and to the message files in the checkout.
  *
  *   node scripts/first-contribution.ts [--dry-run]
+ *   node scripts/first-contribution.ts --sweep [--dry-run]
  *
- * The event comes from environment variables the workflow sets from the
- * payload (EVENT, NUMBER, AUTHOR, AUTHOR_TYPE, ASSOCIATION, GH_REPO), never
- * from the command line. `gh` is called with an argument list, never through
- * a shell. `--dry-run` prints the comment instead of posting it.
+ * For an opened issue, the event comes from environment variables the
+ * workflow sets from the payload (EVENT, NUMBER, AUTHOR, AUTHOR_TYPE,
+ * ASSOCIATION, GH_REPO), never from the command line. `--sweep` instead reads
+ * every open pull request opened in the last few days from the pulls API and
+ * runs the same rules on each: a first-time contributor's pull request comes
+ * from a fork, whose `pull_request` run gets no token that can comment, so
+ * the workflow sweeps hourly from main instead. `gh` is called with an
+ * argument list, never through a shell. `--dry-run` prints the comment
+ * instead of posting it.
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
@@ -18,6 +24,8 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  contributionKind,
+  isRecent,
   welcomeFirstContribution,
   type ContributionEvent,
   type ContributionKind,
@@ -26,6 +34,7 @@ import {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dryRun = process.argv.includes("--dry-run");
+const sweep = process.argv.includes("--sweep");
 
 const env = (name: string): string => {
   const value = process.env[name];
@@ -34,16 +43,6 @@ const env = (name: string): string => {
 };
 
 const repo = env("GH_REPO");
-const event: ContributionEvent = {
-  kind: env("EVENT") === "pull_request_target" ? "pull request" : "issue",
-  number: Number(env("NUMBER")),
-  author: env("AUTHOR"),
-  authorType: env("AUTHOR_TYPE"),
-  association: env("ASSOCIATION"),
-  repo,
-};
-if (!Number.isInteger(event.number) || event.number <= 0)
-  throw new Error(`NUMBER is not an issue number`);
 
 const gh = (args: string[]): string =>
   execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
@@ -86,9 +85,51 @@ const port: WelcomePort = {
   },
 };
 
-const outcome = welcomeFirstContribution(event, port);
-console.log(
-  outcome.posted
-    ? `${outcome.reason[0].toUpperCase()}${outcome.reason.slice(1)}.`
-    : `No welcome: ${outcome.reason}.`,
-);
+/** One open pull request as the pulls API lists it. */
+interface PullSummary {
+  number: number;
+  created_at: string;
+  author_association: string;
+  user: { login: string; type: string };
+}
+
+const events: ContributionEvent[] = sweep
+  ? // @json keeps each object on one line; ghLines parses it back.
+    (
+      ghLines(
+        `repos/${repo}/pulls?state=open&sort=created&direction=desc&per_page=100`,
+        ".[] | {number, created_at, author_association, user: {login: .user.login, type: .user.type}} | @json",
+      ) as PullSummary[]
+    )
+      .filter((pull) => isRecent(pull.created_at, Date.now()))
+      .map((pull) => ({
+        kind: "pull request",
+        number: pull.number,
+        author: pull.user.login,
+        authorType: pull.user.type,
+        association: pull.author_association,
+        repo,
+      }))
+  : [
+      {
+        kind: contributionKind(env("EVENT")),
+        number: Number(env("NUMBER")),
+        author: env("AUTHOR"),
+        authorType: env("AUTHOR_TYPE"),
+        association: env("ASSOCIATION"),
+        repo,
+      },
+    ];
+
+if (sweep)
+  console.log(`${events.length} pull request(s) opened in the sweep window.`);
+for (const event of events) {
+  if (!Number.isInteger(event.number) || event.number <= 0)
+    throw new Error(`NUMBER is not an issue number`);
+  const outcome = welcomeFirstContribution(event, port);
+  console.log(
+    outcome.posted
+      ? `${outcome.reason[0].toUpperCase()}${outcome.reason.slice(1)}.`
+      : `No welcome for #${event.number}: ${outcome.reason}.`,
+  );
+}
