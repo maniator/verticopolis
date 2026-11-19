@@ -25,6 +25,16 @@ prompt already tells players it is an engine update and shows the new version.
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: no build that a client fetches carries them.
 
+## 4.14.1
+
+- A recycling center's card shows the population its verdict counts, so the numbers and "demand met" always agree (#1745).
+- Opening a tower, and counting each save's population in the Saves dialog, takes about a quarter less time on a large tower (#1612).
+- A tower exported to SimTower's `.TDT` format now carries the metro tunnel on each side of a station, as SimTower's own saves do (#1503).
+- Undo and Redo keep the room or elevator you have open, and its card, unless the step took it away, and a step that only puts back a name or a rent is quicker on a large tower (#1802).
+- With a keyboard on a phone, the arrow keys, Home and End now move between the Tools window's tabs.
+- The note about elevators with idle cars now shows once per tower you open, and no longer comes back after an Undo.
+- Tower Statistics now offers the elevator schedule review only while an elevator waits on your choice, so a schedule you kept no longer keeps the button there.
+
 ## 4.14.0
 
 - Modern: pick a look for each sky bridge. While the Sky Bridge tool is picked, a Bridge look strip offers Glass Skywalk, Steel Truss, Deco Arcade, Garden Walk and the plain Lobby look. A new bridge goes up in the picked look, and a click on a finished bridge changes its look for free (Undo puts the old one back). Each look is drawn whole across the bridge, with an underside below it. New bridges start as a glass skywalk; bridges in towers saved before this version keep the plain lobby look until you pick another.

@@ -15,6 +15,18 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.57.0 (2026-11-19)
+
+- The monthly maintenance and Modern rent passes walk the rooms only, past the floor and lobby tiles that owe nothing, so the month roll costs 3 to 36 times less on a large tower (about 520 us to 24 us). The money, the ledger and the messages are unchanged (#1158).
+- A `.TDT` import merges multi-story parts with a sweep by left edge instead of comparing every pair, so a forged file with tens of thousands of theater pieces imports in linear-logarithmic time. The merged rooms are unchanged (#2086).
+- New `recyclingCard()` read: the population the centers serve, what they process, the bins' fill and the verdict, from one read of the census tally (#1745).
+- Loading a save finds each room's fields in one pass over its object instead of a lookup per key: about 30% fewer instructions and 25 to 30% less time on the perf towers, with the loaded game unchanged (#1612).
+- The `.TDT` exporter writes the paving on a metro station's bottom row as the tunnel (type 45, state 0, no logical id), matching the original's own saves; the importer reads it back as paving, so a round trip is unchanged (#1503).
+- An undo or redo step keeps the port's generation, since it is the same tower: hosts follow it from the frame as they follow an edit. A step that puts back only a room's rent, name, No Rate, films or ticket price raises no tower revision, as those edits raise none going forward, and a step that takes rooms out and puts others back walks the unit list's tail once instead of twice (#1802).
+- The conformance lock gains scenarios for the floor and lobby brush, a five-star tower and its TOWER inspection, and engine branches no scenario reached before.
+- A scenario that opens at four or five stars now starts with its favorable VIP visit, as a played tower at that star has.
+- New tests pin what each code in the frame means and the shape of the catalog, so either changing moves its version.
+
 ## 1.56.0 (2026-11-19)
 
 - Dragging an elevator, stairs or escalator reads only the built shafts in the dragged columns, from an index kept per edit, and checks the floors once, so a drag on a tower with many shafts answers far faster (68 us to 0.3 us per move with 1,358 shafts). A build cap check also counts the shafts once per edit. The answers are unchanged (#1261).
