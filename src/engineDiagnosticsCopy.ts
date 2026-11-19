@@ -1,4 +1,4 @@
-import { liveDiagnostics } from "@verticopolis/components/host/engineDiagnosticsLive";
+import { gameDiagnostics } from "./ui/aboutDiagnostics";
 import { copyText } from "./ui/copyText";
 
 /** Copy the engine diagnostics from the stop screen, where Help cannot be
@@ -7,7 +7,7 @@ import { copyText } from "./ui/copyText";
 export function copyEngineDiagnostics(e: Event): void {
   const status = (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-copy-status");
   const host = document.getElementById("boot-fallback-host") ?? document.body;
-  const { text } = liveDiagnostics();
+  const { text } = gameDiagnostics();
   void copyText(text, navigator, document, host).then((ok) => {
     if (status) status.textContent = ok ? "Copied." : "Could not copy. Select the text below and copy it by hand.";
     if (ok) return;
