@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 import ts from "typescript";
 import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
 import { isTestFile, resolveRelative, scanRuntimeImports } from "./importScan";
-import { rustAssertionFreeTests } from "./testHonestyRust";
 
 /**
  * Tests that test something, at the tier they claim.
@@ -18,7 +17,7 @@ import { rustAssertionFreeTests } from "./testHonestyRust";
  *   uses JSON fixtures only as the canned answers those spies return, and
  *   asserts the calls the code made and what it did with the answers.
  * - A check that needs the real engine is an **integration** test
- *   (`*.integration.test.ts`) or a Rust test in `engine-rs/`.
+ *   (`*.integration.test.ts`) or a Rust test in the engine repository.
  * - Every test asserts something about the code it names.
  *
  * This guard holds the parts of that a machine can check:
@@ -30,10 +29,10 @@ import { rustAssertionFreeTests } from "./testHonestyRust";
  *    script, and no module named for recordings beyond the allowlist.
  * 3. Every `it`/`test` in the unit, integration and e2e tiers asserts, in its
  *    body or through a helper in the same file that does (a callback passed by
- *    name counts only when it is such a helper), and so does every Rust
- *    `#[test]` in `engine-rs/`. Only real calls count: a comment or a string
- *    that mentions `expect` does not. A test wrapper that forwards its body
- *    (like `itTdt`) is not followed and needs an allowlist line.
+ *    name counts only when it is such a helper). Only real calls count: a
+ *    comment or a string that mentions `expect` does not. A test wrapper
+ *    that forwards its body (like `itTdt`) is not followed and needs an
+ *    allowlist line.
  *
  * What it cannot check (a test named for a behavior that only asserts "does
  * not throw", a fixture that asserts its own canned answer back) is review
@@ -57,7 +56,7 @@ const ENGINE_RUNNERS: readonly string[] = [
 const PACKAGE_PROBES: ReadonlySet<string> = new Set(["hasWasmPackage"]);
 
 /** Built engine packages, which only an integration test may load. */
-const ENGINE_PACKAGES = ["engine-rs/pkg/", "src/public/engine/"] as const;
+const ENGINE_PACKAGES = ["@verticopolis/engine/web/", "@verticopolis/engine-tooling/", "src/public/engine/"] as const;
 
 const isRunner = (rel: string): boolean => ENGINE_RUNNERS.includes(rel);
 const isUnitTest = (rel: string): boolean => /\.test\.tsx?$/.test(rel) && !/\.integration\.test\.tsx?$/.test(rel);
@@ -320,7 +319,7 @@ describe("unit tests mock the engine; integration tests run it", () => {
       "src/game/c.fixture.ts": 'import { newDraft } from "../tests/portKit/drafts";',
       "src/game/d.test.ts": 'import { boot } from "./boot";',
       "src/game/boot.ts": 'import { wasm } from "../tests/conformance/wasmEngine";',
-      "src/game/e.test.ts": 'const pkg = await import("../../engine-rs/pkg/verticopolis_engine.js");',
+      "src/game/e.test.ts": 'const pkg = await import("@verticopolis/engine-tooling/node/verticopolis_engine.js");',
       "src/game/f.test.ts": 'import { start } from "./f.fixture";',
       "src/game/f.fixture.ts": 'export { wasm as start } from "../tests/conformance/wasmEngine";',
       "src/game/g.test.ts": 'const { wasm } = await import("../tests/conformance/wasmEngine");',
@@ -331,7 +330,7 @@ describe("unit tests mock the engine; integration tests run it", () => {
     expect(reach("src/game/b.test.ts")).toBeNull();
     expect(reach("src/game/c.test.ts")).toBe("src/game/c.test.ts -> src/game/c.fixture.ts -> src/tests/portKit/drafts");
     expect(reach("src/game/d.test.ts")).toBeNull(); // production code is the code under test; the test mocks its boundary
-    expect(reach("src/game/e.test.ts")).toContain("engine-rs/pkg/");
+    expect(reach("src/game/e.test.ts")).toContain("@verticopolis/engine-tooling/");
     expect(reach("src/game/g.test.ts")).toBe("src/game/g.test.ts -> src/tests/conformance/wasmEngine");
     expect(reach("src/game/h.test.ts")).toBe("src/game/h.test.ts -> src/tests/conformance/wasmEngine");
     expect(reach("src/game/f.test.ts")).toBe("src/game/f.test.ts -> src/game/f.fixture.ts -> src/tests/conformance/wasmEngine");
@@ -348,7 +347,7 @@ describe("unit tests mock the engine; integration tests run it", () => {
 
 describe("no recorded engine answers", () => {
   it("has no recordings directory and no record script", () => {
-    const scanned = ["src", "e2e", "scripts", "conformance"].flatMap((dir) => sourceFiles(dir, [".ts", ".tsx", ".json", ".mjs"]).map(repoRel));
+    const scanned = ["src", "e2e", "scripts"].flatMap((dir) => sourceFiles(dir, [".ts", ".tsx", ".json", ".mjs"]).map(repoRel));
     expect(scanned.some((rel) => rel.startsWith("src/") && rel.endsWith(".json"))).toBe(true);
     const dirs = scanned.filter((rel) =>
       rel.split("/").includes("recordings"),
@@ -397,61 +396,6 @@ describe("every test asserts", () => {
     ]);
   });
 
-  it("reads a Rust test's assertions through macros, should_panic and helpers", () => {
-    const rust = [
-      "#[test]\nfn asserts() { assert_eq!(1, 1); }",
-      "#[test]\nfn through_a_helper() { refused(2); }",
-      "fn refused(n: u8) { check(n) }",
-      "fn check(n: u8) { assert!(n > 0, \"{}\", n); }",
-      "#[test]\n#[should_panic(expected = \"x\")]\nfn panics() { boom(); }",
-      "#[test]\nfn asserts_nothing() { let s = \"assert!(true) {\"; run(s); }",
-      "// #[test] fn commented_out() {} 5\" wide",
-      "fn sized(x: [u8; 4]) { assert_eq!(x.len(), 4); }",
-      "#[test]\nfn through_an_array_helper() { sized([0; 4]); }",
-      "#[test]\nfn binds_but_never_runs() { let _verify = || assert!(false); run(); }",
-      "#[test]\nfn runs_its_closure() { let verify = |n: u8| { assert!(n > 0); }; verify(1); }",
-      "#[test]\nfn passes_a_closure() { (0..3).for_each(|n| assert!(n < 3)); }",
-      "#[test]\nfn nests_an_unused_fn() { fn check() { assert!(true); } run(); }",
-    ].join("\n");
-    expect(rustAssertionFreeTests(new Map([["engine-rs/src/x_tests.rs", rust]]))).toEqual([
-      "engine-rs/src/x_tests.rs > asserts_nothing",
-      "engine-rs/src/x_tests.rs > binds_but_never_runs",
-      "engine-rs/src/x_tests.rs > nests_an_unused_fn",
-    ]);
-    // A production function that debug-asserts does not stand in for a test's assertion.
-    const prod = "pub fn apply(n: u8) { debug_assert!(n > 0); }\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn only_applies() { super::apply(1); }\n}";
-    expect(rustAssertionFreeTests(new Map([["engine-rs/src/x.rs", prod]]))).toEqual(["engine-rs/src/x.rs > only_applies"]);
-    // A helper resolves by where it can come from, never by a bare name that
-    // collides with a method, a type's function or another file's helper.
-    const collide = new Map([
-      ["engine-rs/src/a_tests.rs", "fn new() { assert!(true); }\npub(super) fn refused(n: u8) { assert!(n > 0); }\n#[test]\nfn own() { new(); }"],
-      ["engine-rs/src/b_tests.rs", "#[test]\nfn by_type() { let _ = crate::tower::Tower::new(); }\n#[test]\nfn by_method() { let t = t(); t.new(); }\n#[test]\nfn by_name_only() { new(); }"],
-      ["engine-rs/src/c_tests.rs", "use super::a_tests::{refused};\nuse super::checks::{checked};\n#[test]\nfn imported() { refused(1); }\n#[test]\nfn by_path() { super::a_tests::refused(1); }\n#[test]\nfn through_a_path_module() { checked(); }"],
-      ["engine-rs/src/c.rs", "#[cfg(test)]\n#[path = \"c_tests.rs\"]\nmod tests;\n#[cfg(test)]\n#[path = \"c_check_tests.rs\"]\nmod checks;"],
-      ["engine-rs/src/c_check_tests.rs", "pub(super) fn checked() { assert!(true); }\n#[test]\nfn own() { checked(); }"],
-      ["engine-rs/tests/common/mod.rs", "pub fn shared() { assert!(true); }"],
-      ["engine-rs/tests/d.rs", "mod common;\n#[test]\nfn supported() { common::shared(); }"],
-      ["engine-rs/src/e_tests.rs", "fn shared() {}\n#[test]\nfn shadowed() { shared(); }\n#[test]\nfn other_target() { super::f(); }\n#[test]\nfn by_suffix() { tests::refused(1); }"],
-      ["engine-rs/src/f_tests.rs", "#[test]\nfn support_of_another_target() { shared(); }"],
-    ]);
-    expect(rustAssertionFreeTests(collide)).toEqual([
-      "engine-rs/src/b_tests.rs > by_type",
-      "engine-rs/src/b_tests.rs > by_method",
-      "engine-rs/src/b_tests.rs > by_name_only",
-      "engine-rs/src/e_tests.rs > shadowed",
-      "engine-rs/src/e_tests.rs > other_target",
-      "engine-rs/src/e_tests.rs > by_suffix",
-      "engine-rs/src/f_tests.rs > support_of_another_target",
-    ]);
-  });
-
-  it("no Rust test outside the allowlist asserts nothing", () => {
-    const files = new Map(sourceFiles("engine-rs", [".rs"]).map((abs) => [repoRel(abs), readFileSync(abs, "utf8")] as const));
-    expect(files.size).toBeGreaterThan(50);
-    const empty = rustAssertionFreeTests(files).filter((at) => !allow.has(at));
-    expect(empty, "Each Rust test asserts what its name promises (assert macros, #[should_panic], or a helper that asserts).").toEqual([]);
-  });
-
   it("scans the unit, integration and e2e tiers", () => {
     expect(assertingTiers.some((rel) => rel.endsWith(".integration.test.ts"))).toBe(true);
     expect(assertingTiers.some((rel) => rel.startsWith("e2e/"))).toBe(true);
@@ -468,8 +412,7 @@ describe("every test asserts", () => {
       const [file, title] = entry.split(" > ");
       if (!exists(file)) return true;
       if (title === undefined) return engineReach(file, read, exists) === null && !/recording/i.test(file);
-      const found = file.endsWith(".rs") ? rustAssertionFreeTests(new Map([[file, read(file)]])) : assertionFreeTests(file, read(file));
-      return !found.includes(entry);
+      return !assertionFreeTests(file, read(file)).includes(entry);
     });
     expect(stale, "Delete allowlist lines that no longer match anything; the list only shrinks.").toEqual([]);
   });

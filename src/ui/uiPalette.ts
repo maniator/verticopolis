@@ -1,11 +1,11 @@
 import { html, render } from "lit-html";
-import { facilityColor, facilityDescription } from "../presentation/facilityPresentation";
-import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
-import type { FacilityCategory, FacilityKind } from "../shared/types";
+import { facilityColor, facilityDescription } from "@verticopolis/components/presentation/facilityPresentation";
+import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import type { FacilityCategory, FacilityKind } from "@verticopolis/components/shared/types";
 import type { Tool, UI } from "./UI";
-import { shortMoney } from "./format";
-import { iconTemplate } from "./icons";
-import { isSpaceKey } from "../shared/inputEvents";
+import { shortMoney } from "@verticopolis/components/windows/format";
+import { iconTemplate } from "@verticopolis/components/windows/icons";
+import { isSpaceKey } from "@verticopolis/components/shared/inputEvents";
 import { watchPaletteFit } from "./paletteFit";
 import { wirePaletteCollapse } from "./paletteCollapse";
 import { applySectionFolds, wireSectionFolds } from "./paletteSections";

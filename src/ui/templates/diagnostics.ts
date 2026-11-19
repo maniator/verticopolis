@@ -1,5 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
-import type { DiagnosticsReport } from "../../wasmhost/engineDiagnostics";
+import type { DiagnosticsReport } from "@verticopolis/components/host/engineDiagnostics";
 
 /**
  * The engine diagnostics block inside About this game (#963): the

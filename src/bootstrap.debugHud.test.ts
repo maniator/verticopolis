@@ -7,8 +7,8 @@ import { bootGame } from "./bootstrap";
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
-vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./wasmhost/rustEngine")>();
+vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>();
   return {
     ...real,
     loadWasmEngine: vi.fn(async () => ({ Engine: class {}, encodeVctower: () => "" })),

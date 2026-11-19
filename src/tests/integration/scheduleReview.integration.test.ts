@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import type { SerializedGame } from "../../shared/types";
-import { scheduleSlots } from "../../simport/scheduleSlots";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
+import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
 import { keepAct, recoverAct, reviewAct } from "../../ui/templates/scheduleReview";
 import { diffPaths, load, memory, play } from "./scheduleReview.fixture";
 import { look, noEngine } from "../portKit/rustEngine";
@@ -383,13 +383,13 @@ describe.skipIf(noEngine)("the review's notices, focus and copy (#1548)", () => 
   });
 
   it("recovers and undoes on split-tower's 5-car shaft too, and leaves both fixtures' bytes alone", async () => {
-    const before = readFileSync("conformance/fixtures/split-tower.vctower");
+    const before = readFileSync("node_modules/@verticopolis/engine-conformance/fixtures/split-tower.vctower");
     const g = play(load("split-tower"));
     const saved = g.saved();
     g.review.recover(1139);
     expect(g.scheduleOf(1139)!.activeCars).toEqual({ weekday: Array(24).fill(5), weekend: Array(24).fill(5) });
     await g.history.undo();
     expect(diffPaths(saved, g.saved())).toEqual([]);
-    expect(readFileSync("conformance/fixtures/split-tower.vctower").equals(before)).toBe(true);
+    expect(readFileSync("node_modules/@verticopolis/engine-conformance/fixtures/split-tower.vctower").equals(before)).toBe(true);
   });
 });

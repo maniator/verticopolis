@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, relative } from "node:path";
-import { EMOJI_ICONS, ICON_NAMES, ACCENT_FILLS, iconElement } from "../ui/icons";
+import { EMOJI_ICONS, ICON_NAMES, ACCENT_FILLS, iconElement } from "@verticopolis/components/windows/icons";
+import { srcFile } from "./packagePaths";
 
 /**
  * Bulletin icon coverage guard (issue #721).
@@ -40,7 +41,8 @@ import { EMOJI_ICONS, ICON_NAMES, ACCENT_FILLS, iconElement } from "../ui/icons"
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = resolve(here, "..");
-const iconsPath = resolve(here, "..", "ui", "icons.ts");
+/** The mapping table, as the components package ships it. */
+const iconsPath = srcFile("ui/icons.ts");
 /** `src/tests`, `src`-relative. Everything under it is test code, including the
  *  fixtures and helpers that are not named `*.test.ts`. */
 const TEST_DIR = "tests";
@@ -88,13 +90,8 @@ function where(file: string): string {
 }
 
 /** Whether a TypeScript file under `src` is treated as a message emitter.
- *
- *  `src/ui/icons.ts` is skipped because it IS the mapping table. Its
- *  `EMOJI_ICONS` keys are every mapped glyph written as a literal, so scanning
- *  it would only assert the table against itself, and the leading check would
- *  ride on how the object literal happens to be formatted. The comparison is
- *  against the resolved path both sides already share, so moving the module
- *  cannot leave a stale copy of its name behind here.
+ *  The mapping table itself (`EMOJI_ICONS`) ships in the components package,
+ *  outside this scan.
  *
  *  Test code is skipped because a test asserts ABOUT messages rather than
  *  emitting them: it stages tower names and DOM fixtures that hold emoji for
@@ -106,8 +103,7 @@ function where(file: string): string {
  *  `tests/fixtures/towerFixtures.ts` must not start demanding an `EMOJI_ICONS`
  *  entry for it. Colocated tests (`src/game/*.test.ts`) are still caught by
  *  the suffix. */
-function isEmitterFile(abs: string, rel: string): boolean {
-  if (abs === iconsPath) return false;
+function isEmitterFile(rel: string): boolean {
   if (rel.endsWith(".test.ts")) return false;
   if (TEST_LOCATION.test(rel)) return false;
   return true;
@@ -135,7 +131,7 @@ function typescriptFiles(dir: string): TsFile[] {
     }
     if (!entry.name.endsWith(".ts") || entry.name.endsWith(".d.ts")) continue;
     const rel = where(abs);
-    out.push({ abs, rel, emitter: isEmitterFile(abs, rel) });
+    out.push({ abs, rel, emitter: isEmitterFile(rel) });
   }
   return out;
 }
@@ -358,8 +354,6 @@ describe("bulletin icon coverage (issue #721)", () => {
     //
     // Every expectation here is derived from the tree, so a rename, a split, or
     // a new layer moves it automatically and only a real narrowing fails it.
-    const iconsRel = where(iconsPath);
-    expect(iconsRel, "srcRoot no longer resolves to src/").toBe("ui/icons.ts");
 
     // The witness names every emitter-shaped file it can see, file by file. An
     // earlier form asked each top-level directory "do you hold one?", which only
@@ -382,7 +376,7 @@ describe("bulletin icon coverage (issue #721)", () => {
     // applies to a file that is really on disk.
     const scanned = new Set(SOURCES.map((s) => s.rel));
     expect(
-      witness.filter((r) => !scanned.has(r) && r !== iconsRel && !TEST_LOCATION.test(r)),
+      witness.filter((r) => !scanned.has(r) && !TEST_LOCATION.test(r)),
       "these files hold message-layer TypeScript the scan never reads; either they are " +
         "in reach of the guard or the exclusion that drops them belongs in isEmitterFile",
     ).toEqual([]);
@@ -402,9 +396,6 @@ describe("bulletin icon coverage (issue #721)", () => {
 
     // Each exclusion has to apply to a file that is really there, or it would
     // hold trivially: an absent path is absent from any list.
-    const icons = ALL_TS.find((f) => f.abs === iconsPath);
-    expect(icons, "src/ui/icons.ts is not on disk where the exclusion looks for it").toBeDefined();
-    expect(icons?.emitter, "the mapping table is not an emitter").toBe(false);
     const byName = ALL_TS.filter((f) => f.rel.endsWith(".test.ts"));
     const byLocation = ALL_TS.filter((f) => f.rel.startsWith(`${TEST_DIR}/`));
     expect(byName.length, "the walk found no *.test.ts file at all").toBeGreaterThan(0);
@@ -451,7 +442,7 @@ describe("bulletin icon coverage (issue #721)", () => {
         expect(allow.has(fill), `${name} uses a non-allowlisted fill ${fill}`).toBe(true);
       }
     }
-    const generatedPath = resolve(here, "..", "ui", "iconPaths.generated.ts");
+    const generatedPath = srcFile("ui/iconPaths.generated.ts");
     const hexRe = /fill\s*[:=]\s*["'`]?#[0-9a-fA-F]{3,8}/g;
     const generatedFills = readFileSync(generatedPath, "utf8").match(hexRe) ?? [];
     expect(generatedFills, `generated pixelarticons paths must stay currentColor-only`).toEqual([]);
@@ -460,10 +451,7 @@ describe("bulletin icon coverage (issue #721)", () => {
 
   it("carries its MIT provenance", () => {
     // The vendored paths are from Pixelarticons (MIT); the attribution ships in
-    // the icon module header and the generated file it draws from.
-    const iconsSrc = readFileSync(iconsPath, "utf8");
-    expect(iconsSrc).toMatch(/Pixelarticons/i);
-    expect(iconsSrc).toMatch(/MIT/);
-    expect(readFileSync(resolve(here, "..", "ui", "iconPaths.generated.ts"), "utf8")).toMatch(/pixelarticons.*MIT|MIT.*pixelarticons/is);
+    // the generated file the icons draw from, as the components package ships it.
+    expect(readFileSync(srcFile("ui/iconPaths.generated.ts"), "utf8")).toMatch(/pixelarticons.*MIT|MIT.*pixelarticons/is);
   });
 });

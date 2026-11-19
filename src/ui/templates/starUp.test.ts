@@ -3,7 +3,7 @@ import { STAR_DUTY_LABELS, starUpScreen, starUpTemplate } from "./starUp";
 import { renderToFragment, click } from "../testing/litTestUtils";
 import { catalogFor } from "../../tests/catalogFixture";
 import { statsScreenFor } from "../../tests/fixtures/statsScreens";
-import type { StatsReport } from "../../simport/panels";
+import type { StatsReport } from "@verticopolis/components/port/panels";
 
 /**
  * The star-up message box: what it shows for a climb, read from the pinned

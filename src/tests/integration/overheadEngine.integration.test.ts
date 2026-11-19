@@ -1,8 +1,8 @@
 import { it, expect } from "vitest";
 import { newSeededDraft, lay, LOT_WIDTH } from "../portKit/draftFixtures";
-import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
 import { catalogFor } from "../catalogFixture";
-import type { GameMode } from "../../shared/types";
+import type { GameMode } from "@verticopolis/components/shared/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** The Modern carrying costs (operating overhead and the condo hold-tax), on

@@ -1,6 +1,6 @@
 import { headerNow, trackFileExported, trackFileFailure } from "../analytics";
 import { ExportRefused } from "./portLifecycle";
-import type { ViewReader } from "../simport/viewReader";
+import type { ViewReader } from "@verticopolis/components/port/viewReader";
 import { SaveGame } from "../storage/SaveGame";
 import type { UI } from "../ui/UI";
 

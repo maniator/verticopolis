@@ -1,7 +1,7 @@
 import { html, nothing, render, type TemplateResult } from "lit-html";
-import type { CatalogSkyBridge } from "../catalog/skyBridgeTypes";
-import { facilityColor } from "../presentation/facilityPresentation";
-import { groupDigits, shortMoney } from "./format";
+import type { CatalogSkyBridge } from "@verticopolis/components/catalog/skyBridgeTypes";
+import { facilityColor } from "@verticopolis/components/presentation/facilityPresentation";
+import { groupDigits, shortMoney } from "@verticopolis/components/windows/format";
 import { descriptionId } from "./paletteHints";
 
 /**

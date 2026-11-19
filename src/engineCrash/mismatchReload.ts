@@ -1,4 +1,4 @@
-import type { EngineBootFailure } from "../wasmhost/engineBoot";
+import type { EngineBootFailure } from "@verticopolis/components/host/engineBoot";
 import type { KeyValueStore } from "./crashReload";
 
 /**

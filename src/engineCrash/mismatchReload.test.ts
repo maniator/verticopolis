@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { EngineBootFailure, PackageFailure } from "../wasmhost/engineBoot";
+import type { EngineBootFailure, PackageFailure } from "@verticopolis/components/host/engineBoot";
 import { MISMATCH_RELOAD_KEY, claimMismatchReload, engineFilesFromAnotherBuild } from "./mismatchReload";
 
 beforeEach(() => sessionStorage.clear());

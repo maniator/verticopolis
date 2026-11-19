@@ -20,13 +20,13 @@ import { describe, it, expect } from "vitest";
  */
 
 // --- 1. Compile-time surface: every exported TYPE. ---
-import type { Person, PersonState } from "../shared/engineTypes";
+import type { Person, PersonState } from "@verticopolis/components/shared/engineTypes";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { ImportReport } from "../storage/tdtImportReport";
 import type { SlotInfo } from "../storage/SaveGame";
-import type { FastFoodLook, RestaurantLook, RoomCtx, ShopLook } from "../render/pixelSprites";
-import type { EntranceKind } from "../render/sprites/structure";
-import type { SfxName } from "../audio/ToneAudioEngine";
+import type { FastFoodLook, RestaurantLook, RoomCtx, ShopLook } from "@verticopolis/components/render/pixelSprites";
+import type { EntranceKind } from "@verticopolis/components/render/sprites/structure";
+import type { SfxName } from "@verticopolis/components/audio/ToneAudioEngine";
 
 // Reference every type once so the block is provably load-bearing (a removed
 // type becomes an unresolved reference here, failing typecheck).
@@ -42,12 +42,12 @@ export type _TypeSurfacePins = [
 // --- 2. Runtime surface: value bindings must resolve, not just typecheck. ---
 import * as tdtImportHelpers from "../storage/tdtImportHelpers";
 import * as saveGame from "../storage/SaveGame";
-import * as pixelSprites from "../render/pixelSprites";
-import * as structure from "../render/sprites/structure";
-import * as spriteFacilities from "../render/sprites/facilities";
-import * as audio from "../audio/ToneAudioEngine";
-import * as toneScenes from "../audio/toneScenes";
-import * as toneVoices from "../audio/toneVoices";
+import * as pixelSprites from "@verticopolis/components/render/pixelSprites";
+import * as structure from "@verticopolis/components/render/sprites/structure";
+import * as spriteFacilities from "@verticopolis/components/render/sprites/facilities";
+import * as audio from "@verticopolis/components/audio/ToneAudioEngine";
+import * as toneScenes from "@verticopolis/components/audio/toneScenes";
+import * as toneVoices from "@verticopolis/components/audio/toneVoices";
 
 const RUNTIME_EXPORTS: Record<string, string[]> = {
   tdtImportHelpers: ["looksLikeLegacyTower"],

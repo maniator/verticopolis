@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import type { HeatCell } from "../../shared/engineTypes";
+import type { HeatCell } from "@verticopolis/components/shared/engineTypes";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 

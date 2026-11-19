@@ -1,6 +1,6 @@
 import { cpSync, existsSync, rmSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "../wasmhost/enginePackageNames.ts";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "@verticopolis/components/host/enginePackageNames";
 
 /** The engine folder's name inside the public folder (`engine`). */
 const ENGINE_FOLDER = ENGINE_DIR.replace(/\/$/, "");
@@ -15,7 +15,8 @@ export type PublicDirChoice =
  * Which engine package a Vite run serves (#1057). The player package in
  * `src/public/engine/` lacks the binding's tier 3 ops, which the tooling tower
  * (`src/game/toolingTower.ts`) calls, so a `VC_TOOLING=1` build and a dev
- * serve take the tooling package (`engine-rs/pkg-web-tooling/`) in its place.
+ * serve take the tooling package (`@verticopolis/engine-tooling`'s `web/`) in
+ * its place.
  * Every other build, the Vercel deploy included, serves the player package.
  *
  * - `tooling` is true for a `VC_TOOLING=1` build, `serve` for a dev serve.
@@ -43,7 +44,7 @@ export function choosePublicDir(opts: {
   if (!opts.hasPlayerPackage) return { kind: "player" };
   return {
     kind: "missing-tooling",
-    why: "VC_TOOLING=1 needs the tooling engine package (engine-rs/pkg-web-tooling/), which the player package in src/public/engine/ does not replace: it lacks the tier 3 ops the tooling tower calls. Run npm run wasm:build, which writes both.",
+    why: "VC_TOOLING=1 needs the tooling engine package (@verticopolis/engine-tooling), which the player package in src/public/engine/ does not replace: it lacks the tier 3 ops the tooling tower calls. Run npm ci, which installs both.",
   };
 }
 

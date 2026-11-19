@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { refreshTraffic } from "./trafficHud";
-import { TRAFFIC_LABELS } from "../presentation/traffic";
+import { TRAFFIC_LABELS } from "@verticopolis/components/presentation/traffic";
 import type { GameApp } from "../main";
 
 /**

@@ -13,7 +13,8 @@ import { repoRel, sourceFiles } from "./guardFiles";
  * to a variable power. The files below are the sites that are not a named flag
  * set: a bitset keyed by an index (a kind code, a stop, a floor), or a byte or
  * varint codec. Add a file here only with that reason; a new flag set names its
- * flags instead.
+ * flags instead. The engine and the components keep the same rule in their
+ * own repositories.
  */
 
 /** A file that is not a named flag set, how many shift sites it has, and why. The count
@@ -25,15 +26,6 @@ interface Allowed {
 }
 
 const ALLOWED: Readonly<Record<string, Allowed>> = {
-  "engine-rs/src/view/reader.rs": { sites: 1, reason: "the unlocked-kinds mask, bit k = kind code k" },
-  "src/simport/viewReader.ts": { sites: 1, reason: "reads the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)" },
-  "engine-rs/src/dispatch_demand.rs": { sites: 2, reason: "the car's cab-floor bitset, indexed by stop" },
-  "engine-rs/src/floor_bits.rs": { sites: 1, reason: "a per-floor bitset, indexed by floor slot" },
-  "engine-rs/src/crowd/seg_set.rs": { sites: 1, reason: "the route search's seen-segment bitset, indexed by segment id" },
-  "engine-rs/src/view/window.rs": { sites: 1, reason: "the people window's marked-people bitset, indexed by crowd index" },
-  "engine-rs/src/fflate.rs": { sites: 2, reason: "the deflate port: shift widths and masks of the compression format" },
-  "engine-rs/src/canonical.rs": { sites: 1, reason: "the sort key that places non-index keys after every array index" },
-  "src/wasmhost/buildSection.ts": { sites: 1, reason: "the wasm LEB128 varint decoder" },
   "src/build/sourcemapBytes.ts": { sites: 1, reason: "the source-map base64 VLQ decoder" },
 };
 
@@ -85,7 +77,7 @@ describe("named flags guard", () => {
   });
 
   it("no production source packs flags with shifts or powers of two", () => {
-    const found = [...hits("src", [".ts"]), ...hits("engine-rs/src", [".rs"]), ...hits("scripts", [".ts", ".mjs"])];
+    const found = [...hits("src", [".ts"]), ...hits("scripts", [".ts", ".mjs"])];
     expect(found, `Give each flag a named constant instead of 1 << i / 2 ** i:\n${found.join("\n")}`).toEqual([]);
   });
 });

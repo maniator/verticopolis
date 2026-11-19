@@ -1,8 +1,8 @@
 import { html, nothing, render as litRender } from "lit-html";
-import type { EnginePort } from "../simport/enginePort";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 import { isDialogOpen, isEngineStopped } from "../game/interactionState";
-import { iconElement } from "./icons";
+import { iconElement } from "@verticopolis/components/windows/icons";
 import { openFoldedPaletteAround } from "./paletteCollapse";
 import { DESK_TITLE_CLASS } from "./desk/deskTitle";
 

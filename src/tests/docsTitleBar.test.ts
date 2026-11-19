@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { GAME, GITHUB, barLinks, siteName, twoLengths } from "../../docs/engine-site/title-bar.mjs";
-import { SHORT_TITLE } from "../../docs/engine-site/site.mjs";
-import { chrome } from "../../docs/engine-site/scripts/rustdoc-chrome.mjs";
+import { GAME, GITHUB, barLinks, siteName, twoLengths } from "../../help-site/title-bar.mjs";
 
 /**
- * The title bar the help site, the engine docs and the Rust API reference
- * share (`docs/engine-site/title-bar.mjs`). Both Starlight sites draw it
- * through `TitleBar.astro`; the Rust API reference gets the same markup from
- * `scripts/rustdoc-chrome.mjs`. These check the markup each one is handed.
+ * The help site's title bar (`help-site/title-bar.mjs`), which
+ * `TitleBar.astro` draws. These check the markup it is handed.
  */
 describe("the docs title bar", () => {
   it("writes a label in full and in its phone length, the short one hidden from screen readers", () => {
@@ -33,18 +29,5 @@ describe("the docs title bar", () => {
 
   it("points the game button where a site asks", () => {
     expect(barLinks({ game: "/" })).toContain('<a class="vc-bar-game" href="/" data-game-link>');
-  });
-
-  it("is the Rust API reference's title bar too", () => {
-    const { before, after, head } = chrome("main");
-    expect(before).toContain(siteName("Verticopolis engine", SHORT_TITLE));
-    expect(before).toContain(barLinks());
-    // A phone has no room for GitHub in the bar, so the site menu ends with it.
-    expect(before).toMatch(/<li class="vc-top vc-menu-github"><a href="https:\/\/github\.com\/maniator\/verticopolis">GitHub<\/a><\/li><\/ul><\/nav>/);
-    // The bar's styles ride in the page head with the rest of the theme.
-    expect(head).toContain(".vc-bar-game");
-    // On a phone the bar folds into rustdoc's own top bar.
-    expect(after).toContain('querySelector("rustdoc-topbar")');
-    expect(after).toContain('classList.add("vc-one-bar")');
   });
 });

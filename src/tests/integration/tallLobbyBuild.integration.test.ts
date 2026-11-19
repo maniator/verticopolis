@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WasmEngine } from "../../engineBinding/binding";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
 import type { GameApp } from "../../main";
-import type { EnginePort } from "../../simport/enginePort";
-import { PortCodes } from "../../simport/portCodes";
-import { ViewReader } from "../../simport/viewReader";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { ViewReader } from "@verticopolis/components/port/viewReader";
 import { catalogOf, floorsOfPort, isUnlocked } from "../../game/portAccess";
-import type { GameMode } from "../../shared/types";
-import { catalogFacility, type Catalog } from "../../catalog/catalogTypes";
+import type { GameMode } from "@verticopolis/components/shared/types";
+import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
 import { BuildActions } from "../../game/buildActions";
 import { updateBuildPreview } from "../../game/buildPreview";
 import { brushTiles } from "../../ui/placement";

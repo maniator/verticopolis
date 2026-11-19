@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { TOWER_FILE_EXT } from "../../storage/SaveGame";
 import type { ImportReport } from "../../storage/tdtImportReport";
 import type { ExportReport } from "../../storage/tdtExportReport";
-import { groupDigits } from "../format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * The TDT import/export report dialogs plus the export-choice modal. Authored to

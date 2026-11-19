@@ -2,8 +2,12 @@
 
 Verticopolis is an unofficial, from-scratch homage to the 1994 game *SimTower*:
 a browser-native high-rise builder with its own code and art. The simulation
-is a Rust engine compiled to WebAssembly (`engine-rs/`); the game around it
-(UI, rendering, audio, storage) is TypeScript. It is not affiliated with or derived from the original; the canon it mirrors
+is a Rust engine compiled to WebAssembly, built and published from
+[Verticopolis/engine](https://github.com/Verticopolis/engine); the rendering,
+audio and engine host come from
+[Verticopolis/components](https://github.com/Verticopolis/components); this
+repository is the game around them (UI, storage, the app shell, the player's
+manual), in TypeScript. It is not affiliated with or derived from the original; the canon it mirrors
 is behavior, not assets.
 
 This is the contributor guide, the source of truth for how work gets done here:
@@ -45,14 +49,11 @@ Run all four before pushing; they must be green. CI
 (`.github/workflows/test.yml`) runs the same on every PR that touches
 TypeScript, tooling or shared files. Two narrower lanes skip what a change
 cannot reach (`src/build/prLane.ts` holds the rules): a PR that changes only
-`engine-rs/` sources skips lint, typecheck, the build and the plain unit run
-(the Rust workflow tests the crate, and the browser, parity and integration
-checks still run), and a PR that changes only docs, planning files or
-`.changes` notes runs the unit tests and the build without coverage. Cargo
-files, the binding (`engine-rs/src/wasm*`, `frame.rs`), package and lock files, the
-conformance suite and `test.yml` always run everything, and a PR that touches
-no engine path already skips the Rust workflow's jobs. Every required check
-still reports a result on a skipped lane.
+docs, planning files or `.changes` notes runs the unit tests and the build
+without coverage, and a PR that changes only CI metadata runs nothing.
+Package and lock files (which pin the engine and components) and `test.yml`
+always run everything. Every required check still reports a result on a
+skipped lane.
 
 ```bash
 npm run typecheck   # tsc --noEmit, then the api/ project
@@ -102,8 +103,8 @@ Verticopolis has **two test tiers**:
 - **Tier-1: vitest** (`npm test`, i.e. `vitest run`). Fast, headless, run under a
   **happy-dom** environment. Covers the game controllers, UI logic, sprites,
   audio and storage, and (in the integration project) the Rust engine through
-  its WASM binding. The engine's own rules are Rust tests (`cargo test` in
-  `engine-rs/`). The suite has generous
+  its WASM binding. The engine's own rules are Rust tests in
+  Verticopolis/engine. The suite has generous
   timeouts (30s) because a few tests drive many in-game days of the full
   simulation over a tall tower. It is split by filename into two **vitest
   projects** (`vite.config.ts` `test.projects`):
@@ -117,106 +118,38 @@ Verticopolis has **two test tiers**:
     on filename, so a `*.integration.test.ts` anywhere under `src/` runs in this
     tier and never in unit, and the pair covers every test with no gap.
     `npm run test:integration` runs only these.
-    The engine conformance suite runs in this tier: scripted scenarios in
-    `conformance/` whose checkpoint hashes are pinned in
-    `conformance/expected.json` and checked on the Rust engine by
-    `conformanceWasm.integration.test.ts`, which is also the only writer of
-    the lock. A moved hash is a simulation change: regenerate the lock only on
-    purpose, in the same PR. See
-    [conformance/README.md](./conformance/README.md).
+    The engine comes from npm, pinned in `package.json`: `@verticopolis/engine`
+    (the player build the game ships) and, from the same engine release,
+    `@verticopolis/engine-tooling` (the build with the binding's tier 3 test
+    ops, which `npm run dev`, a `VC_TOOLING=1` build and the WASM suites use)
+    and `@verticopolis/engine-conformance` (the conformance scenarios, their
+    pinned hashes, the catalog digests and the fixtures). `npm install` copies
+    the player build into `src/public/engine/` (`scripts/engine-install.ts`),
+    which is build output and is not checked in. The conformance suite runs
+    in this tier: `conformanceWasm.integration.test.ts` replays every
+    scenario of the installed conformance package on the installed engine and
+    must reproduce its hashes, so the engine the game pins is the one the
+    lock describes. The lock, the engine's goldens, its fuzzers and its Rust
+    tests live in Verticopolis/engine, which owns every simulation rule (see
+    its CONTRIBUTING.md); the rendering, audio, binding and host modules come
+    from `@verticopolis/components`. To move the game to a new engine, raise
+    the three engine pins in `package.json` together and run `npm install`;
+    the suites check the rest.
 
-    **One engine.** `engine-rs/` is the only engine the game runs
-    (since app 2.66.0 and engine crate 1.0.0), and every simulation rule and
-    its tests live there (`engine-rs/src/rule_tests/` and each module's own
-    tests). The conformance lock, the goldens and the fuzz corpus are the
-    Rust engine's own regression records, written by the Rust run and checked
-    natively (`cargo run --release --features conformance --bin conformance`)
-    and through the WASM binding from Node with
-    `npm run wasm:build && npm run test:wasm`, which also holds the engine to
-    the frame-day golden: a day on every fixture at every speed, played
-    through the engine's own step driver, pinned every hour.
-    The `.TDT` codec has one
-    implementation, `engine-rs/src/tdt/`. The same command runs the `.vctower`
-    writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
-    every fixture with the engine and reads it back through the web game's
-    readers. Every build runs the WASM engine alone
-    (see below), with no fallback. The served package
-    (`src/public/engine/`) is build output and is not checked in. The build
-    writes two flavors (#1057): the player package the game ships, and a
-    tooling package with the binding's tier 3 test ops, which `npm run dev`,
-    a `VC_TOOLING=1` build and the WASM suites use (engine-rs/README.md has
-    the paths). Build them
-    locally to run the game, with `bash scripts/build-engine-wasm.sh`
-    on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
-    once the toolchain in engine-rs/README.md is installed. `npm run e2e`
-    needs it too, since every spec runs on the WASM engine, and so does `npm run build`: its precache check
-    (`scripts/verify-precache.ts`) refuses a build without the engine, so no
-    build ships without it. Without a Rust toolchain, run
-    `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate build without the
-    engine (it cannot run the game, and a dev serve without the package stops on the engine failure screen; it exists for tooling that never boots one). A stale local build fails the unit test that checks its source
-    hash. CI restores it from the
-    Actions cache, keyed on the engine's source hash, and builds it once per
-    engine change (`.github/actions/engine-wasm`). Vercel builds it through
-    `scripts/vercel-build.sh`: a preview (`VERCEL_ENV=preview`, staging
-    included) reuses the package an earlier deployment built from the same
-    sources and build scripts when its files match their `BUILD.json`
-    (`scripts/vercel-engine-cache.ts`, kept in Vercel's build cache with the
-    same key inputs as CI's), and every other build, production included,
-    compiles it from source. A deploy builds the player package alone
-    (`--player-only`), since none ships the tooling one. A preview also keeps
-    the restored `node_modules` when it is exactly the tree `npm ci` left for
-    the same lockfile, Node and npm (`scripts/vercel-install.sh`); every other
-    build runs `npm ci`. Every build (`npm run build`, a dev serve and the
-    deploy alike) is the Rust-only build: the WASM engine is the only engine, and
-    an engine that cannot start stops the game with a message instead of
-    falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
-    reads the emitted sourcemaps and fails a build that ships test code, a
-    production build that ships the harnesses' tower (#921), and a build that
-    does not precache the engine package.
-    See `docs/performance/player-bundle.md` for what ships and why. A simulation change lands in the
-    Rust engine. An engine PR that adds a branch adds a scenario that reaches it;
-    the `rust-coverage` job (`cargo llvm-cov`, line floor in
-    `engine-rs.yml`) is how review checks that, and the floor only moves up.
-    The catalog every frontend reads (prices, sizes and build rules,
-    `engine-rs/src/catalog.rs`) is pinned the same way by
-    `conformance/catalog-digests.json` (the WASM suite,
-    `conformanceWasm.integration.test.ts`, writes it with the same
-    regeneration switch; a Rust test, the referee and the WASM suite check
-    it), so a changed price or size moves that digest in the PR that changes
-    it.
-    Forged-save handling is pinned the same way by
-    `conformance/loader-cases.json` (frozen; a Rust test replays it), and the `.TDT` codec by
-    `conformance/tdt-cases.json` (frozen; `cargo run --release --features conformance --bin tdt`
-    and a Rust test replay it, and a changed `.TDT` byte moves a hash in the PR that changes it).
-    The codec also has a Rust-only fuzz (`engine-rs/tests/tdt_fuzz.rs`):
-    damaged copies of the nine real saves and forged towers must import,
-    export and import again without a panic and reach a fixed point after one
-    round trip. The pull-request run uses 8 seeds; `tdt-fuzz.yml` runs thousands
-    each night and opens an issue on a failure. To replay one seed, from
-    `engine-rs/`: `VC_TDT_FUZZ_FIRST=<seed> VC_TDT_FUZZ_SEEDS=1 cargo test
-    --release --test tdt_fuzz`. A nightly differential fuzzer
-    (`engine-fuzz.yml`) grows seeded random scenarios on the native Rust
-    engine, replays each through the shipped WASM build in Node and
-    compares the state, crowd and events hashes at checkpoints at least
-    every in-game hour, then the money, the log, each field of the full
-    save, and the fx sequences and emergency counters (which sit outside the
-    hashed views), naming the first one that differs (`scripts/fuzz-compare.ts`; exit
-    3 marks a harness failure, not a divergence). One seed in four grows a
-    tall tower that fills the shaft and stair pools; every seed sets a cash
-    profile once the tower is built, and cash can drop to zero or below mid-run. This is
-    where a wasm32-only difference shows (a WASM trap is its own finding:
-    exit 4, its own line in the summary, and a red night), and a scenario the
-    engine refuses while growing it fails the night too. A divergence it
-    finds is shrunk (`scripts/fuzz-shrink.ts`) and pinned in the fix PR as a
-    corpus entry with its golden (`npx tsx scripts/fuzz-corpus.ts --update`
-    pins the native run's records under `conformance/fuzz-corpus/goldens/`);
-    the `fuzz-corpus` job then holds every entry's native run to its golden
-    and the WASM run to the native one. A run summary names its seed range and the
-    `seed_block` and `seed_offset` that replay it, the seeds that diverged,
-    the seeds that timed out, and the time the WASM leg took. The nightly
-    records the window key (`scripts/fuzz-key.ts`, a hash over the engine's
-    sources and the pins that build it) and the runner image version, so two
-    nights can be compared.
+    Every build (`npm run build`, a dev serve and the deploy alike) runs the
+    WASM engine alone, with no fallback: an engine that cannot start stops the
+    game with a message. `npm run build` refuses a build without the engine
+    package (its precache check, `scripts/verify-precache.ts`), and
+    `VC_ALLOW_NO_ENGINE=1 npm run build` is a deliberate build without it (it
+    cannot run the game; it exists for tooling that never boots one). Its
+    postbuild check (`scripts/verify-engine-bundle.ts`) reads the emitted
+    sourcemaps and fails a build that ships test code, a production build
+    that ships the harnesses' tower (#921), and a build that does not
+    precache the engine package. A Vercel preview keeps the restored
+    `node_modules` when it is exactly the tree `npm ci` left for the same
+    lockfile, Node and npm (`scripts/vercel-install.sh`); every other build
+    runs `npm ci`. See `docs/performance/player-bundle.md` for what ships and
+    why.
 
     **Suites on the engine port.** A converted suite does not build a
     `Simulation` and poke it. It declares itself with `describeEngines`
@@ -258,7 +191,7 @@ Verticopolis has **two test tiers**:
   There is one build and two Playwright projects, split by how the specs need
   the machine (see [`playwright.config.ts`](./playwright.config.ts)):
   `chromium-serial` holds the pinned visual/perf checks (`engineIdentity`,
-  `engineStatusRows`, `atlas`, `visual`, `perf`) and runs with one worker, as
+  `engineStatusRows`, `visual`, `perf`, `overviewMapPerf`) and runs with one worker, as
   the `e2e-serial` job; `chromium` holds the general browser regression suite,
   including `e2e/engineBoot.spec.ts` (boot, failures and offline start), and CI
   runs it as the `e2e-general` job, in six shards on six runners. The spec
@@ -340,10 +273,9 @@ node scripts/screenshot-determinism-check.ts --all
 ```
 
 To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image (its
-`npm run build` needs the engine package, and the image has no Rust toolchain,
-so build the engine packages on the host first with `npm run wasm:build`,
-which writes `src/public/engine/` and the `engine-rs/pkg-web-tooling/` a
-`VC_TOOLING=1` build serves; see the engine note above):
+`npm run build` needs the engine packages, which `npm install` on the host
+puts in `src/public/engine/` and `node_modules/@verticopolis/engine-tooling/`
+for a `VC_TOOLING=1` build; see the engine note above):
 
 ```bash
 docker run --rm --ipc=host \
@@ -375,7 +307,7 @@ and font rasterization may differ from the pinned image. See
 
 The gallery and the Playwright visual baselines are both the Rust engine's
 (#1353), one set of images each. The gallery generator hosts the tower on the
-WASM engine, and it needs the engine package (`npm run wasm:build`). The
+WASM engine, and it needs the engine package (`npm install`). The
 baselines are minted and compared on the `chromium-serial` project, in `npm run
 e2e` and in `update-visual-baselines`.
 
@@ -394,7 +326,7 @@ the code under test did. The rules:
   engine.
 - **A check that needs the real engine is an integration test**
   (`*.integration.test.ts`, listed in `test:wasm:host` when it needs the
-  package) **or a Rust test** in `engine-rs/`.
+  package) **or a Rust test** in Verticopolis/engine.
 - **No recorded engine answers.** Never capture what the engine said and replay
   it as a stand-in engine, and never refresh a unit test's fixtures from a live
   engine. (The conformance locks and catalog digests are written from the Rust
@@ -411,8 +343,7 @@ the code under test did. The rules:
 `src/tests/testHonesty.guard.test.ts` holds the parts a machine can check: no
 unit test reaches a module that starts a real engine (directly or through test
 fixtures), no `recordings` directory or `*:record` script, and no `it`/`test`
-in the unit, integration or e2e tiers and no Rust `#[test]` without an
-assertion. Its allowlist,
+in the unit, integration or e2e tiers without an assertion. Its allowlist,
 `src/tests/testHonesty.allow.txt`, only shrinks, and each line carries its
 reason. The rest is review work:
 the review skills, Copilot and PR-Agent check it on every PR.
@@ -427,12 +358,8 @@ that are easy to test.
 - **Global floor:** 93% statements / 94% lines / 94% functions / 86% branches,
   aggregated over the measured set (`coverage.thresholds` in
   [`vite.config.ts`](./vite.config.ts)).
-- **Per-file floors** for the render and audio layers (the sprite painters, the
-  pixel-sprite code, and the audio graph in `ToneAudioEngine`). These exist so a single weak file
-  **can't hide behind strong siblings**. There is no cross-file masking. Draw
-  code carries deliberately **lower BRANCH floors** because visual variants a spy
-  2D context can't judge are the job of the Tier-2 Playwright visual tier, not
-  the unit tier.
+The renderer, the sprites and the audio graph, which had their own per-file
+floors here, live in Verticopolis/components now and keep their floors there.
 
 ### What is excluded from unit coverage, and why
 
@@ -441,17 +368,9 @@ untested. It is **unit-exempt, integration-covered**, exercised by the Tier-2
 e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
 
 - **`src/main.ts`**: the composition root. Its constructor boots the WebGL
-  `TowerEngine`, so `new GameApp()` can't run under happy-dom. Its testable
-  *logic* lives in the measured `src/game/*` controllers.
-- **`src/render/excalibur/TowerEngine.ts`, `towerScene.ts`,
-  `towerReconcile.ts`**: the Excalibur/WebGL engine wrapper, whose code all
-  bakes an `ex.Canvas` or drives the live engine. The rest of
-  `src/render/excalibur/` is measured.
-- **`src/render/atlas/browserEntry.ts`, `verify.ts`, `verifyExtras.ts`**: the
-  sprite atlas bake's browser half (the page API the export drives and the
-  pixel checks), which reads pixels back from a live canvas. The pipeline they
-  call (bake, compose, lookup, archive) is measured in its own modules, and
-  `e2e/atlas.spec.ts` runs them end to end.
+  renderer from `@verticopolis/components`, so `new GameApp()` can't run under
+  happy-dom. Its testable *logic* lives in the measured `src/game/*`
+  controllers.
 
 Also excluded are non-product tooling entry points that are build/dev plumbing,
 not game logic: the gallery/preview pages (`src/gallery.ts`,
@@ -467,13 +386,6 @@ and the tests themselves.
 These layers were once waved off as "device-only." They are unit-tested here, so
 **follow the pattern** rather than adding new exclusions:
 
-- **Procedural sprite painters** are driven against a **spy 2D context**
-  (`src/render/sprites.test.ts`). The draw calls are asserted without a real
-  canvas.
-- **The Web-Audio engine's** real control flow runs against a **mocked Tone.js +
-  a fake `AudioContext`** (`src/audio/toneAudioEngineGraph.test.ts`), with its
-  inert-without-audio contract pinned separately
-  (`src/audio/toneAudioEngine.test.ts`).
 - **Pure logic extracted out of an untestable shell** into a measured module and
   tested there, e.g. `pwa.ts`'s payload sanitizer lives in
   `src/pwaUpdateInfo.ts` (`src/pwaUpdateInfo.test.ts`).
@@ -487,44 +399,36 @@ For a visual tour (layer diagram, the frame loop, the engine subsystems, input
 flow, and persistence) see **[ARCHITECTURE.md](./ARCHITECTURE.md)** (Mermaid
 diagrams). The prose conventions below are the source of truth.
 
-- **`src/render/`**: canvas rendering and pixel-art sprites. Reads engine state,
-  never mutates it.
+- **`@verticopolis/components`**: the canvas renderer and pixel-art sprites
+  (`render/`), the audio (`audio/`), the catalog handle (`catalog/`), the
+  engine binding and hosts (`binding/`, `host/`, `port/`), shared types and the
+  window chrome styles. The game imports them by subpath. The renderer reads
+  engine state and never mutates it.
 - **`src/ui/`**: DOM controls (palette, status bar, dialogs), using native
   `<dialog>` for modals. The `UI` class is a thin shell over friend-modules that
   take the instance: the lit-html template bodies (`templates/`), the dialog
   controllers (`uiDialogs`), the editor/inspector panels (`uiPanels`), the
   status/log pump (`uiStatus`), and the palette build (`uiPalette`).
-- **`src/audio/`, `src/storage/`**: sound and save/load, independent of
-  rendering. Audio is a boot-time facade (`AudioEngine` in `Audio.ts`) that
-  lazy-loads the live orchestrator (`ToneAudioEngine`), which drives the
-  scene data and math
-  (`toneScenes`), the composed music (`toneTracks`), the action jingles
-  (`toneVoices`), percussion (`tonePercussion`), rain (`toneRain`), and the
-  crowd and venue ambience (`toneCrowd*`); `audioAssets` lists the files it
-  fetches. **[SOUNDS.md](./SOUNDS.md)** maps the audio modules, cues, and
-  ambient layer, and explains how to add a cue.
+- **`src/storage/`**: save and load, independent of rendering.
 - **`src/main.ts`**: the composition root that wires input, engine, and the
   game loop together.
 
 Code reads the catalog through the catalog handle (`towerCatalog`,
-`catalogTypes`, in `src/catalog/`), the frame view
-(`src/wasmhost/frameView.ts`) or an engine query (#868).
+`catalogTypes`, `@verticopolis/components/catalog/*`), the frame view
+(`@verticopolis/components/host/frameView`) or an engine query (#868).
 
 The tower grid is **two-layered**: a structural layer (floor/lobby) with a room
 layer sitting on top, exactly like the original SimTower corridor model.
 
-### Classic vs Modern rule-sets (`engine-rs/src/rules/`)
+### Classic vs Modern rule-sets
 
 A tower is founded under an immutable `GameMode` (`classic` | `modern`), chosen
 once at creation and persisted. Behavior the two modes disagree on belongs
-behind the mode's rule methods in the Rust engine (`impl GameMode` in
-`engine-rs/src/rules/`, one file per domain: construction, economy,
-households, people, services, satisfaction, amenities, parking, rent and
-presentation), which the simulation calls (`self.mode.<x>()`). A few older
-Rust subsystems still test the mode inline (`self.mode.is_modern()`, a
-comparison with `GameMode::Classic`); `src/tests/modeBranch.guard.test.ts`
-fails a new one, and `src/tests/modeBranch.ratchet.txt` lists the old ones,
-which only go down. Move such a test behind a rule method when you change that
+behind the mode's rule methods in the Rust engine (`engine-rs/src/rules/` in
+Verticopolis/engine), which the simulation calls. In this repository,
+`src/tests/modeBranch.guard.test.ts` fails a new inline test of the mode in
+the TypeScript, and `src/tests/modeBranch.ratchet.txt` lists the old ones,
+which only go down. Move such a test into the catalog when you change that
 code, and lower its line in the same PR.
 
 **Tripwire: don't let mode logic smear.** Map the mode to behavior in one
@@ -558,25 +462,15 @@ and misreports the build). A CI guard, `src/tests/versionLockSync.test.ts`,
 fails the moment the two drift.
 
 Every release becomes a GitHub release on its own. When a release PR merges,
-`.github/workflows/release-tag.yml` tags the merge commit `v<version>` for an
-app version change and dispatches `.github/workflows/github-release.yml`, which
-publishes the release with the version's player notes and then dispatches
-`.github/workflows/sprite-atlas.yml` to bake the sprite atlas and attach it
-(docs/atlas.md). The release never waits on the atlas. A crate version change gets its own `engine-v<version>`
-release with that version's `engine-rs/CHANGELOG.md` section and the built
-WASM package attached (a zip and the npm tarball), never marked Latest, so a
-frontend can depend on the crate at that tag or download the package. The
-crate release then dispatches **Publish engine to registries**
-(`.github/workflows/engine-publish.yml`) when registry publishing is on, which publishes the crate to
-crates.io and that tarball to npm as `@verticopolis/engine` (see The
-registries below). A maintainer can
-still tag a commit by hand (`git tag v2.30.0 <commit> && git push origin
-v2.30.0`). Only commits that contain the atlas exporter can get an atlas. A tag push runs
-the release workflow file as it is at the tagged commit. A manual run (Actions,
-"GitHub release" or "Sprite atlas", with the tag as input) uses the copy on the
-branch or tag it runs from. The release workflow publishes when the tag has no
-published release and leaves a published one alone; the atlas workflow attaches
-the atlas when the release lacks it and only audits when it has it.
+`.github/workflows/release-tag.yml` tags the merge commit `v<version>` and
+dispatches `.github/workflows/github-release.yml` on that tag, which publishes
+the release with the version's player notes. A maintainer can still tag a
+commit by hand (`git tag v2.30.0 <commit> && git push origin v2.30.0`), or run
+"GitHub release" from the Actions tab with "Use workflow from" set to the tag.
+Either way the run checks out its own tag and no other ref. It publishes when
+the tag has no published release and leaves a published one alone. The
+sprite atlas is baked and released from Verticopolis/components, which holds
+the art.
 
 **Declare the tier in the same PR as any player-facing change.** The tier is keyed
 to one question: would a player notice anything different?
@@ -594,8 +488,7 @@ to one question: would a player notice anything different?
 
 The owner set this split on 2026-11-14, replacing the earlier "minor for any
 visible change" rule: a fix stays a patch however visible it is, and minor is
-kept for new features. The same split holds for the engine crate (below): a
-new API is minor, a fix or a behavior correction is patch.
+kept for new features.
 
 A player-facing change whose note says `app: none` (or has no note) is a review
 finding: the splash (and the update prompt's build-id line) would otherwise
@@ -605,7 +498,7 @@ misreport the build as unchanged. One note per PR, not per commit.
 
 Every PR that changes a deployed path (anything `scripts/vercel-ignore-build.sh
 --classify` calls "build") adds one file, `.changes/<branch-slug>.md`, with the
-app tier, the crate tier and the changelog lines. The format and its rules are
+app tier and the changelog lines. The format and its rules are
 in [`.changes/README.md`](./.changes/README.md). The file is named after the
 branch, so two open PRs never edit the same line and never conflict over a
 version. A note already on `main` belongs to the PR that merged it, so a
@@ -623,12 +516,8 @@ The release driver cuts a release:
 1. Branch `release/<version>` off an up-to-date `main`.
 2. Run `npm run release` (or `npm run release -- --app 3.0.0` for a headline
    release). It raises the app version by the highest pending `app` level,
-   writes the `CHANGELOG.md` section from the Player lines, and, when a note
-   has a crate level, raises the crate in `engine-rs/Cargo.toml` and the
-   three `Cargo.lock` files, moves the example pins in the engine guides
-   (`docs/engine-site/guides/crate.md` and `javascript.md`) to the new crate
-   version, writes the `engine-rs/CHANGELOG.md` section from the Engine lines
-   and runs `npm run engine:compat`. It deletes the notes.
+   and writes the `CHANGELOG.md` section from the Player lines. It deletes
+   the notes.
 3. Trim the player lines to the few that matter (the prompt shows three),
    commit, and open the PR. It merges like any other PR, and its merge tags
    and publishes the GitHub releases.
@@ -654,10 +543,7 @@ Rules for the release PR:
 CI's "Versions and change notes" step in the test job (`npm run
 version:check` locally, after committing) holds both sides to this: a feature
 PR keeps every version line and changelog heading as `main` has them, keeps
-`main`'s pending notes, adds a note when it changes a deployed path, and sets
-`crate:` in its own note when it moves a pin in the compatibility record, and
-edits an engine README or says `readmes: unchanged` when it changes the engine
-(see The engine READMEs below). A
+`main`'s pending notes and adds a note when it changes a deployed path. A
 release PR raises each version by exactly its notes' highest level (the app may
 go to a later version the driver names), consumes every note and changes
 nothing but the release files.
@@ -667,14 +553,13 @@ than `none`, `scripts/vercel-ignore-build.sh` skips the production deploy, so a
 player never gets new behavior under the old version and the old "What's new"
 notes. Previews still build. The release merge deletes the notes, builds, and
 ships everything pending as one numbered build. Production deploys only on a
-release merge: a push to `main` whose commit leaves the app and crate versions
-as its parent had them is skipped, even with no note pending.
+release merge: a push to `main` whose commit leaves the app version as its
+parent had it is skipped, even with no note pending.
 
 **Production deploys from the release tag.** Vercel's git integration builds
 previews only (`vercel.json` turns it off for `main`). When `release-tag.yml`
 tags a release merge it dispatches **Deploy production**
-(`.github/workflows/deploy-production.yml`) with the tag: `v<version>` for an
-app release, or `engine-v<version>` when only the crate moved. That run checks
+(`.github/workflows/deploy-production.yml`) with the `v<version>` tag. That run checks
 the tag is a release on `main`, runs the gate above against its commit, builds
 with `vercel build --prod` (which runs `scripts/vercel-build.sh`, engine
 included) and deploys the prebuilt output, then waits until the production
@@ -690,8 +575,7 @@ instant rollback without a rebuild, find the release with
 Deploy production run's summary prints that command for its own deployment). An
 app release also gets the deployed web build attached as
 `verticopolis-web-<version>.zip` with its SHA-256 checksum and
-`verticopolis-web-<version>.SHA256SUMS`, one checksum per file, beside the
-engine package zip a crate release carries. Before a deploy passes, it checks
+`verticopolis-web-<version>.SHA256SUMS`, one checksum per file. Before a deploy passes, it checks
 every file production serves (source maps aside, which production does not
 serve publicly) against that list, so the live site is byte for byte the
 release's build; `sha256sum -c` against the list checks a download the same
@@ -714,208 +598,41 @@ its own, so start them with the run button on that PR when GitHub shows one,
 or else close and reopen the PR. `npm run release` on a local
 `release/<version>` branch still works the same way.
 
-### The engine crate version
+### The engine and the components
 
-`engine-rs/Cargo.toml` carries its own version, separate from the app's. It is
-the answer to "which engine contract is this?": `engineIdentity()` reports it,
-and the version line on the splash, in Settings and in About shows it
-(`src/wasmhost/engineLabel.ts`). The app version stays what players see.
+The engine and the components have versions, changelogs and release lanes of
+their own, in their own repositories:
+[Verticopolis/engine](https://github.com/Verticopolis/engine) (the
+`verticopolis-engine` crate on crates.io and `@verticopolis/engine` on npm,
+with its tooling and conformance packages on each engine release) and
+[Verticopolis/components](https://github.com/Verticopolis/components)
+(`@verticopolis/components` on npm). A change to a simulation rule, the
+binding, the renderer or the audio lands there, under that repository's
+CONTRIBUTING.md, and reaches the game when a PR here raises the pin in
+`package.json`. A pin move is an ordinary feature PR with a change note: the
+app tier is what a player would notice from the new engine or components.
 
-**The crate version goes up with any of these** (the PR that moves one sets
-`crate:` in its note, and the release PR raises the version):
+Raise the three engine pins together (`@verticopolis/engine` and the
+`engine-tooling` and `engine-conformance` tarballs of the same release), so
+the suites check the engine the game ships against that release's own
+conformance lock.
 
-- the conformance lock: `catalog-digests.json`, `expected.json`,
-  `loader-cases.json` or `tdt-cases.json` under `conformance/`, or the
-  gameplay event catalog, `engine-rs/src/gameplay/catalog.json` (locked as
-  `events/catalog.json`; it lives in the crate so the published crate compiles
-  it in). A new fixture or scenario lands through `expected.json`, so it counts;
-- `SAVE_VERSION`, or the oldest save version the engine loads;
-- `FRAME_LAYOUT_VERSION`, `VIEW_LAYOUT_VERSION`, `CATALOG_VERSION` or
-  `IDENTITY_SCHEMA` (the frame layout and the identity record's shape each
-  have a pin table in `engine-rs/src/identity_tests.rs` that grows with the
-  version, and the view layout has one in `engine-rs/src/view/layout_tests.rs`;
-  the catalog version has none yet, see #1154);
-- the binding's declaration, `src/engineBinding/engine.d.ts`, outside comments.
+### The changelog, and the update label
 
-Those always move the crate version. Every other change to the engine's code,
-an internal one such as a performance optimization included, takes at least a
-**patch** (owner, 2026-11-17, after #2438 shipped without one). The build hash
-(`sources` in the package's `BUILD.json`) tells builds apart within a version.
+`CHANGELOG.md` is for players, one section per app version. The engine's
+changelog is `engine-rs/CHANGELOG.md` in Verticopolis/engine, and the
+components keep theirs in their repository. Classify a change by what a
+player would notice: an engine fix a player can feel gets a Player line in
+the note of the PR that moves the pin.
 
-The levels follow the app's split (owner, 2026-11-14): **minor** for a new
-API (a call, an answer field, a catalog entry a host can use), **patch** for a
-fix, a behavior correction or an internal change, a lock change on its own
-included. Any PR that changes the engine's code declares one of the two;
-review checks it.
-
-The crate version is independent of the app version: an app release never
-requires a crate release, and a crate release never requires an app one.
-Crate 1.0.0 (2026-10-30, the owner's call) marked that the shipped game runs on
-this engine alone.
-
-**How:** in the feature PR, set `crate:` and add an Engine line in its note,
-then run `npm run engine:compat`. It rewrites `engine-rs/src/compat-record.json`
-from the tree, fetches `origin/main`, and refuses a pin that moved from main's
-record under an unchanged version unless a pending note declares a crate
-level, a version that is not a later `x.y.z` release, or a main record it
-cannot read. The record keeps the crate version main has, and the Rust identity
-test still checks the recorded version constants against the code. The release
-PR raises `version` in `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock` and
-`engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`) and
-re-records, so `engineIdentity()` reports the new version. Two PRs that both
-move the lock still meet in the record's `lockDigest`; whoever merges second
-rebases onto `main` and re-records.
-
-**What the guard sees and what it does not.** `src/tests/engineCompat.guard.test.ts`
-recomputes the lock digest, the five version constants and a digest of
-`engine.d.ts` (comments and spacing aside) and fails when one moved and the
-record did not. It cannot see the Rust `pub` API, a JSON shape that the
-declaration only describes in a doc comment (the `markers` and `commuteStress`
-arguments, for example), or a field added through the save loader's optional
-seam. A change like that still needs a bump; review owns it, and the backlog row
-`engine-compat-coverage` tracks closing the gap. A record edited by hand in the
-same PR also skips the main comparison, so a reviewer reads the record's diff.
-
-### The registries
-
-Each crate release publishes the engine to two registries:
-
-- the crate to crates.io as
-  [`verticopolis-engine`](https://crates.io/crates/verticopolis-engine);
-- its WASM build to npm as
-  [`@verticopolis/engine`](https://www.npmjs.com/package/@verticopolis/engine)
-  (the `verticopolis` npm organization), with the same version.
-
-When a release PR raises the crate version, `release-tag.yml` creates the
-`engine-v<version>` release with the npm tarball attached and, when the
-repository variable `ENGINE_REGISTRY_PUBLISH` is `on`, dispatches
-**Publish engine to registries** (`.github/workflows/engine-publish.yml`).
-The variable is unset for now: publishing is held while the engine and the
-game move to separate repositories, because trusted publishing binds each
-registry to one repository and workflow file. Until the owner sets it, a
-release ships the game and the GitHub releases and leaves the registries
-alone.
-That run checks the version, the tag and the tarball's checksum without any
-credential, then its two publish jobs wait on the `registry` environment,
-whose only reviewer is the owner. Nothing reaches a registry until the owner
-approves the run. Each job then gets a short-lived token through trusted
-publishing (GitHub's OIDC token, exchanged by crates.io and npm for this
-repository, this workflow file and that environment), so no registry token is
-stored in the repository or its secrets. The crate is published from the
-release tag's `engine-rs/`; npm gets the tarball from the GitHub release, so the
-bytes on npm are the bytes attached there, with an npm provenance statement.
-A version a registry already holds is left alone there, so a re-run is safe.
-To publish a version again after a failure, run the workflow by hand from the
-Actions tab with the version.
-
-The crate's `include` list in `engine-rs/Cargo.toml` names what crates.io
-receives, and the `consumer` job in `engine-rs.yml` packages the crate on
-every engine change and builds the consumer crate against the packaged copy,
-so a file the library needs from outside `engine-rs/` fails there. The
-conformance suite is not in the package yet (#893).
-
-**The first version of each.** Both registries set up trusted publishing only
-for a package that already exists, so the owner publishes the first version by
-hand, once, with `scripts/first-publish.ps1 -Version <x.y.z>` (PowerShell,
-from a checkout, with Rust and Node.js installed). It checks out the release
-tag in a temporary folder, runs the dry runs, asks before each publish, and
-prints the trusted-publisher settings to add on each site afterward. Revoke
-the crates.io token it used once it is done.
-
-Versions released before the registries were published only to GitHub
-Packages, as `@maniator/verticopolis-engine`. They stay there; nothing new
-goes there.
-
-### The engine READMEs
-
-Two guides are written for people who build on the engine, and both describe
-the engine as it is on `main`. They are pages of the docs site
-(docs.verticopolis.com):
-
-- [`docs/engine-site/guides/javascript.md`](./docs/engine-site/guides/javascript.md),
-  the guide to the WASM package (`@verticopolis/engine` on npm);
-- [`docs/engine-site/guides/crate.md`](./docs/engine-site/guides/crate.md),
-  the guide to the crate (`verticopolis-engine` on crates.io). Its quick start
-  is `engine-rs/consumer/examples/quick_start.rs`, which CI compiles.
-
-Each registry shows a short README that points at its guide:
-[`packages/verticopolis-engine/README.md`](./packages/verticopolis-engine/README.md)
-is packed into the npm package, and
-[`engine-rs/CRATE_README.md`](./engine-rs/CRATE_README.md) is the crate's
-`readme`. Keep them short (install, a few lines of use, links); the detail
-belongs in the guides (owner, 2026-11-13).
-
-**Every engine change updates them.** A PR that changes the engine (the
-library source under `engine-rs/src/`, its tests and `src/bin/` aside, or the
-binding declaration `src/engineBinding/engine.d.ts`) edits whichever guide or README
-no longer describes the engine: a call added, renamed or removed, a changed
-answer shape, a rule, a save behavior, a feature or a limit. When none needs a
-word, the PR's note says so with `readmes: unchanged` in its front matter,
-written only after you read them. The "Versions and change notes" step fails
-an engine change that does neither, and fails the line beside a guide or
-README edit. Guards check the rest mechanically: every binding call the
-JavaScript guide and the package README name must exist
-(`src/tests/enginePackageReadme.guard.test.ts`), the crate guide's quick start
-must match the compiled example, and both READMEs stay short and link the
-site (`src/tests/engineCrateReadme.guard.test.ts`).
-
-**The docs site.** docs.verticopolis.com is a Starlight site in
-`docs/engine-site/`, its own small npm project, dressed in the game's Windows
-3.1 palette. Its pages are both guides (`docs/engine-site/guides/`), `engine-rs/API.md`,
-`conformance/README.md` and `engine-rs/CHANGELOG.md`, listed in its
-`pages.json`; `scripts/sync-pages.mjs` copies them in before each build and
-points their repository links at the site or at GitHub. The palette, logo and
-favicon are copied from the game (`src/styles/retro-tokens.css`,
-`src/public/`), and the crate's `cargo doc` output goes under `/rust/`, with
-the site's header, side menu and colors drawn in by
-`docs/engine-site/scripts/rustdoc-chrome.mjs` from the same title and menu
-(`docs/engine-site/site.mjs`) and `docs/engine-site/rustdoc/theme.css`. The
-reference shows the host API only: modules and items a host does not call are
-`#[doc(hidden)]`, and `#![warn(missing_docs)]` (an error under clippy's
-`-D warnings`) holds every item it does show to a doc comment that tells a
-host what the item does. `.github/workflows/engine-docs.yml` builds it on a
-pull request that touches any of those files or `engine-rs/src/` and deploys
-it to GitHub Pages on every push to `main` that does, so the site shows
-`main`, as the READMEs do. Run it by hand from the
-Actions tab to redeploy `main`, or to show a release tag instead until the
-next push. Locally: `npm ci --prefix
-docs/engine-site`, then `npm run dev --prefix docs/engine-site`. Edit the
-source files, never the copies under `src/content/docs/`.
-`src/tests/engineDocsSite.guard.test.ts` checks that every listed page names a
-real file and is in the side menu; the workflow's own pull request run checks
-the build.
-
-**Docs previews.** Each open pull request that changes a page, the site, the
-engine's sources or `engine-rs/Cargo.toml` gets a preview at
-`docs.verticopolis.com/pr-preview/pr-<number>/`, with a comment on the pull
-request linking it, and loses it when it closes. Its pull request build runs
-under that path (`DOCS_BASE`, with `docs/engine-site/scripts/preview-base.mjs`
-moving the links written from the site root, and marking the pages noindex);
-`.github/workflows/docs-preview.yml` publishes it from `main` once the build
-passes. Pages takes the whole site in one deploy, so the live docs and the
-previews are kept together, built, on the `docs-pages` branch (one commit,
-replaced on each change), and `.github/workflows/docs-pages-publish.yml`
-stores each part there and deploys the branch. A pull request from a fork
-gets no preview.
-
-### Two changelogs, and the update label
-
-Two files, by audience. `CHANGELOG.md` is for players, one section per app
-version. `engine-rs/CHANGELOG.md` is for people who build on the engine, one
-section per crate version, and the release PR adds its section from the notes' Engine lines
-(`src/tests/engineChangelog.guard.test.ts` fails otherwise). Classify a change
-by what a player would notice, not by which layer changed: an engine fix a
-player can feel gets a line in `CHANGELOG.md`; a contract-only change gets just
-the crate entry.
-
-The update prompt also labels each update **Game update**, **Engine update** or
+The update prompt labels each update **Game update**, **Engine update** or
 **Game and engine update**, with a line such as "Rust engine 0.24.0 → 0.25.0"
-when an engine changed. Nobody writes the label. The build hashes the shell (all
-of `src` outside tests and the engine package) and records the Rust crate
-version and the Rust sources hash. `dist/version.json` carries them (`shell`, `engine`), the running client
-compares its own (`__BUILD_FINGERPRINT__`), and `classifyUpdate` in
-`src/pwaUpdateInfo.ts` picks the label. An older build with no fingerprint shows
-the plain prompt.
+when the engine changed. Nobody writes the label. The build hashes the shell
+(all of `src` outside tests and the engine package) and records the engine
+package's crate version and sources hash. `dist/version.json` carries them
+(`shell`, `engine`), the running client compares its own
+(`__BUILD_FINGERPRINT__`), and `classifyUpdate` in `src/pwaUpdateInfo.ts`
+picks the label. An older build with no fingerprint shows the plain prompt.
 
 ### Player notes (what the update prompt shows players)
 
@@ -1046,7 +763,8 @@ alone.
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
 - **Game logic lives in the Rust engine.** Rules, caps, prices, tuning and
-  every gameplay calculation belong in `engine-rs/`; the web game reads them
+  every gameplay calculation belong in the engine (Verticopolis/engine); the
+  web game reads them
   through the catalog and the frame and never keeps its own copy.
 - **Help and analytics change in the same PR.** A change players can see
   updates the manual in `help-site/` (in its 1990s manual style) and, when it
@@ -1054,20 +772,9 @@ alone.
   [`docs/analytics-data-map.md`](./docs/analytics-data-map.md) and the
   dashboard tiles that read them.
 - **500 lines per file.** `src/tests/fileSize.guard.test.ts` caps TypeScript
-  files (`.ts`, `.tsx`) in `src/` and `scripts/` and Rust files in `engine-rs/`
-  and `engine-bench/` at 500 lines. Files
+  files (`.ts`, `.tsx`) in `src/` and `scripts/` at 500 lines. Files
   already over it sit on a shrink-only ratchet
   (`src/tests/fileSize.ratchet.txt`): split them, never add to them.
-- **Rust follows the same source rules.** The engine in `engine-rs/` is held to
-  the same conventions as the TypeScript, with no grandfathered comments:
-  American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
-  Rust sources at zero), and the 500-line ceiling above (inline `#[cfg(test)]`
-  modules count).
-  The other gates have Rust counterparts: lint and typecheck map to `cargo fmt
-  --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
-  boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
-  free of host access (files, network, console, clock; a few named referee
-  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs` and `src/wasm/`.
 - **Show visual/gameplay changes with real screenshots** in the PR's
   *Screenshots / recordings* section: committed images, not prose descriptions.
   See [docs/screenshots.md](./docs/screenshots.md) for how to capture, commit,
@@ -1091,7 +798,7 @@ alone.
   arm auto-merge with the merge-commit method and let it wait for CI: it
   merges only when every required check passes. If a check fails or a new
   finding comes in, turn auto-merge off and fix it first. No merge
-  queue is in use today; `test.yml` and `engine-rs.yml` still answer the
+  queue is in use today; `test.yml` still answers the
   `merge_group` event so the queue can be turned back on without workflow
   changes.
 
@@ -1099,23 +806,17 @@ alone.
 
 | Path | What |
 | --- | --- |
-| `engine-rs/` | The simulation: the Rust engine, compiled to WebAssembly, and the only engine the game runs. No host access (`engine-rs/tests/independence.rs`), deterministic, tested with `cargo test`. It owns the rules, caps and tuning (`facilities.rs`, `rules/`), the catalog the UI reads (`catalog.rs`), saves and `.TDT`, and undo. Its module map and how to build, test and change it: [`engine-rs/README.md`](./engine-rs/README.md). |
-| `src/simport/` | `EnginePort`, the one synchronous interface the game uses to call the engine, and the shared view reader that decodes the engine's frame. |
-| `src/engineBinding/`, `src/wasmhost/` | The WASM binding and its declaration (`engine.d.ts`); loading the engine package, its build metadata and the catalog checks. |
-| `src/shared/` | Types and small helpers shared across the game. |
+| `@verticopolis/engine` (npm) | The simulation, built from [Verticopolis/engine](https://github.com/Verticopolis/engine): the Rust engine compiled to WebAssembly, the only engine the game runs. It owns the rules, caps and tuning, the catalog the UI reads, saves and `.TDT`, and undo. Its tooling and conformance packages come from the same engine release. |
+| `@verticopolis/components` (npm) | Rendering, sprites, audio, the engine binding and hosts, the catalog handle and shared types, built from [Verticopolis/components](https://github.com/Verticopolis/components). |
 | `src/game/` | Game controllers: the testable logic behind the composition root. |
-| `src/render/` | Canvas rendering and pixel-art sprites (`sprites.ts`, `sprites/**`, `pixelSprites.ts`). Reads engine state, never mutates it. |
-| `src/render/excalibur/` | The Excalibur/WebGL engine wrapper (unit-exempt, e2e-covered). |
 | `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. The `UI` shell delegates to friend-modules: `templates/` (lit-html bodies), `uiDialogs`, `uiPanels`, `uiStatus`, `uiPalette`. |
-| `src/audio/` | Sound, independent of rendering: the `AudioEngine` facade (`Audio.ts`), `ToneAudioEngine` (orchestrator), `toneScenes` (data/math), `toneTracks` (music), `toneVoices` (jingles), `tonePercussion`, `toneRain`, the `toneCrowd*` ambience modules, and `audioAssets`. See [SOUNDS.md](./SOUNDS.md). |
 | `src/storage/` | Save/load, the `VCZ1:` storage container, `.vctower` file handling. Who owns what, and every path: [`docs/architecture/save-paths.md`](./docs/architecture/save-paths.md). |
 | `api/` | Vercel serverless functions, with their own `tsconfig.json` (typecheck and lint cover them). |
 | `help-site/` | The player manual (Astro + Starlight), served at help.verticopolis.com. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures, integration suites (`*.integration.test.ts`) and the repository-wide guard tests; unit tests colocate next to their source. |
-| `conformance/` | The conformance lock and catalog digests the engine is held to. |
 | `e2e/` | Tier-2 Playwright end-to-end specs. |
-| `docs/` | Contributor docs: the architecture pages (`docs/architecture/`, start at its [README](./docs/architecture/README.md)), `screenshots.md`, the performance and analytics references, and the docs site's source (`docs/engine-site/`). |
+| `docs/` | Contributor docs: the architecture pages (`docs/architecture/`, start at its [README](./docs/architecture/README.md)), `screenshots.md`, and the performance and analytics references. |
 | `.github/workflows/` | CI and release automation. What runs on a pull request and why: [`docs/ci/pipeline.md`](./docs/ci/pipeline.md). |
 
 ## License

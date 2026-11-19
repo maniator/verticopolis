@@ -51,7 +51,7 @@ export const ALLOW_NO_ENGINE = "VC_ALLOW_NO_ENGINE";
  */
 export function missingEngine(env: Record<string, string | undefined>, builtEngine: boolean): string | null {
   if (builtEngine) return null;
-  const how = "build it first (npm run wasm:build, or scripts/build-engine-wasm.sh)";
+  const how = "build it first (npm install)";
   if (env.VERCEL === "1") {
     return `this deploy has no engine package in dist/, and a deploy must ship the WASM engine (${ALLOW_NO_ENGINE} does not apply to one); ${how}`;
   }

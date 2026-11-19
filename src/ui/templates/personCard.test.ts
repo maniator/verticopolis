@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { PersonDetail } from "../../simport/personCards";
-import { catalogFacility } from "../../catalog/catalogTypes";
+import type { PersonDetail } from "@verticopolis/components/port/personCards";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
 import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
 import { PERSON_FOLLOW_ACTION, goneWords, personCardTemplate, personNow, personRole, personWhy, placeWords, type PersonCardInput } from "./personCard";

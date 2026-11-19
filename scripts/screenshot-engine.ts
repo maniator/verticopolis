@@ -31,30 +31,38 @@
  * `pg*` functions are BROWSER-INJECTED: self-contained, no module-scope refs.
  */
 import { type Page } from "playwright";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { staleEnginePackages } from "../src/build/engineCache.ts";
-import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
+
+/** The sources hash a package's BUILD.json records, or undefined. */
+function recordedSources(dir: string): string | undefined {
+  try {
+    const sources = (JSON.parse(readFileSync(resolve(dir, "BUILD.json"), "utf8")) as { sources?: unknown }).sources;
+    return typeof sources === "string" ? sources : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** The Rust render needs the engine package in the build this script serves,
- *  built from the Rust sources in the tree. Say so up front instead of timing
- *  out on every game scene, or rendering an old engine that only the CI drift
- *  gate would catch (#1369). A run against an already-served BASE_URL builds
- *  nothing here, so it is not checked. CI checks its package the same way
- *  (.github/actions/engine-wasm-download), so this holds there too. */
+ *  the one package.json pins (`@verticopolis/engine`). Say so up front instead
+ *  of timing out on every game scene, or rendering an old engine that only the
+ *  CI drift gate would catch (#1369). A run against an already-served BASE_URL
+ *  builds nothing here, so it is not checked. */
 export function assertEnginePackage(): void {
   if (process.env.BASE_URL) return;
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   if (!existsSync(resolve(root, "src", "public", "engine", "BUILD.json"))) {
-    throw new Error("The gallery renders on the Rust engine, but src/public/engine/ has no engine package: run `npm run wasm:build`.");
+    throw new Error("The gallery renders on the Rust engine, but src/public/engine/ has no engine package: run `npm install`.");
   }
   // The tooling package is what a VC_TOOLING=1 build serves, and dist/ is
   // what RUN_SERVER's `vite preview` serves.
-  const dirs = ["src/public/engine", "engine-rs/pkg-web-tooling", ...(process.env.RUN_SERVER ? ["dist/engine"] : [])];
-  const stale = staleEnginePackages(root, engineSourceHash(resolve(root, "engine-rs")), dirs);
+  const pinned = recordedSources(resolve(root, "node_modules/@verticopolis/engine/web"));
+  const dirs = ["src/public/engine", "node_modules/@verticopolis/engine-tooling/web", ...(process.env.RUN_SERVER ? ["dist/engine"] : [])];
+  const stale = dirs.filter((d) => existsSync(resolve(root, d, "BUILD.json")) && recordedSources(resolve(root, d)) !== pinned);
   if (stale.length > 0) {
-    throw new Error(`The engine package was built from other Rust sources than the tree's: ${stale.join(", ")}. Run \`npm run wasm:build\`, then \`VC_TOOLING=1 npm run build\` again before a RUN_SERVER run.`);
+    throw new Error(`The served engine package is not the pinned @verticopolis/engine: ${stale.join(", ")}. Run \`npm install\`, then \`VC_TOOLING=1 npm run build\` again before a RUN_SERVER run.`);
   }
 }
 

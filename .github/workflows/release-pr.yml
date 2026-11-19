@@ -62,7 +62,6 @@ jobs:
           git checkout -b release/pending
           if [ -n "$APP" ]; then npm run release -- --app "$APP"; else npm run release; fi
           app=$(node -p 'require("./package.json").version')
-          crate=$(awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }' engine-rs/Cargo.toml)
           branch="release/$app"
           if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
             echo "::error::$branch already exists on origin; merge or delete its PR first"
@@ -70,7 +69,6 @@ jobs:
           fi
           git branch -m "$branch"
           title="Release $app"
-          if ! git diff --quiet HEAD -- engine-rs/Cargo.toml; then title="$title (engine crate $crate)"; fi
           git add -A
           git commit -m "$title"
           git push origin "$branch"
@@ -78,7 +76,6 @@ jobs:
             echo "Cut by the **Cut release** workflow from the pending change notes on main $base."
             echo
             echo "- App: $app"
-            echo "- Engine crate: $crate"
             echo
             echo "**Start the checks:** this PR was opened by the workflow token, which starts no runs on its own. Start the required checks with the run button on this PR if GitHub shows one, or else close and reopen this PR."
             echo

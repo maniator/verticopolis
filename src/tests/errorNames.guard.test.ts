@@ -88,7 +88,7 @@ describe("error class names", () => {
   it("finds the game's Error subclasses", () => {
     // A scan that matched nothing would pass every check below vacuously.
     expect(classes.map((c) => c.name)).toEqual(
-      expect.arrayContaining(["EngineBootError", "EnginePackageError", "SaveTooLargeError", "TowerTooLargeError"]),
+      expect.arrayContaining(["ReadDeadlineError", "SaveTooLargeError", "TowerTooLargeError", "FileSpaceFullError"]),
     );
   });
 

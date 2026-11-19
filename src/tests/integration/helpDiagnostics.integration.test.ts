@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
-import { IDENTITY_FIXTURE } from "../../wasmhost/engineIdentity.fixture";
+import { IDENTITY_FIXTURE } from "../engineFixtures/engineIdentity.fixture";
 
 /**
  * About this game carries the engine diagnostics (#963), and its Copy

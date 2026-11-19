@@ -1,8 +1,8 @@
 import { it, expect } from "vitest";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
-import { catalogFacility } from "../../catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
 import { catalogFor } from "../catalogFixture";
-import type { FacilityKind, GameMode, Unit } from "../../shared/types";
+import type { FacilityKind, GameMode, Unit } from "@verticopolis/components/shared/types";
 import { PortSim, describeEngines, type Leg, type Draft } from "../portKit/portSim";
 
 /** Every kind the player prices, as the engine's Modern catalog publishes it

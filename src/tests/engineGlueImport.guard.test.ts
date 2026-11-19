@@ -5,32 +5,30 @@ import { repoRel, sourceFiles } from "./guardFiles";
 
 /**
  * The engine package runs only after the byte check (#985, criterion 5). The
- * check lives in `src/wasmhost/loadEngineModule.ts`; a module that imports
- * the glue by a computed URL, or calls the unchecked loader, would run files
- * nobody hashed with every other test still green (the engine worker and the
- * dual run's worker had no test of their own at the time this guard landed).
+ * check lives in the components package's host (`host/loadEngineModule`); a
+ * game module that imports the glue by a computed URL, or calls the unchecked
+ * loader, would run files nobody hashed with every other test still green.
  *
- * So: a `import()` whose argument is not a string literal may appear only in
- * the files named below, and the unchecked loaders in engineLoad.ts (`initEngineGlue`, the
- * development serve's route, and `compileEngineBinary`, which it uses) are
- * named only by the checked loader or by engineLoad.ts itself.
+ * So: in the game's own sources, an `import()` whose argument is not a string
+ * literal may appear only in the files named below, and the host's unchecked
+ * loaders (`initEngineGlue` and `compileEngineBinary`) are never named: the
+ * game loads the engine only through the host's checked loader.
  */
 const isTestFile = (rel: string): boolean => /\.(test|spec|fixture)\.tsx?$/.test(rel);
 
-/** Computed `import()` allowed: the loader, its development route, and the
- *  perf tooling that loads a package of its own choosing in a page it owns. */
+/** Computed `import()` allowed: the perf tooling that loads a package of its
+ *  own choosing in a page it owns. */
 const COMPUTED_IMPORT_ALLOWED = new Set([
-  "src/wasmhost/loadEngineModule.ts",
-  "src/wasmhost/engineLoad.ts",
   "src/tests/perfCompare/page.ts",
   "src/tests/perfCompare/pageSim.ts",
   "src/tests/perfCompare/nodeCheck.ts",
 ]);
 
-/** The unchecked loaders in engineLoad.ts (each fetches or imports the package on its own), and who may name them. */
+/** The host's unchecked loaders (each fetches or imports the package on its
+ *  own), and the game files that may name them: none. */
 const UNCHECKED_LOADERS: Record<string, ReadonlySet<string>> = {
-  initEngineGlue: new Set(["src/wasmhost/loadEngineModule.ts", "src/wasmhost/engineLoad.ts"]),
-  compileEngineBinary: new Set(["src/wasmhost/engineLoad.ts"]),
+  initEngineGlue: new Set(),
+  compileEngineBinary: new Set(),
 };
 
 function parse(abs: string): ts.SourceFile {
@@ -49,7 +47,7 @@ const sources = sourceFiles("src", [".ts", ".tsx"])
 describe("the engine glue is imported only through the byte check", () => {
   it("scans the source tree", () => {
     expect(sources.length).toBeGreaterThan(100);
-    expect(sources.map((f) => f.rel)).toContain("src/wasmhost/loadEngineModule.ts");
+    expect(sources.map((f) => f.rel)).toContain("src/main.ts");
   });
 
   it("allows an import() of a computed module only in the named files", () => {

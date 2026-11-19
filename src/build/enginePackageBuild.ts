@@ -9,8 +9,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { precacheFile } from "../precacheEntry.ts";
-import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames.ts";
-import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEnginePackage } from "../wasmhost/enginePackageRecord.ts";
+import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "@verticopolis/components/host/enginePackageNames";
+import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEnginePackage } from "@verticopolis/components/host/enginePackageRecord";
 
 /** A text file as the page reads it: the page's TextDecoder drops a leading
  *  byte order mark, so the build does too. */
@@ -37,10 +37,10 @@ export function readExpectedPackage(publicDir: string, mode: "build" | "other"):
   if (!existsSync(file)) {
     // An empty folder counts as no package, as scripts/verify-precache.ts counts it.
     if (!existsSync(dir) || readdirSync(dir).length === 0) return null;
-    throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from a package that exists; rebuild it with npm run wasm:build`);
+    throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from a package that exists; reinstall it with npm install`);
   }
   const parsed = parseEngineRecord(readText(file));
-  if (!parsed.ok) throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); rebuild the package with npm run wasm:build`);
+  if (!parsed.ok) throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); reinstall it with npm install`);
   return { ...expectedOf(parsed.record), revisions: revisionsOf(dir) };
 }
 

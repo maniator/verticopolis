@@ -10,7 +10,7 @@ import { expectEngineHosted } from "./helpers";
  * installed, and on a phone-sized screen its "all cars, all hours" button is on screen and puts the
  * whole fleet on every hour of both day types.
  */
-const TOWER = readFileSync(new URL("../conformance/fixtures/split-tower.vctower", import.meta.url), "utf8");
+const TOWER = readFileSync(new URL("../node_modules/@verticopolis/engine-conformance/fixtures/split-tower.vctower", import.meta.url), "utf8");
 const SHAFT = 1139;
 const PHONE = { width: 390, height: 844 };
 

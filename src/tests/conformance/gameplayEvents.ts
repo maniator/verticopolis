@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { checkCatalog, checkEvent } from "../../events/gameplayCatalog";
+import { checkEvent } from "@verticopolis/components/events/gameplayCatalog";
+import { GAMEPLAY_EVENT_RULES } from "@verticopolis/components/events/gameplayEventRules";
 import type { ScenarioEngine } from "./scenario";
 
 /**
@@ -9,10 +7,9 @@ import type { ScenarioEngine } from "./scenario";
  * drains and hashes (`conformance/README.md`, Checkpoints).
  */
 
-// Resolved from this file: scenario.ts imports this module, so its
-// CONFORMANCE_DIR is not set yet when this runs.
-const CATALOG = resolve(dirname(fileURLToPath(import.meta.url)), "../../../engine-rs/src/gameplay/catalog.json");
-const catalog = checkCatalog(JSON.parse(readFileSync(CATALOG, "utf8")));
+// The catalog's enums and payload fields, as the components package ships
+// them (generated from the engine's catalog), without its prose.
+const catalog = GAMEPLAY_EVENT_RULES;
 
 /** Drain an engine's gameplay events for hashing: none may have been pushed
  *  out of a full ring (the scenario must checkpoint more often), and each

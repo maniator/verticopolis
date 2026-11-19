@@ -10,8 +10,8 @@
 #   exit 0  -> SKIP   (nothing that reaches the deployed app changed)
 #
 # A production deploy is also held (skipped) while a pending change note in
-# .changes/ asks for an app or crate release (see held_notes below), and it
-# builds only for a commit that changes the app or crate version, so production
+# .changes/ asks for an app release (see held_notes below), and it builds
+# only for a commit that changes the app version, so production
 # moves only on a release merge. Vercel's git integration no longer deploys
 # production (vercel.json turns it off for main); the production deploy
 # workflow (.github/workflows/deploy-production.yml) runs this script with
@@ -19,7 +19,8 @@
 # it exits 1, so this production branch is still the release gate.
 #
 # A deploy is skipped when every changed file is one that never reaches the
-# deployed app, its WASM engine package or the build checks that gate them.
+# deployed app or the build checks that gate it. The engine package comes
+# from npm (package.json), so a change to it is a package file change.
 # This is a denylist on purpose: a path nobody listed builds, so a forgotten
 # entry costs one harmless extra build and never a missed deploy.
 #
@@ -27,12 +28,8 @@
 #   - docs, skills, bmad artifacts, workflows, e2e, and the tools/ folder
 #   - the root doc markdown and the lint and Playwright configs
 #   - unit and integration test files, and src/tests
-#   - the engine's Rust tests and consumer crate, and its markdown
-#   - the hour-boundary bench crate (engine-bench/), which only its weekly
-#     workflow builds
 #   - .pr_agent.toml, the PR review bot's settings, and .mcp.json, the
 #     agents' MCP servers
-#   - the conformance suite, except the files the engine crate compiles in
 #   - standalone dev scripts (screenshots, perf, fuzz, PostHog, rollback,
 #     release and version check)
 #
@@ -41,14 +38,7 @@
 #     checkout, so it can change the bytes of built files
 #   - docs/screenshots: the help site's pages (help-site/src/content/docs/)
 #     show those pictures at /help
-#   - docs/engine-site/src/styles: the help site wears the engine docs site's
-#     theme
-#   - docs/engine-site/src/components/TitleBar.astro and
-#     docs/engine-site/title-bar.mjs: the help site draws the shared title bar
 #   - CHANGELOG.md: the build reads it into version.json `notes`
-#   - the conformance lock files (catalog-digests, events/, expected,
-#     loader-cases, tdt-cases): the engine crate includes some with
-#     include_str!, and src/build/engineCompat.ts digests all five
 #   - .changes/: the release PR deletes the notes, and the production deploy
 #     that lifts the hold must see that diff and build
 #   - everything else, including api/, scripts the build runs, package files
@@ -66,10 +56,8 @@ set -uo pipefail
 # (build), 1 when it cannot (skip). Unknown paths build.
 affects_deploy() {
   case "$1" in
-    # Reach the deployed /help site: its pages show the screenshots, and it
-    # wears the engine docs site's theme and title bar.
-    docs/screenshots/* | docs/engine-site/src/styles/*) return 0 ;;
-    docs/engine-site/src/components/TitleBar.astro | docs/engine-site/title-bar.mjs) return 0 ;;
+    # Reach the deployed /help site: its pages show the screenshots.
+    docs/screenshots/*) return 0 ;;
 
     # Documentation, agent skills, workflows and other repo meta.
     docs/* | _bmad/* | _bmad-output/* | .agents/* | .claude/* | .github/* | .vscode/*) return 1 ;;
@@ -82,28 +70,11 @@ affects_deploy() {
     src/*.test.ts | src/*.test.tsx) return 1 ;;
     src/tests/*) return 1 ;;
 
-    # The engine crate's Rust tests, consumer crate and markdown. Its src/,
-    # Cargo.toml and Cargo.lock build.
-    engine-rs/tests/* | engine-rs/consumer/*) return 1 ;;
-    engine-rs/README.md | engine-rs/CRATE_README.md | engine-rs/API.md | engine-rs/CHANGELOG.md) return 1 ;;
-    # The weekly hour-boundary bench, a crate of its own that no build reads.
-    engine-bench/*) return 1 ;;
-
-    # The conformance suite. The lock files build (engineCompat.ts LOCK_FILES);
-    # the fixtures, scenarios and fuzz corpus are read only by tests.
-    conformance/catalog-digests.json | conformance/expected.json) return 0 ;;
-    conformance/loader-cases.json | conformance/tdt-cases.json) return 0 ;;
-    # The fixtures the engine's rule tests compile in (include_str!, include_bytes!).
-    conformance/fixtures/sixseven_2.vctower | conformance/fixtures/split-tower.vctower | conformance/fixtures/split-tower-4.vctower | conformance/fixtures/towerone_6.vctower) return 0 ;;
-    conformance/fixtures/regression/split-tower-26.vctower | conformance/fixtures/regression/split-tower-26-remembered.vctower | conformance/fixtures/regression/split-tower-29.vctower | conformance/fixtures/regression/split-tower-31.vctower | conformance/fixtures/regression/split-tower-32.vctower) return 0 ;;
-    conformance/*) return 1 ;;
-
-    # Standalone dev scripts that no build step imports or runs.
     scripts/screenshot* | scripts/scenes/*) return 1 ;;
     scripts/perf-* | scripts/fuzz-* | scripts/posthog-* | scripts/rollback-*) return 1 ;;
     scripts/test-port.ts | scripts/derive-fixture.ts) return 1 ;;
     scripts/release.ts | scripts/version-check.ts) return 1 ;;
-    scripts/engine-bundle-size.ts | scripts/engine-compat.ts | scripts/export-atlas.ts | scripts/atlas-bundle.ts) return 1 ;;
+    scripts/engine-bundle-size.ts) return 1 ;;
     scripts/persistence-failures.* | scripts/reliability-coverage.* | scripts/engine-reliability.* | scripts/backlog-priority-labels.*) return 1 ;;
   esac
   return 0
@@ -119,12 +90,11 @@ if [ "${1:-}" = "--classify" ]; then
   exit 0
 fi
 
-# The pending change notes whose app or crate level is not `none`, one path per
+# The pending change notes whose app level is not `none`, one path per
 # line. A merged feature PR leaves its note in .changes/ (src/build/changeNotes.ts)
 # and the release PR raises the versions and deletes the notes. Until then a
 # production build would ship the new behavior under the old version and the old
-# "What's new" notes, and report the old crate version beside a new lock, so
-# production waits for the release PR. Previews still build.
+# "What's new" notes, so production waits for the release PR. Previews still build.
 held_notes() {
   local note
   for note in .changes/*.md; do
@@ -136,7 +106,7 @@ held_notes() {
       NR == 1 && $0 != "---" { exit }
       NR > 1 && $0 == "---" { exit }
       { v = $0; sub(/[ \t]*#.*$/, "", v); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v) }
-      v ~ /^(app|crate):/ {
+      v ~ /^app:/ {
         sub(/^[a-z]+:[ \t]*/, "", v)
         if (v != "none") { print FILENAME; exit }
       }' "$note"
@@ -159,19 +129,17 @@ fi
 # boundary); the build only runs `git rev-parse HEAD`, which that does not
 # affect. Prints why and returns non-zero when it cannot fetch.
 # Production deploys only on a release merge (owner, 2026-11-11): a push to main
-# whose commit leaves the app version (package.json) and the engine crate
-# version (engine-rs/Cargo.toml) as its first parent had them is skipped,
-# however much else changed. The release PR raises one or both, so its merge
+# whose commit leaves the app version (package.json) as its first parent had
+# it is skipped, however much else changed. The release PR raises it, so its merge
 # commit is the deploy. This reads the push's own commit and its first parent,
 # which every clone has, and not the previous deploy, which can arrive without
 # its file contents or fail to fetch; it runs before the previous deploy is
 # resolved, so neither can bypass it. With no parent to read, it falls through
 # to the per-path diff below. Previews build per change below.
 app_version() { git show "$1:package.json" 2>/dev/null | sed -n 's/^  "version": "\(.*\)",$/\1/p' | head -n 1; }
-crate_version() { git show "$1:engine-rs/Cargo.toml" 2>/dev/null | awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }'; }
 if [ "${VERCEL_ENV:-}" = "production" ]; then
   parent="$(git rev-parse --verify --quiet 'HEAD^1' || true)"
-  if [ -n "$parent" ] && [ "$(app_version "$parent")" = "$(app_version HEAD)" ] && [ "$(crate_version "$parent")" = "$(crate_version HEAD)" ]; then
+  if [ -n "$parent" ] && [ "$(app_version "$parent")" = "$(app_version HEAD)" ]; then
     echo "vercel-ignore-build: production deploys only on a release merge, and this commit changes no version; skipping."
     exit 0
   fi

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { toolInfoFor, toolInfoTemplate } from "./toolInfo";
 import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
-import { groupDigits } from "../format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * The tool-info panel bodies (E5-S2, event-driven). Package: the build-kind

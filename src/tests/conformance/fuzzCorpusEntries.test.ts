@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { corpusDir, corpusFiles, goldenDir, goldenFiles } from "./fuzzCorpus";
-import { CONFORMANCE_DIR, loadScenario, type Scenario } from "./scenario";
+import { loadScenario, type Scenario } from "./scenario";
+import { conformanceFile } from "../packagePaths";
 
 /**
  * What the fuzz corpus entries must look like. The corpus job replays them on
@@ -24,7 +25,7 @@ describe("the fuzz corpus entries", () => {
     const { start } = load(file);
     if ("newGame" in start) return;
     expect(start.fixture.startsWith("conformance/fixtures/")).toBe(true);
-    expect(existsSync(join(CONFORMANCE_DIR, "..", start.fixture))).toBe(true);
+    expect(existsSync(conformanceFile(start.fixture))).toBe(true);
   });
 
   it.each(entries)("%s is named after its file", (file) => {

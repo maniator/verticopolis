@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { catalogFacility, catalogTileCost } from "../catalog/catalogTypes";
-import { viewWorld } from "../presentation/viewWorld";
-import { PortCodes } from "../simport/portCodes";
+import { catalogFacility, catalogTileCost } from "@verticopolis/components/catalog/catalogTypes";
+import { viewWorld } from "@verticopolis/components/presentation/viewWorld";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { catalogFor } from "../tests/catalogFixture";
 import { LAYOUT, mockPort } from "../tests/portKit/mockPort";
 import { brushTiles } from "../ui/placement";
-import { groupDigits } from "../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 import { BuildActions, type BuildActionsDeps } from "./buildActions";
 
 /**

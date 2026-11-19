@@ -1,5 +1,5 @@
 import { takeCrashReload, tabStore, withoutSavedPeople } from "../engineCrash/crashReload";
-import type { EnginePort } from "../simport/enginePort";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { SaveGame } from "../storage/SaveGame";
 import { loadStored, newerSaveRefused } from "./portLifecycle";
 

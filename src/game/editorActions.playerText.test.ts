@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { knownPlayerText, resetPlayerTextForTest } from "../analyticsPlayerText";
 import { office, rec, root, setup } from "./editorActions.fixture";
 
-vi.mock("../simport/headerClock", () => ({
+vi.mock("@verticopolis/components/port/headerClock", () => ({
   clockOf: () => ({ hour: 9, isWeekend: true }),
 }));
 

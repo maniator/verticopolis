@@ -1,6 +1,6 @@
 import { vi } from "vitest";
-import type { AutoTuneDay, AutoTuneProposal, PresetProposal, ScheduleFacts } from "../simport/enginePort";
-import { SCHEDULE_HOURS } from "../simport/scheduleSlots";
+import type { AutoTuneDay, AutoTuneProposal, PresetProposal, ScheduleFacts } from "@verticopolis/components/port/enginePort";
+import { SCHEDULE_HOURS } from "@verticopolis/components/port/scheduleSlots";
 import { makeUI, mountAppDom } from "../tests/uiFixture";
 import type { FloorRow } from "./templates/elevatorSchedule";
 import { scheduleDialogUX } from "./scheduleDialogRules";

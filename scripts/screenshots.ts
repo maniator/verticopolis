@@ -40,7 +40,7 @@
  * SHOTS_DIR relocates the output gallery (used by the determinism guard to render
  * two independent runs into separate roots concurrently). The gallery renders
  * on the Rust engine (WASM), which needs the engine package in
- * src/public/engine/ (npm run wasm:build); see screenshot-engine.ts.
+ * src/public/engine/ (npm install); see screenshot-engine.ts.
  *
  * TypeScript runs natively on Node ≥ 22.18 (type-stripping): no build step, no
  * extra dep. Keep every module here ERASABLE (type annotations / interfaces /

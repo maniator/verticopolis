@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeHeader } from "../../wasmhost/frameView";
+import { decodeHeader } from "@verticopolis/components/host/frameView";
 import { hasWasmPackage, startWasmHandle } from "../conformance/wasmEngine";
 
 /**
@@ -14,7 +14,7 @@ const run = hasWasmPackage();
 describe.runIf(run)("a refused bomb ransom through the WASM binding", () => {
   for (const mode of ["classic", "modern"] as const) {
     it(`${mode}: starts a search the game can draw, with no outcome yet`, () => {
-      const w = startWasmHandle({ fixture: "conformance/fixtures/towerone-star4.vctower", mode });
+      const w = startWasmHandle({ fixture: "node_modules/@verticopolis/engine-conformance/fixtures/towerone-star4.vctower", mode });
       try {
         let hours = 0;
         while (!(w.pendingChoice() ?? "").includes("bombThreat")) {

@@ -1,9 +1,9 @@
 import type { TemplateResult } from "lit-html";
-import type { Transport, Unit } from "../shared/types";
-import type { EnginePort } from "../simport/enginePort";
-import { clockOf } from "../simport/headerClock";
-import { PortCodes } from "../simport/portCodes";
-import type { ViewReader } from "../simport/viewReader";
+import type { Transport, Unit } from "@verticopolis/components/shared/types";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { clockOf } from "@verticopolis/components/port/headerClock";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import type { ViewReader } from "@verticopolis/components/port/viewReader";
 import type { Draft } from "../tests/portKit/drafts";
 import { unitEditorTemplate, transportEditorTemplate } from "../ui/templates/editor";
 import { unitInspectorTemplate, transportInspectorTemplate } from "../ui/templates/inspector";

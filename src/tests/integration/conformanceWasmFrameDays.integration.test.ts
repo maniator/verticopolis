@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { WasmEngine } from "../../engineBinding/binding";
-import { readCatalog } from "../../engineBinding/catalog";
-import type { EnginePort } from "../../simport/enginePort";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import { readCatalog } from "@verticopolis/components/binding/catalog";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import {
@@ -40,7 +40,7 @@ import { FRAME_DAYS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * the engine package is built.
  */
 
-if (UPDATE && !hasWasmPackage()) throw new Error("the frame-day golden needs the engine package (VC_FRAME_DAYS_UPDATE=1), and engine-rs/pkg/ is not built; run npm run wasm:build");
+if (UPDATE && !hasWasmPackage()) throw new Error("the frame-day golden needs the engine package (VC_FRAME_DAYS_UPDATE=1), and @verticopolis/engine-tooling is not installed; run npm install");
 
 /** A fresh Rust engine; the case loads or founds its own tower over the
  *  placeholder it starts with. The views are hashed in canonical form, as the

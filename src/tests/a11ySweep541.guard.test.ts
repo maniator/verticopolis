@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import { gameStylesheet } from "./gameStylesheet.ts";
+import { srcFile } from "./packagePaths";
 
 /**
  * Static guards for the markup/CSS half of the #541 a11y/UX sweep: the toast
@@ -13,8 +12,7 @@ import { gameStylesheet } from "./gameStylesheet.ts";
  * pinned by their own colocated unit tests.
  */
 
-const srcRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (rel: string): string => readFileSync(resolve(srcRoot, rel), "utf8");
+const read = (rel: string): string => readFileSync(srcFile(rel), "utf8");
 
 const indexHtml = read("index.html");
 const stylesCss = gameStylesheet();

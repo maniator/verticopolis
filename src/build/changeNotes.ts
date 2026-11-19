@@ -4,23 +4,20 @@
  *
  *     ---
  *     app: minor
- *     crate: none
- *     readmes: unchanged   (optional, see below)
  *     ---
  *     ## Player
  *     - Elevators now skip floors with nobody waiting.
- *     ## Engine
- *     - (only when `crate` is not none) what changed in the engine's contract.
  *     ## Contributors
  *     - (optional, any level) who to thank and for what.
  *
- * `app` and `crate` take `major`, `minor`, `patch` or `none`, by the tier rules
- * in CONTRIBUTING.md "Versioning". `readmes: unchanged` says the PR changes the
- * engine and its author checked that both engine READMEs (the WASM package's
- * and the crate's) still describe it; `scripts/version-check.ts` asks for that
- * line or a README edit on every engine change. The release driver runs `npm run release`
- * (`scripts/release.ts`) on a `release/` branch: it raises each version by the
- * highest pending level, writes the changelog sections from the notes and
+ * `app` takes `major`, `minor`, `patch` or `none`, by the tier rules in
+ * CONTRIBUTING.md "Versioning". The engine is versioned and released from
+ * Verticopolis/engine; the game moves to a new engine by raising
+ * `@verticopolis/engine` in package.json, which is a game change like any
+ * other. Notes written before the split say `crate: none`, which is still
+ * read and means nothing. The release driver runs `npm run release`
+ * (`scripts/release.ts`) on a `release/` branch: it raises the version by the
+ * highest pending level, writes the changelog section from the notes and
  * deletes them. `scripts/version-check.ts` (run in CI) keeps feature PRs off
  * the version lines and checks a release PR's arithmetic, and
  * `scripts/vercel-ignore-build.sh` holds production deploys while a note with a
@@ -44,26 +41,22 @@ export interface ChangeNote {
   /** The file name inside `.changes/`. */
   file: string;
   app: Level;
-  crate: Level;
   /** Lines for `CHANGELOG.md`, the player-facing "What's new". */
   player: string[];
-  /** Lines for `engine-rs/CHANGELOG.md`. */
-  engine: string[];
   /** Who to thank in the release notes: a community author, reporter or
    *  tester, by the name they go by, and what they did. */
   contributors: string[];
-  /** `readmes: unchanged`: the engine READMEs were checked and still hold. */
-  readmesUnchanged?: boolean;
 }
 
 /** A note's file name: a branch slug, lower case, ending in `.md`. */
 const NOTE_NAME = /^[a-z0-9][a-z0-9._-]*\.md$/;
-type Section = "player" | "engine" | "contributors";
+type Section = "player" | "contributors";
 const SECTIONS = new Map<string, Section>([
   ["## Player", "player"],
-  ["## Engine", "engine"],
   ["## Contributors", "contributors"],
 ]);
+/** Where a note's engine change goes now. */
+const ENGINE_HOME = "the engine is versioned in Verticopolis/engine: write its change there, and raise @verticopolis/engine here once it is released";
 const EM_DASH = "—";
 
 export function isNoteFile(name: string): boolean {
@@ -80,35 +73,28 @@ export function parseNote(text: string, file: string): ChangeNote {
   if (lines[0] !== "---") fail('the first line must be "---"');
   const close = lines.indexOf("---", 1);
   if (close < 0) fail('the front matter has no closing "---"');
-  const levels: Partial<Record<"app" | "crate", Level>> = {};
-  let readmesUnchanged = false;
+  let app: Level | undefined;
   for (const raw of lines.slice(1, close)) {
     const line = raw.replace(/#.*$/, "").trim();
     if (line === "") continue;
-    const readmes = /^readmes:\s*(\S+)$/.exec(line);
-    if (readmes) {
-      if (readmesUnchanged) fail("readmes is set twice");
-      if (readmes[1] !== "unchanged") fail(`readmes: ${readmes[1]} is not "unchanged" (leave the line out when the PR updates a README)`);
-      readmesUnchanged = true;
-      continue;
-    }
-    const m = /^(app|crate):\s*(\S+)$/.exec(line);
-    if (!m) fail(`"${raw}" is not "app: <level>", "crate: <level>" or "readmes: unchanged"`);
-    const [, key, value] = m as RegExpExecArray;
-    const k = key as "app" | "crate";
-    if (levels[k] !== undefined) fail(`${k} is set twice`);
-    if (!(LEVELS as readonly string[]).includes(value)) fail(`${k}: ${value} is not one of ${LEVELS.join(", ")}`);
-    levels[k] = value as Level;
+    // A note from before the split; its only allowed value says nothing.
+    if (line === "crate: none") continue;
+    if (/^(crate|readmes):/.test(line)) fail(`"${raw}": ${ENGINE_HOME}`);
+    const m = /^app:\s*(\S+)$/.exec(line);
+    if (!m) fail(`"${raw}" is not "app: <level>"`);
+    const value = (m as RegExpExecArray)[1];
+    if (app !== undefined) fail("app is set twice");
+    if (!(LEVELS as readonly string[]).includes(value)) fail(`app: ${value} is not one of ${LEVELS.join(", ")}`);
+    app = value as Level;
   }
-  if (levels.app === undefined) fail("the front matter has no app level");
-  if (levels.crate === undefined) fail("the front matter has no crate level");
-  const note: ChangeNote = { file, app: levels.app as Level, crate: levels.crate as Level, player: [], engine: [], contributors: [] };
-  if (readmesUnchanged) note.readmesUnchanged = true;
+  if (app === undefined) fail("the front matter has no app level");
+  const note: ChangeNote = { file, app: app as Level, player: [], contributors: [] };
   let section: Section | null = null;
   const seen = new Set<string>();
   for (const raw of lines.slice(close + 1)) {
     const line = raw.trimEnd();
     if (line === "") continue;
+    if (line === "## Engine") fail(`## Engine: ${ENGINE_HOME}`);
     const heading = SECTIONS.get(line);
     if (heading !== undefined) {
       if (seen.has(line)) fail(`${line} appears twice`);
@@ -116,7 +102,7 @@ export function parseNote(text: string, file: string): ChangeNote {
       section = heading;
       continue;
     }
-    if (section === null) fail(`"${line}" comes before a "## Player", "## Engine" or "## Contributors" heading`);
+    if (section === null) fail(`"${line}" comes before a "## Player" or "## Contributors" heading`);
     if (!line.startsWith("- ") || line.trim() === "-") fail(`"${line}" is not a one-line "- " bullet`);
     const bullet = line.slice(2).trim();
     if (!bullet.endsWith(".")) fail(`"${bullet}" does not end with a period`);
@@ -124,8 +110,6 @@ export function parseNote(text: string, file: string): ChangeNote {
     note[section as Section].push(bullet);
   }
   if (note.app === "none" && note.player.length > 0) fail("Player lines need an app level other than none");
-  if (note.crate === "none" && note.engine.length > 0) fail("Engine lines need a crate level other than none");
-  if (note.crate !== "none" && note.engine.length === 0) fail("a crate level needs at least one Engine line for engine-rs/CHANGELOG.md");
   if (note.app !== "none" && note.player.length === 0) fail("an app level needs at least one Player line for CHANGELOG.md and the update prompt");
   return note;
 }
@@ -155,6 +139,21 @@ export function headlineFirst<T extends Pick<ChangeNote, "app">>(notes: readonly
 
 const PLAIN_SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 
+/**
+ * Whether `to` is a later plain `x.y.z` than `from`. A pre-release, a build
+ * suffix, a lower number or the same number is not a bump.
+ */
+export function isSemverIncrease(from: string, to: string): boolean {
+  const a = PLAIN_SEMVER.exec(from);
+  const b = PLAIN_SEMVER.exec(to);
+  if (!a || !b) return false;
+  for (let i = 1; i <= 3; i++) {
+    const d = Number(b[i]) - Number(a[i]);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
 /** `version` raised by `level`, the way `npm version <level>` raises it. */
 export function bumpVersion(version: string, level: Level): string {
   const m = PLAIN_SEMVER.exec(version);
@@ -173,12 +172,12 @@ export function changelogVersions(changelog: string): string[] {
 
 /**
  * The notes a release must keep because their credits went nowhere: when the
- * app does not move, CHANGELOG.md gets no section, so a note that moves
- * neither version and credits someone waits for the next app release.
+ * app does not move, CHANGELOG.md gets no section, so a note that credits
+ * someone waits for the next app release.
  */
 export function notesKeptForCredits(notes: readonly ChangeNote[], appMoved: boolean): ChangeNote[] {
   if (appMoved) return [];
-  return notes.filter((n) => n.crate === "none" && n.contributors.length > 0);
+  return notes.filter((n) => n.contributors.length > 0);
 }
 
 /** The notes' Contributors lines, each once, in note order. */
@@ -202,53 +201,4 @@ export function insertSection(changelog: string, heading: string, bullets: reado
   const at = changelog.search(/^## /m);
   if (at < 0) return `${changelog.replace(/\s*$/, "")}${eol}${eol}${section}`;
   return changelog.slice(0, at) + section + changelog.slice(at);
-}
-
-/** The `version = "…"` line of a Cargo.toml's `[package]` table, by line index. */
-function packageVersionLine(lines: string[]): number {
-  const start = lines.findIndex((l) => l.trim() === "[package]");
-  if (start < 0) throw new Error("Cargo.toml has no [package] table");
-  for (let i = start + 1; i < lines.length && !lines[i].trim().startsWith("["); i++) {
-    if (/^version\s*=\s*"[^"]*"\s*$/.test(lines[i].trim())) return i;
-  }
-  throw new Error("Cargo.toml's [package] table has no version line");
-}
-
-/** A Cargo.toml with its `[package]` version set to `version`. */
-export function setCargoVersion(cargoToml: string, version: string): string {
-  const lines = cargoToml.split("\n");
-  const i = packageVersionLine(lines);
-  lines[i] = lines[i].replace(/"[^"]*"/, `"${version}"`);
-  return lines.join("\n");
-}
-
-/** A Cargo.lock with package `name`'s version set to `version`. */
-export function setLockVersion(cargoLock: string, name: string, version: string): string {
-  const entry = new RegExp(`(name = "${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"\\r?\\nversion = ")[^"]*(")`);
-  if (!entry.test(cargoLock)) throw new Error(`the lockfile has no ${name} entry`);
-  return cargoLock.replace(entry, `$1${version}$2`);
-}
-
-/** The engine guides whose examples pin a crate release. */
-export const ENGINE_PIN_DOCS = ["docs/engine-site/guides/crate.md", "docs/engine-site/guides/javascript.md"];
-const PIN_TAG = /(tag = "engine-v)\d+\.\d+\.\d+(")/g;
-const PIN_EXACT = /`"\d+\.\d+\.\d+"`, not `"\^\d+\.\d+\.\d+"`/g;
-
-/**
- * A guide with every example pin set to crate `version`: the git tag
- * (`tag = "engine-v1.2.3"`) and the exact-version note (`"1.2.3"`, not
- * `"^1.2.3"`). A guide with no pin throws, so a reworded guide stops the
- * release instead of going stale (#2080).
- */
-export function setEnginePins(guide: string, version: string): string {
-  if (guide.match(PIN_TAG) === null && guide.match(PIN_EXACT) === null) throw new Error("the guide pins no engine release");
-  return movePins(guide, version);
-}
-
-/** A guide with its example pins blanked, so the release check can tell a
- *  moved pin (allowed on a release branch) from any other edit (#2080). */
-export const blankEnginePins = (guide: string): string => movePins(guide, "");
-
-function movePins(guide: string, version: string): string {
-  return guide.replace(PIN_TAG, `$1${version}$2`).replace(PIN_EXACT, `\`"${version}"\`, not \`"^${version}"\``);
 }

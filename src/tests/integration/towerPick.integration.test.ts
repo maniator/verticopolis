@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import * as ex from "excalibur";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
-import { pickEntityAt } from "../../render/excalibur/towerInputCamera";
-import type { TowerEngine } from "../../render/excalibur/TowerEngine";
-import { FLOOR, TILE } from "../../render/scale";
+import { pickEntityAt } from "@verticopolis/components/render/excalibur/towerInputCamera";
+import type { TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
+import { FLOOR, TILE } from "@verticopolis/components/render/scale";
 import { look, newEngine, noEngine } from "../portKit/rustEngine";
 
 /**

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import type { Unit } from "../shared/types";
-import type { Transport } from "../shared/types";
+import type { Unit } from "@verticopolis/components/shared/types";
+import type { Transport } from "@verticopolis/components/shared/types";
 import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
 
 /**
@@ -21,11 +21,13 @@ const rec = vi.hoisted(() => ({
   captions: [] as string[],
 }));
 
-vi.mock("../render/pixelSprites", () => ({ drawRoom: () => {} }));
-vi.mock("../render/sprites", () => ({
+vi.mock("@verticopolis/components/render/pixelSprites", () => ({ drawRoom: () => {} }));
+vi.mock("@verticopolis/components/render/sprites", () => ({
   drawUnit: (_d: unknown, u: Unit, _x: number, _y: number, w: number, h: number) => {
     rec.units.push({ u, w, h });
   },
+}));
+vi.mock("@verticopolis/components/render/sprites/transport", () => ({
   drawTransport: (_ctx: unknown, t: Transport, _x: number, _y: number, w: number, floorH: number) => {
     rec.transports.push({ t, w, floorH });
   },
@@ -36,7 +38,7 @@ vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
 // The gallery reads the Rust engine's catalog before it draws. This run has no
 // engine package, so the engine's stand-in answers with the Rust catalog's
 // checked-in fixture; what the page does with it is what these guards watch.
-vi.mock("../wasmhost/rustEngine", async () => {
+vi.mock("@verticopolis/components/host/rustEngine", async () => {
   const { readFileSync } = await import("node:fs");
   const { catalogFixturePath } = await import("./catalogFixture");
   return { loadWasmEngine: async () => ({ catalog: (mode: "classic" | "modern") => readFileSync(catalogFixturePath(mode), "utf8") }) };

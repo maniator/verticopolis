@@ -11,13 +11,14 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Engine } from "../../engineBinding/engine";
+import type { Engine } from "@verticopolis/engine-tooling/node/verticopolis_engine";
 import { stampText } from "../../storage/saveStamp";
 import { inflateCapped } from "../../storage/saveCompression";
 import { packHere } from "../../storage/savePacker";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
-const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
+const FIXTURES = resolve(CONFORMANCE_ROOT, "fixtures");
 const fixtures = readdirSync(FIXTURES)
   .filter((f) => f.endsWith(".vctower"))
   .sort();

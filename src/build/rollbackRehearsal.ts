@@ -21,7 +21,19 @@
  * `scripts/rollback-rehearsal.ts` runs under plain `node`; never imported by the
  * app. The procedure is `_bmad-output/planning-artifacts/release-3.0-rollback-rehearsal.md`.
  */
-import { isSemverIncrease, type CompatRecord } from "./engineCompat.ts";
+import { isSemverIncrease } from "./changeNotes.ts";
+
+/** What a build's engine says about the formats it reads and writes: its
+ *  identity record (`engineIdentity()`) and its view layout's version. */
+export interface CompatRecord {
+  crateVersion: string;
+  saveVersion: number;
+  oldestSaveVersion: number;
+  frameLayoutVersion: number;
+  viewLayoutVersion: number;
+  catalogVersion: number;
+  identitySchema: number;
+}
 
 /** The path of a value in a save, with every array index written as `[]`. */
 export type SavePath = string;

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { repoRoot } from "./guardFiles";
-import { versionLine } from "../wasmhost/engineLabel";
-import { IDENTITY_FIXTURE } from "../wasmhost/engineIdentity.fixture";
+import { versionLine } from "@verticopolis/components/host/engineLabel";
+import { IDENTITY_FIXTURE } from "./engineFixtures/engineIdentity.fixture";
 
 /**
  * The GitHub issue forms (`.github/ISSUE_TEMPLATE/`) are the first thing a

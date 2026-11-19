@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import type { SerializedGame, Unit, VacateReason } from "../../shared/types";
+import type { SerializedGame, Unit, VacateReason } from "@verticopolis/components/shared/types";
 import {
   CONFORMANCE_DIR,
   firstDivergence,
@@ -11,7 +11,7 @@ import {
   type ScenarioEngine,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../engineBinding/binding";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
 
 /**
  * The diagnostics facts (#1215, facade slice 6c) over the whole conformance

@@ -4,27 +4,15 @@
  * and asks these functions what is wrong.
  *
  * A feature PR leaves every version line as main has it, keeps main's pending
- * notes, adds or edits a note when it changes a deployed path, and declares a
- * crate level when it moves a compatibility pin, and edits an engine guide or
- * README (or says in its note that they all still hold) when it changes the engine. A release PR (a `release/`
- * branch) consumes every pending note and raises each version by exactly the
- * highest pending level (only the app may go to a later version the driver
- * names, such as 3.0.0), and changes nothing but the release files.
+ * notes, and adds or edits a note when it changes a deployed path. A release
+ * PR (a `release/` branch) consumes every pending note and raises the app
+ * version by exactly the highest pending level (or to a later version the
+ * driver names, such as 3.0.0), and changes nothing but the release files.
+ * The engine is versioned in Verticopolis/engine.
  *
  * Node only, and ERASABLE (see scripts/screenshot-env.ts); never imported by the app.
  */
-import {
-  CHANGES_DIR,
-  ENGINE_PIN_DOCS,
-  blankEnginePins,
-  bumpVersion,
-  changelogVersions,
-  highestLevel,
-  isNoteFile,
-  parseNote,
-  type ChangeNote,
-} from "./changeNotes.ts";
-import { COMPAT_RECORD_PATH, cargoPackage, isSemverIncrease } from "./engineCompat.ts";
+import { CHANGES_DIR, bumpVersion, changelogVersions, highestLevel, isNoteFile, isSemverIncrease, parseNote, type ChangeNote } from "./changeNotes.ts";
 
 /** One commit's files, read by repository path. */
 export interface Tree {
@@ -40,18 +28,7 @@ export interface Change {
 }
 
 /** The files a release PR writes, and a feature PR leaves at main's versions. */
-export const RELEASE_FILES = [
-  "package.json",
-  "package-lock.json",
-  "CHANGELOG.md",
-  "engine-rs/Cargo.toml",
-  "engine-rs/Cargo.lock",
-  "engine-rs/consumer/Cargo.lock",
-  "engine-bench/Cargo.lock",
-  "engine-rs/CHANGELOG.md",
-  COMPAT_RECORD_PATH,
-  ...ENGINE_PIN_DOCS,
-] as const;
+export const RELEASE_FILES = ["package.json", "package-lock.json", "CHANGELOG.md"] as const;
 
 export const RELEASE_BRANCH = /^release\//;
 /** Dependabot's branches: it cannot write a note, and a dependency bump with no
@@ -63,12 +40,7 @@ export interface Versions {
   app: string;
   "package-lock.json version": string;
   "package-lock.json root package version": string;
-  crate: string;
-  "engine-rs/Cargo.lock crate version": string;
-  "engine-rs/consumer/Cargo.lock crate version": string;
-  "compat record crateVersion": string;
   "CHANGELOG.md sections": string;
-  "engine-rs/CHANGELOG.md sections": string;
 }
 
 function need(tree: Tree, path: string): string {
@@ -77,25 +49,14 @@ function need(tree: Tree, path: string): string {
   return text.replace(/\r\n/g, "\n");
 }
 
-function lockVersion(lock: string, name: string): string {
-  return new RegExp(`name = "${name}"\\nversion = "([^"]+)"`).exec(lock)?.[1] ?? "(no entry)";
-}
-
 export function versionsOf(tree: Tree): Versions {
   const pkg = JSON.parse(need(tree, "package.json")) as { version: string };
   const lock = JSON.parse(need(tree, "package-lock.json")) as { version?: string; packages?: Record<string, { version?: string }> };
-  const crate = cargoPackage(need(tree, "engine-rs/Cargo.toml"));
-  const record = JSON.parse(need(tree, COMPAT_RECORD_PATH)) as { crateVersion: string };
   return {
     app: pkg.version,
     "package-lock.json version": lock.version ?? "(none)",
     "package-lock.json root package version": lock.packages?.[""]?.version ?? "(none)",
-    crate: crate.version,
-    "engine-rs/Cargo.lock crate version": lockVersion(need(tree, "engine-rs/Cargo.lock"), crate.name),
-    "engine-rs/consumer/Cargo.lock crate version": lockVersion(need(tree, "engine-rs/consumer/Cargo.lock"), crate.name),
-    "compat record crateVersion": record.crateVersion,
     "CHANGELOG.md sections": changelogVersions(need(tree, "CHANGELOG.md")).join(", "),
-    "engine-rs/CHANGELOG.md sections": changelogVersions(need(tree, "engine-rs/CHANGELOG.md")).join(", "),
   };
 }
 
@@ -115,52 +76,6 @@ export function notesOf(tree: Tree): { notes: ChangeNote[]; errors: string[] } {
 
 const isNotePath = (path: string): boolean =>
   path.startsWith(`${CHANGES_DIR}/`) && !path.slice(CHANGES_DIR.length + 1).includes("/") && isNoteFile(path.slice(CHANGES_DIR.length + 1));
-
-/** The compatibility pins that moved, the crate version aside. */
-function movedPins(base: Tree, head: Tree): string[] {
-  const a = JSON.parse(need(base, COMPAT_RECORD_PATH)) as Record<string, unknown>;
-  const b = JSON.parse(need(head, COMPAT_RECORD_PATH)) as Record<string, unknown>;
-  return [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => k !== "crateVersion" && a[k] !== b[k]);
-}
-
-/** The pages an engine user reads: the full guides on the docs site, and the
- *  short READMEs the npm package and the crate show on their registries,
- *  which point at the guides. */
-export const ENGINE_READMES = [
-  "docs/engine-site/guides/javascript.md",
-  "docs/engine-site/guides/crate.md",
-  "packages/verticopolis-engine/README.md",
-  "engine-rs/CRATE_README.md",
-] as const;
-
-/** Engine code a README can describe: the crate's library source (its tests and
- *  command-line tools aside) and the binding declaration the WASM package ships. */
-export function isEngineSource(path: string): boolean {
-  if (path === "src/engineBinding/engine.d.ts") return true;
-  if (!path.startsWith("engine-rs/src/") || !path.endsWith(".rs")) return false;
-  if (path.startsWith("engine-rs/src/bin/")) return false;
-  return !path.endsWith("_tests.rs") && !path.endsWith("/tests.rs");
-}
-
-/**
- * A PR that changes the engine either edits an engine guide or README, or says,
- * with `readmes: unchanged` in its own note, that its author checked they all
- * still hold.
- * A note that says so while the PR edits a README is contradicting itself.
- */
-function checkReadmes(changes: readonly Change[], own: readonly ChangeNote[]): string[] {
-  const engine = changes.filter((c) => isEngineSource(c.path)).map((c) => c.path);
-  const readmes = changes.filter((c) => c.status !== "D" && (ENGINE_READMES as readonly string[]).includes(c.path)).map((c) => c.path);
-  const ack = own.filter((n) => n.readmesUnchanged).map((n) => `${CHANGES_DIR}/${n.file}`);
-  if (ack.length > 0 && readmes.length > 0) {
-    return [`${ack.join(", ")} says readmes: unchanged, but this PR edits ${readmes.join(" and ")}: drop the line.`];
-  }
-  if (engine.length === 0 || readmes.length > 0 || ack.length > 0) return [];
-  const sample = engine.slice(0, 3).join(", ") + (engine.length > 3 ? `, and ${engine.length - 3} more` : "");
-  return [
-    `this PR changes the engine (${sample}) and no engine guide or README: update ${ENGINE_READMES.join(", ")} where they no longer describe the engine, or add "readmes: unchanged" to this PR's note once you have checked that they all still hold (CONTRIBUTING.md "Versioning").`,
-  ];
-}
 
 const RELEASE_HOW = "versions move only in a release PR (`npm run release` on a release/ branch); add a .changes note with the tier instead (CONTRIBUTING.md \"Versioning\")";
 
@@ -184,19 +99,12 @@ export function checkFeature(base: Tree, head: Tree, changes: readonly Change[],
       errors.push(`${c.path} is a pending note main already has, from a merged PR: leave it to the release and add .changes/<branch-slug>-2.md for this PR.`);
     }
   }
-  const { notes, errors: unreadable } = notesOf(head);
-  errors.push(...unreadable);
+  errors.push(...notesOf(head).errors);
   const touched = changes.filter((c) => c.status !== "D" && isNotePath(c.path));
   const shipped = changes.map((c) => c.path).filter((p) => deployed.has(p) && !p.startsWith(`${CHANGES_DIR}/`));
   if (shipped.length > 0 && touched.length === 0 && !noteOptional) {
     const sample = shipped.slice(0, 3).join(", ") + (shipped.length > 3 ? `, and ${shipped.length - 3} more` : "");
-    errors.push(`this PR changes deployed paths (${sample}) and adds no .changes note: add .changes/<branch-slug>.md, with app: none and crate: none when no player or engine user would notice.`);
-  }
-  const pins = movedPins(base, head);
-  const own = new Set(touched.map((c) => c.path.slice(CHANGES_DIR.length + 1)));
-  if (!noteOptional) errors.push(...checkReadmes(changes, notes.filter((n) => own.has(n.file))));
-  if (pins.length > 0 && !notes.some((n) => own.has(n.file) && n.crate !== "none")) {
-    errors.push(`${pins.join(", ")} moved in ${COMPAT_RECORD_PATH} and this PR's note declares no crate level: set crate: and add an Engine line (CONTRIBUTING.md "The engine crate version").`);
+    errors.push(`this PR changes deployed paths (${sample}) and adds no .changes note: add .changes/<branch-slug>.md, with app: none when no player would notice.`);
   }
   return errors;
 }
@@ -211,13 +119,9 @@ function checkBump(errors: string[], what: string, from: string, to: string, not
 }
 
 /** A version line blanked, so two copies compare equal when only it differs. */
-const blank = (pattern: RegExp) => (text: string) => text.replace(pattern, "$1");
-const CRATE_LOCK = /(name = "verticopolis-engine"\nversion = )"[^"]*"/;
-
 /** Each release file with its version fields blanked; a release PR may change
- *  nothing else in them. The changelogs are free to edit (the driver curates
- *  the new section), the compat record may change only its crateVersion, and
- *  the engine guides only their example pins. */
+ *  nothing else in them. The changelog is free to edit (the driver curates
+ *  the new section). */
 const VERSION_FREE: Partial<Record<string, (text: string) => string>> = {
   "package.json": (t) => JSON.stringify({ ...JSON.parse(t), version: null }),
   "package-lock.json": (t) => {
@@ -226,12 +130,6 @@ const VERSION_FREE: Partial<Record<string, (text: string) => string>> = {
     const packages = root ? { ...lock.packages, "": { ...root, version: null } } : lock.packages;
     return JSON.stringify({ ...lock, version: null, packages });
   },
-  "engine-rs/Cargo.toml": blank(/(\[package\][^[]*?\nversion = )"[^"]*"/),
-  "engine-rs/Cargo.lock": blank(CRATE_LOCK),
-  "engine-rs/consumer/Cargo.lock": blank(CRATE_LOCK),
-  "engine-bench/Cargo.lock": blank(CRATE_LOCK),
-  [COMPAT_RECORD_PATH]: (t) => JSON.stringify({ ...JSON.parse(t), crateVersion: null }),
-  ...Object.fromEntries(ENGINE_PIN_DOCS.map((guide) => [guide, blankEnginePins])),
 };
 
 /** What a release PR got wrong. */
@@ -245,22 +143,17 @@ export function checkRelease(base: Tree, head: Tree, changes: readonly Change[])
   const was = versionsOf(base);
   const now = versionsOf(head);
   checkBump(errors, "app", was.app, now.app, notes, (n) => n.app, true);
-  checkBump(errors, "crate", was.crate, now.crate, notes, (n) => n.crate, false);
   const same = (key: keyof Versions, want: string) => {
     if (now[key] !== want) errors.push(`${key} is "${now[key]}" and should be "${want}".`);
   };
   same("package-lock.json version", now.app);
   same("package-lock.json root package version", now.app);
-  same("engine-rs/Cargo.lock crate version", now.crate);
-  same("engine-rs/consumer/Cargo.lock crate version", now.crate);
-  same("compat record crateVersion", now.crate);
   if (now.app !== was.app && now["CHANGELOG.md sections"].split(", ")[0] !== now.app) errors.push(`CHANGELOG.md has no ${now.app} section at the top.`);
-  if (now.crate !== was.crate && now["engine-rs/CHANGELOG.md sections"].split(", ")[0] !== now.crate) errors.push(`engine-rs/CHANGELOG.md has no ${now.crate} section at the top.`);
   const release = new Set<string>(RELEASE_FILES);
   for (const c of changes) {
     if (c.status === "D" && isNotePath(c.path)) continue;
     if (!release.has(c.path)) {
-      errors.push(`${c.path} changed: a release PR changes only versions, changelogs and the notes it consumes.`);
+      errors.push(`${c.path} changed: a release PR changes only the version, the changelog and the notes it consumes.`);
       continue;
     }
     const strip = VERSION_FREE[c.path];

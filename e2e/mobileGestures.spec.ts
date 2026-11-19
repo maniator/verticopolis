@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { FLOOR } from "../src/render/scale";
+import { FLOOR } from "@verticopolis/components/render/scale";
 import { dispatchTouch, expectEngineHosted } from "./helpers";
 
 // Every test must end with its tower still on the engine.

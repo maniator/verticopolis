@@ -11,7 +11,8 @@ vertical metropolis you build floor by floor. Wire it with elevators, attract
 tenants, set the rents, keep everyone happy, and climb the star ratings all the
 way to a coveted **TOWER**.
 
-The simulation is a **Rust** engine (`engine-rs/`) compiled to
+The simulation is a **Rust** engine
+([Verticopolis/engine](https://github.com/Verticopolis/engine)) compiled to
 **WebAssembly**, and it is the only engine the game runs. Everything around it
 is **TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)** game
 engine (camera, scene, culling and the render loop). The music is a
@@ -57,14 +58,12 @@ the developer's checklist is [PARITY.md](PARITY.md).
 ## Quick start
 
 ```bash
-npm install
-npm run wasm:build   # build the Rust engine package (needs the toolchain in engine-rs/README.md)
-npm run dev          # open the printed localhost URL
+npm install   # also installs the engine and components packages the game pins
+npm run dev   # open the printed localhost URL
 ```
 
-The game cannot start without the engine package. On x86_64 Linux,
-`bash scripts/build-engine-wasm.sh` installs the pinned Rust toolchain and builds
-it in one step.
+No Rust toolchain is needed: the engine comes from npm as
+`@verticopolis/engine`, built and published from Verticopolis/engine.
 
 ## The Verticopolis repositories
 
@@ -75,9 +74,9 @@ it in one step.
 | [Verticopolis/components](https://github.com/Verticopolis/components) | `@verticopolis/components`: the renderer, the Windows 95 windows and menus, the sprites and audio, and the engine binding |
 
 The engine and the components were split out of this repository with their
-history. Until the game builds from their packages, their code still lives
-here too (`engine-rs/`, `src/render/`, `src/ui/` and the rest), and changes
-to those folders are on hold here until then. Each repository has its own
+history, and the game builds from their npm packages. A change to the
+simulation, the renderer, the sprites or the audio goes to their repository;
+this one raises the pins in `package.json` to pick it up. Each repository has its own
 issue forms; the organization-wide funding link, security policy and the
 shared PR template and issue form checks live in
 [Verticopolis/.github](https://github.com/Verticopolis/.github).
@@ -88,7 +87,7 @@ shared PR template and issue form checks live in
 | --- | --- |
 | [Your first tower](https://help.verticopolis.com/first-tower/) | [CONTRIBUTING.md](CONTRIBUTING.md): setup, quality gates, tests and coverage, versioning, review |
 | [Controls](https://help.verticopolis.com/controls/) (mouse, touch, keyboard) | [ARCHITECTURE.md](ARCHITECTURE.md): source layout, the frame loop, input, saves, the PWA; deeper pages in [docs/architecture/](docs/architecture/README.md) |
-| [Rooms](https://help.verticopolis.com/rooms/) | [engine-rs/README.md](engine-rs/README.md): working on the simulation |
+| [Rooms](https://help.verticopolis.com/rooms/) | [Verticopolis/engine](https://github.com/Verticopolis/engine): working on the simulation |
 | [Map and windows](https://help.verticopolis.com/tower/map-and-windows/) | [docs.verticopolis.com](https://docs.verticopolis.com/): the engine package, crate, API and conformance |
 | [Importing and exporting](https://help.verticopolis.com/your-towers/importing-exporting/) | [docs/canon/tdt-format.md](docs/canon/tdt-format.md): the `.TDT` save format |
 | [The whole manual](https://help.verticopolis.com/) | [docs/screenshots.md](docs/screenshots.md): the screenshot gallery and how it is rendered, including the [1★ to TOWER ladder](docs/screenshots/milestones/) |

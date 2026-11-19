@@ -1,9 +1,9 @@
 import type { GameApp } from "../main";
 import { isCrashed, isEngineStopped, isRecoveringGraphics, isSplashUp, isDialogOpen } from "./interactionState";
 import { flushPrefsSave } from "./audioPrefs";
-import { isPrimaryPress, noButtonHeld } from "../ui/overviewMapInput";
+import { isPrimaryPress, noButtonHeld } from "@verticopolis/components/windows/overviewMapInput";
 import { keyId } from "../ui/overviewMapKeys";
-import { isSpaceKey, wheelZoomDelta } from "../shared/inputEvents";
+import { isSpaceKey, wheelZoomDelta } from "@verticopolis/components/shared/inputEvents";
 import { heldEnter } from "./heldEnter";
 
 /**

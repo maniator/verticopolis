@@ -1,16 +1,16 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { iconTemplate } from "../icons";
+import { iconTemplate } from "@verticopolis/components/windows/icons";
 import { keyed } from "lit-html/directives/keyed.js";
-import { isOperational, isTenanted } from "../../shared/unitState";
-import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, filmPolicyEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog, type CatalogCalendar, type CatalogRentCadence } from "../../catalog/catalogTypes";
-import type { ScreenDetail, TransportDetail, UnitDetail } from "../../simport/panels";
+import { isOperational, isTenanted } from "@verticopolis/components/shared/unitState";
+import { isCommercialKind, isHotelKind } from "@verticopolis/components/presentation/viewKinds";
+import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, filmPolicyEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog, type CatalogCalendar, type CatalogRentCadence } from "@verticopolis/components/catalog/catalogTypes";
+import type { ScreenDetail, TransportDetail, UnitDetail } from "@verticopolis/components/port/panels";
 import { catalogCalendar, priceOptionsFor, rentPerCollection } from "../catalogPricing";
-import type { CalendarKind } from "../../shared/engineTypes";
+import type { CalendarKind } from "@verticopolis/components/shared/engineTypes";
 import { hasAccessDiagnostic, occupantsText } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { isBasementFloor } from "../floorLabel";
-import { floorTag, groupDigits } from "../format";
+import { floorTag, groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * The editor card bodies (E6-S1), pure functions of (card, catalog, mobile).

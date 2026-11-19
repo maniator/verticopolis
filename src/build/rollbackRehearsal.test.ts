@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { CompatRecord } from "./engineCompat.ts";
 import {
   buildReport,
   diffSaves,
@@ -11,20 +10,19 @@ import {
   staleAllowances,
   type AllowedLoss,
   type BuildFacts,
+  type CompatRecord,
   type EngineHandle,
   type EnginePackage,
 } from "./rollbackRehearsal.ts";
 
 const compat = (over: Partial<CompatRecord> = {}): CompatRecord => ({
   crateVersion: "1.5.2",
-  lockDigest: "x",
   saveVersion: 7,
   oldestSaveVersion: 1,
   frameLayoutVersion: 1,
   viewLayoutVersion: 8,
   catalogVersion: 5,
   identitySchema: 1,
-  interfaceDigest: "y",
   ...over,
 });
 const facts = (label: string, appVersion: string, over: Partial<CompatRecord> = {}): BuildFacts => ({ label, appVersion, compat: compat(over) });

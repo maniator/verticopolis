@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootGame } from "./bootstrap";
-import { EngineBootError } from "./wasmhost/engineBoot";
-import { EnginePackageError } from "./wasmhost/enginePackageCheck";
+import { EngineBootError } from "@verticopolis/components/host/engineBoot";
+import { EnginePackageError } from "@verticopolis/components/host/enginePackageCheck";
 import { ENGINE_LOADING_DELAY_MS, ENGINE_LOADING_TEXT } from "./engineLoading";
 import { resetEngineStatus } from "./analyticsEngineStatus";
 import { MISMATCH_RELOAD_KEY } from "./engineCrash/mismatchReload";
@@ -13,8 +13,8 @@ vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 // A package load the test settles itself, to hold the boot while it looks at the cover.
 const held = vi.hoisted(() => ({ fail: (_e: Error) => {} }));
 const noop = held.fail;
-vi.mock("./wasmhost/rustEngine", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./wasmhost/rustEngine")>()),
+vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>()),
   loadWasmEngine: vi.fn(() => new Promise((_, reject) => (held.fail = reject))),
 }));
 

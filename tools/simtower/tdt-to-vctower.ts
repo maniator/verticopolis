@@ -9,7 +9,7 @@
 // byte-diffs it against the first input (a real empty SimTower save), to find
 // what our exporter emits differently.
 //
-// Runs the Rust engine package (`npm run wasm:build` first) under tsx, so it
+// Runs the Rust engine package (`npm install` first) under tsx, so it
 // exercises the codec the app ships.
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";

@@ -4,11 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../../main";
 import { jumpFrame, jumpToTraffic, lineSpan, updateTraffic } from "../../game/trafficHud";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
-import { TRAFFIC_LABELS, trafficTier, linePressure, type LineWaitTier } from "../../presentation/traffic";
+import { TRAFFIC_LABELS, trafficTier, linePressure, type LineWaitTier } from "@verticopolis/components/presentation/traffic";
 import { floorLabel } from "../../ui/floorLabel";
-import type { EnginePort } from "../../simport/enginePort";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { PortCodes } from "../../simport/portCodes";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 
 vi.mock("../../analytics", () => ({ trackAppAction: vi.fn() }));
 

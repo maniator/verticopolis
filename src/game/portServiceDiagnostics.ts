@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { ServiceDiagnosticFacts } from "../simport/enginePort";
+import type { ServiceDiagnosticFacts } from "@verticopolis/components/port/enginePort";
 import type { SupplementalLines } from "./portUnitDiagnostics";
-import { groupDigits } from "../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * Sole source of player-facing service diagnostic copy for both engines.

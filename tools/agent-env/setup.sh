@@ -3,15 +3,12 @@
 # (Claude Code cloud sessions run it from .claude/hooks/session-start.sh; a
 # Codex environment's setup script and a person's fresh Linux box can call it
 # directly). It installs what CI uses, so the agent can run every quality
-# gate, build the engine, run e2e and render screenshots in the pinned
-# Playwright image itself:
+# gate, run e2e and render screenshots in the pinned Playwright image itself:
 #
 #   - Node.js at the .nvmrc version (package.json engines asks for 26.x)
-#   - npm dependencies (npm ci, skipped while the lockfile is unchanged)
-#   - Rust at the engine's rust-version, as the default toolchain, with
-#     rustfmt, clippy and the wasm32 target
-#   - the engine WASM package (scripts/build-engine-wasm.sh, which pins and
-#     checksums wasm-bindgen), skipped while it matches the Rust sources
+#   - npm dependencies (npm ci, skipped while the lockfile is unchanged),
+#     which include the engine packages the game pins (Verticopolis/engine
+#     builds them, so no Rust toolchain is needed here)
 #   - Docker: starts dockerd when it is installed and not running, and pulls
 #     the pinned Playwright image in the background
 #   - the Playwright MCP server package, so .mcp.json starts it quickly
@@ -121,51 +118,6 @@ if ! sha256sum --check --status "$hashes" 2>/dev/null; then
   fi
 fi
 
-# --- Rust toolchain -------------------------------------------------------------
-# The version engine-rs.yml pins, made the default so cargo fmt, clippy, test
-# and the wasm build all use it without RUSTUP_TOOLCHAIN.
-if [ -x "$HOME/.cargo/bin/rustup" ]; then
-  case ":$PATH:" in *":$HOME/.cargo/bin:"*) ;; *) export PATH="$HOME/.cargo/bin:$PATH" ;; esac
-  env_line "export PATH=\"$HOME/.cargo/bin:\$PATH\""
-fi
-RUST_WANT="$(sed -n 's/^rust-version *= *"\([0-9.]*\)"/\1/p' engine-rs/Cargo.toml 2>/dev/null | head -1)"
-case "$RUST_WANT" in *.*.*) ;; ?*) RUST_WANT="${RUST_WANT}.0" ;; esac
-if [ -n "$RUST_WANT" ] && ! command -v rustup >/dev/null 2>&1; then
-  warn "rustup is not installed; scripts/build-engine-wasm.sh installs it below"
-elif [ -n "$RUST_WANT" ]; then
-  if ! rustup target list --installed --toolchain "$RUST_WANT" 2>/dev/null | grep -qx wasm32-unknown-unknown \
-    || ! rustup component list --installed --toolchain "$RUST_WANT" 2>/dev/null | grep -q '^clippy' \
-    || ! rustup component list --installed --toolchain "$RUST_WANT" 2>/dev/null | grep -q '^rustfmt'; then
-    say "installing Rust ${RUST_WANT} (rustfmt, clippy, wasm32)"
-    if ! { rustup toolchain install "$RUST_WANT" --profile minimal --component rustfmt,clippy \
-        && rustup target add wasm32-unknown-unknown --toolchain "$RUST_WANT"; } > "$LOG_DIR/rustup.log" 2>&1; then
-      warn "Rust ${RUST_WANT} install failed (log: $LOG_DIR/rustup.log)"
-    fi
-  fi
-  rustup default "$RUST_WANT" > /dev/null 2>&1 || true
-fi
-
-# --- Engine WASM package --------------------------------------------------------
-# Built when missing or stale against the Rust sources (the check the
-# engine-wasm action makes). After an engine-rs edit, run `npm run wasm:build`.
-engine_current() {
-  # Both flavors (#1057): the player package and the tooling ones a dev serve,
-  # a VC_TOOLING=1 build and the WASM suites use.
-  [ -f src/public/engine/BUILD.json ] && [ -f engine-rs/pkg-web-tooling/BUILD.json ] && [ -f engine-rs/pkg/verticopolis_engine.js ] && [ -f engine-rs/pkg-player/verticopolis_engine.js ] || return 1
-  local want built
-  want="$(node --input-type=module -e 'import { engineSourceHash } from "./src/wasmhost/packageHash.ts"; process.stdout.write(engineSourceHash("engine-rs"))' 2>/dev/null)" || return 1
-  built="$(node -p 'require("./src/public/engine/BUILD.json").sources' 2>/dev/null)" || return 1
-  [ -n "$want" ] && [ "$want" = "$built" ]
-}
-if [ -d node_modules ] && ! engine_current; then
-  say "building the engine WASM package (one to three minutes)"
-  if bash scripts/build-engine-wasm.sh > "$LOG_DIR/engine-wasm.log" 2>&1; then
-    say "engine package built"
-  else
-    warn "engine build failed (log: $LOG_DIR/engine-wasm.log); rerun: bash scripts/build-engine-wasm.sh"
-  fi
-fi
-
 # --- Playwright on the host -----------------------------------------------------
 # The lockfile's Playwright wants its own Chromium build, and its download host
 # may be blocked; point e2e and the MCP server at a preinstalled Chromium
@@ -233,5 +185,5 @@ if [ -z "${AGENT_ENV_NO_DOCKER:-}" ] && command -v dockerd >/dev/null 2>&1; then
   fi
 fi
 
-say "ready: node $(node -v 2>/dev/null), $(rustc --version 2>/dev/null | cut -d' ' -f1-2), $(wasm-bindgen --version 2>/dev/null)"
+say "ready: node $(node -v 2>/dev/null)"
 exit 0

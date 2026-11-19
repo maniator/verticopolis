@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import type { FacilityKind, UnitState } from "../shared/types";
-import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
-import { extentFloors, fitLayout, mapExtent } from "../render/overviewMap/geometry";
-import { HOTEL_VIEW_STYLE } from "../render/overviewMap/hotelView";
-import type { MapPaintContext, PatternSource } from "../render/overviewMap/paint";
+import type { FacilityKind, UnitState } from "@verticopolis/components/shared/types";
+import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
+import { extentFloors, fitLayout, mapExtent } from "@verticopolis/components/render/overviewMap/geometry";
+import { HOTEL_VIEW_STYLE } from "@verticopolis/components/render/overviewMap/hotelView";
+import type { MapPaintContext, PatternSource } from "@verticopolis/components/render/overviewMap/paint";
 import { MAP_DOM_ID } from "./overviewMapDom";
 import { MAP_PICKER_DOM } from "./overviewMapPicker";
 import { gameHour, MINUTES_PER_GAME_HOUR, OverviewMapViews, type MapViewRoom } from "./overviewMapViews";

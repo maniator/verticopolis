@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import type { Person } from "../../shared/engineTypes";
-import type { FacilityKind } from "../../shared/types";
+import type { Person } from "@verticopolis/components/shared/engineTypes";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { PortSim, describeEngines, type Leg, draftTower } from "../portKit/portSim";
 import { roomTallies } from "../portKit/rooms";
 

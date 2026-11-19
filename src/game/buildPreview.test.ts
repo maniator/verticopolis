@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useTowerCatalogSource } from "../catalog/towerCatalog";
-import type { GameMode } from "../shared/types";
-import { PortCodes } from "../simport/portCodes";
+import { useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
+import type { GameMode } from "@verticopolis/components/shared/types";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { catalogFor } from "../tests/catalogFixture";
 import { code, mockPort, record } from "../tests/portKit/mockPort";
 import { brushTiles, snapX } from "../ui/placement";

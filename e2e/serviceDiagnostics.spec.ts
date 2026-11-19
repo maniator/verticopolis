@@ -3,7 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   serviceDiagnosticsFixture, retailServiceFixture, underServedRetailFixture, withHotelState, type FixtureBuilder,
 } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import type { SerializedGame } from "../src/shared/types";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
 import { buildInPage, expectEngineHosted } from "./helpers";
 
 /**

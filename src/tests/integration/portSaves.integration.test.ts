@@ -2,11 +2,12 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { floorsOfPort, newViewReader } from "../../game/portAccess";
-import type { FacilityKind } from "../../shared/types";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { decodeVctower } from "../../storage/vctowerContainer";
-import { clockOf } from "../../simport/headerClock";
-import type { EnginePort } from "../../simport/enginePort";
+import { clockOf } from "@verticopolis/components/port/headerClock";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { engineFromSave, look, noEngine } from "../portKit/rustEngine";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
 /**
  * The shared reader and the header's clock on the conformance saves, on the
@@ -33,7 +34,7 @@ const roomsOf = (e: EnginePort) => look(e).tower.units.filter((u) => !STRUCTURE.
 
 describe.skipIf(noEngine)("the port's reads on the conformance saves", () => {
   it("reads a loaded save's clock, on every conformance save", () => {
-    const dir = resolve(__dirname, "../../../conformance/fixtures");
+    const dir = resolve(CONFORMANCE_ROOT, "fixtures");
     const saves = readdirSync(dir).filter((f) => f.endsWith(".vctower"));
     expect(saves.sort()).toEqual(SAVES.map(([f]) => f).sort());
     for (const [f, format, retro] of SAVES) {
@@ -45,7 +46,7 @@ describe.skipIf(noEngine)("the port's reads on the conformance saves", () => {
 
   it("answers every story of a taller room as the tower's own index does", () => {
     // split-tower-4 holds cinemas and party halls (2 floors) and a metro (3).
-    const e = engineFromSave(JSON.stringify(decodeVctower(readFileSync(resolve(__dirname, "../../../conformance/fixtures/split-tower-4.vctower"), "utf8"))));
+    const e = engineFromSave(JSON.stringify(decodeVctower(readFileSync(resolve(CONFORMANCE_ROOT, "fixtures/split-tower-4.vctower"), "utf8"))));
     const r = newViewReader(e);
     const floorsOf = floorsOfPort(e);
     const own = look(e).tower;

@@ -12,8 +12,8 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The package load is stubbed so boot runs without an engine package. The
 // default package has a save writer, the one part boot requires of it.
 const wasmStub = vi.hoisted(() => ({ loadError: null as Error | null, module: { Engine: class {}, encodeVctower: () => "" } as unknown }));
-vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./wasmhost/rustEngine")>();
+vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>();
   return {
     ...real,
     loadWasmEngine: vi.fn(async () => {

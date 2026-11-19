@@ -5,7 +5,7 @@ import { rebuildEngine } from "./engineWiring";
 // The real renderer needs WebGL, which a headless run lacks; the rebuild only
 // needs a renderer it can wire, configure and start.
 const { built } = vi.hoisted(() => ({ built: [] as unknown[] }));
-vi.mock("../render/excalibur/TowerEngine", () => ({
+vi.mock("@verticopolis/components/render/excalibur/TowerEngine", () => ({
   TowerEngine: class {
     preview: unknown = null;
     transportPreview: unknown = null;

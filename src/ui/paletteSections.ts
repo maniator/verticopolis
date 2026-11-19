@@ -11,7 +11,7 @@
  * write is dropped.
  */
 
-import { isSpaceKey } from "../shared/inputEvents";
+import { isSpaceKey } from "@verticopolis/components/shared/inputEvents";
 
 export const PALETTE_FOLDED_STORAGE_KEY = "vc-tools-folded-groups";
 

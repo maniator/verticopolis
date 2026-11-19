@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { repoRel, sourceFiles } from "./guardFiles";
+import { srcFile } from "./packagePaths";
 
 /**
  * One player-facing name for the engine (#1197, spec "One player-facing
@@ -15,15 +16,17 @@ import { repoRel, sourceFiles } from "./guardFiles";
  * identifiers keep their names.
  */
 
+/** The engine's copy modules: the host's (from the components package, as
+ *  it ships them) and the game's own. */
 const COPY_MODULES = [
-  "src/wasmhost/engineLabel.ts",
-  "src/wasmhost/engineDiagnostics.ts",
-  "src/wasmhost/engineBoot.ts",
-  "src/wasmhost/hostFault.ts",
-  "src/wasmhost/rustEngine.ts",
-  "src/wasmhost/catalogCheck.ts",
-  "src/build/thirdPartyNotices.ts",
-  "src/bootstrap.ts",
+  srcFile("wasmhost/engineLabel.ts"),
+  srcFile("wasmhost/engineDiagnostics.ts"),
+  srcFile("wasmhost/engineBoot.ts"),
+  srcFile("wasmhost/hostFault.ts"),
+  srcFile("wasmhost/rustEngine.ts"),
+  srcFile("wasmhost/catalogCheck.ts"),
+  resolve("src/build/thirdPartyNotices.ts"),
+  resolve("src/bootstrap.ts"),
 ];
 
 const OLD_NAME = /\b(WASM|TypeScript) engine\b/i;
@@ -49,7 +52,7 @@ describe("Rust engine name guard", () => {
   });
 
   it("no player-facing string says WASM engine or TypeScript engine", () => {
-    const files = [...ui, ...COPY_MODULES.map((f) => resolve(f))];
+    const files = [...ui, ...COPY_MODULES];
     expect(files.flatMap(hits)).toEqual([]);
   });
 });

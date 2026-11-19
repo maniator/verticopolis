@@ -1,5 +1,5 @@
 import { trackAppAction } from "../analyticsActions";
-import type { LogEntry } from "../shared/types";
+import type { LogEntry } from "@verticopolis/components/shared/types";
 
 /**
  * Why a drag stopped, said once when it is let go. A drag's steps keep their

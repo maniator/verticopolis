@@ -2,10 +2,10 @@
  * What the overview MAP window (`overviewMapWindow.ts`) is given: the tower
  * it draws, the camera it reads and moves, and the views with their View dropdown.
  */
-import type { FacilityKind } from "../shared/types";
-import type { HallRun } from "../render/lobbyHalls";
-import type { MapCamera, MapCameraCenter, MapWorld } from "../render/overviewMap/geometry";
-import type { MapViewInput } from "../render/overviewMap/model";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { HallRun } from "@verticopolis/components/render/lobbyHalls";
+import type { MapCamera, MapCameraCenter, MapWorld } from "@verticopolis/components/render/overviewMap/geometry";
+import type { MapViewInput } from "@verticopolis/components/render/overviewMap/model";
 import type { OverviewMapViews } from "./overviewMapViews";
 
 /** What the window draws each frame. */

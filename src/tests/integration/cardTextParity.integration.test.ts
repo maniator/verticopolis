@@ -1,11 +1,11 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { useTowerCatalogSource } from "../../catalog/towerCatalog";
-import { readCatalog } from "../../engineBinding/catalog";
+import { useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
+import { readCatalog } from "@verticopolis/components/binding/catalog";
 import { createCardKit } from "../../game/cardKit";
 import { newViewReader } from "../../game/portAccess";
 import { swapDone } from "../../game/portLifecycle";
-import type { EnginePort } from "../../simport/enginePort";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import {
   CARD_TEXT_CASES,
@@ -53,7 +53,7 @@ import { CARD_TEXT_WRITER, writeAfterPassingRun } from "../goldens/updateGate";
  */
 
 const WRITING = CARD_TEXT_WRITER === "rust";
-if (WRITING && !hasWasmPackage()) throw new Error("the card-text sweep needs the engine package (VC_CARD_TEXT_UPDATE=rust); run npm run wasm:build");
+if (WRITING && !hasWasmPackage()) throw new Error("the card-text sweep needs the engine package (VC_CARD_TEXT_UPDATE=rust); run npm install");
 
 const fresh: CardTextGolden[] = [];
 writeAfterPassingRun(

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PersonDetail } from "../simport/personCards";
+import type { PersonDetail } from "@verticopolis/components/port/personCards";
 import { catalogFor } from "../tests/catalogFixture";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { PERSON_FOLLOW_ACTION } from "../ui/templates/personCard";

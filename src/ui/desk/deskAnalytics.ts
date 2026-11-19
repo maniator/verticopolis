@@ -1,7 +1,7 @@
 import { trackAppAction } from "../../analyticsActions";
-import type { DeskWindowId } from "./deskGeometry";
-import type { DeskChange } from "./deskWindow";
-import type { WindowMenuFrom } from "./deskWindowMenu";
+import type { DeskWindowId } from "@verticopolis/components/windows/desk/deskGeometry";
+import type { DeskChange } from "@verticopolis/components/windows/desk/deskWindow";
+import type { WindowMenuFrom } from "@verticopolis/components/windows/desk/deskWindowMenu";
 
 /**
  * The 1994 desk's analytics codes (docs/ui/desk-windows.md and the data map's

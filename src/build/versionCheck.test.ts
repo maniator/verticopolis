@@ -5,23 +5,14 @@ type Files = Record<string, string>;
 
 const pkg = (v: string) => JSON.stringify({ name: "x", version: v });
 const npmLock = (v: string) => JSON.stringify({ name: "x", version: v, packages: { "": { name: "x", version: v } } });
-const toml = (v: string) => `[package]\nname = "verticopolis-engine"\nversion = "${v}"\n`;
-const cargoLock = (v: string) => `[[package]]\nname = "verticopolis-engine"\nversion = "${v}"\n`;
-const record = (v: string, lock = "aaaa") => JSON.stringify({ crateVersion: v, lockDigest: lock, saveVersion: 7 });
-const note = (app: string, crate: string) =>
-  `---\napp: ${app}\ncrate: ${crate}\n---\n${app === "none" ? "" : "## Player\n- A player line.\n"}${crate === "none" ? "" : "## Engine\n- An engine line.\n"}`;
+const note = (app: string) => `---\napp: ${app}\n---\n${app === "none" ? "" : "## Player\n- A player line.\n"}`;
 
-/** Main at app 2.89.1 and crate 1.22.0, plus `extra`. */
+/** Main at app 2.89.1, plus `extra`. */
 function main(extra: Files = {}): Files {
   return {
     "package.json": pkg("2.89.1"),
     "package-lock.json": npmLock("2.89.1"),
     "CHANGELOG.md": "# Changelog\n\n## 2.89.1\n\n- Old.\n",
-    "engine-rs/Cargo.toml": toml("1.22.0"),
-    "engine-rs/Cargo.lock": cargoLock("1.22.0"),
-    "engine-rs/consumer/Cargo.lock": cargoLock("1.22.0"),
-    "engine-rs/CHANGELOG.md": "# Engine changelog\n\n## 1.22.0 (2026-11-10)\n\n- Old.\n",
-    "engine-rs/src/compat-record.json": record("1.22.0"),
     "src/a.ts": "a",
     ...extra,
   };
@@ -54,10 +45,10 @@ const release = (base: Files, head: Files) => checkRelease(tree(base), tree(head
 
 describe("a feature PR", () => {
   it("passes with a note beside a deployed change, and without one for a skipped path", () => {
-    expect(feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": note("minor", "none") }))).toEqual([]);
+    expect(feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": note("minor") }))).toEqual([]);
     expect(feature(main(), main({ "docs/a.md": "b" }))).toEqual([]);
     // A none note counts.
-    expect(feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": note("none", "none") }))).toEqual([]);
+    expect(feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": note("none") }))).toEqual([]);
   });
 
   it("needs a note when it changes a deployed path", () => {
@@ -74,140 +65,80 @@ describe("a feature PR", () => {
       "package.json": pkg("2.90.0"),
       "package-lock.json": npmLock("2.90.0"),
       "CHANGELOG.md": "# Changelog\n\n## 2.90.0\n\n- New.\n\n## 2.89.1\n\n- Old.\n",
-      "engine-rs/Cargo.toml": toml("1.23.0"),
-      "engine-rs/Cargo.lock": cargoLock("1.23.0"),
-      "engine-rs/consumer/Cargo.lock": cargoLock("1.23.0"),
-      "engine-rs/CHANGELOG.md": "## 1.23.0 (2026-11-11)\n\n- New.\n\n## 1.22.0 (2026-11-10)\n",
-      "engine-rs/src/compat-record.json": record("1.23.0"),
-      ".changes/topic.md": note("minor", "minor"),
+      ".changes/topic.md": note("minor"),
     });
     const errors = feature(main(), head);
-    expect(errors).toHaveLength(9);
+    expect(errors).toHaveLength(4);
     for (const e of errors) expect(e).toMatch(/moved from .*release PR/);
   });
 
   it("leaves a merged PR's pending note alone on a reused branch", () => {
-    const pending = main({ ".changes/topic.md": note("minor", "none") });
-    const errors = feature(pending, { ...pending, "src/a.ts": "b", ".changes/topic.md": note("none", "none") });
+    const pending = main({ ".changes/topic.md": note("minor") });
+    const errors = feature(pending, { ...pending, "src/a.ts": "b", ".changes/topic.md": note("none") });
     expect(errors).toEqual([
       ".changes/topic.md is a pending note main already has, from a merged PR: leave it to the release and add .changes/<branch-slug>-2.md for this PR.",
     ]);
-    expect(feature(pending, { ...pending, "src/a.ts": "b", ".changes/topic-2.md": note("none", "none") })).toEqual([]);
+    expect(feature(pending, { ...pending, "src/a.ts": "b", ".changes/topic-2.md": note("none") })).toEqual([]);
   });
 
   it("keeps main's pending notes and reads its own", () => {
-    const pending = main({ ".changes/other.md": note("minor", "none") });
-    const gone = { ...pending, ".changes/topic.md": note("patch", "none"), "src/a.ts": "b" };
+    const pending = main({ ".changes/other.md": note("minor") });
+    const gone = { ...pending, ".changes/topic.md": note("patch"), "src/a.ts": "b" };
     delete (gone as Files)[".changes/other.md"];
     expect(feature(pending, gone)).toEqual([".changes/other.md was deleted: only a release PR consumes notes."]);
     expect(feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": "app: minor\n" }))[0]).toMatch(/first line/);
   });
 
-  it("needs its own crate level when a compatibility pin moves", () => {
-    const moved = { "engine-rs/src/compat-record.json": record("1.22.0", "bbbb"), "src/a.ts": "b" };
-    expect(feature(main(), main({ ...moved, ".changes/topic.md": note("none", "minor") }))).toEqual([]);
-    expect(feature(main(), main({ ...moved, ".changes/topic.md": note("minor", "none") }))[0]).toMatch(/lockDigest moved.*declares no crate level/);
-    // Another PR's pending crate note does not describe this one's change.
-    const pending = main({ ".changes/other.md": note("none", "patch") });
-    expect(feature(pending, { ...pending, ...moved, ".changes/topic.md": note("none", "none") })).toHaveLength(1);
-  });
-});
-
-describe("the engine READMEs on an engine change", () => {
-  const engine = { "engine-rs/src/sim.rs": "changed", "src/a.ts": "b" };
-  const readmesNote = "---\napp: none\ncrate: none\nreadmes: unchanged\n---\n";
-  const deployed = ["src/a.ts", "engine-rs/src/sim.rs"];
-
-  it("needs a README edit or the note's readmes line", () => {
-    const errors = feature(main(), main({ ...engine, ".changes/topic.md": note("none", "none") }), deployed);
+  it("refuses a note that still declares an engine change", () => {
+    const errors = feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": "---\napp: none\ncrate: patch\n---\n" }));
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatch(/changes the engine \(engine-rs\/src\/sim\.rs\) and no engine guide or README.*readmes: unchanged/);
-    expect(feature(main(), main({ ...engine, ".changes/topic.md": readmesNote }), deployed)).toEqual([]);
-    for (const readme of ["docs/engine-site/guides/javascript.md", "docs/engine-site/guides/crate.md", "packages/verticopolis-engine/README.md", "engine-rs/CRATE_README.md"]) {
-      expect(feature(main(), main({ ...engine, [readme]: "new", ".changes/topic.md": note("none", "none") }), deployed)).toEqual([]);
-    }
-  });
-
-  it("counts the binding declaration and leaves tests, tools and other files alone", () => {
-    expect(feature(main(), main({ "src/engineBinding/engine.d.ts": "x", ".changes/topic.md": note("none", "none") }), ["src/engineBinding/engine.d.ts"])[0]).toMatch(/src\/engineBinding\/engine\.d\.ts/);
-    for (const path of ["engine-rs/src/sim_tests.rs", "engine-rs/src/crowd/tests.rs", "engine-rs/src/bin/dump.rs", "engine-rs/tests/api.rs", "engine-rs/README.md"]) {
-      expect(feature(main(), main({ [path]: "x", ".changes/topic.md": note("none", "none") }), [path]), path).toEqual([]);
-    }
-  });
-
-  it("refuses the readmes line beside a README edit, reads only this PR's note, and spares Dependabot", () => {
-    const both = main({ ...engine, "engine-rs/CRATE_README.md": "new", ".changes/topic.md": readmesNote });
-    expect(feature(main(), both, deployed)[0]).toMatch(/says readmes: unchanged, but this PR edits engine-rs\/CRATE_README\.md/);
-    const pending = main({ ".changes/other.md": readmesNote });
-    expect(feature(pending, { ...pending, ...engine, ".changes/topic.md": note("none", "none") }, deployed)).toHaveLength(1);
-    const head = main(engine);
-    expect(checkFeature(tree(main()), tree(head), diff(main(), head), new Set(deployed), true)).toEqual([]);
+    expect(errors[0]).toMatch(/Verticopolis\/engine/);
   });
 });
 
 describe("a release PR", () => {
-  const pending = main({ ".changes/a.md": note("patch", "none"), ".changes/b.md": note("minor", "patch") });
-  const cut = (app: string, crate: string, extra: Files = {}): Files => {
-    const out: Files = {
-      ...main(),
-      "package.json": pkg(app),
-      "package-lock.json": npmLock(app),
-      "CHANGELOG.md": `# Changelog\n\n## ${app}\n\n- New.\n\n## 2.89.1\n\n- Old.\n`,
-      "engine-rs/Cargo.toml": toml(crate),
-      "engine-rs/Cargo.lock": cargoLock(crate),
-      "engine-rs/consumer/Cargo.lock": cargoLock(crate),
-      "engine-rs/CHANGELOG.md": `## ${crate} (2026-11-11)\n\n- New.\n\n## 1.22.0 (2026-11-10)\n`,
-      "engine-rs/src/compat-record.json": record(crate),
-      ...extra,
-    };
-    return out;
-  };
+  const pending = main({ ".changes/a.md": note("patch"), ".changes/b.md": note("minor") });
+  const cut = (app: string, extra: Files = {}): Files => ({
+    ...main(),
+    "package.json": pkg(app),
+    "package-lock.json": npmLock(app),
+    "CHANGELOG.md": `# Changelog\n\n## ${app}\n\n- New.\n\n## 2.89.1\n\n- Old.\n`,
+    ...extra,
+  });
 
-  it("passes when each version rises by its highest pending level and every note is consumed", () => {
-    expect(release(pending, cut("2.90.0", "1.22.1"))).toEqual([]);
+  it("passes when the version rises by its highest pending level and every note is consumed", () => {
+    expect(release(pending, cut("2.90.0"))).toEqual([]);
   });
 
   it("accepts a named later app version, and nothing lower or skipped", () => {
-    expect(release(pending, cut("3.0.0", "1.22.1"))).toEqual([]);
-    expect(release(pending, cut("2.89.2", "1.22.1"))[0]).toMatch(/app is 2\.89\.2.*\(minor\) is 2\.90\.0/);
-    const noApp = main({ ".changes/a.md": note("none", "patch") });
-    expect(release(noApp, cut("3.0.0", "1.22.1"))[0]).toMatch(/app is 3\.0\.0.*\(none\)/);
-    // The crate takes exactly its level: a patch note cannot carry a minor release.
-    expect(release(pending, cut("2.90.0", "1.23.0"))).toEqual(["crate is 1.23.0, but main's 1.22.0 raised by the highest pending crate level (patch) is 1.22.1."]);
+    expect(release(pending, cut("3.0.0"))).toEqual([]);
+    expect(release(pending, cut("2.89.2"))[0]).toMatch(/app is 2\.89\.2.*\(minor\) is 2\.90\.0/);
+    const noApp = main({ ".changes/a.md": note("none") });
+    expect(release(noApp, cut("3.0.0"))[0]).toMatch(/app is 3\.0\.0.*\(none\)/);
   });
 
-  it("refuses leftover notes, mismatched locks, a missing section and unrelated files", () => {
-    expect(release(pending, cut("2.90.0", "1.22.1", { ".changes/b.md": note("minor", "patch") }))[0]).toMatch(/b\.md remain/);
-    expect(release(pending, cut("2.90.0", "1.22.1", { "engine-rs/consumer/Cargo.lock": cargoLock("1.22.0") }))).toEqual([
-      'engine-rs/consumer/Cargo.lock crate version is "1.22.0" and should be "1.22.1".',
+  it("refuses leftover notes, a mismatched lock, a missing section and unrelated files", () => {
+    expect(release(pending, cut("2.90.0", { ".changes/b.md": note("minor") }))[0]).toMatch(/b\.md remain/);
+    expect(release(pending, cut("2.90.0", { "package-lock.json": npmLock("2.89.1") }))).toEqual([
+      'package-lock.json version is "2.89.1" and should be "2.90.0".',
+      'package-lock.json root package version is "2.89.1" and should be "2.90.0".',
     ]);
-    expect(release(pending, cut("2.90.0", "1.22.1", { "CHANGELOG.md": main()["CHANGELOG.md"] }))).toEqual(["CHANGELOG.md has no 2.90.0 section at the top."]);
-    expect(release(pending, cut("2.90.0", "1.22.1", { "src/a.ts": "b" }))).toEqual([
-      "src/a.ts changed: a release PR changes only versions, changelogs and the notes it consumes.",
+    expect(release(pending, cut("2.90.0", { "CHANGELOG.md": main()["CHANGELOG.md"] }))).toEqual(["CHANGELOG.md has no 2.90.0 section at the top."]);
+    expect(release(pending, cut("2.90.0", { "src/a.ts": "b" }))).toEqual([
+      "src/a.ts changed: a release PR changes only the version, the changelog and the notes it consumes.",
     ]);
   });
 
   it("refuses an edit inside a release file beyond its version", () => {
     const beyond = (path: string, edit: (t: string) => string) => {
-      const head = cut("2.90.0", "1.22.1");
+      const head = cut("2.90.0");
       return release(pending, { ...head, [path]: edit(head[path]) });
     };
     expect(beyond("package.json", (t) => JSON.stringify({ ...JSON.parse(t), scripts: { x: "y" } }))).toEqual([
       "package.json changed beyond its version: a release PR changes only the version there.",
     ]);
-    expect(beyond("engine-rs/Cargo.toml", (t) => `${t}\n[dependencies]\nserde = "1"\n`)).toHaveLength(1);
-    expect(beyond("engine-rs/Cargo.lock", (t) => `${t}\n[[package]]\nname = "serde"\n`)).toHaveLength(1);
-    expect(beyond("engine-rs/src/compat-record.json", (t) => JSON.stringify({ ...JSON.parse(t), lockDigest: "bbbb" }))).toHaveLength(1);
     expect(beyond("package-lock.json", (t) => JSON.stringify({ ...JSON.parse(t), packages: { "": { name: "x", version: "2.90.0" }, "node_modules/a": {} } }))).toHaveLength(1);
-    // The engine guides may move only their example pins (#2080).
-    const guide = (v: string) => `Pin \`tag = "engine-v${v}"\`.\nUse \`"${v}"\`, not \`"^${v}"\`.\n`;
-    const withGuide = (v: string, extra = "") => ({ ...cut("2.90.0", "1.22.1"), "docs/engine-site/guides/crate.md": guide(v) + extra });
-    const guideBase = { ...pending, "docs/engine-site/guides/crate.md": guide("1.22.0") };
-    expect(release(guideBase, withGuide("1.22.1"))).toEqual([]);
-    expect(release(guideBase, withGuide("1.22.1", "More prose.\n"))).toEqual([
-      "docs/engine-site/guides/crate.md changed beyond its version: a release PR changes only the version there.",
-    ]);
-    // The changelogs are the driver's to curate.
+    // The changelog is the driver's to curate.
     expect(beyond("CHANGELOG.md", (t) => t.replace("- New.", "- Curated."))).toEqual([]);
   });
 

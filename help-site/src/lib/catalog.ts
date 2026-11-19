@@ -1,13 +1,14 @@
 // The engine's catalog, read at build time so every price, size and limit the
-// help pages print is the one the game runs on. The engine package is build
-// output (scripts/build-engine-wasm.sh writes src/public/engine/), so the game
-// and this site read the same WASM file.
+// help pages print is the one the game runs on. The game copies the engine's
+// browser build from @verticopolis/engine into src/public/engine/
+// (scripts/engine-install.ts), so the game and this site read the same WASM
+// file.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { Catalog, CatalogFacility } from "../../../src/catalog/catalogTypes";
-import { readCatalog } from "../../../src/engineBinding/catalog";
-import type { FacilityKind, GameMode } from "../../../src/shared/types";
+import type { Catalog, CatalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { readCatalog } from "@verticopolis/components/binding/catalog";
+import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
 
 /** The game's checkout: `npm run build --prefix help-site` runs from help-site/. */
 const repo = resolve(process.cwd(), process.cwd().endsWith("help-site") ? ".." : ".");
@@ -29,7 +30,7 @@ export function catalogs(): Promise<Record<GameMode, Catalog>> {
     try {
       wasm = readFileSync(resolve(engineDir, "verticopolis_engine_bg.wasm"));
     } catch {
-      throw new Error("the help site needs the engine package for its room facts: run `npm run wasm:build` in the game's checkout first");
+      throw new Error("the help site needs the engine package for its room facts: run `npm ci` (or `npm run engine:install`) in the game's checkout first");
     }
     const mod = (await import(/* @vite-ignore */ pathToFileURL(resolve(engineDir, "verticopolis_engine.js")).href)) as EngineModule;
     mod.initSync({ module: wasm });

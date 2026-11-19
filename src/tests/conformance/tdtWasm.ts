@@ -1,6 +1,6 @@
-import type { SerializedGame } from "../../shared/types";
-import { PortCodes } from "../../simport/portCodes";
-import { exportFacts, importFacts } from "../../simport/tdtRecords";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { exportFacts, importFacts } from "@verticopolis/components/port/tdtRecords";
 import { exportReport, type ExportReport } from "../../storage/tdtExportReport";
 import { importReport, type ImportReport } from "../../storage/tdtImportReport";
 import { describe, it } from "vitest";

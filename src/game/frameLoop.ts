@@ -1,4 +1,4 @@
-import { stepFollow } from "../render/excalibur/personFocus";
+import { stepFollow } from "@verticopolis/components/render/excalibur/personFocus";
 import type { GameApp } from "../main";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
@@ -11,9 +11,9 @@ import { maybeShowStarUp, noteStarUp } from "./starUpFlow";
 import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
 import { hudSource } from "./hudSource";
-import { groupDigits } from "../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 import { TOAST_SHOWN_MS } from "../ui/uiStatus";
-import { frameWindow } from "../render/excalibur/peopleWindow";
+import { frameWindow } from "@verticopolis/components/render/excalibur/peopleWindow";
 
 /** Real milliseconds between two ticks of the bomb's clock. */
 const BOMB_TICK_MS = 1000;

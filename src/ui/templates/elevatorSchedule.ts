@@ -1,8 +1,8 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import type { ElevatorSchedule } from "../../shared/engineTypes";
+import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
 import type { ElevatorScheduleUX } from "../scheduleDialogRules";
-import type { AssistedPreset, AutoTuneStatus } from "../../simport/enginePort";
+import type { AssistedPreset, AutoTuneStatus } from "@verticopolis/components/port/enginePort";
 // floorLabel is a DOM-free pure helper in its own module (so the schedule
 // formatter can reuse it without pulling in lit-html); re-exported here so
 // existing importers and tests keep their `./elevatorSchedule` path.

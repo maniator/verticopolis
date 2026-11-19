@@ -21,7 +21,7 @@ vi.mock("./overviewMapWiring", () => ({
 }));
 vi.mock("./fileSpaceCommands", () => files);
 vi.mock("./titleScreen", () => closer);
-vi.mock("../ui/movableWindow", () => ({ MovableWindow: movable, WITHIN_PARENT: "parent" }));
+vi.mock("@verticopolis/components/windows/movableWindow", () => ({ MovableWindow: movable, WITHIN_PARENT: "parent" }));
 vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
 const recent = vi.hoisted(() => ({ fill: vi.fn(), wire: vi.fn() }));

@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { deflateSync, inflateSync } from "fflate";
 import { draftFromSave, draftTower } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
-import type { SerializedGame } from "../../shared/types";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
 import { SaveGame } from "../../storage/SaveGame";
 import { saveOf, readImport, readResult, readSlot } from "../fixtures/saveText";
 

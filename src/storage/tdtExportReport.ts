@@ -1,5 +1,5 @@
-import type { ExportReportFacts } from "../simport/tdtReportFacts";
-import { groupDigits } from "../ui/format";
+import type { ExportReportFacts } from "@verticopolis/components/port/tdtReportFacts";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /** The elevator slots a `.TDT` file holds. */
 const TDT_ELEVATOR_SLOTS = 24;

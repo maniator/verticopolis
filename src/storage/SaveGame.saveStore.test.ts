@@ -8,6 +8,7 @@ import { inflateCapped, STORE_MAGIC, toBase64 } from "./saveCompression";
 import { resetSavePackerForTests } from "./savePacker";
 import { stampText } from "./saveStamp";
 import { toTowerFile } from "./towerFileCodec";
+import { CONFORMANCE_ROOT } from "../tests/packagePaths";
 
 /**
  * SaveGame through the save store, on a real tower: every read and write the
@@ -17,7 +18,7 @@ import { toTowerFile } from "./towerFileCodec";
  * (`fakeIndexedDb.ts`); the store itself is `saveStore.test.ts`'s.
  */
 
-const FIXTURE = resolve(__dirname, "../../conformance/fixtures/split-tower.vctower");
+const FIXTURE = resolve(CONFORMANCE_ROOT, "fixtures/split-tower.vctower");
 const AUTO_KEY = "verticopolis-save";
 const SLOT_1 = "simtower-clone-slot-1";
 

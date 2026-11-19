@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import type { GameApp } from "../main";
-import { PortCodes } from "../simport/portCodes";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { mockPort } from "../tests/portKit/mockPort";
 
 /** The fake engine port the frame loop tests drive: its commands land on the

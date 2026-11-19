@@ -1,16 +1,16 @@
 import { html, render } from "lit-html";
-import type { Catalog, CatalogFacility } from "./catalog/catalogTypes";
-import type { FacilityKind, UnitState } from "./shared/types";
-import type { DrawCtx } from "./render/sprites";
-import { drawRoomPortrait, drawTransportPortrait } from "./render/roomPortrait";
+import type { Catalog, CatalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import type { FacilityKind, UnitState } from "@verticopolis/components/shared/types";
+import type { DrawCtx } from "@verticopolis/components/render/sprites";
+import { drawRoomPortrait, drawTransportPortrait } from "@verticopolis/components/render/roomPortrait";
 import { pageShell } from "./ui/templates/pageShell";
 import { takeFromGameFlag } from "./ui/fromGame";
 import { injectPageTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
-import { bindViewWorld } from "./presentation/viewWorld";
-import { bindViewKinds } from "./presentation/viewKinds";
-import { readCatalog } from "./engineBinding/catalog";
-import { loadWasmEngine } from "./wasmhost/rustEngine";
+import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
+import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
+import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { loadWasmEngine } from "@verticopolis/components/host/rustEngine";
 import { helpUrl } from "./helpAddress";
 
 /** The Rust engine's Modern catalog, read before the page draws. The engine is

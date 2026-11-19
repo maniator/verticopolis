@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { html } from "lit-html";
-import type { ServiceDiagnosticFacts } from "../simport/enginePort";
-import type { ViewReader } from "../simport/viewReader";
+import type { ServiceDiagnosticFacts } from "@verticopolis/components/port/enginePort";
+import type { ViewReader } from "@verticopolis/components/port/viewReader";
 import { LAYOUT, code, mockPort, record } from "../tests/portKit/mockPort";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { unitEditorTemplate } from "../ui/templates/editor";

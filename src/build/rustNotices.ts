@@ -18,8 +18,8 @@ export const STD_NAME = "Rust standard library";
 export const STD_LICENSE = "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib";
 
 /**
- * Code ported into the engine from an npm package (#1356). While the port's
- * `source` is in the crate, the record must carry the package's notice,
+ * Code ported into the engine from an npm package (#1356). The engine's
+ * record must carry the package's notice,
  * marked `kind: "port"`. Paths are relative to the crate directory, and the
  * license text is vendored beside the port (`notice`), so the engine build
  * needs no `node_modules`. `scripts/engine-third-party.ts` writes the entry,

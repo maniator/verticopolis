@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ScheduleFacts, SchedulePresetName } from "../../simport/enginePort";
-import { SCHEDULE_HOURS, scheduleSlots } from "../../simport/scheduleSlots";
+import type { ScheduleFacts, SchedulePresetName } from "@verticopolis/components/port/enginePort";
+import { SCHEDULE_HOURS, scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
 import { MIXED, WARM, measure, openEngine, tower } from "../fixtures/scheduleTower";
 import { hasWasmPackage } from "../conformance/wasmEngine";
 

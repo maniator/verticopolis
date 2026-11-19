@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
 import { towerCalls } from "../../game/towerCallItems";
-import { PortCodes, outcome } from "../../simport/portCodes";
-import type { PendingChoiceView } from "../../simport/view";
-import type { GameMode } from "../../shared/types";
+import { PortCodes, outcome } from "@verticopolis/components/port/portCodes";
+import type { PendingChoiceView } from "@verticopolis/components/port/view";
+import type { GameMode } from "@verticopolis/components/shared/types";
 import { LOT_WIDTH, newSeededDraft, placeUnit } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 

@@ -1,6 +1,6 @@
 import { refusalCode, type FileFailureCode } from "../analytics";
-import type { SerializedView } from "../shared/types";
-import type { EnginePort, PortRecord } from "../simport/enginePort";
+import type { SerializedView } from "@verticopolis/components/shared/types";
+import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 
 /**

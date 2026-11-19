@@ -3,11 +3,12 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GOLDEN_SPEEDS } from "./goldenSpeeds";
 import { swapDone } from "../../game/portLifecycle";
-import type { EnginePort } from "../../simport/enginePort";
-import { PortCodes } from "../../simport/portCodes";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { canonicalJson, digestText } from "../conformance/canonical";
 import { writeGoldenFile } from "./updateGate";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
 /**
  * The frame-day golden: the #945 Dual run row ("a day on every fixture at
@@ -133,7 +134,7 @@ export interface FrameDayLeg {
   crowdView(): string;
 }
 
-const FIXTURE_DIR = resolve(ROOT, "conformance/fixtures");
+const FIXTURE_DIR = resolve(CONFORMANCE_ROOT, "fixtures");
 
 /** Every save under the fixtures directory, so a new one is covered. */
 export const FRAME_DAY_FIXTURES: readonly string[] = readdirSync(FIXTURE_DIR)

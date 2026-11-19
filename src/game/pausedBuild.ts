@@ -1,6 +1,6 @@
-import type { CatalogRules } from "../catalog/catalogTypes";
+import type { CatalogRules } from "@verticopolis/components/catalog/catalogTypes";
 import type { GameApp } from "../main";
-import type { LogEntry } from "../shared/types";
+import type { LogEntry } from "@verticopolis/components/shared/types";
 import { SPEEDS } from "./frameLoop";
 import { catalogOf } from "./portAccess";
 

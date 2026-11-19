@@ -1,5 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
-import { iconTemplate, messageWithIcons } from "../icons";
+import { iconTemplate, messageWithIcons } from "@verticopolis/components/windows/icons";
 
 /**
  * The emergency event-choice dialog (a fire, a bomb threat, etc.): a message, the

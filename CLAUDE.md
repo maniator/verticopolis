@@ -69,9 +69,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   CONTRIBUTING.md → **Quality gates**.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
-  engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
+  engine package (`npm install` copies it from `@verticopolis/engine`), or `VC_ALLOW_NO_ENGINE=1` for a
   deliberate build without the engine (it cannot run the game); see CONTRIBUTING.md.
-- **American English everywhere;** keep `engine-rs/` free of DOM/rendering.
+- **American English everywhere.**
 - **Preserve readable intent at call sites.** Never obscure gameplay or UI
   rules behind positional shorthand like `done: bit(0)` or an unexplained
   numeric mask. Use named facts/predicates and keep bit offsets at the
@@ -94,41 +94,24 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   keyed by a real index (a kind code, a stop, a floor) or a byte codec is fine
   and goes on the allowlist in `src/tests/namedFlags.guard.test.ts` with its
   reason. This is the pattern the owner rejected in PR #1403.
-- **Rust follows the same source rules.** The engine in `engine-rs/` is held to
-  the same conventions as the TypeScript, with no grandfathered comments:
-  American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
-  Rust sources at zero), and the 500-line file ceiling that
-  `src/tests/fileSize.guard.test.ts` enforces on TypeScript in `src/`
-  and `scripts/` and Rust in `engine-rs/` and `engine-bench/` (inline `#[cfg(test)]` modules included; today's oversized
-  Rust files sit on the same shrink-only ratchet, `src/tests/fileSize.ratchet.txt`).
-  The other gates have Rust counterparts: lint and typecheck map to `cargo fmt
-  --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
-  boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
-  free of host access (files, network, console, clock; a few named referee
-  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs` and `src/wasm/`.
+- **The engine and the components live in their own repositories.** A
+  simulation rule, the binding, the renderer, the sprites or the audio changes
+  in [Verticopolis/engine](https://github.com/Verticopolis/engine) or
+  [Verticopolis/components](https://github.com/Verticopolis/components), under
+  that repository's CLAUDE.md, and reaches the game when a PR here raises the
+  pin in `package.json` (the three engine pins move together). Never copy
+  engine or component code back into this repository.
 - **Declare the version tier in a change note; never edit a version.** A PR that
   changes a deployed path adds `.changes/<branch-slug>.md` with `app:` keyed to
   "would a player notice anything different?" (**major** for a save/compat break
-  or a headline milestone, **minor** for a new feature (or, for the crate, a
-  new API), **patch** for a bug fix or behavior correction even when a player
-  notices it (owner, 2026-11-14), **none** for internal-only work),
-  `crate:` for the engine crate, and the `## Player` / `## Engine` lines. The
+  or a headline milestone, **minor** for a new feature, **patch** for a bug
+  fix or behavior correction even when a player notices it (owner,
+  2026-11-14), **none** for internal-only work) and the `## Player` lines. The
   release driver's `npm run release` PR (a `release/` branch) raises the
-  versions and writes both changelogs; `scripts/version-check.ts` fails a
+  version and writes the changelog; `scripts/version-check.ts` fails a
   feature PR that edits a version line, and production waits for the release
   PR. See [`.changes/README.md`](./.changes/README.md) and
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
-- **Every engine change keeps the engine guides and READMEs current** (owner,
-  2026-11-11). The full guides live on the docs site
-  (`docs/engine-site/guides/javascript.md` and `crate.md`); the READMEs the
-  registries show (`packages/verticopolis-engine/README.md` on npm,
-  `engine-rs/CRATE_README.md` on crates.io) stay short and link the site
-  (owner, 2026-11-13). All four describe the engine as `main` has it. A PR that
-  changes `engine-rs/src/` (tests and `src/bin/` aside) or
-  `src/engineBinding/engine.d.ts` edits whichever page went stale, or, after
-  reading them, puts `readmes: unchanged` in its change note's front matter.
-  `scripts/version-check.ts` fails a PR that does neither. See
-  [CONTRIBUTING.md](./CONTRIBUTING.md) → **The engine READMEs**.
 - **Screenshots come from the pinned Playwright Docker container, never a host
   browser.** Regenerate `docs/screenshots/**` either by approving the
   `commit-on-approval` job on the PR's `pr-drift-check` run (it renders in the
@@ -279,18 +262,10 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **The Rust engine is the only engine the shipped game runs** (since app
   2.66.0 and engine crate 1.0.0; every build is the Rust-only
   build). A simulation change
-  lands in `engine-rs/`. The TypeScript reference engine was deleted (#1875);
-  every rule and its tests live in `engine-rs/` now, so never add a TypeScript
-  copy of a rule.
-- **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
-  conformance lock, the save/frame layout/catalog/identity versions and the
-  binding declaration `src/engineBinding/engine.d.ts`.** The PR that moves one sets
-  `crate:` in its change note, adds an Engine line and runs
-  `npm run engine:compat`; the release PR raises the version in `Cargo.toml`
-  and both `Cargo.lock` files. Steps and limits are in CONTRIBUTING.md →
-  Versioning → The engine crate version.
-
-- **The Rust engine (`engine-rs/`) is the source of truth for gameplay rules,
+  lands in `engine-rs/` in Verticopolis/engine. The TypeScript reference engine
+  was deleted (#1875); every rule and its tests live in the engine now, so
+  never add a TypeScript copy of a rule.
+- **The Rust engine (`engine-rs/` in Verticopolis/engine) is the source of truth for gameplay rules,
   caps and tuning.** Per-tower build caps live in `engine-rs/src/facilities.rs`
   (`build_cap`, `POOLED_CAPS`, `Kind::max_cars`, `Kind::max_span`) and are
   enforced in one place, `Tower::cap_reason` (`engine-rs/src/tower.rs`). Mirror

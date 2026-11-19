@@ -1,7 +1,7 @@
 import type { GameApp } from "../main";
-import { waitMood } from "../render/excalibur/crowdLook";
-import { clearPersonFocus, focusPerson, focusedPerson, notePersonPlace, setFollow } from "../render/excalibur/personFocus";
-import { PersonCards } from "../simport/personCards";
+import { waitMood } from "@verticopolis/components/render/excalibur/crowdLook";
+import { clearPersonFocus, focusPerson, focusedPerson, notePersonPlace, setFollow } from "@verticopolis/components/render/excalibur/personFocus";
+import { PersonCards } from "@verticopolis/components/port/personCards";
 import { PersonCardController } from "./personCard";
 import { catalogOf } from "./portAccess";
 

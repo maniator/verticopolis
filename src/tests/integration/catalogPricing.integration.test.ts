@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { catalogOn } from "../../catalog/towerCatalog";
+import { catalogOn } from "@verticopolis/components/catalog/towerCatalog";
 import { newViewReader } from "../../game/portAccess";
-import { Cards } from "../../simport/cards";
-import type { FacilityKind } from "../../shared/types";
+import { Cards } from "@verticopolis/components/port/cards";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { unitPrice } from "../../ui/catalogPricing";
 import { LOT_WIDTH, layTile, newSeededDraft } from "../portKit/draftFixtures";
 import { engineFromSave, look, noEngine } from "../portKit/rustEngine";

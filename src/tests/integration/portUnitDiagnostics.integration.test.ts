@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { EnginePort } from "../../simport/enginePort";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { createPortUnitDiagnostics } from "../../game/portUnitDiagnostics";
-import { readCatalog } from "../../engineBinding/catalog";
+import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
 /**
  * The inspector's unit diagnostics, rendered by the production adapter from
@@ -15,7 +15,7 @@ import { readCatalog } from "../../engineBinding/catalog";
  */
 
 type RustEngine = EnginePort & { free(): void };
-const FIXTURES = resolve(dirname(fileURLToPath(import.meta.url)), "../../../conformance/fixtures");
+const FIXTURES = resolve(CONFORMANCE_ROOT, "fixtures");
 
 const freed: RustEngine[] = [];
 afterEach(() => {

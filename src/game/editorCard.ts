@@ -1,7 +1,7 @@
 import type { UI } from "../ui/UI";
 import { unitEditorTemplate, transportEditorTemplate } from "../ui/templates/editor";
-import { clockOf } from "../simport/headerClock";
-import type { ViewReader } from "../simport/viewReader";
+import { clockOf } from "@verticopolis/components/port/headerClock";
+import type { ViewReader } from "@verticopolis/components/port/viewReader";
 import type { CardKit } from "./cardKit";
 
 /** What {@link refreshEditorCard} reads off the app. */

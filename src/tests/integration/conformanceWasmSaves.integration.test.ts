@@ -28,20 +28,20 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Engine, encodeVctower } from "../../engineBinding/engine";
-import type { SerializedGame } from "../../shared/types";
+import type { Engine, encodeVctower } from "@verticopolis/engine-tooling/node/verticopolis_engine";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
 import { importTower } from "../fixtures/saveText";
 import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped, parseSaveJson } from "../../storage/saveCompression";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
-const ROOT = resolve(__dirname, "../../..");
-const FIXTURES = resolve(ROOT, "conformance/fixtures");
+const FIXTURES = resolve(CONFORMANCE_ROOT, "fixtures");
 const fixtures = readdirSync(FIXTURES)
   .filter((f) => f.endsWith(".vctower"))
   .sort();
-const cases = (JSON.parse(readFileSync(resolve(ROOT, "conformance/loader-cases.json"), "utf8")) as { cases: LoaderCase[] }).cases;
+const cases = (JSON.parse(readFileSync(resolve(CONFORMANCE_ROOT, "loader-cases.json"), "utf8")) as { cases: LoaderCase[] }).cases;
 
 interface LoaderCase {
   id: string;

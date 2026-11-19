@@ -1,5 +1,5 @@
 import { telemetryHostAllowed } from "./telemetry";
-import type { GameplayMilestoneId } from "./events/gameplayEvents";
+import type { GameplayMilestoneId } from "@verticopolis/engine/events/gameplayEvents";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
 import { clearMenuPicks } from "./analyticsMenus";

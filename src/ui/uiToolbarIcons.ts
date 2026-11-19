@@ -1,4 +1,4 @@
-import { iconElement, type IconName } from "./icons";
+import { iconElement, type IconName } from "@verticopolis/components/windows/icons";
 
 /**
  * Inject the static toolbar and transport icons once at boot (issue #721). The

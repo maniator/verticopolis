@@ -1,14 +1,14 @@
 import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
 import { browserStorage } from "../overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../paletteCollapse";
-import { defaultLayout, fitRect, parseLayout, TOOLS_LIMITS, TOWER_LIMITS, type DeskRect, type DeskWindowId } from "./deskGeometry";
+import { defaultLayout, fitRect, parseLayout, TOOLS_LIMITS, TOWER_LIMITS, type DeskRect, type DeskWindowId } from "@verticopolis/components/windows/desk/deskGeometry";
 import { read, write, type Store } from "./deskStore";
 import { DeskTitle } from "./deskTitle";
 import { buildControlPanel } from "./deskControlPanel";
 import { deskTaskResult, trackDeskClose, trackDeskStartOpen, trackDeskTask, trackDeskTray, trackDeskWindow, trackWindowMenuOpen, trackWindowMenuPick } from "./deskAnalytics";
 import { DeskTaskbar, type TaskEntry } from "./deskTaskbar";
-import { runWindowCommand, windowMenuState } from "./deskWindowMenu";
-import { buildFrame, DESK_ACTIVE_CLASS, DeskWindow, titleButton, type DeskChange, type DeskWindowSpec } from "./deskWindow";
+import { runWindowCommand, windowMenuState } from "@verticopolis/components/windows/desk/deskWindowMenu";
+import { buildFrame, DESK_ACTIVE_CLASS, DeskWindow, titleButton, type DeskChange, type DeskWindowSpec } from "@verticopolis/components/windows/desk/deskWindow";
 
 /**
  * The 1994 desk (option C, picked by the owner on 2026-11-15): on a computer,

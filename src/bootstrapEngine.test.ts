@@ -10,8 +10,8 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The package load and the Rust engine's first tower are stubbed so the boot
 // state can be asserted without a package.
 const wasmStub = vi.hoisted(() => ({ loadError: null as Error | null, module: null as unknown, startError: null as Error | null, rustCorrupt: false, binary: null as { state: "ok"; sourceHash: string } | null }));
-vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./wasmhost/rustEngine")>();
+vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>();
   return {
     ...real,
     loadWasmEngine: vi.fn(async (_url?: string, _signal?: AbortSignal, opts?: { onBuild?: (b: unknown) => void }) => {
@@ -32,14 +32,14 @@ vi.mock("./engineCrash/crashReload", async (importOriginal) => {
 });
 // The relay, so the reliability rows (`engine_status`) can be read back.
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
-import { rustBootTower } from "./wasmhost/rustEngine";
+import { rustBootTower } from "@verticopolis/components/host/rustEngine";
 import { sendToRelay } from "./analyticsRelay";
 import { resetEngineStatus } from "./analyticsEngineStatus";
 import * as pwa from "./pwa";
 import { SaveGame } from "./storage/SaveGame";
 import { setSlotPopulationReader, slotPopulation } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
-import { EngineBootError } from "./wasmhost/engineBoot";
+import { EngineBootError } from "@verticopolis/components/host/engineBoot";
 import { engineTrapped, noteEngineThrow, watchEngineTraps } from "./game/engineFault";
 import { CRASH_FRESH_CROWD_KEY, countRustCrash, reloadSoon } from "./engineCrash/crashReload";
 

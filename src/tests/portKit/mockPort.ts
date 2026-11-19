@@ -1,7 +1,8 @@
+import { COMPONENT_FIXTURES } from "../packagePaths";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { vi } from "vitest";
-import type { EnginePort } from "../../simport/enginePort";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 
 /**
  * A mock engine port for the port's unit tests (`src/simport/`). Each method a
@@ -10,7 +11,7 @@ import type { EnginePort } from "../../simport/enginePort";
  * hand over throws when called, so an unexpected port call fails the test.
  *
  * The numeric answers (frames, the structure, records) are encoded from the
- * Rust engine's own layout, `src/simport/fixtures/viewLayout.json`, which
+ * Rust engine's own layout, the components' `viewLayout.json`, which
  * `portReads.integration.test.ts` holds to the engine's fresh answer.
  */
 
@@ -54,7 +55,7 @@ export interface Layout {
   records: Record<string, string[]>;
 }
 
-export const FIXTURES = resolve(__dirname, "../../simport/fixtures");
+export const FIXTURES = COMPONENT_FIXTURES;
 /** The layout fixture's text, as the engine's `viewLayout()` answers it. */
 export const LAYOUT_TEXT = JSON.stringify(JSON.parse(readFileSync(resolve(FIXTURES, "viewLayout.json"), "utf8")));
 export const LAYOUT = JSON.parse(LAYOUT_TEXT) as Layout;

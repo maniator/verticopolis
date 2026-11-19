@@ -7,8 +7,8 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The package load is stubbed to fail the way the byte check refuses another
 // build's files, so boot's answer to it can be asserted without a package.
 const loadStub = vi.hoisted(() => ({ error: null as Error | null }));
-vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./wasmhost/rustEngine")>();
+vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>();
   return {
     ...real,
     loadWasmEngine: vi.fn(async () => {
@@ -24,7 +24,7 @@ vi.mock("./engineCrash/mismatchReload", async (importOriginal) => {
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 import { sendToRelay } from "./analyticsRelay";
 import { resetEngineStatus } from "./analyticsEngineStatus";
-import { EngineBootError, type PackageFailure } from "./wasmhost/engineBoot";
+import { EngineBootError, type PackageFailure } from "@verticopolis/components/host/engineBoot";
 import { MISMATCH_RELOAD_KEY, MISMATCH_RELOAD_LINE, reloadForMatchingFiles } from "./engineCrash/mismatchReload";
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */

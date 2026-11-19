@@ -1,4 +1,4 @@
-import type { FacilityKind } from "../../shared/types";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import type { At, Outcome, ScenarioEngine, Spec } from "./scenario";
 
 /**

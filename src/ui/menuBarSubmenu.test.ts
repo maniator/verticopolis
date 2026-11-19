@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MenuBar } from "./menuBar";
+import { MenuBar } from "@verticopolis/components/windows/menuBar";
 
 /** A File menu with a submenu between two items, the way index.html lays out
  *  File > Open Recent, its lines numbered with the number underlined. */

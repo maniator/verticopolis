@@ -11,7 +11,7 @@
  */
 
 import type { DeskTrayIcon } from "./deskAnalytics";
-import { WindowMenu, type WindowMenuHandlers } from "./deskWindowMenu";
+import { WindowMenu, type WindowMenuHandlers } from "@verticopolis/components/windows/desk/deskWindowMenu";
 
 /** A window's button on the taskbar. */
 export interface TaskEntry {

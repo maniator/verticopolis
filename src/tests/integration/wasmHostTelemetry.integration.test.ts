@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { WasmEngine } from "../../engineBinding/binding";
-import type { CalendarKind } from "../../shared/engineTypes";
-import type { SerializedGame } from "../../shared/serializedGame";
-import type { TelemetryDocument } from "../../wasmhost/telemetry";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import type { CalendarKind } from "@verticopolis/components/shared/engineTypes";
+import type { SerializedGame } from "@verticopolis/components/shared/serializedGame";
+import type { TelemetryDocument } from "@verticopolis/components/host/telemetry";
 import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { FIXTURES } from "../conformance/fixtureSim";

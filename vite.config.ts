@@ -10,7 +10,7 @@ import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices
 import { entryWithIntegrity, pageLastTransform, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
-import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "@verticopolis/components/host/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
 import { assembleToolingPublicDir, choosePublicDir, hasEnginePackage, toolingEngineFile } from "./src/build/toolingPublicDir";
 import { helpMarkdown } from "./src/build/helpMarkdown";
@@ -85,7 +85,7 @@ function engineChoiceFor(command: "build" | "serve"): EngineChoice {
   // A VC_TOOLING=1 build and a dev serve take the tooling engine package in
   // place of the player one (#1057, src/build/toolingPublicDir.ts).
   const base = resolve(__dirname, "src/public");
-  const tooling = resolve(__dirname, "engine-rs/pkg-web-tooling");
+  const tooling = resolve(__dirname, "node_modules/@verticopolis/engine-tooling/web");
   const choice = choosePublicDir({
     tooling: TOOLING_BUILD,
     serve: command === "serve",
@@ -95,7 +95,7 @@ function engineChoiceFor(command: "build" | "serve"): EngineChoice {
   });
   if (choice.kind === "missing-tooling") throw new Error(choice.why);
   if (choice.kind === "player") {
-    if (command === "serve" && !process.env.VITEST) console.warn("[serve] engine-rs/pkg-web-tooling/ is missing, so this serve runs the player engine package: window.game's raw edits will fail. Run npm run wasm:build.");
+    if (command === "serve" && !process.env.VITEST) console.warn("[serve] @verticopolis/engine-tooling is not installed, so this serve runs the player engine package: window.game's raw edits will fail. Run npm ci.");
     return { publicDir: base, toolingEngine: false };
   }
   // A dev serve (and `vite preview`, which serves dist/ and ignores both)
@@ -453,7 +453,7 @@ export default defineConfig(({ command }) => ({
         // chunks are excluded so an install ships just the game.
         //
         // The shell includes the WASM engine package (`engine/`, its glue and
-        // `.wasm`, built on every deploy by scripts/build-engine-wasm.sh), so
+        // `.wasm`, copied from @verticopolis/engine by scripts/engine-install.ts), so
         // an installed game starts the engine offline (#945). One precache
         // version holds the shell and the engine together: Workbox installs a
         // new worker's whole manifest or none of it, activates it through
@@ -640,6 +640,10 @@ export default defineConfig(({ command }) => ({
     // 5s default on slower CI runners. Give the suite generous headroom.
     testTimeout: 30000,
     hookTimeout: 30000,
+    // The components package runs through Vitest's own transform, as its
+    // sources did inside src/, so a test can spy on or mock one of its
+    // modules (an external module's namespace is frozen).
+    server: { deps: { inline: [/[\\/]node_modules[\\/]@verticopolis[\\/]components[\\/]/] } },
     // Two tiers, split by filename suffix (see CONTRIBUTING.md → "Testing &
     // coverage"). UNIT tests sit next to the module they cover (`foo.ts` +
     // `foo.test.ts`) and mock their collaborators; INTEGRATION tests drive
@@ -676,12 +680,11 @@ export default defineConfig(({ command }) => ({
       provider: "v8",
       reporter: ["text", "json", "html"],
       // Coverage measures the whole app so the report can't overstate itself.
-      // Only code that can't run headless is excluded — src/main.ts (its ctor
-      // boots the WebGL engine) and src/render/excalibur/** — plus dev/tooling
-      // entry points; those are integration-covered by the Playwright e2e tier.
-      // Everything else (incl. the sprite painters and the audio engine) IS
-      // unit-measured. Rationale, test tiers, and the per-file floors below are
-      // documented in CONTRIBUTING.md → "Testing & coverage".
+      // Only code that can't run headless is excluded: src/main.ts (its ctor
+      // boots the WebGL renderer) plus dev/tooling entry points; those are
+      // integration-covered by the Playwright e2e tier. Everything else IS
+      // unit-measured. Rationale and test tiers are documented in
+      // CONTRIBUTING.md → "Testing & coverage".
       include: ["src/**/*.ts"],
       exclude: [
         "**/*.d.ts",
@@ -708,32 +711,7 @@ export default defineConfig(({ command }) => ({
         // telemetry gate, and the boot/error branches; appBoot.test.ts drives
         // runBootFlow and invokes every wireControllers adapter closure). Only
         // main.ts itself stays excluded, because its ctor boots the real WebGL
-        // engine.
-        // The Excalibur/WebGL render layer was split into friend-modules; the
-        // headless-testable ones are now MEASURED (towerInputCamera, towerOverlay,
-        // towerCrowd) with per-file floors below. What stays excluded genuinely
-        // can't run under happy-dom: its logic funnels through `new ex.Canvas`
-        // (which needs a real 2D context) and the live Excalibur engine.
-        //   - TowerEngine.ts: the class ctor boots the WebGL engine; its methods
-        //     are thin delegations to the measured friend-modules.
-        //   - towerScene.ts: bakeSharedGraphics / makeSky / makeOverlay and the
-        //     dispose/teardown lifecycle all allocate ex.Canvas or drive engine
-        //     teardown; only two trivial pure exports are reachable.
-        //   - towerReconcile.ts: every reconciler funnels through addRoom /
-        //     addTransport / transportGraphic / syncCrane, all of which bake an
-        //     ex.Canvas, so nothing here can run headless.
-        // These are integration-covered by the Playwright e2e tier.
-        "src/render/excalibur/TowerEngine.ts",
-        "src/render/excalibur/towerScene.ts",
-        "src/render/excalibur/towerReconcile.ts",
-        // The atlas bake's browser half: the page API the export script
-        // drives and the pixel checks, all of which read pixels back from a
-        // live canvas (getImageData). The pipeline they call (bake, compose,
-        // lookup, archive) is measured in its own modules; the e2e
-        // comparison spec runs these end to end.
-        "src/render/atlas/browserEntry.ts",
-        "src/render/atlas/verify.ts",
-        "src/render/atlas/verifyExtras.ts",
+        // engine (the renderer, which @verticopolis/components holds).
         // The harnesses' tower (game.sim in a tooling build): it drives the
         // Rust engine package, which the coverage run does not build, so its
         // tests skip here and run on the unitWasm leg, and every e2e spec and
@@ -741,37 +719,13 @@ export default defineConfig(({ command }) => ({
         "src/game/toolingTower.ts",
         "src/game/toolingSim.ts",
       ],
-      // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
-      // logic layers; per-file globs stop a weak painter/synth file hiding behind
-      // strong siblings. Draw code gets lower BRANCH floors (visual variants are
-      // the e2e visual tier's job). See CONTRIBUTING.md → "Coverage floors".
+      // Enforced floors (a ratchet, not a vanity ceiling), over the whole
+      // measured set. See CONTRIBUTING.md → "Coverage floors".
       thresholds: {
         statements: 93,
         lines: 94,
         functions: 94,
         branches: 86,
-        // Per-file lines are EXEMPTIONS only: the audio graph and the procedural
-        // draw code genuinely can't reach the branch/line floor from unit tests
-        // (audio wiring and per-pixel visual variants are the Playwright e2e
-        // tier's job), so those files get a lower floor. A file that already
-        // clears the global gets no line: a per-file threshold that just
-        // restates the global earns nothing and is left off.
-        // ToneAudioEngine.ts is the graph/lifecycle orchestrator: it clears the
-        // global on statements and lines, so only its function and branch floors
-        // stay lower. The mocked-Tone graph test drives the wiring end to end,
-        // but units can't reach every construction and teardown branch.
-        // (toneVoices.ts, slimmed to the action jingles, now clears the global
-        // outright and needs no per-file floor.)
-        "src/audio/ToneAudioEngine.ts": { functions: 80, branches: 72 },
-        "src/render/sprites/**": { branches: 72 },
-        "src/render/pixelSprites.ts": { statements: 82, lines: 84 },
-        // towerCrowd.ts is MEASURED, but roughly half of it (syncMotion,
-        // buildWalkers, spawnWalker) bakes ex.Canvas cab/train/walker graphics,
-        // which needs a real 2D context and can't run under happy-dom; that half
-        // is the Playwright tier's job. The reconcile/clear/updateMotion paths
-        // ARE unit-covered here, so it gets an honest lower floor rather than
-        // staying fully excluded.
-        "src/render/excalibur/towerCrowd.ts": { statements: 46, lines: 46, functions: 50, branches: 45 },
       },
     },
   },

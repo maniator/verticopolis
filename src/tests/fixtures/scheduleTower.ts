@@ -1,7 +1,7 @@
-import type { HourlyByDay, OriginRings } from "../../shared/engineTypes";
-import type { FacilityKind, GameMode } from "../../shared/types";
-import type { EnginePort } from "../../simport/enginePort";
-import { telemetryDocument } from "../../wasmhost/telemetry";
+import type { HourlyByDay, OriginRings } from "@verticopolis/components/shared/engineTypes";
+import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { telemetryDocument } from "@verticopolis/components/host/telemetry";
 import { wasm } from "../conformance/wasmEngine";
 import { draftTower, type Draft } from "../portKit/drafts";
 

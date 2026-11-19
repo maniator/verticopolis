@@ -1,6 +1,6 @@
 import { createEngagementDetector, watchGameplayCommands } from "../analyticsEngagement";
 import { noteEngineEngaged } from "../analyticsEngineStatus";
-import type { EnginePortCommands } from "../simport/enginePort";
+import type { EnginePortCommands } from "@verticopolis/components/port/enginePort";
 import { isDialogOpen, isSplashUp } from "./interactionState";
 
 /** How often the `play` branch judges a second of play. */

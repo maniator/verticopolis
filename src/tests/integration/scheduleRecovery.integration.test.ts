@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { newViewReader } from "../../game/portAccess";
 import { acknowledgementKey, shortFleets, type ShaftFacts } from "../../game/scheduleRecovery";
-import type { EnginePort } from "../../simport/enginePort";
-import { scheduleFromSlots } from "../../simport/scheduleSlots";
-import type { FacilityKind } from "../../shared/types";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { scheduleFromSlots } from "@verticopolis/components/port/scheduleSlots";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { engineFromSave, look, noEngine } from "../portKit/rustEngine";
 
@@ -14,7 +14,7 @@ import { engineFromSave, look, noEngine } from "../portKit/rustEngine";
  * The review's rules on hand-built shafts are `src/game/scheduleRecovery.test.ts`.
  */
 
-const FIXTURES = "conformance/fixtures";
+const FIXTURES = "node_modules/@verticopolis/engine-conformance/fixtures";
 const saveOf = (name: string) => JSON.stringify(decodeVctower(readFileSync(`${FIXTURES}/${name}.vctower`, "utf8")));
 
 const shaftsOf = (engine: EnginePort): ShaftFacts[] =>

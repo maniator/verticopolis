@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import { gameStylesheet } from "./gameStylesheet.ts";
+import { srcFile } from "./packagePaths";
 
 /**
  * Shift-left guard for the pinned dialog action strip.
@@ -108,10 +107,7 @@ describe("pinned dialog action strip", () => {
     expect(parts.indexOf(`0 ${pad - 1}px 0 var(--r-shadow)`)).toBeLessThan(
       parts.indexOf(`0 ${pad}px 0 var(--r-dark)`),
     );
-    const tokens = readFileSync(
-      resolve(dirname(fileURLToPath(import.meta.url)), "..", "styles", "retro-tokens.css"),
-      "utf8",
-    );
+    const tokens = readFileSync(srcFile("styles/retro-tokens.css"), "utf8");
     const bevel = /--bevel-out:([^;]*)/.exec(tokens)?.[1] ?? "";
     expect(bevel).toContain(`inset -1px -1px var(--r-dark)`);
     expect(bevel).toContain(`inset -${BEVEL_PX}px -${BEVEL_PX}px var(--r-shadow)`);

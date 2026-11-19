@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sendToRelay } from "../../analyticsRelay";
 import { gameplaySession } from "../../analytics";
 import { bindEngineBridge, drainEngineEvents, engineBridgeStats, resetEngineBridge } from "../../analyticsEngineBridge";
-import type { EnginePort } from "../../simport/enginePort";
-import { PortCodes } from "../../simport/portCodes";
-import { PortEvents } from "../../simport/portEvents";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortEvents } from "@verticopolis/components/port/portEvents";
 import { look, newEngine, noEngine } from "../portKit/rustEngine";
 
 /**

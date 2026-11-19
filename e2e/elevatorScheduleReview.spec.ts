@@ -9,7 +9,7 @@ import { expectEngineHosted } from "./helpers";
  * cars off shift. The player imports it, is told once, opens the review from Tower Statistics, sets
  * one elevator to use all its cars, and undoes that. Nothing changes until the player chooses it.
  */
-const TOWER = readFileSync(new URL("../conformance/fixtures/split-tower-4.vctower", import.meta.url), "utf8");
+const TOWER = readFileSync(new URL("../node_modules/@verticopolis/engine-conformance/fixtures/split-tower-4.vctower", import.meta.url), "utf8");
 const SHAFT = 1139; // a standard elevator with 8 cars and a flat schedule of 3
 const PHONE = { width: 390, height: 844 };
 

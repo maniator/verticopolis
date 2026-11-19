@@ -1,7 +1,7 @@
 import { html, type TemplateResult } from "lit-html";
-import type { CatalogRules } from "../catalog/catalogTypes";
-import type { EnginePort, PortRecord } from "../simport/enginePort";
-import type { VacateReason } from "../shared/types";
+import type { CatalogRules } from "@verticopolis/components/catalog/catalogTypes";
+import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
+import type { VacateReason } from "@verticopolis/components/shared/types";
 import {
   accessCopy,
   amenityCopy,

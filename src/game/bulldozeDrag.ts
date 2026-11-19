@@ -1,4 +1,4 @@
-import type { FacilityKind } from "../shared/types";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 
 /**
  * What a bulldoze drag clears. By default a drag removes only the kind of

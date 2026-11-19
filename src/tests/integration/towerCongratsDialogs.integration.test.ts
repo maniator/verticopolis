@@ -5,7 +5,7 @@ import { CHOICE_WAITING_NOTICE, runFrame } from "../../game/frameLoop";
 import { hasBlockingModal } from "../../game/interactionState";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
-import { PortCodes } from "../../simport/portCodes";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { newViewReader } from "../../game/portAccess";
 import { portOf } from "../../game/cardKit.fixture";
 import { draftFromSave, draftTower, type Draft } from "../portKit/drafts";

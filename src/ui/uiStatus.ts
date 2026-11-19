@@ -1,23 +1,23 @@
-import type { LogEntry } from "../shared/types";
-import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
-import type { FacilityKind, GameMode } from "../shared/types";
+import type { LogEntry } from "@verticopolis/components/shared/types";
+import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
 import { RULE_SET_NAME } from "./ruleSetName";
 import { showNewsInStatusBar, showTowerInStatusBar } from "./statusBar";
-import type { EnginePort } from "../simport/enginePort";
-import type { PortCodes } from "../simport/portCodes";
-import { clockOf } from "../simport/headerClock";
-import type { SimView } from "../simport/view";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { PortCodes } from "@verticopolis/components/port/portCodes";
+import { clockOf } from "@verticopolis/components/port/headerClock";
+import type { SimView } from "@verticopolis/components/port/view";
 import type { UI } from "./UI";
 import { render } from "lit-html";
-import { appendMessageWithIcons } from "./icons";
-import { groupDigits } from "./format";
+import { appendMessageWithIcons } from "@verticopolis/components/windows/icons";
+import { groupDigits } from "@verticopolis/components/windows/format";
 import { paletteWindow, relabelPalette, syncPaletteTabs } from "./uiPalette";
 import { refitPalette } from "./paletteFit";
 import { toolInfoFor } from "./templates/toolInfo";
 import { scanSkyBridgeButton, skyBridgeUnlocked } from "./skyBridgePalette";
 import { towerStatsTemplate, type TowerStatsSnapshot } from "./templates/towerStats";
-import { bindViewWorld } from "../presentation/viewWorld";
-import { bindViewKinds } from "../presentation/viewKinds";
+import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
+import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
 
 /**
  * Status-bar, palette-lock, tower-stats, Undo and Redo, and bulletin-log

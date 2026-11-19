@@ -9,10 +9,8 @@ import {
   insertSection,
   notesKeptForCredits,
   parseNote,
+  isSemverIncrease,
   readNotes,
-  setCargoVersion,
-  setEnginePins,
-  setLockVersion,
 } from "./changeNotes";
 
 const note = (front: string, body = "") => `---\n${front}\n---\n${body}`;
@@ -22,62 +20,58 @@ describe("change notes", () => {
     expect(() => readNotes(resolve(__dirname, "../.."))).not.toThrow();
   });
 
-  it("reads the levels and both sections", () => {
-    const n = parseNote(
-      note("app: minor   # what a player notices\ncrate: patch", "## Player\n- Elevators skip empty floors.\n\n## Engine\n- `frame()` adds a count.\n"),
-      "my-branch.md",
-    );
-    expect(n).toEqual({ file: "my-branch.md", app: "minor", crate: "patch", player: ["Elevators skip empty floors."], engine: ["`frame()` adds a count."], contributors: [] });
+  it("reads the level and the Player lines", () => {
+    const n = parseNote(note("app: minor   # what a player notices", "## Player\n- Elevators skip empty floors.\n"), "my-branch.md");
+    expect(n).toEqual({ file: "my-branch.md", app: "minor", player: ["Elevators skip empty floors."], contributors: [] });
+  });
+
+  it("reads a note from before the split, whose crate: none means nothing", () => {
+    expect(parseNote(note("app: patch", "## Player\n- A fix.\n"), "old.md")).toEqual({ file: "old.md", app: "patch", player: ["A fix."], contributors: [] });
+  });
+
+  it("sends an engine change to the engine's repository", () => {
+    expect(() => parseNote(note("app: none\ncrate: patch"), "x.md")).toThrow(/Verticopolis\/engine/);
+    expect(() => parseNote(note("app: none\nreadmes: unchanged"), "x.md")).toThrow(/Verticopolis\/engine/);
+    expect(() => parseNote(note("app: none", "## Engine\n- A fix.\n"), "x.md")).toThrow(/Verticopolis\/engine/);
   });
 
   it("reads Contributors lines at any level, and credits each person once", () => {
-    const a = parseNote(note("app: none\ncrate: none", "## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n"), "a.md");
+    const a = parseNote(note("app: none", "## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n"), "a.md");
     expect(a.contributors).toEqual(["trvorth extended the room-capacity sweep (#2198)."]);
-    const b = parseNote(note("app: patch\ncrate: none", "## Player\n- A fix.\n## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n- Sam reported it (#670).\n"), "b.md");
+    const b = parseNote(note("app: patch", "## Player\n- A fix.\n## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n- Sam reported it (#670).\n"), "b.md");
     expect(contributorLines([a, b])).toEqual(["trvorth extended the room-capacity sweep (#2198).", "Sam reported it (#670)."]);
-    expect(() => parseNote(note("app: none\ncrate: none", "## Contributors\n- No period"), "c.md")).toThrow(/period/);
-    expect(() => parseNote(note("app: none\ncrate: none", "## Contributors\n- A.\n## Contributors\n- B.\n"), "c.md")).toThrow(/twice/);
+    expect(() => parseNote(note("app: none", "## Contributors\n- No period"), "c.md")).toThrow(/period/);
+    expect(() => parseNote(note("app: none", "## Contributors\n- A.\n## Contributors\n- B.\n"), "c.md")).toThrow(/twice/);
   });
 
   it("keeps a credit-only note when the release does not move the app", () => {
-    const credit = parseNote(note("app: none\ncrate: none", "## Contributors\n- Sam helped (#1).\n"), "credit.md");
-    const engine = parseNote(note("app: none\ncrate: patch", "## Engine\n- A fix.\n## Contributors\n- Ana helped (#2).\n"), "engine.md");
-    const plain = parseNote(note("app: none\ncrate: none"), "plain.md");
-    expect(notesKeptForCredits([credit, engine, plain], false).map((n) => n.file)).toEqual(["credit.md"]);
-    expect(notesKeptForCredits([credit, engine, plain], true)).toEqual([]);
-  });
-
-  it("reads the optional readmes line, and only as unchanged", () => {
-    expect(parseNote(note("app: none\ncrate: none\nreadmes: unchanged   # checked both"), "x.md").readmesUnchanged).toBe(true);
-    expect(parseNote(note("app: none\ncrate: none"), "x.md")).not.toHaveProperty("readmesUnchanged");
-    expect(() => parseNote(note("app: none\ncrate: none\nreadmes: updated"), "x.md")).toThrow(/not "unchanged"/);
-    expect(() => parseNote(note("app: none\ncrate: none\nreadmes: unchanged\nreadmes: unchanged"), "x.md")).toThrow(/readmes is set twice/);
+    const credit = parseNote(note("app: none", "## Contributors\n- Sam helped (#1).\n"), "credit.md");
+    const plain = parseNote(note("app: none"), "plain.md");
+    expect(notesKeptForCredits([credit, plain], false).map((n) => n.file)).toEqual(["credit.md"]);
+    expect(notesKeptForCredits([credit, plain], true)).toEqual([]);
   });
 
   it("reads a CRLF checkout and a note with no sections", () => {
-    expect(parseNote("---\r\napp: none\r\ncrate: none\r\n---\r\n", "x.md")).toMatchObject({ app: "none", crate: "none", player: [], engine: [] });
+    expect(parseNote("---\r\napp: none\r\n---\r\n", "x.md")).toMatchObject({ app: "none", player: [] });
   });
 
   it.each([
-    ["Bad.md", note("app: none\ncrate: none"), /branch slug/],
+    ["Bad.md", note("app: none"), /branch slug/],
     ["x.md", "app: none\n", /first line/],
     ["x.md", "---\napp: none\n", /closing/],
-    ["x.md", note("app: minor"), /no crate level/],
     ["x.md", note("crate: none"), /no app level/],
-    ["x.md", note("app: minor\napp: patch\ncrate: none"), /twice/],
-    ["x.md", note("app: huge\ncrate: none"), /not one of/],
+    ["x.md", note("app: minor\napp: patch"), /twice/],
+    ["x.md", note("app: huge"), /not one of/],
     ["x.md", note("app: none\ncrate: none\nother: 1"), /is not "app/],
-    ["x.md", note("app: minor\ncrate: none", "- A line.\n"), /before a "## Player"/],
-    ["x.md", note("app: minor\ncrate: none", "## Player\nA line.\n"), /bullet/],
-    ["x.md", note("app: minor\ncrate: none", "## Player\n- A line.\n  continued.\n"), /bullet/],
-    ["x.md", note("app: minor\ncrate: none", "## Player\n- No period\n"), /period/],
-    ["x.md", note("app: minor\ncrate: none", "## Player\n- One — two.\n"), /em-dash/],
-    ["x.md", note("app: minor\ncrate: none", "## Player\n- A.\n## Player\n- B.\n"), /twice/],
-    ["x.md", note("app: minor\ncrate: none", "## Notes\n- A.\n"), /before a "## Player"/],
-    ["x.md", note("app: none\ncrate: none", "## Player\n- A line.\n"), /Player lines need/],
-    ["x.md", note("app: none\ncrate: none", "## Engine\n- A line.\n"), /Engine lines need/],
-    ["x.md", note("app: none\ncrate: minor"), /at least one Engine line/],
-    ["x.md", note("app: patch\ncrate: none"), /at least one Player line/],
+    ["x.md", note("app: minor", "- A line.\n"), /before a "## Player"/],
+    ["x.md", note("app: minor", "## Player\nA line.\n"), /bullet/],
+    ["x.md", note("app: minor", "## Player\n- A line.\n  continued.\n"), /bullet/],
+    ["x.md", note("app: minor", "## Player\n- No period\n"), /period/],
+    ["x.md", note("app: minor", "## Player\n- One — two.\n"), /em-dash/],
+    ["x.md", note("app: minor", "## Player\n- A.\n## Player\n- B.\n"), /twice/],
+    ["x.md", note("app: minor", "## Notes\n- A.\n"), /before a "## Player"/],
+    ["x.md", note("app: none", "## Player\n- A line.\n"), /Player lines need/],
+    ["x.md", note("app: patch"), /at least one Player line/],
   ])("refuses %s with %s", (file, text, why) => {
     expect(() => parseNote(text, file)).toThrow(why);
   });
@@ -133,24 +127,11 @@ describe("change notes", () => {
     });
   });
 
-  it("raises the crate's own version and nothing else", () => {
-    const toml = '[package]\nname = "verticopolis-engine"\nversion = "1.22.0"\n\n[dependencies]\nserde = { version = "1" }\nversion = "x"\n';
-    expect(setCargoVersion(toml, "1.23.0")).toBe(toml.replace('version = "1.22.0"', 'version = "1.23.0"'));
-    expect(() => setCargoVersion('[dependencies]\nversion = "1"\n', "2.0.0")).toThrow(/\[package\]/);
-    const lock = '[[package]]\nname = "serde"\nversion = "1.22.0"\n\n[[package]]\nname = "verticopolis-engine"\nversion = "1.22.0"\n';
-    expect(setLockVersion(lock, "verticopolis-engine", "1.23.0")).toBe(lock.replace(/("verticopolis-engine"\nversion = )"1\.22\.0"/, '$1"1.23.0"'));
-    expect(() => setLockVersion(lock, "other", "1.0.0")).toThrow(/no other entry/);
-  });
-
-  it("moves every example pin in an engine guide to the new crate release", () => {
-    const guide = [
-      'verticopolis-engine = { git = "https://github.com/maniator/verticopolis", tag = "engine-v1.24.0" }',
-      'verticopolis-engine = { git = "https://github.com/maniator/verticopolis", tag = "engine-v1.24.0", features = ["conformance"] }',
-      'To pin exactly, depend on an exact version (`"1.24.0"`, not `"^1.24.0"`).',
-      "Tags are named `engine-v<version>`; serde stays at `1.0.210`.",
-    ].join("\n");
-    expect(setEnginePins(guide, "1.56.0")).toBe(guide.replace(/1\.24\.0/g, "1.56.0"));
-    expect(setEnginePins(guide, "1.24.0")).toBe(guide);
-    expect(() => setEnginePins("Tags are named `engine-v<version>`.", "1.56.0")).toThrow(/pins no engine release/);
+  it("tells a later plain version from anything else", () => {
+    expect(isSemverIncrease("2.89.1", "2.89.2")).toBe(true);
+    expect(isSemverIncrease("2.89.1", "3.0.0")).toBe(true);
+    expect(isSemverIncrease("2.89.1", "2.89.1")).toBe(false);
+    expect(isSemverIncrease("2.89.1", "2.9.9")).toBe(false);
+    expect(isSemverIncrease("2.89.1", "3.0.0-beta")).toBe(false);
   });
 });

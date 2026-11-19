@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ImportCounts, ImportReportFacts } from "./simport/tdtReportFacts";
-import type { GameMode } from "./shared/types";
+import type { ImportCounts, ImportReportFacts } from "@verticopolis/components/port/tdtReportFacts";
+import type { GameMode } from "@verticopolis/components/shared/types";
 
 const trackEvent = vi.fn();
 vi.mock("./analyticsCore", () => ({ trackEvent: (...args: unknown[]) => trackEvent(...args) }));

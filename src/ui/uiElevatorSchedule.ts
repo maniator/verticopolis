@@ -1,11 +1,11 @@
 import type { UI } from "./UI";
 import { render } from "lit-html";
 import { elevatorScheduleTemplate, floorLabel, type FloorRow, type SchedCtx, type SchedState, type SchedHandlers } from "./templates/elevatorSchedule";
-import type { ElevatorSchedule } from "../shared/engineTypes";
-import type { OriginRings } from "../shared/engineTypes";
-import { SCHEDULE_HOURS } from "../simport/scheduleSlots";
+import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
+import type { OriginRings } from "@verticopolis/components/shared/engineTypes";
+import { SCHEDULE_HOURS } from "@verticopolis/components/port/scheduleSlots";
 import { hotspotFloors, type ElevatorScheduleUX } from "./scheduleDialogRules";
-import type { AssistedPreset, AutoTuneProposal, PresetProposal, ScheduleFacts, SchedulePresetName } from "../simport/enginePort";
+import type { AssistedPreset, AutoTuneProposal, PresetProposal, ScheduleFacts, SchedulePresetName } from "@verticopolis/components/port/enginePort";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
 import { autoAnnouncement, fillFromProposal, tunedAnnouncement } from "./uiElevatorScheduleAuto";
 

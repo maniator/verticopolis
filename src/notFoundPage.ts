@@ -1,5 +1,5 @@
 import { html, nothing, render, type TemplateResult } from "lit-html";
-import { iconTemplate } from "./ui/icons";
+import { iconTemplate } from "@verticopolis/components/windows/icons";
 import { injectPageTelemetry } from "./telemetry";
 import { trackAppAction } from "./analyticsActions";
 import { BACK_NOTE_ID, backToOpenGame, takeFromGameFlag } from "./ui/fromGame";

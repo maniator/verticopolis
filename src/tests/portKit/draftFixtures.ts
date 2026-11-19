@@ -1,4 +1,4 @@
-import type { FacilityKind, Unit } from "../../shared/types";
+import type { FacilityKind, Unit } from "@verticopolis/components/shared/types";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { draftTower, type Draft } from "./portSim";
 
@@ -17,7 +17,7 @@ export interface CatalogFacts {
 /** The engine's catalog for `mode`. */
 export function catalogFacts(mode: "classic" | "modern" = "classic"): CatalogFacts {
   const read = wasm().catalog;
-  if (!read) throw new Error("the engine package has no catalog; run npm run wasm:build");
+  if (!read) throw new Error("the engine package has no catalog; run npm install");
   return JSON.parse(read(mode)) as CatalogFacts;
 }
 

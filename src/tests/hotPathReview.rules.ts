@@ -21,51 +21,40 @@ export const SECTIONS = [
 
 /** Section 1's table: every surface and its paths. Changing the gate's scope must be deliberate. */
 export const SURFACES: Record<string, string[]> = {
-  "Rust engine and its build": [
+  "Rust engine and its build (Verticopolis/engine)": [
     "engine-rs/src/",
     "engine-rs/Cargo.toml",
-    "engine-rs/Cargo.lock",
+    "Cargo.lock",
     "scripts/wasm-build.ts",
     "scripts/build-engine-wasm.sh",
   ],
-  "App build settings (which engine and code paths ship)": [
-    "vite.config.ts",
-    "src/build/",
-  ],
-  "WASM binding": [
-    "engine-rs/src/wasm.rs",
-    "engine-rs/src/wasm/",
-    "engine-rs/src/frame.rs",
-    "src/engineBinding/",
-  ],
-  "Hosts (main thread and worker)": ["src/wasmhost/"],
-  "Saves (load per command, autosave on a timer)": ["src/storage/"],
-  "Rendering, frame loop and UI": [
+  "WASM binding (Verticopolis/engine)": ["engine-rs/src/wasm.rs", "engine-rs/src/wasm/", "engine-rs/src/frame.rs"],
+  "Binding and hosts (Verticopolis/components)": ["src/engineBinding/", "src/wasmhost/", "src/simport/"],
+  "Rendering and audio (Verticopolis/components)": [
     "src/render/",
     "src/presentation/",
-    "src/game/",
-    "src/ui/",
     "src/catalog/",
+    "src/shared/",
+    "src/events/",
+    "src/audio/",
   ],
-  "Per-frame and periodic services": ["src/analytics*.ts", "src/audio/"],
-  "App shell": [
-    "src/main.ts",
-    "src/*.ts",
-    "src/game/",
-    "src/render/",
-    "src/ui/",
-  ],
-  "Runtime dependencies and toolchain": [
-    "package.json",
-    "package-lock.json",
-    ".nvmrc",
-  ],
+  "App build settings (which engine and code paths ship)": ["vite.config.ts", "src/build/"],
+  "Saves (load per command, autosave on a timer)": ["src/storage/"],
+  "Frame loop and UI": ["src/game/", "src/ui/"],
+  "Per-frame and periodic services": ["src/analytics*.ts"],
+  "App shell": ["src/main.ts", "src/*.ts", "src/game/", "src/ui/"],
+  "Runtime dependencies and toolchain (each repository)": ["package.json", "package-lock.json", ".nvmrc"],
 };
+
+/** Whether a surface's paths are in another repository, which this guard
+ *  cannot check on disk. */
+export const IN_OTHER_REPO = (surface: string): boolean => /\(Verticopolis\/(engine|components)\)$/.test(surface);
 
 /**
  * The code spans of section 1's not-hot-path list, in order. This pins the
  * list's wording; it is not an exclusion list (`engine-rs/src/` is here only
- * because the `*_tests.rs` files it names live there).
+ * because the `*_tests.rs` files it names live there). The `engine-rs/` paths
+ * are in Verticopolis/engine.
  */
 export const NOT_HOT = [
   "*.test.ts",

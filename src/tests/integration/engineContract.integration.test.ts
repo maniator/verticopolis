@@ -1,8 +1,8 @@
 import { afterEach, describe, it } from "vitest";
-import type { EnginePort } from "../../simport/enginePort";
-import { describeEngineContract } from "../../simport/engineContract.fixture";
-import { describeEngineLifecycle } from "../../simport/engineLifecycle.fixture";
-import { describeEngineQueries } from "../../simport/engineQueries.fixture";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { describeEngineContract } from "../engineFixtures/engineContract.fixture";
+import { describeEngineLifecycle } from "../engineFixtures/engineLifecycle.fixture";
+import { describeEngineQueries } from "../engineFixtures/engineQueries.fixture";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { releaseDrafts } from "../portKit/drafts";
 
@@ -27,6 +27,6 @@ if (hasWasmPackage()) {
   describeEngineQueries("Rust Engine", make);
 } else {
   describe("the Rust engine's port contract", () => {
-    it.skip("needs the engine package (npm run wasm:build)", () => {});
+    it.skip("needs the engine package (npm install)", () => {});
   });
 }

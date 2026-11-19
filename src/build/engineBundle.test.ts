@@ -86,13 +86,13 @@ describe("precacheManifest", () => {
 describe("the engine package's tier 3 ops (#1057)", () => {
   it("refuses a production build whose engine glue defines a tier 3 op", () => {
     expect(checkEngineBundle(production({ engineGlue: TOOLING_GLUE })).errors).toEqual([
-      "the engine package ships tier 3 ops only the tooling build may carry (setMoney, advanceClock); src/public/engine/ must hold the player build (npm run wasm:build)",
+      "the engine package ships tier 3 ops only the tooling build may carry (setMoney, advanceClock); src/public/engine/ must hold the player build (npm install)",
     ]);
   });
 
   it("refuses a tooling build that ships the player package", () => {
     expect(checkEngineBundle(bundle({ engineGlue: PLAYER_GLUE })).errors).toEqual([
-      "a tooling build ships the player engine package: its glue lacks setMoney, advanceClock, which the tooling tower calls (engine-rs/pkg-web-tooling/ should replace src/public/engine/)",
+      "a tooling build ships the player engine package: its glue lacks setMoney, advanceClock, which the tooling tower calls (the web build of @verticopolis/engine-tooling should replace src/public/engine/)",
     ]);
   });
 

@@ -17,8 +17,8 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
 import { checkEngineBundle, ENGINE_PACKAGE_FILES, precacheManifest, repoRelativeSource, type EmittedChunk } from "../src/build/engineBundle.ts";
-import { ENGINE_DIR, ENGINE_GLUE } from "../src/wasmhost/enginePackageNames.ts";
-import { TOOLING_METHODS } from "../src/engineBinding/toolingMethods.ts";
+import { ENGINE_DIR, ENGINE_GLUE } from "@verticopolis/components/host/enginePackageNames";
+import { TOOLING_METHODS } from "@verticopolis/components/binding/toolingMethods";
 import { MAPLESS_PUBLIC_SCRIPTS } from "../src/build/publicFiles.ts";
 import { sourceToPath } from "../src/build/thirdPartyNotices.ts";
 

@@ -24,7 +24,7 @@ describe("choosePublicDir (#1057)", () => {
   it("refuses a VC_TOOLING=1 build that has the player package but no tooling one", () => {
     const choice = choosePublicDir({ ...base, tooling: true, hasToolingPackage: false });
     expect(choice.kind).toBe("missing-tooling");
-    expect(choice.kind === "missing-tooling" && choice.why).toContain("npm run wasm:build");
+    expect(choice.kind === "missing-tooling" && choice.why).toContain("npm ci");
   });
 
   it("lets a dev serve fall back to the player package, and a build with no engine at all through", () => {

@@ -8,22 +8,28 @@ diagrams. The pages here go deeper into one system each.
 
 ```mermaid
 flowchart LR
-    subgraph repo["Verticopolis/web"]
+    subgraph engine["Verticopolis/engine"]
         Engine["engine-rs/<br/>Rust simulation"]
+        Conf["conformance/<br/>the lock the engine is held to"]
+        DocsSite["docs/engine-site/<br/>engine docs"]
+    end
+    subgraph components["Verticopolis/components"]
+        Comp["renderer, sprites, audio,<br/>binding and hosts"]
+    end
+    subgraph repo["Verticopolis/web"]
         Web["src/<br/>the web game (TypeScript)"]
         Help["help-site/<br/>player manual"]
-        DocsSite["docs/engine-site/<br/>engine docs"]
-        Conf["conformance/<br/>the lock the engine is held to"]
     end
 
-    Engine -->|"npm run wasm:build"| Pkg["WASM package<br/>src/public/engine/"]
-    Pkg --> Web
+    Engine -->|"engine release"| Registries["npm · crates.io<br/>@verticopolis/engine"]
     Conf -.checks.-> Engine
+    Comp -->|"components release"| NpmComp["npm<br/>@verticopolis/components"]
+    Registries -->|"npm install"| Web
+    NpmComp -->|"npm install"| Web
     Web --> Vercel["Vercel<br/>verticopolis.com · staging · previews"]
     Help --> Vercel
     Vercel --> HelpHost["help.verticopolis.com"]
     DocsSite --> Pages["GitHub Pages<br/>docs.verticopolis.com"]
-    Engine -.->|"crate release, when publishing is on"| Registries["crates.io · npm<br/>@verticopolis/engine"]
     Web -->|"gameplay events"| PostHog["PostHog analytics"]
 ```
 
@@ -39,13 +45,12 @@ flowchart LR
 
 Elsewhere:
 
-- [engine-rs/README.md](../../engine-rs/README.md): the engine's module map,
-  building it and changing it. The engine guides for hosts are on the docs
-  site (`docs/engine-site/guides/`).
-- [conformance/README.md](../../conformance/README.md): the conformance lock.
+- [Verticopolis/engine](https://github.com/Verticopolis/engine): the engine's
+  module map, building it and changing it, and the conformance lock. The
+  engine guides for hosts are on [docs.verticopolis.com](https://docs.verticopolis.com/).
 - [docs/analytics-data-map.md](../analytics-data-map.md): every analytics
   event and what it carries.
-- [docs/atlas.md](../atlas.md): the sprite atlas.
+- The sprite atlas: [Verticopolis/components](https://github.com/Verticopolis/components), which holds the art and bakes it.
 - [docs/performance/hot-path-review.md](../performance/hot-path-review.md):
   the complexity checklist for hot paths.
 - [SOUNDS.md](../../SOUNDS.md): the audio modules and cues.

@@ -1,18 +1,18 @@
 import type { GameApp } from "../main";
-import type { FacilityKind } from "../shared/types";
-import type { Picked } from "../render/excalibur/TowerEngine";
-import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "../catalog/catalogTypes";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { Picked } from "@verticopolis/components/render/excalibur/TowerEngine";
+import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";
 import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
-import { FLOOR } from "../render/scale";
+import { FLOOR } from "@verticopolis/components/render/scale";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft, type BuildQuote } from "./portAccess";
-import { NOT_ENOUGH_MONEY } from "../simport/request";
+import { NOT_ENOUGH_MONEY } from "@verticopolis/components/port/request";
 import { lobbyHeightFor } from "./lobbyHeight";
 import { quoteSkyBridge, quotedTiles, skyBridgeLabel } from "./skyBridgeTool";
-import { finishedSkyBridgeAt } from "../simport/skyBridgeView";
+import { finishedSkyBridgeAt } from "@verticopolis/components/port/skyBridgeView";
 import { pickedSkyBridgeLook } from "../ui/skyBridgeLookStrip";
-import { groupDigits } from "../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels

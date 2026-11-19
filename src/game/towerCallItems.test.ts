@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const engine = vi.hoisted(() => ({ catalog: vi.fn(), report: vi.fn() }));
 vi.mock("./portAccess", () => ({ catalogOf: engine.catalog }));
-vi.mock("../simport/statsSheet", () => ({ statsReport: engine.report }));
+vi.mock("@verticopolis/components/port/statsSheet", () => ({ statsReport: engine.report }));
 
 import { TOWER_CALL_ITEM, showTowerCalls, towerCalls } from "./towerCallItems";
 

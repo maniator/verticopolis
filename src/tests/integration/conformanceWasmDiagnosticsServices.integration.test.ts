@@ -1,11 +1,11 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import type { SerializedGame, Unit } from "../../shared/types";
-import { isOperational } from "../../shared/unitState";
-import { catalogFacility } from "../../catalog/catalogTypes";
+import type { SerializedGame, Unit } from "@verticopolis/components/shared/types";
+import { isOperational } from "@verticopolis/components/shared/unitState";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
 import { catalogFor } from "../catalogFixture";
-import type { ServiceDiagnosticFacts } from "../../simport/enginePort";
+import type { ServiceDiagnosticFacts } from "@verticopolis/components/port/enginePort";
 import {
   CONFORMANCE_DIR,
   firstDivergence,
@@ -15,8 +15,8 @@ import {
   type ScenarioEngine,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
-import type { WasmEngine } from "../../engineBinding/binding";
-import viewLayout from "../../simport/fixtures/viewLayout.json";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import viewLayout from "../engineFixtures/viewLayout.json";
 
 /**
  * The service, venue and transport facts behind the card (#1215, facade slice

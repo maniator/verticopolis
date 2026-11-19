@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { GameApp } from "../main";
-import { PinchTracker } from "../render/pinchTracker";
+import { PinchTracker } from "@verticopolis/components/render/pinchTracker";
 import { watchLostRelease } from "./lostRelease";
 
 /**

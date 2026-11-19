@@ -1,12 +1,12 @@
-import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
-import { catalogOn, useTowerCatalogSource } from "../catalog/towerCatalog";
-import type { FacilityKind } from "../shared/types";
-import type { EnginePort } from "../simport/enginePort";
-import type { PortCodes } from "../simport/portCodes";
-import { PortRenderSim } from "../simport/portRenderSim";
-import type { SimView } from "../simport/view";
-import { bindViewKinds } from "../presentation/viewKinds";
-import { ViewReader } from "../simport/viewReader";
+import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogOn, useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortRenderSim } from "@verticopolis/components/port/portRenderSim";
+import type { SimView } from "@verticopolis/components/port/view";
+import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
+import { ViewReader } from "@verticopolis/components/port/viewReader";
 
 /**
  * What the game's callers read through the engine port to price and preview a

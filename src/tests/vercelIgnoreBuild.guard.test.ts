@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, posix, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { LOCK_FILES, lockFilePath } from "../build/engineCompat";
 import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
 
 /**
@@ -39,15 +38,11 @@ function classify(paths: string[]): Map<string, "build" | "skip"> {
 describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", () => {
   describe("the path table", () => {
     const BUILDS = [
-      // The /help site shows these pictures and wears the engine site's theme
-      // and title bar.
+      // The /help site shows these pictures.
       "docs/screenshots/00-splash.png",
       "docs/screenshots/features/stats-tenancy-modern.png",
-      "docs/engine-site/src/styles/theme.css",
-      "docs/engine-site/src/styles/title-bar.css",
-      "docs/engine-site/src/components/TitleBar.astro",
-      "docs/engine-site/title-bar.mjs",
       "help-site/src/content/docs/keyboard.md",
+      "help-site/title-bar.mjs",
       "help-site/astro.config.mjs",
       // Build inputs and configs.
       "CHANGELOG.md",
@@ -61,21 +56,12 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       "LICENSE",
       "ASSETS-LICENSE.md",
       "api/anything.ts",
-      // The app, the engine crate and what it compiles in.
+      // The app.
       "src/main.ts",
       "src/public/sw-navigation-fallback.js",
-      "src/simport/enginePort.ts",
-      "engine-rs/src/lib.rs",
-      "engine-rs/Cargo.toml",
-      "engine-rs/Cargo.lock",
-      "engine-rs/src/gameplay/catalog.json",
-      "conformance/loader-cases.json",
-      "conformance/catalog-digests.json",
-      ...LOCK_FILES.map(lockFilePath),
       // Scripts the build runs.
       "scripts/vercel-build.sh",
-      "scripts/build-engine-wasm.sh",
-      "scripts/wasm-build.ts",
+      "scripts/engine-install.ts",
       "scripts/verify-precache.ts",
       "scripts/gen-third-party-notices.ts",
       // The release merge deletes the notes, and that deploy must build.
@@ -105,17 +91,8 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       "src/tests/namedFlags.guard.test.ts",
       "src/tests/guardFiles.ts",
       "src/tests/portKit/convertedList.ts",
-      "engine-rs/tests/api.rs",
-      "engine-rs/consumer/src/main.rs",
-      "engine-bench/src/lib.rs",
-      "engine-bench/Cargo.toml",
       ".pr_agent.toml",
       ".mcp.json",
-      "engine-rs/API.md",
-      "engine-rs/CRATE_README.md",
-      "engine-rs/CHANGELOG.md",
-      "conformance/fixtures/sixseven-december.vctower",
-      "conformance/scenarios/anything.json",
       "scripts/screenshots.ts",
       "scripts/scenes/anything.ts",
       "scripts/perf-compare.ts",
@@ -181,9 +158,8 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
     }
 
     const pkg = (version: string, dep = "0") => `{\n  "name": "x",\n  "version": "${version}",\n  "dep": "${dep}"\n}\n`;
-    const crate = (version: string) => `[package]\nname = "verticopolis-engine"\nversion = "${version}"\n\n[dependencies]\nversion = "9.9.9"\n`;
     const bump = (version: string) => ({ "package.json": pkg(version) });
-    const base = { "src/a.ts": "a", "docs/a.md": "a", "README.md": "a", "package.json": pkg("2.0.0"), "engine-rs/Cargo.toml": crate("1.0.0") };
+    const base = { "src/a.ts": "a", "docs/a.md": "a", "README.md": "a", "package.json": pkg("2.0.0") };
 
     it("skips (0) when only skipped paths changed", () => {
       expect(exitCode(base, { "docs/a.md": "b", "README.md": "b", ".github/workflows/x.yml": "b", "src/a.test.ts": "b" })).toBe(0);
@@ -205,28 +181,29 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
     });
 
     describe("the production hold for pending change notes", () => {
-      const note = (app: string, crate: string, eol = "\n") => ["---", `app: ${app}`, `crate: ${crate} # a comment`, "---", "## Player", "- A line."].join(eol) + eol;
+      const note = (app: string, eol = "\n") => ["---", `app: ${app} # a comment`, "---", "## Player", "- A line."].join(eol) + eol;
 
-      it("holds production while a note asks for an app or crate release", () => {
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor", "none") }, "sha", "production")).toBe(0);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none", "patch") }, "sha", "production")).toBe(0);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("major", "none", "\r\n") }, "sha", "production")).toBe(0);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/a.md": note("none", "none"), ".changes/b.md": note("patch", "none") }, "sha", "production")).toBe(0);
+      it("holds production while a note asks for an app release", () => {
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor") }, "sha", "production")).toBe(0);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("major", "\r\n") }, "sha", "production")).toBe(0);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/a.md": note("none"), ".changes/b.md": note("patch") }, "sha", "production")).toBe(0);
         // An indented level parses, so it holds too.
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none", "none").replace("app: none", "  app: minor") }, "sha", "production")).toBe(0);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none").replace("app: none", "  app: minor") }, "sha", "production")).toBe(0);
+        // A note from before the split says crate: none, which holds nothing.
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": "---\napp: none\ncrate: none\n---\n", ...bump("2.1.0") }, "sha", "production")).toBe(1);
       });
 
       it("builds a preview with pending notes, and production when every note is none", () => {
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor", "minor") }, "sha", "preview")).toBe(1);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor", "minor") })).toBe(1);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none", "none"), ...bump("2.1.0") }, "sha", "production")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor") }, "sha", "preview")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor") })).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none"), ...bump("2.1.0") }, "sha", "production")).toBe(1);
         // The folder's README is not a note, and a level outside the front matter does not count.
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/README.md": note("minor", "minor"), ...bump("2.1.0") }, "sha", "production")).toBe(1);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": `${note("none", "none")}app: minor\n`, ...bump("2.1.0") }, "sha", "production")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/README.md": note("minor"), ...bump("2.1.0") }, "sha", "production")).toBe(1);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": `${note("none")}app: minor\n`, ...bump("2.1.0") }, "sha", "production")).toBe(1);
       });
 
       it("builds the release merge that deletes the notes", () => {
-        const pending = { ...base, ".changes/x.md": note("minor", "none") };
+        const pending = { ...base, ".changes/x.md": note("minor") };
         expect(exitCode(pending, { ...bump("2.1.0"), ".changes/x.md": null }, "sha", "production")).toBe(1);
       });
     });
@@ -236,12 +213,11 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         expect(exitCode(base, { "src/a.ts": "b" }, "sha", "production")).toBe(0);
         expect(exitCode(base, { "src/a.ts": "b", "package.json": pkg("2.0.0", "1") }, "sha", "production")).toBe(0);
         // A release that consumed only none notes moved nothing, so it deploys nothing.
-        expect(exitCode({ ...base, ".changes/x.md": "---\napp: none\ncrate: none\n---\n" }, { ".changes/x.md": null }, "sha", "production")).toBe(0);
+        expect(exitCode({ ...base, ".changes/x.md": "---\napp: none\n---\n" }, { ".changes/x.md": null }, "sha", "production")).toBe(0);
       });
 
-      it("builds production when the app or the engine crate version changes", () => {
+      it("builds production when the app version changes", () => {
         expect(exitCode(base, bump("2.1.0"), "sha", "production")).toBe(1);
-        expect(exitCode(base, { "engine-rs/Cargo.toml": crate("1.1.0") }, "sha", "production")).toBe(1);
       });
 
       it("skips a production push with no version move even when the previous deploy cannot be fetched", () => {
@@ -400,16 +376,15 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         "src/index.html",
         "src/gallery.html",
         "src/preview.html",
-        "scripts/wasm-build.ts",
-        "scripts/engine-third-party.ts",
+        "scripts/engine-install.ts",
         "scripts/gen-third-party-notices.ts",
         // The help site: its config, its header and title screen (the config
-        // names them by path), the engine site theme it wears and its pages.
+        // names them by path), its theme and its pages.
         "help-site/astro.config.mjs",
         "help-site/src/components/Header.astro",
         "help-site/src/components/TitleScreen.astro",
         "help-site/src/pages/changelog.astro",
-        "docs/engine-site/src/styles/theme.css",
+        "help-site/src/styles/theme.css",
         ...sourceFiles("help-site/src/content/docs", [".md"]).map(repoRel),
         ...sourceFiles("scripts", [".ts"])
           .map(repoRel)
@@ -440,20 +415,6 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       expect(reached).toContain("docs/screenshots/00b-onboarding-modern.png");
       const got = classify(reached);
       expect(reached.filter((p) => got.get(p) !== "build")).toEqual([]);
-    });
-
-    it("builds every file the engine crate includes with include_str! or include_bytes!", () => {
-      const INCLUDE = /include_(?:str|bytes)!\(\s*"([^"]+)"\s*\)/g;
-      const targets = new Set<string>();
-      for (const abs of sourceFiles("engine-rs/src", [".rs"])) {
-        const rel = repoRel(abs);
-        for (const match of readFileSync(abs, "utf8").matchAll(INCLUDE)) {
-          targets.add(posix.normalize(posix.join(posix.dirname(rel), match[1] as string)));
-        }
-      }
-      expect(targets.size).toBeGreaterThan(0);
-      const got = classify([...targets]);
-      expect([...targets].filter((p) => got.get(p) !== "build")).toEqual([]);
     });
   });
 });

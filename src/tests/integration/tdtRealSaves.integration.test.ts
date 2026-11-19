@@ -10,9 +10,10 @@ import { resolve } from "node:path";
 import { expect, it } from "vitest";
 import { describeWithCodec, parseTDT } from "../conformance/tdtWasm";
 import { wasm } from "../conformance/wasmEngine";
-import type { SerializedGame } from "../../shared/types";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
-const DIR = resolve(__dirname, "../../../conformance/fixtures/tdt-reddit");
+const DIR = resolve(CONFORMANCE_ROOT, "fixtures/tdt-reddit");
 const load = (name: string) => {
   const bytes = readFileSync(resolve(DIR, name));
   return parseTDT(bytes, name);

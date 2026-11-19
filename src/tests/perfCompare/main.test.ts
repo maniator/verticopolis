@@ -179,11 +179,11 @@ describe("packageErrors", () => {
     expect(packageErrors(build(), build({ files: { "verticopolis_engine.js": "b", "verticopolis_engine_bg.wasm": "a" } }), "h")).toEqual([]);
   });
   it.each<[string, PackageState, PackageState, string | null, RegExp[]]>([
-    ["built from other sources", build({ buildHash: "old" }), build({ buildHash: "old" }), "h", [/was not built from the current engine-rs sources \(h\)/]],
+    ["built from other sources", build({ buildHash: "old" }), build({ buildHash: "old" }), "h", [/is not the pinned @verticopolis\/engine package \(h\)/]],
     ["no BUILD.json", build({ buildHash: null, buildProblem: "has no BUILD.json" }), build({ buildHash: null, buildProblem: "has no BUILD.json" }), "h", [/\(dist-perf\/\) has no BUILD.json/, /the sizes build \(dist\/\) has no BUILD.json too/]],
     ["a BUILD.json with no sources hash", build({ buildHash: null, buildProblem: "has a BUILD.json with no sources hash" }), build(), "h", [/has a BUILD.json with no sources hash/, /carry different engine packages \(h vs none: dist-perf\/ has a BUILD.json with no sources hash\)/]],
-    ["no engine-rs sources", build(), build(), null, [/no engine-rs sources in this checkout/]],
-    ["no sources and no BUILD.json", build({ buildHash: null, buildProblem: "has no BUILD.json" }), build({ buildHash: null, buildProblem: "has no BUILD.json" }), null, [/no engine-rs sources/, /\(dist-perf\/\) has no BUILD.json/, /the sizes build \(dist\/\) has no BUILD.json too/]],
+    ["no installed engine", build(), build(), null, [/no installed @verticopolis\/engine records its sources hash/]],
+    ["no sources and no BUILD.json", build({ buildHash: null, buildProblem: "has no BUILD.json" }), build({ buildHash: null, buildProblem: "has no BUILD.json" }), null, [/no installed @verticopolis\/engine/, /\(dist-perf\/\) has no BUILD.json/, /the sizes build \(dist\/\) has no BUILD.json too/]],
     ["dist/ built from another package", build(), build({ buildHash: "stale" }), "h", [/dist\/ \(sizes\) and dist-perf\/ \(timings\) carry different engine packages \(stale vs h\)/]],
     ["dist/ with an unreadable BUILD.json", build(), build({ buildHash: null, buildProblem: "has a BUILD.json that is not JSON" }), "h", [/\(none: dist\/ has a BUILD.json that is not JSON vs h\)/]],
     ["a rebuilt binary in one build", build(), build({ files: { ...files, "verticopolis_engine_bg.wasm": "rebuilt" } }), "h", [/serve different engine bytes/]],

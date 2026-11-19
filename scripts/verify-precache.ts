@@ -15,11 +15,11 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
-import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
+import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "@verticopolis/components/audio/audioAssets";
 import { engineDistProblems, manifestIntegrityProblems, pageAssetsMissing, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
 import { enginePreloadProblems } from "../src/build/enginePreload.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
-import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
+import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "@verticopolis/components/host/engineAssets";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const SW = resolve(DIST, "sw.js");
@@ -133,7 +133,7 @@ const stop = missingEngine(process.env, builtEngine);
 if (stop) fail(stop);
 if (builtEngine) {
   const notBuilt = ENGINE_RUNTIME_FILES.filter((f) => !existsSync(resolve(DIST, f)));
-  if (notBuilt.length > 0) fail(`the engine package in dist/ is incomplete (rebuild it with npm run wasm:build): ${notBuilt.join(", ")}`);
+  if (notBuilt.length > 0) fail(`the engine package in dist/ is incomplete (reinstall it with npm install): ${notBuilt.join(", ")}`);
   // A file in the package that the list does not classify could be one the
   // game fetches, so it stops the build until someone says which it is.
   const shipped = readdirSync(engineDir, { recursive: true, withFileTypes: true })

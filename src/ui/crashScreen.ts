@@ -1,7 +1,7 @@
 import { downloadFile } from "./downloadFile";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl, type CrashTower } from "../game/crashReport";
 import type { CrashDescription, FrameErrorEntry } from "../game/crashReport";
-import { escapeHtml } from "./escape";
+import { escapeHtml } from "@verticopolis/components/windows/escape";
 import { readRecoveryText } from "../storage/recoveryCopy";
 import { downloadRecoveryCopy, RECOVERY_COPY_STATUS } from "./recoveryCopy";
 import { GRAPHICS_RECOVERY_ID } from "./graphicsRecovery";

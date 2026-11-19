@@ -1,8 +1,8 @@
 import type { GameApp } from "../main";
-import type { FacilityKind } from "../shared/types";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { dragRemoves } from "./bulldozeDrag";
-import { TowerEngine } from "../render/excalibur/TowerEngine";
-import { catalogFacility } from "../catalog/catalogTypes";
+import { TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
+import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
 import { snapX } from "../ui/placement";
 import { classifyGesture, isPaintKind } from "./gesture";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors, clearBuildRefusal } from "./buildPreview";
@@ -13,7 +13,7 @@ import { noteFrameError } from "./frameErrors";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 import { appPlacementPaused, refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { holdRefusal, sayHeldRefusal, sayPressRefusal } from "./dragRefusal";
-import { pickPersonAt } from "../render/excalibur/personFocus";
+import { pickPersonAt } from "@verticopolis/components/render/excalibur/personFocus";
 import { placeSkyBridge, skyBridgeStep, tapSkyBridge } from "./skyBridgeGestures";
 
 /**

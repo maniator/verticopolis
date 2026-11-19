@@ -1,5 +1,5 @@
 import type { MapLayoutClass } from "./overviewMapPrefs";
-import type { Spot } from "./movableWindow";
+import type { Spot } from "@verticopolis/components/windows/movableWindow";
 
 /**
  * Where the player moved the Map window, per layout class, so a Map dragged

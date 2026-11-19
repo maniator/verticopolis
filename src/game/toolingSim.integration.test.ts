@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { EnginePort } from "../simport/enginePort";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import type { HudSource } from "../ui/uiStatus";
 import { hasWasmPackage, wasm } from "../tests/conformance/wasmEngine";
 import { adoptToolingSim, syncToolingSim, toolingSim } from "./toolingSim";

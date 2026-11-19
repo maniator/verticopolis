@@ -21,8 +21,9 @@ call something new. The paths in the table below are hot-path surfaces, and so
 is any other production file whose changed code an entry point calls, apart
 from these, which are not hot paths even inside a listed path:
 
-- tests: `*.test.ts`, `src/tests/`, `e2e/`, `engine-rs/tests/`, the
-  `*_tests.rs` files under `engine-rs/src/` and Rust `#[cfg(test)]` modules;
+- tests: `*.test.ts`, `src/tests/`, `e2e/`, the engine's `engine-rs/tests/`,
+  the `*_tests.rs` files under `engine-rs/src/` and Rust `#[cfg(test)]`
+  modules;
 - test fixtures and helpers: `*.fixture.ts` and `src/ui/testing/`;
 - the engine's command-line tools in `engine-rs/src/bin/` (conformance, dump,
   fuzz and TDT), and docs;
@@ -37,17 +38,22 @@ at once (HP-11). A Rust toolchain or Cargo configuration file added later
 (`rust-toolchain.toml`, `.cargo/config.toml`) joins the engine build row, and
 the PR that adds one adds it to the table too (owner, 2026-11-19, #1203).
 
+The game is built from three repositories, and this page governs all three.
+A row's paths are in Verticopolis/web unless its surface names another
+repository.
+
 | Surface | Paths |
 | --- | --- |
-| Rust engine and its build | `engine-rs/src/`, `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
+| Rust engine and its build (Verticopolis/engine) | `engine-rs/src/`, `engine-rs/Cargo.toml`, `Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
+| WASM binding (Verticopolis/engine) | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs` |
+| Binding and hosts (Verticopolis/components) | `src/engineBinding/`, `src/wasmhost/`, `src/simport/` |
+| Rendering and audio (Verticopolis/components) | `src/render/`, `src/presentation/`, `src/catalog/`, `src/shared/`, `src/events/`, `src/audio/` |
 | App build settings (which engine and code paths ship) | `vite.config.ts`, `src/build/` (the build modules it imports) |
-| WASM binding | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs`, `src/engineBinding/` |
-| Hosts (main thread and worker) | `src/wasmhost/` |
 | Saves (load per command, autosave on a timer) | `src/storage/` |
-| Rendering, frame loop and UI | `src/render/`, `src/presentation/`, `src/game/`, `src/ui/`, `src/catalog/` |
-| Per-frame and periodic services | `src/analytics*.ts`, `src/audio/` |
-| App shell | `src/main.ts` (`GameApp`, read on every HUD refresh) and any other root `src/*.ts` module that `src/game/`, `src/render/` or `src/ui/` imports |
-| Runtime dependencies and toolchain | `package.json`, `package-lock.json`, `.nvmrc` |
+| Frame loop and UI | `src/game/`, `src/ui/` |
+| Per-frame and periodic services | `src/analytics*.ts` |
+| App shell | `src/main.ts` (`GameApp`, read on every HUD refresh) and any other root `src/*.ts` module that `src/game/` or `src/ui/` imports |
+| Runtime dependencies and toolchain (each repository) | `package.json`, `package-lock.json`, `.nvmrc` |
 
 A port or a rewrite changes every line it adds, so all of it is in scope,
 including algorithms copied unchanged. A diff that touches no hot-path surface

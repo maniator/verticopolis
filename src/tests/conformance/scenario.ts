@@ -3,14 +3,15 @@ import { CHARGE_OPS, applyCharge, type ChargeCommand, type ChargeEngine } from "
 import { TUNE_OPS, applyTune, expectOk, expectOutcome, type TuneCommand } from "./tuneOps";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { FacilityKind, GameMode } from "../../shared/types";
-import type { FilmPolicy } from "../../simport/commands";
+import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
+import type { FilmPolicy } from "@verticopolis/components/port/commands";
 import { reloadChanged } from "./reloadCheck";
 import { digest } from "./canonical";
 import { check, own, type Spec } from "./scenarioSchema";
 export type { Spec } from "./scenarioSchema";
 import { requireDetail, type CheckpointDetail } from "./checkpointDetail";
 import { drainChecked } from "./gameplayEvents";
+import { CONFORMANCE_ROOT } from "../packagePaths";
 
 /**
  * The scenario runner for the engine conformance suite. The format and the
@@ -20,7 +21,7 @@ import { drainChecked } from "./gameplayEvents";
  */
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-export const CONFORMANCE_DIR = resolve(REPO_ROOT, "conformance");
+export const CONFORMANCE_DIR = CONFORMANCE_ROOT;
 
 export type Start =
   | { newGame: { seed: number; mode: GameMode; star?: number } }

@@ -50,7 +50,7 @@ import {
 import { installedLinkProblems } from "../src/build/installedLinks.ts";
 import { MAPLESS_PUBLIC_SCRIPTS } from "../src/build/publicFiles.ts";
 import { ENGINE_PORTS, ENGINE_THIRD_PARTY, engineRecordPackages, portVersionProblems } from "../src/build/rustNotices.ts";
-import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames.ts";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "@verticopolis/components/host/enginePackageNames";
 import { readLicenseFiles } from "./license-files.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
@@ -285,7 +285,7 @@ if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(
     try {
       return JSON.parse(readFileSync(path, "utf8"));
     } catch {
-      fail(`${relative(ROOT, path)} is missing or not valid JSON, so the WASM engine that ships cannot be attributed (rebuild it with npm run wasm:build)`);
+      fail(`${relative(ROOT, path)} is missing or not valid JSON, so the WASM engine that ships cannot be attributed (reinstall it with npm install)`);
     }
   };
   const build = read(join(DIST, "engine", "BUILD.json")) as { sources?: unknown } | null;
@@ -301,7 +301,8 @@ if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(
   // The record describes this package and nothing else, so another file here would ship unattributed.
   const extra = statSync(engineDir).isDirectory() ? readdirSync(engineDir).filter((f) => !ENGINE_FILES.has(f)) : [];
   if (extra.length > 0) problems.push(`dist/engine/ ships ${extra.join(", ")}, which the engine's record does not describe`);
-  const ports = ENGINE_PORTS.filter((p) => existsSync(join(ROOT, "engine-rs", p.source)));
+  // The installed engine package ports these, so its record must list each one.
+  const ports = ENGINE_PORTS;
   problems.push(...portVersionProblems(ports, installedVersion));
   const engine = engineRecordPackages(read(recordPath), { sources: build?.sources, wasm, ports: ports.map((p) => p.name) });
   problems.push(...engine.problems.map((p) => `${relative(ROOT, recordPath)}: ${p}`));

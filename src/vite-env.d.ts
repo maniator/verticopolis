@@ -14,7 +14,7 @@ declare const __TOOLING_BUILD__: boolean;
 declare const __HELP_ORIGIN__: string;
 /** True when the engine this run serves is the tooling package, with the
  *  binding's tier 3 ops (#1057): a tooling build, or a dev serve that found
- *  `engine-rs/pkg-web-tooling/`. The boot check asks for those ops only then. */
+ *  `@verticopolis/engine-tooling`. The boot check asks for those ops only then. */
 declare const __TOOLING_ENGINE__: boolean;
 /** True only in a Vercel preview deployment's build (`VERCEL_ENV=preview`).
  *  The page then registers no service worker (see src/build/previewDeploy.ts
@@ -27,7 +27,7 @@ declare const __PREVIEW_DEPLOY__: boolean;
 /** This build's parts, for the update prompt's "game or engine" label (see
  *  src/pwaUpdateInfo.ts and src/build/buildFingerprint.ts). */
 declare const __BUILD_FINGERPRINT__: import("./pwaUpdateInfo").BuildFingerprint;
-declare const __ENGINE_PACKAGE__: import("./wasmhost/enginePackageRecord").ExpectedEnginePackage | null;
+declare const __ENGINE_PACKAGE__: import("@verticopolis/components/host/enginePackageRecord").ExpectedEnginePackage | null;
 
 /** A help page from help-site/src/content/docs/, compiled at build time by
  *  src/build/helpMarkdown.ts: its front matter and its body as lit templates. */

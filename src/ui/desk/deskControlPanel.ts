@@ -1,4 +1,4 @@
-import { buildFrame, titleButton } from "./deskWindow";
+import { buildFrame, titleButton } from "@verticopolis/components/windows/desk/deskWindow";
 
 /**
  * The Control Panel on the 1994 desk: the settings a 1995 player looked for

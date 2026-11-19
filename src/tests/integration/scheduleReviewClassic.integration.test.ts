@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { SerializedGame } from "../../shared/types";
-import { scheduleSlots } from "../../simport/scheduleSlots";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
+import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
 import { diffPaths, load, play } from "./scheduleReview.fixture";
 import { noEngine } from "../portKit/rustEngine";
 
@@ -34,7 +34,7 @@ describe.skipIf(noEngine)("the schedule review on a Classic tower, and across Un
     expect(diffPaths(before, g.saved())).toEqual([]);
   });
 
-  it("does not mention a schedule set after the look when an Undo moves the generation", async () => {
+  it("does not mention a schedule set after the look across an Undo", async () => {
     const { raw, id } = classicWithFlatShaft();
     const g = play(raw);
     g.review.tick();
@@ -50,7 +50,8 @@ describe.skipIf(noEngine)("the schedule review on a Classic tower, and across Un
     edit(third!.id, Array.from({ length: 24 }, (_, h) => (h < 12 ? 1 : 2)));
     const generation = g.port.generation();
     await g.history.undo();
-    expect(g.port.generation()).not.toBe(generation);
+    // An Undo is a step like an edit and keeps the generation (#1802).
+    expect(g.port.generation()).toBe(generation);
     expect(g.review.undecided().map((f) => f.shaft.id)).toContain(other!.id);
     g.review.tick();
     // Undo says what it undid in a toast of its own; the review adds none.

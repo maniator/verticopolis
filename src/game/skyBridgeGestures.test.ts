@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("./buildPreview", () => ({ updateBuildPreview: vi.fn() }));
 import { updateBuildPreview } from "./buildPreview";
-import { PortCodes } from "../simport/portCodes";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { catalogFor } from "../tests/catalogFixture";
 import { LAYOUT, mockPort } from "../tests/portKit/mockPort";
 import type { GameApp } from "../main";
@@ -9,7 +9,7 @@ import type { Tool } from "../ui/UI";
 import { KeyboardPlay, type KeyboardPlayDeps } from "./keyboardPlay";
 import { disarmSkyBridge, placeSkyBridge, tapSkyBridge } from "./skyBridgeGestures";
 import { BRIDGE_LOOK_STEP, SKY_BRIDGE_STEP, type SkyBridgeClick } from "./skyBridgeTool";
-import type { SkyBridgeView } from "../simport/view";
+import type { SkyBridgeView } from "@verticopolis/components/port/view";
 
 /**
  * The Sky Bridge tool's gestures over a mock port: a phone's first tap shows

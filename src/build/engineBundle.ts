@@ -71,10 +71,10 @@ export function checkEngineBundle(input: EngineBundleInput): EngineBundleResult 
     const methods = glueMethods(input.engineGlue);
     if (input.tooling) {
       const missing = input.toolingMethods.filter((m) => !methods.has(m));
-      if (missing.length > 0) errors.push(`a tooling build ships the player engine package: its glue lacks ${missing.join(", ")}, which the tooling tower calls (engine-rs/pkg-web-tooling/ should replace src/public/engine/)`);
+      if (missing.length > 0) errors.push(`a tooling build ships the player engine package: its glue lacks ${missing.join(", ")}, which the tooling tower calls (the web build of @verticopolis/engine-tooling should replace src/public/engine/)`);
     } else {
       const shipped = input.toolingMethods.filter((m) => methods.has(m));
-      if (shipped.length > 0) errors.push(`the engine package ships tier 3 ops only the tooling build may carry (${shipped.join(", ")}); src/public/engine/ must hold the player build (npm run wasm:build)`);
+      if (shipped.length > 0) errors.push(`the engine package ships tier 3 ops only the tooling build may carry (${shipped.join(", ")}); src/public/engine/ must hold the player build (npm install)`);
     }
   }
   return { errors };

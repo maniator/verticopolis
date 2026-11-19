@@ -1,10 +1,10 @@
 import type { GameApp } from "../main";
-import type { FacilityKind } from "../shared/types";
-import type { SimView } from "../simport/view";
+import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { SimView } from "@verticopolis/components/port/view";
 import { trackAppAction } from "../analytics";
-import { holdTowerFrames } from "../render/excalibur/frameHold";
+import { holdTowerFrames } from "@verticopolis/components/render/excalibur/frameHold";
 import { reducedMotionActive } from "../storage/Prefs";
-import { groupDigits } from "../ui/format";
+import { groupDigits } from "@verticopolis/components/windows/format";
 import { openScreenSaverDialog } from "../ui/screenSaver/saverDialog";
 import { NO_SAVER, loadSaverPrefs, saveSaverPrefs, type SaverId, type SaverPrefs } from "../ui/screenSaver/saverPrefs";
 import type { SaverScene } from "../ui/screenSaver/saverScene";

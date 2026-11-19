@@ -4,12 +4,12 @@ vi.mock("../analytics", async (importOriginal) => ({ ...(await importOriginal<ty
 vi.mock("./fileSpaceCommands", () => ({ saveCurrentFile: files.saveCurrentFile }));
 vi.mock("./fileKeep", () => ({ keepOpenedFile: files.keepOpenedFile }));
 import { catalogFor } from "../tests/catalogFixture";
-import type { GameMode } from "../shared/types";
+import type { GameMode } from "@verticopolis/components/shared/types";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
 import { NO_GESTURE } from "./appHistory";
-import type { EnginePort } from "../simport/enginePort";
+import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { mockPort } from "../tests/portKit/mockPort";
-import { PortCodes } from "../simport/portCodes";
+import { PortCodes } from "@verticopolis/components/port/portCodes";
 
 /**
  * The UI command boundary is pure wiring: every UICallbacks member delegates to

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { WasmEngine } from "../../engineBinding/binding";
-import type { SerializedGame } from "../../shared/serializedGame";
+import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import type { SerializedGame } from "@verticopolis/components/shared/serializedGame";
 import { catalogFor } from "../catalogFixture";
 import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";

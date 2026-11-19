@@ -67,6 +67,14 @@ describe("third-party notices hardening (#974)", () => {
     expect(isPackagePath("/repo/src/a.css", stylesheet)).toBe(false);
   });
 
+  it("treats the project's own @verticopolis packages as first-party, but not packages nested in them", () => {
+    expect(isPackagePath("/repo/node_modules/@verticopolis/components/src/styles.css")).toBe(false);
+    expect(isPackagePath("C:\\repo\\node_modules\\@verticopolis\\engine\\web\\verticopolis_engine.js")).toBe(false);
+    expect(isPackagePath("/repo/node_modules/@verticopolis/components/node_modules/fflate/esm/browser.js")).toBe(true);
+    expect(isPackagePath("/repo/node_modules/@verticopolisx/a/b.js")).toBe(true);
+    expect(isPackagePath("/repo/node_modules/@other/components/a.css")).toBe(true);
+  });
+
   it("finds a package stylesheet's extension at the end of the path or of any query part", () => {
     // The plugin's test: the path's extension, or the whole id's.
     const refused = (id: string): boolean => isPackagePath(id, PACKAGE_STYLESHEET) || (isPackagePath(id) && PACKAGE_STYLESHEET.test(id));
