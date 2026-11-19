@@ -429,7 +429,7 @@ function censusCrowd(engine: TowerEngine, dominant: ViewFocus["dominant"], bound
         // updatePresence, so both read it.
         // (`customersIn` is not persisted: just after a save load a busy venue
         // reads empty for the seconds the crowd system takes to re-route diners
-        // in. That is honest and self-heals; see the ambience backlog.)
+        // in. That is honest and self-heals, so nothing tracks it.)
         occ += def.commercial && def.population > 0 ? (u.customersIn ?? 0) : (u.occupants ?? 0);
         cap += unitCap;
       }

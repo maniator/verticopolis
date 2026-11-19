@@ -14,10 +14,12 @@ way to a coveted **TOWER**.
 The simulation is a **Rust** engine (`engine-rs/`) compiled to
 **WebAssembly**, and it is the only engine the game runs. Everything around it
 is **TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)** game
-engine (camera, scene, culling and the render loop). A procedural soundtrack
-built on **[Tone.js](https://tonejs.github.io/)** changes depending on which
-part of the tower you're looking at. No external art assets: every sprite is
-drawn in code.
+engine (camera, scene, culling and the render loop). The music is a
+procedural soundtrack built on **[Tone.js](https://tonejs.github.io/)**, with
+one theme for the title screen and another in the tower. The ambience under it
+follows the part of the tower you're looking at: offices type away through the
+workday, diners chatter, the metro rumbles. No external art assets: every
+sprite is drawn in code.
 
 | Day | Night |
 | --- | --- |

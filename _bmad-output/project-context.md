@@ -36,7 +36,9 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   editor, no C#/C++/GDScript, no scene files**. Do not assume Unity/Unreal/Godot
   workflows. (The gds module's `primary_platform` is pinned to `web` in
   `_bmad/custom/config.toml`; the installer's `unity/unreal/godot/other` default is wrong.)
-- All art and audio are **generated in code** (no ripped/imported assets), a clean-room homage.
+- All art and audio are **generated in code** (no ripped/imported assets), a clean-room homage. The one
+  exception is the crowd's two voice seeds (`src/public/audio/voice-talk.mp3` and `voice-laughs.mp3`),
+  original recordings by the owner, licensed in `ASSETS-LICENSE.md`.
 - The simulation is deterministic and **headless-testable** (seeded `rng.ts`); tests are Vitest.
 
 ## Distribution targets (packaging only, game scope unchanged)
