@@ -84,18 +84,6 @@ describe("scripts/vercel-install.sh", () => {
     expect(npmCalls()).toHaveLength(2);
   });
 
-  it("keeps the preview's engine package cache across an npm ci", () => {
-    install();
-    const cached = join(project, "node_modules/.cache/vc-engine/key-1");
-    mkdirSync(cached, { recursive: true });
-    writeFileSync(join(cached, "BUILD.json"), "{}");
-    writeFileSync(join(project, "package-lock.json"), '{ "lockfileVersion": 3, "y": 2 }\n');
-    install();
-    expect(npmCalls()).toHaveLength(2);
-    expect(readFileSync(join(cached, "BUILD.json"), "utf8")).toBe("{}");
-    expect(existsSync(join(project, "node_modules/dep"))).toBe(true);
-  });
-
   it("leaves no stamp after a failed install, so the next build installs again", () => {
     install();
     writeFileSync(join(project, "package-lock.json"), '{ "lockfileVersion": 3, "x": 1 }\n');

@@ -18,8 +18,12 @@ const json = (file: string): Record<string, unknown> => JSON.parse(readFileSync(
 
 describe("the installed engine and components packages", () => {
   it("carry the same gameplay event types", () => {
-    const fromEngine = readFileSync(resolve(engine, "events/gameplayEvents.d.ts"), "utf8");
-    const fromComponents = readFileSync(resolve(components, "lib/events/gameplayEvents.d.ts"), "utf8");
+    // The first line names the script that generated each copy, which differs
+    // between the two repositories, so only the declarations are compared.
+    const declarations = (file: string): string => readFileSync(file, "utf8").replace(/^\/\/ Generated from .*\n/, "");
+    const fromEngine = declarations(resolve(engine, "events/gameplayEvents.d.ts"));
+    const fromComponents = declarations(resolve(components, "lib/events/gameplayEvents.d.ts"));
+    expect(fromEngine).toContain("export");
     expect(fromComponents).toBe(fromEngine);
   });
 
