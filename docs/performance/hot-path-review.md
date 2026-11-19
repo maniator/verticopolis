@@ -35,10 +35,7 @@ from these, which are not hot paths even inside a listed path:
 The build files in the table do count: they set the cost of every engine path
 at once (HP-11). A Rust toolchain or Cargo configuration file added later
 (`rust-toolchain.toml`, `.cargo/config.toml`) joins the engine build row, and
-the PR that adds one adds it to the table too. The runtime row counts a change
-to `dependencies` in `package.json` (and the lock entries it pulls in) and to
-the Node version the app is built with; a change to `devDependencies` or to
-`scripts` alone is tooling, not a hot path (owner, 2026-11-19, #1203).
+the PR that adds one adds it to the table too (owner, 2026-11-19, #1203).
 
 | Surface | Paths |
 | --- | --- |
@@ -206,8 +203,8 @@ every pass in one occurrence together (owner, 2026-11-19, #1203). A
 per-person multiplier counts the most people the pass can visit, never a
 typical count: the whole population (17,322 on the large tower) for a pass over
 the census or the residents, and for the drawn crowd its cap, 140 trip
-spawns plus every housekeeper the tower can field (144 on the hotel-heavy
-tower).
+spawns plus every housekeeper the tower can field (up to 144 housekeepers on
+the hotel-heavy tower, so up to 284 people in all there).
 
 A pass over a small collection (the 110 floors, the shafts and their cars,
 the stair and escalator links, the drawn crowd) is fine at any tier while
@@ -498,8 +495,8 @@ item, and Copilot and Codex are asked to:
   naming its group. A "no hot-path surface" line counts only when it covers the
   whole diff of the PR, or when the group records together cover it.
 - A review runs on a commit. A diff with no commit behind it (a patch file, or
-  an uncommitted tree handed over for review) is committed on a branch first,
-  and the record names that commit. When a run cannot post to the PR, it saves
+  an uncommitted tree handed over for review) is committed and pushed on a
+  branch first, and the record names that commit. When a run cannot post to the PR, it saves
   its record under `_bmad-output/implementation-artifacts/` and the thread or
   person that asked for the review posts it on the PR as a comment; a record
   pasted into the PR description under Complexity counts too (owner,
