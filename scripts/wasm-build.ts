@@ -25,7 +25,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
 import { engineBuildRecord } from "../src/wasmhost/enginePackageRecord.ts";
@@ -91,12 +92,44 @@ if (which === "engine") {
 // crates have one build, into pkg/.
 const PLAYER_FEATURES = "wasm";
 const TOOLING_FEATURES = "wasm,tooling";
-const run = (cmd: string, args: string[]) => execFileSync(cmd, args, { cwd: crate, stdio: "inherit" });
+const run = (cmd: string, args: string[], env?: NodeJS.ProcessEnv) => execFileSync(cmd, args, { cwd: crate, stdio: "inherit", env });
 const wasm = `target/wasm32-unknown-unknown/release/${target.lib}.wasm`;
+/**
+ * The compiler flags that keep this machine's folders out of the binary
+ * (#1079). A panic location in a dependency names its source file, which
+ * lives under the builder's cargo home (`/home/runner/.cargo/registry/...`
+ * in CI, a user folder on a desktop), so without these two builds of one
+ * commit on two machines differ, and a desktop build carries its user name.
+ * The checkout, the cargo home and the toolchain each map to a fixed
+ * stand-in. rustc applies the last matching prefix, so the cargo home and
+ * the toolchain win over a checkout that holds them. The flags go in
+ * `CARGO_ENCODED_RUSTFLAGS` (a path with a space stays one flag), after any
+ * flags the caller set in it or in `RUSTFLAGS`; like either variable, it
+ * replaces the `rustflags` of a cargo config file, and the repository has none.
+ * One difference is expected to stay (not yet measured): a Windows build
+ * names the folders under a stand-in with `\\`, so its binary would still
+ * differ from a Linux or macOS build's in those separators.
+ */
+function remapFlags(): string[] {
+  // Cargo reads a relative CARGO_HOME from its own working folder, the crate.
+  const cargoHome = resolve(crate, process.env.CARGO_HOME || join(homedir(), ".cargo"));
+  const sysroot = execFileSync("rustc", ["--print", "sysroot"], { cwd: crate, encoding: "utf8" }).trim();
+  const own = process.env.CARGO_ENCODED_RUSTFLAGS
+    ? process.env.CARGO_ENCODED_RUSTFLAGS.split("\x1f")
+    : (process.env.RUSTFLAGS ?? "").split(/\s+/).filter((f) => f !== "");
+  return [
+    ...own,
+    `--remap-path-prefix=${resolve(crate, "..")}=/verticopolis`,
+    `--remap-path-prefix=${cargoHome}=/cargo`,
+    `--remap-path-prefix=${sysroot}=/rust-toolchain`,
+  ];
+}
 /** Compile the cdylib with `features`. The crate is an rlib; the cdylib is
  *  asked for here so the native build stays as it is. */
 function compile(features: string): void {
-  run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", features, "--crate-type", "cdylib"]);
+  const env = { ...process.env, CARGO_ENCODED_RUSTFLAGS: remapFlags().join("\x1f") };
+  delete env.RUSTFLAGS;
+  run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", features, "--crate-type", "cdylib"], env);
 }
 // The hash of the sources every binary is stamped with and BUILD.json records.
 // It covers the sources only, so stamping a binary with it cannot change it.

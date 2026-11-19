@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { cargoPackage } from "../build/engineCompat";
@@ -41,6 +41,16 @@ describe.skipIf(!existsSync(BUILD))("the served engine package", () => {
     const entry = built.files["verticopolis_engine_bg.wasm"];
     expect(entry.bytes).toBe(served.length);
     expect(entry.sha256).toBe(createHash("sha256").update(served).digest("hex"));
+  });
+
+  it("carries no folder of the machine that built it (#1079)", () => {
+    const cargoHome = resolve(process.env.CARGO_HOME || join(homedir(), ".cargo"));
+    for (const f of [...PLAYER_PACKAGES, ...TOOLING_PACKAGES].map((dir) => `${dir}/verticopolis_engine_bg.wasm`)) {
+      const text = readFileSync(resolve(ROOT, f)).toString("latin1");
+      for (const folder of [ROOT, cargoHome, ".cargo/registry", ".cargo\\registry"]) {
+        expect(text.includes(folder), `${f} names ${folder}`).toBe(false);
+      }
+    }
   });
 
   it("builds the binding's tier 3 ops into the tooling packages alone (#1057)", () => {
