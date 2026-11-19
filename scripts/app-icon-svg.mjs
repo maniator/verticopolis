@@ -1,8 +1,9 @@
 /**
  * The Verticopolis app mark as an in-code SVG: a stepped art-deco tower with
  * lit gold windows and a setting sun, on an indigo, plum and coral "Metropolis
- * Dusk" sky. `gen-pwa-icons.mjs` rasterizes it for the web app, and the atlas
- * export ships it (with the committed PNGs) for other frontends.
+ * Dusk" sky. `gen-pwa-icons.mjs` rasterizes it for the web app. The sprite
+ * atlas that ships it to other frontends is baked in Verticopolis/components,
+ * which keeps its own copy.
  */
 
 // "Metropolis Dusk" palette (matches the splash + wordmark).
