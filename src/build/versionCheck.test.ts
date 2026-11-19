@@ -89,6 +89,23 @@ describe("a feature PR", () => {
     expect(feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": "app: minor\n" }))[0]).toMatch(/first line/);
   });
 
+  it("needs at least a patch note to move the engine or components pin", () => {
+    const pinned = (engine: string, components = "0.2.1") =>
+      JSON.stringify({ name: "x", version: "2.89.1", dependencies: { "@verticopolis/engine": engine, "@verticopolis/components": components } });
+    const base = main({ "package.json": pinned("1.57.1") });
+    const none = feature(base, { ...base, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") });
+    expect(none).toHaveLength(1);
+    expect(none[0]).toMatch(/@verticopolis\/engine pin .* at least app: patch/);
+    expect(feature(base, { ...base, "package.json": pinned("1.57.1", "0.2.2"), ".changes/topic.md": note("none") })[0]).toMatch(/@verticopolis\/components pin/);
+    expect(feature(base, { ...base, "package.json": pinned("1.57.2"), ".changes/topic.md": note("patch") })).toEqual([]);
+    // A pending note from main does not count for this PR.
+    const pending = { ...base, ".changes/other.md": note("minor") };
+    expect(feature(pending, { ...pending, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") })).toHaveLength(1);
+    // Other dependencies move with any note.
+    const other = JSON.stringify({ name: "x", version: "2.89.1", dependencies: { "@verticopolis/engine": "1.57.1", "@verticopolis/components": "0.2.1", fflate: "^0.8.4" } });
+    expect(feature(base, { ...base, "package.json": other, ".changes/topic.md": note("none") })).toEqual([]);
+  });
+
   it("refuses a note that still declares an engine change", () => {
     const errors = feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": "---\napp: none\ncrate: patch\n---\n" }));
     expect(errors).toHaveLength(1);

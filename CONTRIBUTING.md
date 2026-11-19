@@ -610,12 +610,15 @@ with its tooling and conformance packages on each engine release) and
 binding, the renderer or the audio lands there, under that repository's
 CONTRIBUTING.md, and reaches the game when a PR here raises the pin in
 `package.json`. A pin move is an ordinary feature PR with a change note: the
-app tier is what a player would notice from the new engine or components.
+app tier is what a player would notice from the new engine or components, and
+at least `patch`, since the game players run changes (owner, 2026-11-19;
+`npm run version:check` enforces it).
 
 Raise the three engine pins together (`@verticopolis/engine` and the
 `engine-tooling` and `engine-conformance` tarballs of the same release), so
 the suites check the engine the game ships against that release's own
-conformance lock.
+conformance lock. `src/tests/enginePackagesAgree.test.ts` fails when the
+installed three are not the same release.
 
 ### The changelog, and the update label
 

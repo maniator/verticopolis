@@ -18,8 +18,10 @@ app: minor    # major | minor | patch | none
   repositories (Verticopolis/engine, Verticopolis/components), so a note here
   has no `crate:` level, no `readmes:` line and no `## Engine` section. A note
   written before the split that says `crate: none` still reads. A PR that
-  raises an engine or components pin in `package.json` describes what a player
-  notices from it in its Player lines.
+  moves the `@verticopolis/engine` or `@verticopolis/components` pin in
+  `package.json` changes the game players run, so its note needs at least
+  `app: patch` (owner, 2026-11-19), and its Player lines describe what a
+  player notices from it. `npm run version:check` enforces the tier.
 - `## Player` lines go into `CHANGELOG.md` and the update prompt, in the house
   style of CONTRIBUTING.md "Player notes".
 - `## Contributors` (optional, at any level) credits the people outside the

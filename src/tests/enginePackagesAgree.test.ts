@@ -12,6 +12,9 @@ const require = createRequire(import.meta.url);
 const root = (pkg: string) => dirname(require.resolve(`${pkg}/package.json`));
 const engine = root("@verticopolis/engine");
 const components = root("@verticopolis/components");
+const tooling = root("@verticopolis/engine-tooling");
+const conformance = root("@verticopolis/engine-conformance");
+const json = (file: string): Record<string, unknown> => JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
 
 describe("the installed engine and components packages", () => {
   it("carry the same gameplay event types", () => {
@@ -42,5 +45,20 @@ describe("the installed engine and components packages", () => {
     const [, pM, pm, pp] = m!.map(Number);
     expect(major).toBe(pM);
     expect(minor * 1e6 + patch).toBeGreaterThanOrEqual(pm * 1e6 + pp);
+  });
+
+  // The e2e, screenshot and integration tiers run the tooling build and the
+  // conformance lock; players run the engine package. All three must be the
+  // same engine release, so a pin raise that misses one fails here.
+  it("pin the tooling and conformance packages to the engine's own release", () => {
+    const version = json(resolve(engine, "package.json")).version;
+    expect(json(resolve(tooling, "package.json")).version).toBe(version);
+    expect(json(resolve(conformance, "package.json")).version).toBe(version);
+  });
+
+  it("build the tooling engine from the player engine's sources", () => {
+    const sources = (dir: string) => json(resolve(dir, "web/BUILD.json")).sources;
+    expect(sources(engine)).toMatch(/^[0-9a-f]{64}$/);
+    expect(sources(tooling)).toBe(sources(engine));
   });
 });

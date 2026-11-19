@@ -106,7 +106,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   "would a player notice anything different?" (**major** for a save/compat break
   or a headline milestone, **minor** for a new feature, **patch** for a bug
   fix or behavior correction even when a player notices it (owner,
-  2026-11-14), **none** for internal-only work) and the `## Player` lines. The
+  2026-11-14), **none** for internal-only work; a PR that moves the
+  `@verticopolis/engine` or `@verticopolis/components` pin takes at least
+  **patch**, owner 2026-11-19) and the `## Player` lines. The
   release driver's `npm run release` PR (a `release/` branch) raises the
   version and writes the changelog; `scripts/version-check.ts` fails a
   feature PR that edits a version line, and production waits for the release

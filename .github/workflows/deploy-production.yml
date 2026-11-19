@@ -216,9 +216,8 @@ jobs:
       - name: Record the web build's checksums
         run: (cd dist && find . -type f -printf '%P\0' | LC_ALL=C sort -z | xargs -0 sha256sum) > web-SHA256SUMS
 
-      # Kept for the release's archive job. Only an app tag gets one.
+      # Kept for the release's archive job.
       - name: Keep the web build for the release
-        if: ${{ startsWith(inputs.tag, 'v') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-build
@@ -336,7 +335,6 @@ jobs:
   # left alone.
   archive:
     needs: [check, deploy]
-    if: ${{ startsWith(inputs.tag, 'v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

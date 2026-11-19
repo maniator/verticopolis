@@ -77,6 +77,16 @@ export function notesOf(tree: Tree): { notes: ChangeNote[]; errors: string[] } {
 const isNotePath = (path: string): boolean =>
   path.startsWith(`${CHANGES_DIR}/`) && !path.slice(CHANGES_DIR.length + 1).includes("/") && isNoteFile(path.slice(CHANGES_DIR.length + 1));
 
+/** The packages whose pinned version is the game players run: raising one
+ *  changes what players get, so the PR's own notes must ask for at least a
+ *  patch release (owner, 2026-11-19). */
+export const PLAYER_PACKAGES = ["@verticopolis/engine", "@verticopolis/components"] as const;
+
+function dependencyOf(tree: Tree, name: string): string | null {
+  const pkg = JSON.parse(need(tree, "package.json")) as { dependencies?: Record<string, string> };
+  return pkg.dependencies?.[name] ?? null;
+}
+
 const RELEASE_HOW = "versions move only in a release PR (`npm run release` on a release/ branch); add a .changes note with the tier instead (CONTRIBUTING.md \"Versioning\")";
 
 /**
@@ -105,6 +115,20 @@ export function checkFeature(base: Tree, head: Tree, changes: readonly Change[],
   if (shipped.length > 0 && touched.length === 0 && !noteOptional) {
     const sample = shipped.slice(0, 3).join(", ") + (shipped.length > 3 ? `, and ${shipped.length - 3} more` : "");
     errors.push(`this PR changes deployed paths (${sample}) and adds no .changes note: add .changes/<branch-slug>.md, with app: none when no player would notice.`);
+  }
+  const moved = PLAYER_PACKAGES.filter((name) => dependencyOf(base, name) !== dependencyOf(head, name));
+  if (moved.length > 0) {
+    const own: ChangeNote[] = [];
+    for (const c of touched) {
+      try {
+        own.push(parseNote(need(head, c.path), c.path.slice(CHANGES_DIR.length + 1)));
+      } catch {
+        // An unreadable note is already reported above.
+      }
+    }
+    if (highestLevel(own.map((n) => n.app)) === "none") {
+      errors.push(`this PR changes the ${moved.join(" and ")} pin in package.json, which changes the game players run: its .changes note needs at least app: patch, with a Player line.`);
+    }
   }
   return errors;
 }
