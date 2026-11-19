@@ -8,13 +8,15 @@ import type { GameApp } from "../main";
 import type { Tool } from "../ui/UI";
 import { KeyboardPlay, type KeyboardPlayDeps } from "./keyboardPlay";
 import { disarmSkyBridge, placeSkyBridge, tapSkyBridge } from "./skyBridgeGestures";
-import { SKY_BRIDGE_STEP } from "./skyBridgeTool";
+import { BRIDGE_LOOK_STEP, SKY_BRIDGE_STEP, type SkyBridgeClick } from "./skyBridgeTool";
+import type { SkyBridgeView } from "../simport/view";
 
 /**
  * The Sky Bridge tool's gestures over a mock port: a phone's first tap shows
  * the bridge and its price and a second tap on the same bridge lays it as one
- * undo step; a click and the keyboard's Enter lay it at once. The engine's
- * quote and build are spies.
+ * undo step; a click and the keyboard's Enter lay it at once. A tap on a
+ * finished bridge changes its look at once. The engine's quote and build are
+ * spies.
  */
 
 function rec(op: string, slots: Record<string, number>): Float64Array {
@@ -22,7 +24,7 @@ function rec(op: string, slots: Record<string, number>): Float64Array {
 }
 
 /** A fake app whose engine quotes `answer` at every cell. */
-function fakeApp(answer: Record<string, number>, reason = "Point at the gap.") {
+function fakeApp(answer: Record<string, number>, reason = "Point at the gap.", bridges: SkyBridgeView[] = []) {
   const port = mockPort({ quoteSkyBridge: () => rec("quoteSkyBridge", answer), lastReason: () => reason });
   const steps: string[] = [];
   const app = {
@@ -30,7 +32,9 @@ function fakeApp(answer: Record<string, number>, reason = "Point at the gap.") {
     portCodes: new PortCodes(port),
     captureUndo: vi.fn((label: string) => steps.push(`capture:${label}`)),
     commitUndo: vi.fn(() => steps.push("commit")),
-    build: { buildSkyBridge: vi.fn(() => ({ ok: true, tiles: 4 })) },
+    build: { buildSkyBridge: vi.fn((): SkyBridgeClick => ({ ok: true, tiles: 4, restyled: false })) },
+    // Sky lobbies stand at columns 119 and 124 of floor 30, past the bridge.
+    reader: { tower: { skyBridges: () => bridges, structureKindAt: (f: number, x: number) => (f === 30 && (x === 119 || x === 124) ? "lobby" : undefined) } },
     engine: { preview: { kind: "lobby" } as unknown },
     ui: { toast: vi.fn() },
   };
@@ -58,6 +62,21 @@ describe("tapSkyBridge", () => {
     expect(app.engine.preview).toBeNull();
   });
 
+  it("changes a finished bridge's look on one tap, as its own undo step", () => {
+    const { app, game, steps } = fakeApp({ ok: 0 }, "This sky bridge is already finished.", [{ floor: 30, from: 120, to: 124, look: 1 }]);
+    tapSkyBridge(game, 122, 30);
+    expect(app.build.buildSkyBridge).toHaveBeenCalledExactlyOnceWith(122, 30);
+    expect(steps).toEqual([`capture:${BRIDGE_LOOK_STEP}`, "commit"]);
+    expect(app.ui.toast).not.toHaveBeenCalled();
+  });
+
+  it("treats a half bridge's tile as a gap to finish, not a bridge to restyle", () => {
+    const { app, game } = fakeApp(BRIDGE, undefined, [{ floor: 30, from: 120, to: 122, look: 0 }]);
+    tapSkyBridge(game, 121, 30);
+    expect(app.build.buildSkyBridge).not.toHaveBeenCalled();
+    expect(app.ui.toast).toHaveBeenCalledWith("Sky bridge: 4 tiles, $44,000. Tap it again to build.", "info");
+  });
+
   it("forgets the first tap when the tool changes", () => {
     const { app, game } = fakeApp(BRIDGE);
     tapSkyBridge(game, 121, 30);
@@ -79,7 +98,7 @@ describe("placeSkyBridge", () => {
   it("lays the bridge at once and drops a phone's pending first tap", () => {
     const { app, game } = fakeApp(BRIDGE);
     tapSkyBridge(game, 121, 30);
-    expect(placeSkyBridge(game, 121, 30)).toEqual({ ok: true, tiles: 4 });
+    expect(placeSkyBridge(game, 121, 30)).toEqual({ ok: true, tiles: 4, restyled: false });
     // The click consumed the armed bridge: the next tap only shows it again.
     tapSkyBridge(game, 121, 30);
     expect(app.build.buildSkyBridge).toHaveBeenCalledOnce();
@@ -87,7 +106,7 @@ describe("placeSkyBridge", () => {
 });
 
 describe("KeyboardPlay with the Sky Bridge tool", () => {
-  function keyboard(laid: { ok: boolean; reason?: string; tiles: number }) {
+  function keyboard(laid: SkyBridgeClick, step = SKY_BRIDGE_STEP) {
     const port = mockPort({});
     const steps: string[] = [];
     const announce = vi.fn();
@@ -113,6 +132,7 @@ describe("KeyboardPlay with the Sky Bridge tool", () => {
       placeSimpleBuild: vi.fn(() => null),
       updateBuildPreview: vi.fn(),
       placeSkyBridge: placeBridge,
+      skyBridgeStep: () => step,
       refusePausedPlacement: () => false,
     } satisfies KeyboardPlayDeps;
     const kb = new KeyboardPlay(deps);
@@ -122,7 +142,7 @@ describe("KeyboardPlay with the Sky Bridge tool", () => {
   }
 
   it("Enter lays the bridge at the cursor as one undo step and says how long it is", () => {
-    const { kb, steps, announce, placeBridge, deps } = keyboard({ ok: true, tiles: 4 });
+    const { kb, steps, announce, placeBridge, deps } = keyboard({ ok: true, tiles: 4, restyled: false });
     const c = kb.cursor()!;
     kb.commitCursor();
     expect(placeBridge).toHaveBeenCalledExactlyOnceWith(c.tile, c.floor);
@@ -132,8 +152,15 @@ describe("KeyboardPlay with the Sky Bridge tool", () => {
   });
 
   it("Enter speaks the engine's reason when it lays nothing", () => {
-    const { kb, announce } = keyboard({ ok: false, reason: "A sky bridge crosses open air.", tiles: 0 });
+    const { kb, announce } = keyboard({ ok: false, reason: "A sky bridge crosses open air.", tiles: 0, restyled: false });
     kb.commitCursor();
     expect(announce).toHaveBeenCalledExactlyOnceWith("A sky bridge crosses open air.");
+  });
+
+  it("Enter on a finished bridge changes its look as its own undo step and says so", () => {
+    const { kb, steps, announce } = keyboard({ ok: true, tiles: 0, restyled: true }, BRIDGE_LOOK_STEP);
+    kb.commitCursor();
+    expect(steps).toEqual([`capture:${BRIDGE_LOOK_STEP}`, "commit"]);
+    expect(announce).toHaveBeenCalledExactlyOnceWith("Bridge look changed");
   });
 });

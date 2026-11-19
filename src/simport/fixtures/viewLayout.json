@@ -1,5 +1,5 @@
 {
-  "version": 33,
+  "version": 34,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -251,6 +251,10 @@
       "status",
       "delta",
       "tiles"
+    ],
+    "restyleSkyBridge": [
+      "status",
+      "delta"
     ],
     "buildShaft": [
       "status",

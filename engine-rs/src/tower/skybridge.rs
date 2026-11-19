@@ -83,6 +83,12 @@ pub struct SkybridgeSpan {
     pub missing: Vec<i64>,
 }
 
+/// The refusal for a story laid right under a sky bridge: a bridge keeps
+/// open air below it, so floors or a room built up to one never cut it in
+/// two, and its look's underside has room to hang.
+pub(crate) const UNDER_A_BRIDGE: &str =
+    "A sky bridge needs open air under it. Bulldoze the bridge first to build up to it.";
+
 /// The refusal for selling a wing's lobby tile that a bridge hangs from.
 pub(crate) const BRIDGE_HANGS_HERE: &str =
     "A sky bridge hangs from this lobby. Bulldoze the bridge first.";
@@ -239,6 +245,13 @@ impl Tower {
             return None;
         }
         self.bridge_row(u.floor).bridge_around(u.x..u.x + u.width)
+    }
+
+    /// Whether the bridge on `cols` of `floor` reaches a wing's sky lobby
+    /// at each end, as a finished bridge does; a half bridge has an open end.
+    pub(crate) fn skybridge_finished(&self, floor: i64, cols: &std::ops::Range<i64>) -> bool {
+        let row = self.bridge_row(floor);
+        row.is_anchor(cols.start - 1) && row.is_anchor(cols.end)
     }
 
     /// The ids of the units on `cols` of `floor`, each once, left to right.

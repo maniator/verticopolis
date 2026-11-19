@@ -16,6 +16,7 @@ mod metro;
 mod placement;
 mod removal;
 mod skybridge;
+mod skybridge_look;
 mod tall_lobby;
 mod transport_reach;
 mod transports;
@@ -26,6 +27,8 @@ mod unit_save;
 pub use lobby_halls::HallRun;
 pub(crate) use skybridge::{OverAir, Row as BridgeRow, PEOPLE_CROSSING, SKYBRIDGE_PRICE_FACTOR};
 pub use skybridge::{SkybridgeSpan, SKYBRIDGE_MAX_SPAN, SKYBRIDGE_MIN_STAR};
+pub use skybridge_look::{look_index, SkybridgeLook, NEW_SKYBRIDGE_LOOK, SKYBRIDGE_LOOKS};
+pub(crate) use skybridge_look::{look_named, look_subtype, FINISH_THE_BRIDGE, POINT_AT_A_BRIDGE};
 pub(crate) use transport_reach::ShaftColumns;
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
 pub(crate) use unit_save::SavedUnit;
@@ -284,6 +287,9 @@ impl Tower {
     /// then built structure a lobby cannot be laid over, then rooms on the
     /// plain floor a lobby would take over.
     fn structure_taken_reason(&self, kind: Kind, floor: i64, x: i64, w: i64) -> Option<String> {
+        if self.span_has_skybridge(floor + 1, x, w) {
+            return Some(skybridge::UNDER_A_BRIDGE.into());
+        }
         if let Some(r) = self.tall_lobby_story_reason(floor, x, w) {
             return Some(r);
         }

@@ -104,8 +104,12 @@ export type AppActionName =
   | "found_bridged"
   | "auto_bridge"
   // The Sky Bridge tool laid a bridge (Modern, 2026-11-16): detail `new`, or
-  // `finish` for the rest of a half bridge from a save made before the tool.
+  // `finish` for the rest of a half bridge from a save made before the tool,
+  // or `restyle` when a click gave a finished bridge a new look.
   | "sky_bridge"
+  // The look a bridge was built in or given (2026-11-17): detail the look's
+  // name from the catalog, such as `Glass Skywalk`.
+  | "sky_bridge_look"
   // A shaft's Auto checkbox saved changed (Modern daily re-tune,
   // 2026-11-17): detail `on` or `off`. New Modern elevators start on.
   | "elevator_auto_tune"

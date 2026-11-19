@@ -14,8 +14,7 @@ import { engineTrapped, noteEngineThrow } from "./engineFault";
 import { appPlacementPaused, refuseAppPlacementWhilePaused } from "./pausedBuild";
 import { holdRefusal, sayHeldRefusal, sayPressRefusal } from "./dragRefusal";
 import { pickPersonAt } from "../render/excalibur/personFocus";
-import { placeSkyBridge, tapSkyBridge } from "./skyBridgeGestures";
-import { SKY_BRIDGE_STEP } from "./skyBridgeTool";
+import { placeSkyBridge, skyBridgeStep, tapSkyBridge } from "./skyBridgeGestures";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -138,10 +137,11 @@ export function wireEngine(app: GameApp): void {
     // nothing and opens no step; with no drag, the moves and the release that
     // follow place nothing either.
     if (app.tool.type === "build" && refuseAppPlacementWhilePaused(app)) return;
-    // A mouse click with the Sky Bridge tool lays the whole bridge (a touch
-    // pans and taps instead: classifyGesture); the release closes the step.
+    // A mouse click with the Sky Bridge tool lays the whole bridge, or dresses
+    // a bridge in the picked look (a touch pans and taps instead:
+    // classifyGesture); the release closes the step.
     if (app.tool.type === "skyBridge") {
-      app.captureUndo(SKY_BRIDGE_STEP);
+      app.captureUndo(skyBridgeStep(app, tile, floor));
       drag = { gesture: app.undoGesture(), generation: app.enginePort.generation() };
       placeSkyBridge(app, tile, floor);
       updateBuildPreview(app, tile, floor);

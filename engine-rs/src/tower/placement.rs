@@ -1,7 +1,7 @@
 //! Placing rooms and structure, and the support rules behind it.
 
 use super::removal::GROUND_FLOOR;
-use super::skybridge::{OverAir, LOBBY_OVER_OPEN_AIR};
+use super::skybridge::{OverAir, LOBBY_OVER_OPEN_AIR, UNDER_A_BRIDGE};
 use super::{PlaceResult, Tower, Unit, UnitState};
 use crate::facilities::*;
 
@@ -124,6 +124,9 @@ impl Tower {
             }
             if let Some(r) = self.tall_lobby_story_reason(fl, x, f.width) {
                 return Some(r);
+            }
+            if self.span_has_skybridge(fl + 1, x, f.width) {
+                return Some(UNDER_A_BRIDGE.into());
             }
             // The wedding hall's upper stories stand above the last floor slab.
             if fl > lot.top_floor() {

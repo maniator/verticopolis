@@ -16,7 +16,8 @@ import { descriptionId } from "./paletteHints";
 export const SKY_BRIDGE_TOOL = "skyBridge";
 
 /** What the tool does, for the button's description and its card. */
-export const SKY_BRIDGE_DESCRIPTION = "Click the open air between two towers' sky lobbies to build the whole bridge at once.";
+export const SKY_BRIDGE_DESCRIPTION =
+  "Click the open air between two towers' sky lobbies to build the whole bridge at once. Click a bridge to give it the look picked on the strip, free.";
 
 /** The button's spoken label: its name and its price per tile. */
 function spokenLabel(rule: CatalogSkyBridge): string {

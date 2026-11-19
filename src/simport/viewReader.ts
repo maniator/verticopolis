@@ -1,19 +1,9 @@
 import type { FacilityKind, GameMode, UnitState, WeatherKind } from "../shared/types";
-import type { CalendarKind } from "../shared/engineTypes";
-import type { PersonState } from "../shared/engineTypes";
+import type { CalendarKind, PersonState } from "../shared/engineTypes";
 import type { EnginePort } from "./enginePort";
 import { EmergencyReads } from "./emergencyReads";
-import type {
-  CameraView,
-  CrowdView,
-  HeaderView,
-  PersonView,
-  SimView,
-  StructureRunView,
-  TowerView,
-  TransportView,
-  UnitView,
-} from "./view";
+import { skyBridgeReads } from "./skyBridgeView";
+import type { CameraView, CrowdView, HeaderView, PersonView, SimView, StructureRunView, TowerView, TransportView, UnitView } from "./view";
 
 /**
  * The shared view reader (facade slice 7, PR 3; contract section 5): the
@@ -186,6 +176,7 @@ export class ViewReader implements SimView {
       unitAt: (floor: number, x: number) => this.roomAt(floor, x) ?? this.tileAt(floor, x),
       hasStructure: (floor: number, x: number) => this.runAt(floor, x) !== undefined,
       structureKindAt: (floor: number, x: number) => this.runAt(floor, x)?.kind,
+      skyBridges: skyBridgeReads(port, () => this.revision),
     };
     this.tower = Object.defineProperties(lookups, {
       units: { get: () => (this.tiles ??= this.expand()) },

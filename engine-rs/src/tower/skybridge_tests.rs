@@ -349,3 +349,59 @@ fn a_saved_half_bridge_loads_as_it_was_and_the_tool_finishes_it() {
     let right = loaded.tower.seg_at(SKY, Some(right_wing(GAP).start as f64));
     assert_eq!(loaded.tower.seg_at(SKY, Some(LEFT.start as f64)), right);
 }
+
+#[test]
+fn floors_rise_to_a_story_below_a_bridge_and_no_closer() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    lay(&mut sim);
+    let x = LEFT.end + 3;
+    for floor in 2..SKY - 1 {
+        let r = sim.tower.place(Kind::Floor, floor, x);
+        assert!(r.ok, "{floor}: {:?}", r.reason);
+    }
+    let r = sim.tower.place(Kind::Floor, SKY - 1, x);
+    assert_eq!(r.reason.as_deref(), Some(UNDER_A_BRIDGE));
+    let r = sim
+        .tower
+        .can_place_structure_ignoring_support(Kind::Floor, SKY - 1, x);
+    assert_eq!(r.reason.as_deref(), Some(UNDER_A_BRIDGE));
+    assert!(
+        gap_tiles(GAP)
+            .iter()
+            .all(|&c| sim.tower.is_skybridge_tile(SKY, c)),
+        "the bridge stays whole"
+    );
+}
+
+#[test]
+fn a_story_under_open_air_on_a_sky_lobby_floor_is_still_fine() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    // No bridge: the gap is open air, so floors may rise right up to floor 15.
+    let x = LEFT.end + 3;
+    for floor in 2..SKY {
+        let r = sim.tower.place(Kind::Floor, floor, x);
+        assert!(r.ok, "{floor}: {:?}", r.reason);
+    }
+}
+
+#[test]
+fn a_room_right_under_a_bridge_is_refused_in_its_quote_and_its_build() {
+    let mut sim = towers(GameMode::Modern, GAP, SKY);
+    lay(&mut sim);
+    let x = LEFT.end;
+    assert!(
+        Kind::Office.facility().width <= GAP,
+        "the office fits the gap"
+    );
+    let quote = sim.can_build(Kind::Office, SKY - 1, x);
+    assert!(!quote.ok, "no green ghost under a bridge");
+    assert_eq!(quote.reason.as_deref(), Some(UNDER_A_BRIDGE));
+    let built = sim.build(Kind::Office, SKY - 1, x);
+    assert_eq!(built.reason.as_deref(), Some(UNDER_A_BRIDGE));
+    assert!(
+        gap_tiles(GAP)
+            .iter()
+            .all(|&c| sim.tower.is_skybridge_tile(SKY, c)),
+        "the bridge stays whole"
+    );
+}

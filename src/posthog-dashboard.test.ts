@@ -113,9 +113,11 @@ describe("posthog-dashboard planAdditions (add-only sync)", () => {
     );
   });
 
-  it("adds nothing for the real spec list today, because both overview tiles carry the short id of the insight a run made", () => {
+  it("adds only the sky bridge looks tile for the real spec list today, because the other overview tiles carry the short id of the insight a run made", () => {
     const plan = planAdditions(buildInsights({ newGame: 1 }), [], new Set());
-    expect(plan.add).toEqual([]);
+    expect(plan.add.map((a) => a.spec.name)).toEqual([
+      "Sky bridge looks (Modern)",
+    ]);
     expect(plan.added).toEqual([
       "Session FPS by tower size and speed",
       "Engine cost per game hour by version, tower size and speed",
@@ -123,7 +125,10 @@ describe("posthog-dashboard planAdditions (add-only sync)", () => {
   });
 
   it("lets --update-view rewrite the view on a run with no tile to add, and writes no tile or action then", () => {
-    const plan = planAdditions(buildInsights({ newGame: 1 }), [], new Set());
+    const recorded = buildInsights({ newGame: 1 }).filter(
+      (s) => !s.overview || s.shortId,
+    );
+    const plan = planAdditions(recorded, [], new Set());
     expect(plan.add).toEqual([]);
     expect(runSteps(plan, true)).toEqual({
       tiles: false,

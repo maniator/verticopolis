@@ -6,6 +6,8 @@ import { catalogFor } from "../tests/catalogFixture";
 import { LAYOUT, mockPort } from "../tests/portKit/mockPort";
 import { groupDigits } from "../ui/format";
 import { BuildActions, type BuildActionsDeps } from "./buildActions";
+import { pickSkyBridgeLook } from "../ui/skyBridgeLookStrip";
+import type { SkyBridgeView } from "../simport/view";
 import { finishesHalfBridge, quoteSkyBridge, quotedTiles, skyBridgeLabel, tapLays, type SkyBridgeQuote } from "./skyBridgeTool";
 
 /**
@@ -80,10 +82,12 @@ describe("the ghost's tag and the tap flow", () => {
 describe("BuildActions.buildSkyBridge", () => {
   beforeEach(() => vi.mocked(trackAppAction).mockClear());
 
-  function setup(answers: Parameters<typeof mockPort>[0], kinds: Record<string, string> = {}) {
+  beforeEach(() => pickSkyBridgeLook(1, null));
+
+  function setup(answers: Parameters<typeof mockPort>[0], kinds: Record<string, string> = {}, bridges: SkyBridgeView[] = []) {
     const port = mockPort({ lastReason: () => "Not enough money.", ...answers });
     const codes = new PortCodes(port);
-    const tower = { structureKindAt: vi.fn((floor: number, x: number) => kinds[`${floor}:${x}`]) };
+    const tower = { structureKindAt: vi.fn((floor: number, x: number) => kinds[`${floor}:${x}`]), skyBridges: () => bridges };
     const deps = {
       enginePort: () => port,
       portCodes: () => codes,
@@ -104,11 +108,41 @@ describe("BuildActions.buildSkyBridge", () => {
       quoteSkyBridge: () => rec("quoteSkyBridge", { ok: 1, cost: 44_000, from: 120, to: 124 }),
       buildSkyBridge: () => rec("buildSkyBridge", { status: 1, tiles: 4 }),
     });
-    expect(build.buildSkyBridge(121, 30)).toEqual({ ok: true, tiles: 4 });
-    expect(port.buildSkyBridge).toHaveBeenCalledExactlyOnceWith(30, 121);
+    pickSkyBridgeLook(2, null);
+    expect(build.buildSkyBridge(121, 30)).toEqual({ ok: true, tiles: 4, restyled: false });
+    expect(port.buildSkyBridge).toHaveBeenCalledExactlyOnceWith(30, 121, 2);
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
     expect(deps.ui.toast).not.toHaveBeenCalled();
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("sky_bridge", "new");
+    expect(vi.mocked(trackAppAction).mock.calls).toEqual([
+      ["sky_bridge", "new"],
+      ["sky_bridge_look", "Steel Truss"],
+    ]);
+  });
+
+  it("dresses a finished bridge in the picked look, free, instead of building", () => {
+    const { build, port, deps } = setup(
+      { restyleSkyBridge: () => rec("restyleSkyBridge", { status: 1 }), buildSkyBridge: () => rec("buildSkyBridge", { status: 1 }) },
+      { "30:119": "lobby", "30:124": "lobby" },
+      [{ floor: 30, from: 120, to: 124, look: 1 }],
+    );
+    pickSkyBridgeLook(4, null);
+    expect(build.buildSkyBridge(122, 30)).toEqual({ ok: true, tiles: 0, restyled: true });
+    expect(port.restyleSkyBridge).toHaveBeenCalledExactlyOnceWith(30, 122, 4);
+    expect(port.buildSkyBridge).not.toHaveBeenCalled();
+    expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
+    expect(vi.mocked(trackAppAction).mock.calls).toEqual([
+      ["sky_bridge", "restyle"],
+      ["sky_bridge_look", "Garden Walk"],
+    ]);
+  });
+
+  it("says so when the bridge already wears the picked look, and asks the engine nothing", () => {
+    const { build, port, deps } = setup({ restyleSkyBridge: () => rec("restyleSkyBridge", { status: 1 }) }, { "30:119": "lobby", "30:124": "lobby" }, [{ floor: 30, from: 120, to: 124, look: 1 }]);
+    const r = build.buildSkyBridge(122, 30);
+    expect(r.ok).toBe(false);
+    expect(port.restyleSkyBridge).not.toHaveBeenCalled();
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("This sky bridge already has that look. Pick another look on the strip.", "info");
+    expect(trackAppAction).not.toHaveBeenCalled();
   });
 
   it("reports finishing a half bridge when a bridge tile stands beside the gap", () => {
@@ -120,7 +154,7 @@ describe("BuildActions.buildSkyBridge", () => {
       { "30:119": "lobby" },
     );
     build.buildSkyBridge(120, 30);
-    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("sky_bridge", "finish");
+    expect(trackAppAction).toHaveBeenCalledWith("sky_bridge", "finish");
   });
 
   it("says why on a refusal, lays nothing and reports nothing", () => {
@@ -128,7 +162,7 @@ describe("BuildActions.buildSkyBridge", () => {
       quoteSkyBridge: () => rec("quoteSkyBridge", { ok: 1, cost: 44_000, from: 120, to: 124 }),
       buildSkyBridge: () => rec("buildSkyBridge", { status: 0 }),
     });
-    expect(build.buildSkyBridge(121, 30)).toEqual({ ok: false, reason: "Not enough money.", tiles: 0 });
+    expect(build.buildSkyBridge(121, 30)).toEqual({ ok: false, reason: "Not enough money.", tiles: 0, restyled: false });
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
     expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("Not enough money.", "bad");
     expect(trackAppAction).not.toHaveBeenCalled();

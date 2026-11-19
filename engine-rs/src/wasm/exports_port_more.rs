@@ -10,10 +10,28 @@ use super::{err, Engine};
 impl Engine {
     /// `buildSkyBridge(floor, x)` (Modern): lays the whole sky bridge a
     /// click at the cell asks for, every missing tile of the gap between
-    /// two sky lobbies, or nothing. `[status, delta, tiles]`.
+    /// two sky lobbies, or nothing, in look `look` (an index into the
+    /// catalog's `rules.skyBridge.looks`; the glass skywalk when omitted).
+    /// `[status, delta, tiles]`.
     #[wasm_bindgen(js_name = buildSkyBridge)]
-    pub fn build_sky_bridge(&mut self, floor: f64, x: f64) -> Vec<f64> {
-        self.port_build_skybridge(floor, x)
+    pub fn build_sky_bridge(&mut self, floor: f64, x: f64, look: f64) -> Vec<f64> {
+        self.port_build_skybridge(floor, x, look)
+    }
+
+    /// `restyleSkyBridge(floor, x, look)` (Modern): dresses the whole sky
+    /// bridge at the cell in look `look`, an index into the catalog's
+    /// `rules.skyBridge.looks`. Free. `[status, delta]`.
+    #[wasm_bindgen(js_name = restyleSkyBridge)]
+    pub fn restyle_sky_bridge(&mut self, floor: f64, x: f64, look: f64) -> Vec<f64> {
+        self.port_restyle_skybridge(floor, x, look)
+    }
+
+    /// `skyBridgeLooks()`: every sky bridge as `[floor, from, to, look]`,
+    /// four numbers each, `from..to` its columns and `look` an index into the
+    /// catalog's `rules.skyBridge.looks`. Read once per layout change.
+    #[wasm_bindgen(js_name = skyBridgeLooks)]
+    pub fn sky_bridge_looks(&self) -> Vec<f64> {
+        self.port_skybridge_looks()
     }
 
     /// `quoteSkyBridge(floor, x)` (Modern): `[ok, cost, from, to]`, the

@@ -2447,6 +2447,13 @@
     "scheduleAssist": true,
     "shadedLook": true,
     "skyBridge": {
+      "looks": [
+        "Lobby",
+        "Glass Skywalk",
+        "Steel Truss",
+        "Deco Arcade",
+        "Garden Walk"
+      ],
       "maxSpan": 24,
       "minStar": 3,
       "tileCost": 11000
@@ -2489,7 +2496,7 @@
     "variantHouseholds": true,
     "venueFlights": true
   },
-  "version": 25,
+  "version": 26,
   "world": {
     "groundFloor": 1,
     "groundFloorStructure": "lobby",

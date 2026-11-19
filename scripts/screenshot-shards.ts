@@ -96,7 +96,7 @@ export const SHARDS: Record<string, string[]> = {
   // two shots each, about 11s together, and the venue flights tower (two
   // shots of one small frozen tower), the metro line (three shots) and the
   // split lot (one small frozen tower run a few engine minutes).
-  engine: ["engine", "metro", "metro-line", "first-run", "first-run-mobile", "preview-rooms", "install-affordance", "tall-lobby-classic", "tall-lobby-modern-sky", "tall-lobby-split-halls", "tall-lobby-flights", "tall-lobby-phone", "venue-flights", "split-lot-street", "sky-bridge"],
+  engine: ["engine", "metro", "metro-line", "first-run", "first-run-mobile", "preview-rooms", "install-affordance", "tall-lobby-classic", "tall-lobby-modern-sky", "tall-lobby-split-halls", "tall-lobby-flights", "tall-lobby-phone", "venue-flights", "split-lot-street", "sky-bridge", "sky-bridge-looks"],
   // ~71s before the Tools window fit: anchored by the tablet shots (the
   // heaviest drawSettle scene) plus the small scenes + the mobile
   // install-affordance shot (its engine-tower sibling) + the overview Map

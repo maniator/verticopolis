@@ -53,7 +53,7 @@ import { wireDesk } from "../ui/desk/deskController";
 import { wireTitlePicks } from "./titlePicks";
 import { wireTrafficJump } from "./trafficHud";
 import { refuseAppPlacementWhilePaused } from "./pausedBuild";
-import { placeSkyBridge } from "./skyBridgeGestures";
+import { placeSkyBridge, skyBridgeStep } from "./skyBridgeGestures";
 import { wirePlayerTextSources } from "./playerTextSources";
 import { createPersonCard } from "./personCardWiring";
 import { captureOutgoing, dropOutgoing, keepOutgoing, type SwapKind } from "./keepOutgoing";
@@ -264,6 +264,7 @@ export function wireControllers(app: GameApp): void {
     placeSimpleBuild: (kind, tile, floor) => app.placeSimpleBuild(kind, tile, floor),
     updateBuildPreview: (tile, floor) => app.updateBuildPreview(tile, floor),
     placeSkyBridge: (tile, floor) => placeSkyBridge(app, tile, floor),
+    skyBridgeStep: (tile, floor) => skyBridgeStep(app, tile, floor),
     refusePausedPlacement: () => refuseAppPlacementWhilePaused(app),
     captureUndo: (label) => app.captureUndo(label),
     commitUndo: () => app.commitUndo(),
