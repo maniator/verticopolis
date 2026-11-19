@@ -1,0 +1,232 @@
+{
+  "id": "quarter-rentals-modern",
+  "description": "Found a Modern game on the real-world calendar at four stars (so it has had its favorable VIP visit) and build a small tower: offices, a fast food, a Fitness Club and a Clinic, two studios and two apartments, a condo, a Security office, an Aquatic Center, seven basement floors and a metro station whose platform the one elevator reaches. Play a hundred days with a save round trip at day fifty (#869), so the run crosses a 90-day quarter (the rent scale and the Fitness Club and Clinic lease lines), pays the rentals at each month roll, and lets rain fall on an operational metro.",
+  "start": {
+    "newGame": {
+      "seed": 869,
+      "mode": "modern",
+      "star": 4
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 3,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 4,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 5,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 6,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 7,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 0,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": -1,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": -2,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": -3,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": -4,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": -5,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": -6,
+      "from": 150,
+      "to": 199
+    },
+    {
+      "op": "build",
+      "kind": "metro",
+      "floor": -7,
+      "x": 150
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": -7,
+      "from": 180,
+      "to": 199
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 150
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 159
+    },
+    {
+      "op": "build",
+      "kind": "fastFood",
+      "floor": 2,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "fitnessClub",
+      "floor": 3,
+      "x": 150
+    },
+    {
+      "op": "build",
+      "kind": "clinic",
+      "floor": 3,
+      "x": 166
+    },
+    {
+      "op": "build",
+      "kind": "rentalStudio",
+      "floor": 4,
+      "x": 150
+    },
+    {
+      "op": "build",
+      "kind": "rentalStudio",
+      "floor": 4,
+      "x": 156
+    },
+    {
+      "op": "build",
+      "kind": "rentalApartment",
+      "floor": 4,
+      "x": 162
+    },
+    {
+      "op": "build",
+      "kind": "rentalApartment",
+      "floor": 4,
+      "x": 173
+    },
+    {
+      "op": "build",
+      "kind": "condo",
+      "floor": 5,
+      "x": 150
+    },
+    {
+      "op": "build",
+      "kind": "security",
+      "floor": 5,
+      "x": 166
+    },
+    {
+      "op": "build",
+      "kind": "aquaticCenter",
+      "floor": 6,
+      "x": 150
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 190,
+      "bottom": -7,
+      "top": 7
+    },
+    {
+      "op": "setCars",
+      "floor": 1,
+      "x": 190,
+      "cars": 4
+    },
+    {
+      "op": "checkpoint",
+      "label": "built"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 1200,
+      "checkpointEvery": 120
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 1200,
+      "checkpointEvery": 120
+    }
+  ]
+}

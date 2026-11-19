@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { HeatmapMode } from "../../shared/engineTypes";
 import type { WasmEngine } from "../../engineBinding/binding";
-import { REPO_ROOT, type EngineStart, type ScenarioEngine, type Start } from "./scenario";
-import { wasm, wasmEngine, wasmFxSlots } from "./wasmEngine";
+import type { EngineStart, ScenarioEngine, Start } from "./scenario";
+import { startWasmHandle, wasm, wasmEngine, wasmFxSlots } from "./wasmEngine";
 
 /**
  * The hook behind the panel-getter checks (facade slice 6b, #1214): a
@@ -35,9 +33,7 @@ export function probedWasmStart(onCheckpoint: (h: WasmEngine) => void): EngineSt
       },
     };
   };
-  return (start: Start) => {
-    const { Engine } = wasm();
-    if ("newGame" in start) return probed(Engine.newGame(start.newGame.seed, start.newGame.mode));
-    return probed(Engine.fromVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.mode ?? null));
-  };
+  // The start the scenario runner's own engine takes (`startWasmHandle`), so
+  // a new game raised to a star starts at that star here too.
+  return (start: Start) => probed(startWasmHandle(start));
 }
