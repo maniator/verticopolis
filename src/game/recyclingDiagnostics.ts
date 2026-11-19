@@ -6,11 +6,14 @@ import { groupDigits } from "../ui/format";
  * The card kit builds them from what the Rust engine's port reports.
  */
 
-/** The lines for `pop` population against `cap` processed, with the bins
- *  `fill` full (0 to 1). `demandMet` is the engine's verdict
- *  (`recyclingDemandMet`); the card only words it, with the fix where
- *  `advises` (the catalog's `rules.advisesFixes`). */
-export function recyclingLinesOf(pop: number, cap: number, fill: number, demandMet: boolean, advises: boolean): TemplateResult[] {
+/** The lines for the engine's `recyclingCard` (#1745): the population the
+ *  centers serve, what they process, the bins' fill (0 to 1) and the
+ *  engine's verdict, all from one read, so the population shown is the one
+ *  the verdict used. The card only words them, with the fix where `advises`
+ *  (the catalog's `rules.advisesFixes`). */
+export function recyclingLinesOf(card: ArrayLike<number>, advises: boolean): TemplateResult[] {
+  const [pop, cap, fill, met] = [card[0], card[1], card[2], card[3]];
+  const demandMet = met === 1;
   const fillPct = Math.round(fill * 100);
   // The catalog's `rules.advisesFixes` (#549): Classic names the cause only.
   const over = advises

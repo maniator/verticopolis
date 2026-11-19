@@ -283,6 +283,7 @@ export const BINDING_EXPORT_TIERS = {
   recyclingFill: T2,
   recyclingCapacity: T2,
   recyclingDemandMet: T2,
+  recyclingCard: T2,
   positionReachable: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,

@@ -209,6 +209,24 @@ impl Engine {
         recycling_demand_met_of(counts.population, recycling_capacity_of(counts.centers))
     }
 
+    /// The recycling card as `[population, capacity, fill, demandMet]` from
+    /// one read of the tally (#1745): the population the centers serve (the
+    /// one the verdict and the fill use, without Modern's live venue
+    /// customers), the population they can process, the bins' fill from 0
+    /// to 1, and 1 when the capacity covers the population or 0.
+    pub(crate) fn port_recycling_card(&mut self) -> Vec<f64> {
+        let counts = self.sim.inspector_recycling();
+        let capacity = recycling_capacity_of(counts.centers);
+        let fill = self.sim.recycling_fill_of(counts.population, capacity);
+        let met = recycling_demand_met_of(counts.population, capacity);
+        vec![
+            counts.population as f64,
+            capacity,
+            fill,
+            if met { 1.0 } else { 0.0 },
+        ]
+    }
+
     /// Whether a walker can stand at `floor`, `x`; a position that is not a
     /// whole tile is not one. `&mut` because reachability memoizes its graph
     /// by tower revision.

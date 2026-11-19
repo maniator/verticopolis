@@ -96,6 +96,15 @@ impl Engine {
 /// ceiling holds.
 #[wasm_bindgen]
 impl Engine {
+    // The recycling card from one read (#1745): `[population, capacity,
+    // fill, demandMet]`, the population the centers serve (the one the
+    // verdict and the fill use), what they can process, the bins' fill
+    // from 0 to 1, and 1 when the demand is met or 0.
+    #[wasm_bindgen(js_name = recyclingCard)]
+    pub fn recycling_card(&mut self) -> Vec<f64> {
+        self.port_recycling_card()
+    }
+
     // The structural snapshot (`view::structure_view`): the floor bounds,
     // the mode and calendar, rooms by slot, floor and lobby tiles as runs,
     // transports with their skipped floors. Read again when the frame

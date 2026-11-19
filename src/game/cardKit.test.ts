@@ -78,9 +78,9 @@ function tower(mode: "classic" | "modern" = "classic") {
     unitFacts: (id: number) =>
       facts(id, id === OFFICE ? state.officeFacts : {}),
     serviceDiagnostics: () => undefined,
-    recyclingCapacity: () => 2500,
-    recyclingFill: () => 0.4,
-    recyclingDemandMet: () => true,
+    // The population the centers serve, which leaves out Modern's live
+    // venue customers, so it differs from the frame header's 40.
+    recyclingCard: () => Float64Array.of(37, 2500, 0.4, 1),
     shaftCard: (id: number) =>
       id === SHAFT
         ? record("shaftCard", {
@@ -129,19 +129,17 @@ const text = (
     .join("\n");
 
 describe("the card kit's unit and shaft lines over the port", () => {
-  it("show a recycling center's fill and capacity lines from the port's recycling reads", () => {
+  it("show a recycling center's fill and capacity lines from one recycling card read, with the population its verdict used", () => {
     const { port, kit } = tower();
     const center = kit.diagnostics.unit(CENTER);
     expect(center).toHaveLength(2);
     expect(text(center)).toContain("Fill: 40%");
+    // The card's population (37), not the frame header's (40).
     expect(text(center)).toContain(
-      `${groupDigits(40)}/${groupDigits(2500)} population; demand met`,
+      `${groupDigits(37)}/${groupDigits(2500)} population; demand met`,
     );
-    expect(
-      [port.recyclingCapacity, port.recyclingFill, port.recyclingDemandMet].map(
-        (f) => vi.mocked(f).mock.calls.length,
-      ),
-    ).toEqual([1, 1, 1]);
+    // One read; the single reads are not stubbed, so a call to one throws.
+    expect(vi.mocked(port.recyclingCard).mock.calls.length).toBe(1);
     expect(kit.diagnostics.unit(OFFICE).length).toBeGreaterThan(0);
   });
 
@@ -186,7 +184,7 @@ describe("the card kit's unit and shaft lines over the port", () => {
     expect(officeText).toContain("Access:");
     expect(officeText).toContain("No elevator or stair reaches this floor.");
     expect(
-      port.recyclingCapacity,
+      port.recyclingCard,
       "an office reads no recycling",
     ).not.toHaveBeenCalled();
     state.center = card(CENTER, "recycling", -1, {
@@ -195,7 +193,7 @@ describe("the card kit's unit and shaft lines over the port", () => {
     kit.cards.forget();
     expect(kit.diagnostics.unit(CENTER)).toEqual([]);
     expect(
-      port.recyclingCapacity,
+      port.recyclingCard,
       "an inert center reads no recycling",
     ).not.toHaveBeenCalled();
   });

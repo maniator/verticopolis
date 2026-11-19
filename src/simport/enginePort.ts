@@ -14,6 +14,7 @@
 // status clear and set `lastReason()`.
 //
 // `src/simport/enginePort.types.test.ts` holds the engine to this shape.
+import type { EnginePortRecycling } from "./recyclingPort";
 import type { EnginePortSkyBridge } from "./skyBridgePort";
 import type { EnginePortTraffic } from "./trafficPort";
 
@@ -479,10 +480,6 @@ export interface EnginePortRender {
    *  height, ...]` quads by floor and then column, `x1` the hall's last
    *  column (#308, #2068); read once per structure pass. */
   lobbyHeights(): PortRecord;
-  /** The population the working recycling centers can process. */
-  recyclingCapacity(): number;
-  /** Whether the working recycling centers can process the whole population. */
-  recyclingDemandMet(): boolean;
   /** Whether a walker can stand at `floor`, `x`; false off a whole tile. */
   positionReachable(floor: number, x: number): boolean;
 }
@@ -496,5 +493,6 @@ export interface EnginePort
     EnginePortQueries,
     EnginePortFiles,
     EnginePortRender,
+    EnginePortRecycling,
     EnginePortSkyBridge,
     EnginePortTraffic {}
