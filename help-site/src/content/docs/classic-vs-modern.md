@@ -37,7 +37,7 @@ Every tower runs one of two sets of rules. You choose when you found the tower, 
 | Towers on one lot | One tower: the ground lobby is one stretch | Several, each on its own stretch of ground lobby with its own front door and doorman ([Floors and lobbies](/help/building/floors-and-lobbies/#the-ground-lobby)) |
 | Bulldozing lobbies | Lobbies stay for good | Any lobby tile sells; the lot keeps its last ground lobby tile ([Bulldoze and undo](/help/building/bulldoze-and-undo/)) |
 | Tall lobbies | Only the ground lobby can rise 2 or 3 stories | Sky lobbies can rise too ([Floors and lobbies](/help/building/floors-and-lobbies/#tall-lobbies)) |
-| Sky bridges | None, as in 1994 | From 3 stars, the Sky Bridge tool joins two towers' sky lobbies in one click ([Floors and lobbies](/help/building/floors-and-lobbies/#sky-bridges)) |
+| Sky bridges | None, as in 1994 | From 3 stars, the Sky Bridge tool joins two towers' sky lobbies in one click, in a look you pick and can change for free ([Floors and lobbies](/help/building/floors-and-lobbies/#sky-bridges)) |
 | Build hints | A refused spot says why when you click | Hovering a refused spot says why first |
 | Problems on a card | A room's card, the tower's notices and Tower Statistics name what's wrong, as in 1994 | They also say what to do about it ([Tenant ratings](/help/tower/ratings/#finding-the-trouble)) |
 | A new star | A message box names the rating and the rooms it opens | It also warns what the rating starts asking for, such as parking, and lists what the next rating needs ([Stars](/help/tower/stars/#when-you-earn-a-star)) |
