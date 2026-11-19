@@ -212,13 +212,13 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   const coverTookSpace = (): boolean =>
     !!spacePress && worldCovered() && (!spacePress.covered || document.activeElement !== spacePress.target);
   // A control that got focus since the press never got the press, as when a
-  // narrower window closes the Map and the Map gives its button focus with
-  // no key or pointer press in between. Nor did one focused before a Space
-  // first seen as repeats. Space's repeats would arm it and the release
-  // would press it. A click during a hold the game follows makes the hold a
-  // pan, whose release is canceled anyway; after a Space typed into a field
-  // or pressed as a chord there is no hold, and this rule alone keeps a
-  // clicked button out.
+  // narrower window closes the Map and gives its button focus. Nor did one
+  // focused before a Space first seen as repeats: the repeats would arm it and
+  // the release press it. A click mid-hold makes the hold a pan, whose release
+  // is canceled anyway; after a Space typed into a field or pressed as a chord
+  // there is no hold, and this rule alone keeps a clicked button out. A release
+  // with no press on record (a blur cleared it) needs no rule: Chromium and
+  // Firefox press a control on a Space release only if it saw the keydown (#1841).
   const focusTookSpace = (): boolean =>
     !!spacePress && document.activeElement !== spacePress.target && actsOnSpaceRelease(document.activeElement);
   // Whether Space was held as each press went down, by its native event. The
