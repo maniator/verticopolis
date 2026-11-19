@@ -141,7 +141,10 @@ export function drawMedical(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" | "x"
   const foot = sy(fy);
   personStanding(ctx, nurseX, foot, staffSeed(u) * 2 + 1);
   whiteCoat(ctx, nurseX, foot);
-  personStanding(ctx, doctorX, foot, staffSeed(u) * 2 + 7);
+  // The doctor's seed sits 1 to 9 past the nurse's, and the cast has 10 looks,
+  // so the doctor is never the nurse's twin and either can stand beside nine
+  // others (#1117).
+  personStanding(ctx, doctorX, foot, staffSeed(u) * 2 + 2 + geoVariant(u, 7, 9));
   whiteCoat(ctx, doctorX, foot);
   // Stocked supply cabinet, sized so the five bottle columns sit flush against
   // both bevels, the same at each end.
