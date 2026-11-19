@@ -101,6 +101,9 @@ describe("a feature PR", () => {
     // A pending note from main does not count for this PR.
     const pending = { ...base, ".changes/other.md": note("minor") };
     expect(feature(pending, { ...pending, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") })).toHaveLength(1);
+    // Adding the first pin, where main had none, is not a raise.
+    const unpinned = main({ "package.json": JSON.stringify({ name: "x", version: "2.89.1", dependencies: {} }) });
+    expect(feature(unpinned, { ...unpinned, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") })).toEqual([]);
     // Other dependencies move with any note.
     const other = JSON.stringify({ name: "x", version: "2.89.1", dependencies: { "@verticopolis/engine": "1.57.1", "@verticopolis/components": "0.2.1", fflate: "^0.8.4" } });
     expect(feature(base, { ...base, "package.json": other, ".changes/topic.md": note("none") })).toEqual([]);

@@ -116,7 +116,12 @@ export function checkFeature(base: Tree, head: Tree, changes: readonly Change[],
     const sample = shipped.slice(0, 3).join(", ") + (shipped.length > 3 ? `, and ${shipped.length - 3} more` : "");
     errors.push(`this PR changes deployed paths (${sample}) and adds no .changes note: add .changes/<branch-slug>.md, with app: none when no player would notice.`);
   }
-  const moved = PLAYER_PACKAGES.filter((name) => dependencyOf(base, name) !== dependencyOf(head, name));
+  // A pin that main already had and this PR moves. The first pin, which
+  // replaced the in-repository engine and components, is not a raise.
+  const moved = PLAYER_PACKAGES.filter((name) => {
+    const was = dependencyOf(base, name);
+    return was !== null && was !== dependencyOf(head, name);
+  });
   if (moved.length > 0) {
     const own: ChangeNote[] = [];
     for (const c of touched) {
