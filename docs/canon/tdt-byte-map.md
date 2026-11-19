@@ -162,7 +162,10 @@ rows 109 to 113 as five stacked parts (types 40 on floor 100 up to 36 on floor
 Rows that are not rooms. Type 0 is a paving piece (state 2) that fills floor
 tiles between rooms; type 45 is the metro tunnel, on floor index 0 only (our
 floor -9, B10), running along both sides of the station (TOWER7: tiles 0 to 208
-and 238 to 375). The metro station is three records, types 31, 32 and 33 on
+and 238 to 375). A tunnel record has state 0 and no logical id (byte 12
+`FF`), with the paving piece's tail; the piece left of the station repeats the
+station's bytes 8 to 11 (TOWER2, TOWER3 and TOWER7), which the exporter writes
+as zero (#1503). The metro station is three records, types 31, 32 and 33 on
 floor indexes 2, 1 and 0, 30 tiles wide each (TOWER7: tiles 208 to 238). Widths
 seen in the saves: security 16, medical center 26, housekeeping 15, recycling
 center 25, parking stall 4, parkade ramp 16 (type 44).

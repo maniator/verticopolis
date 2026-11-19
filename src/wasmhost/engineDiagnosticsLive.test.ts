@@ -18,11 +18,10 @@ describe("liveDiagnostics", () => {
         failure: null,
         identity: JSON.stringify(IDENTITY_FIXTURE),
       },
-      __vcEngine: { status: { hosted: true, placement: "worker" } },
+      // The host's status wins over a boot that loaded the engine.
+      __vcEngine: { status: { hosted: false } },
     });
-    expect(r.rows.find((x) => x.label === "Engine in use")?.value).toBe(
-      "Rust engine (worker)",
-    );
+    expect(r.rows.find((x) => x.label === "Engine in use")?.value).toBe("not running");
     expect(r.rows.find((x) => x.label === "Engine crate")?.value).toBe(
       "example-engine 9.8.7",
     );

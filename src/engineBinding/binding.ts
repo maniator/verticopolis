@@ -73,8 +73,8 @@ export const INSTANCE_METHODS = [
   "autoTuneProposal",
   "scheduleFacts",
   "schedulePreset",
-  // The recycling card's capacity line.
-  "recyclingCapacity", "recyclingDemandMet",
+  // The recycling card's capacity line, and the whole card from one read (#1745).
+  "recyclingCapacity", "recyclingDemandMet", "recyclingCard",
   // The rooms' evaluation and rent tiers for the Map's Eval and Pricing views (#343 S7).
   "roomTiers",
   // The tooling harnesses' reads (src/game/toolingTower.ts, #1875 step 4).

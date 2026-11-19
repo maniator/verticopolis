@@ -1,5 +1,6 @@
 //! Reading a save into a `Simulation`: the entry points and the per-unit reader.
 
+use super::unit_fields::UnitFields;
 use super::*;
 use crate::economy::visitors::census_follows_the_day;
 use crate::tower::Extras;
@@ -195,33 +196,33 @@ fn current_label(kind: Kind, label: &str) -> String {
 /// count in `deserialize` relies on. It reads nothing outside the entry but
 /// the save's mode.
 pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i64>)> {
-    let kind = kind_of(u)?;
+    let f = UnitFields::of(u);
+    let kind = f.kind.and_then(Value::as_str).and_then(Kind::parse)?;
     let cat = kind.facility().width;
     // `drop_overlapping_units` indexes its tile grids by the floors and tiles
     // these clamps allow, so a loosened clamp would trap there.
-    let floor =
-        (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, kind.highest_base_floor());
-    let x = (round(num(u.get("x"), 0.0)) as i64).clamp(0, LOT - 1);
+    let floor = (round(num(f.floor, 1.0)) as i64).clamp(MIN_FLOOR, kind.highest_base_floor());
+    let x = (round(num(f.x, 0.0)) as i64).clamp(0, LOT - 1);
     let cap = if kind.is_structural() { cat } else { LOT - x };
-    let width = (round(num(u.get("width"), cat as f64)) as i64)
+    let width = (round(num(f.width, cat as f64)) as i64)
         .min(cap)
         .min(LOT - x)
         .max(1);
     let state = if kind.is_structural() {
         UnitState::Empty
     } else {
-        parse_state(u.get("state")).unwrap_or(UnitState::Empty)
+        parse_state(f.state).unwrap_or(UnitState::Empty)
     };
     let not_owned = matches!(
         state,
         UnitState::Empty | UnitState::Construction | UnitState::Gutted
     );
     let ever_occupied =
-        u.get("everOccupied") == Some(&Value::Bool(true)) && !(not_owned && !kind.is_hotel());
+        f.ever_occupied == Some(&Value::Bool(true)) && !(not_owned && !kind.is_hotel());
     let sold_condo = kind == Kind::Condo && ever_occupied;
     let keep_household = ever_occupied && kind.has_household();
     let ladder_priced = !modern && classic_ladder(kind).is_some();
-    let mut rent: Option<f64> = match u.get("rent") {
+    let mut rent: Option<f64> = match f.rent {
         None => None,
         Some(r) if ladder_priced => Some(r.as_f64().unwrap_or(f64::NAN)),
         Some(r) => Some(num(
@@ -248,7 +249,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         }
     }
     let residents = if keep_household && modern {
-        match u.get("residents") {
+        match f.residents {
             None => None,
             Some(r) => {
                 let v = if r.as_f64().is_some_and(|x| x.is_finite()) {
@@ -262,26 +263,23 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
     } else {
         None
     };
-    let film_policy = film_policy(u.get("filmPolicy"));
-    let subtype: Option<&'static str> = match (
-        u.get("subtype").and_then(Value::as_str),
-        kind.subtype_list(),
-    ) {
-        (Some(s), Some(list)) => list.iter().copied().find(|c| *c == s),
-        // A sky bridge tile's look (`tower/skybridge_look.rs`).
-        (Some(s), None) if kind == Kind::Lobby => crate::tower::look_named(s),
-        _ => None,
-    };
+    let film_policy = film_policy(f.film_policy);
+    let subtype: Option<&'static str> =
+        match (f.subtype_name.and_then(Value::as_str), kind.subtype_list()) {
+            (Some(s), Some(list)) => list.iter().copied().find(|c| *c == s),
+            // A sky bridge tile's look (`tower/skybridge_look.rs`).
+            (Some(s), None) if kind == Kind::Lobby => crate::tower::look_named(s),
+            _ => None,
+        };
     let retail = kind.subtype_list().is_some();
-    let retail_field = |key: &str| -> Option<f64> {
+    let retail_field = |field: Option<&Value>| -> Option<f64> {
         if !retail {
             return None;
         }
-        let v = u.get(key)?;
+        let v = field?;
         Some(num(Some(v), 0.0).max(0.0))
     };
-    let no_rate =
-        rent_config(kind).is_some() && !modern && u.get("noRate") == Some(&Value::Bool(true));
+    let no_rate = rent_config(kind).is_some() && !modern && f.no_rate == Some(&Value::Bool(true));
     let unit = Unit {
         id: 0,
         kind,
@@ -292,12 +290,12 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         satisfaction: if kind.is_structural() {
             1.0
         } else {
-            num(u.get("satisfaction"), 1.0).min(1.0).max(0.0)
+            num(f.satisfaction, 1.0).min(1.0).max(0.0)
         },
         occupants: if kind.counts_visitors() || kind.is_structural() {
             0
         } else {
-            let occupants = num(u.get("occupants"), 0.0).clamp(0.0, MAX_SAFE_INTEGER) as i64;
+            let occupants = num(f.occupants, 0.0).clamp(0.0, MAX_SAFE_INTEGER) as i64;
             // An office's head count is its workers at their desks, each of
             // whom may leave as a person (`crowd::commuters`): never more
             // than the office holds (#2230).
@@ -313,46 +311,46 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         out_for_meal: None,
         residents,
         visitors_yest: if census_follows_the_day(kind) {
-            u.get("visitorsYest")
+            f.visitors_yest
                 .map(|v| num(Some(v), 0.0).clamp(0.0, f64::from(u8::MAX)).floor() as u8)
         } else {
             None
         },
         ever_occupied,
-        pending_income: num(u.get("pendingIncome"), 0.0),
+        pending_income: num(f.pending_income, 0.0),
         rent,
         no_rate,
-        label: u
-            .get("label")
+        label: f
+            .label_text
             .and_then(Value::as_str)
             .map(|s| current_label(kind, s))
             .unwrap_or_else(|| kind.facility().name.to_string()),
         subtype,
         extras: Extras {
-            vacate_reason: vacate_reason(u.get("vacateReason")),
-            vacate_at: u.get("vacateAt").map(|v| num(Some(v), 0.0)),
+            vacate_reason: vacate_reason(f.vacate_reason),
+            vacate_at: f.vacate_at.map(|v| num(Some(v), 0.0)),
             film_policy,
-            film_days: film_days(kind, u.get("filmDays")),
-            film_classic: cinema_flag(kind, u.get("filmClassic")),
+            film_days: film_days(kind, f.film_days),
+            film_classic: cinema_flag(kind, f.film_classic),
             // Only Modern shows a blockbuster (#1950); Classic reads a new film.
-            film_blockbuster: modern && cinema_flag(kind, u.get("filmBlockbuster")),
-            ticket_price: ticket_price(kind, modern, u.get("ticketPrice")),
-            second_screen: second_screen(kind, u.get("screen2")),
-            patronage_today: retail_field("patronageToday"),
-            patronage_yest: retail_field("patronageYest"),
-            profit_today: retail_field("profitToday"),
-            profit_yest: retail_field("profitYest"),
-            complete_at: u.get("completeAt").and_then(Value::as_f64),
-            complete_at_raw: match u.get("completeAt") {
+            film_blockbuster: modern && cinema_flag(kind, f.film_blockbuster),
+            ticket_price: ticket_price(kind, modern, f.ticket_price),
+            second_screen: second_screen(kind, f.screen2),
+            patronage_today: retail_field(f.patronage_today),
+            patronage_yest: retail_field(f.patronage_yest),
+            profit_today: retail_field(f.profit_today),
+            profit_yest: retail_field(f.profit_yest),
+            complete_at: f.complete_at.and_then(Value::as_f64),
+            complete_at_raw: match f.complete_at {
                 Some(v) if !v.is_number() => Some(v.clone()),
                 _ => None,
             },
-            dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
+            dirty_days: coerce_dirty_days(state, kind, f.dirty_days),
             // Set from the save's `lobbyHeights` once every unit is read.
             lobby_stories: None,
         }
         .without_mirrored_screen()
         .boxed(),
     };
-    Some((unit, sane_id(u.get("id"))))
+    Some((unit, sane_id(f.id)))
 }

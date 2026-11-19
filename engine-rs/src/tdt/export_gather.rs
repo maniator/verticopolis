@@ -44,7 +44,7 @@ use super::format::{
 };
 use super::tables::{
     is_priced, rent_from_class, HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK,
-    HOTEL_STAY_VACANT,
+    HOTEL_STAY_VACANT, TDT_METRO_TUNNEL,
 };
 use super::venue_people::split_theatre;
 use super::venues::OutVenueHalf;
@@ -381,9 +381,16 @@ pub fn gather_units<U: Borrow<Value>>(
     }
 
     // Paving spans: each floor's extent minus the tiles under a record, one
-    // record per contiguous run; lobby floors type 24, others type 0.
+    // record per contiguous run; lobby floors type 24, a metro platform's row
+    // the tunnel (type 45, as the original writes it beside the station,
+    // #1503), others type 0.
     const TDT_LOBBY_TYPE: i64 = 24;
     const TDT_FLOOR_TYPE: i64 = 0;
+    let platform = part_stack(Kind::Metro).map_or(0, |stack| stack[0]);
+    let tunnel_rows: Vec<FloorKey> = (tenants_by_tdt.iter())
+        .filter(|(_, row)| row.iter().any(|t| t.type_id.abs() == platform))
+        .map(|(key, _)| *key)
+        .collect();
     let extent_list: Vec<(FloorKey, (f64, f64))> = extents.iter().map(|(k, v)| (*k, *v)).collect();
     for (key, ext) in extent_list {
         let floor = key.value();
@@ -395,6 +402,7 @@ pub fn gather_units<U: Borrow<Value>>(
         // tile of a lobby story (to confirm on the PC, #308).
         let lobby = floor.fract() == 0.0
             && (is_lobby_floor(floor as i64) || raised.contains(&(floor as i64)));
+        let tunnel = tunnel_rows.contains(&FloorKey::of(floor + TDT_FLOOR_OFFSET as f64));
         let covered = covered_tiles.get(&key);
         let lo = clamp_tile(ext.0);
         let hi = clamp_tile(ext.1).max(lo);
@@ -411,12 +419,12 @@ pub fn gather_units<U: Borrow<Value>>(
                 OutTenant {
                     left: start as f64,
                     right: end as f64,
-                    type_id: if lobby {
-                        TDT_LOBBY_TYPE
-                    } else {
-                        TDT_FLOOR_TYPE
+                    type_id: match (lobby, tunnel) {
+                        (true, _) => TDT_LOBBY_TYPE,
+                        (false, true) => TDT_METRO_TUNNEL,
+                        (false, false) => TDT_FLOOR_TYPE,
                     },
-                    status: if lobby { 0 } else { 2 },
+                    status: if lobby || tunnel { 0 } else { 2 },
                     rent_class: 4,
                     retail_row: None,
                     draw: 0,

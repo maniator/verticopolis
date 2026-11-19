@@ -71,15 +71,6 @@ describe("buildDiagnostics", () => {
     expect(row(r, "Mismatch")).toEqual([]);
   });
 
-  it("names the worker placement", () => {
-    const r = buildDiagnostics({
-      ...base,
-      boot: wasmBoot(),
-      host: { hosted: true, placement: "worker" },
-    });
-    expect(row(r, "Engine in use")).toEqual(["Rust engine (worker)"]);
-  });
-
   it("says the identity is unavailable for a package without the call", () => {
     const { identity: _omit, ...noIdentity } = wasmBoot();
     const r = buildDiagnostics({

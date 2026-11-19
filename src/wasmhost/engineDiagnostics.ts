@@ -49,7 +49,6 @@ export interface DiagnosticsReport {
 
 export interface DiagnosticsHost {
   hosted?: boolean;
-  placement?: "worker";
   lastError?: string | null;
   droppedErrors?: number;
 }
@@ -139,10 +138,7 @@ function wasmRunning(input: DiagnosticsInput): boolean {
 /** The Rust engine is the only engine (#1875), so a tower it does not run has
  *  no engine running at all. */
 function engineName(input: DiagnosticsInput): string {
-  if (!wasmRunning(input)) return "not running";
-  return input.host?.placement === "worker"
-    ? "Rust engine (worker)"
-    : "Rust engine";
+  return wasmRunning(input) ? "Rust engine" : "not running";
 }
 
 /** The sentence for an engine that is not running, by where it stopped. */

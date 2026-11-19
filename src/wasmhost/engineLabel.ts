@@ -13,7 +13,7 @@ import { shortId } from "./enginePackageRecord";
  * left out when the package did not report it.
  */
 interface EngineHandle {
-  status: { hosted: boolean; placement?: "worker" };
+  status: { hosted: boolean };
 }
 
 interface LabelSource {
@@ -47,8 +47,7 @@ function suffixOf(g: LabelSource): string {
   const version = parseEngineIdentity(g.__vcEngineBoot?.identity)?.crate.version;
   const binary = g.__vcEngineBoot?.binary;
   const hash = binary?.state === "ok" ? shortId(binary.sourceHash) : null;
-  // The experimental worker host says so, so a tester can tell the two apart.
-  const extras = [hash, g.__vcEngine?.status.placement === "worker" ? "worker" : null, stopped ? "stopped" : null].filter((x) => x !== null);
+  const extras = [hash, stopped ? "stopped" : null].filter((x) => x !== null);
   return ` · Rust engine${version ? ` ${version}` : ""}${extras.length > 0 ? ` (${extras.join(", ")})` : ""}`;
 }
 

@@ -97,7 +97,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     // stored; each read puts them between the kept halves, after the lobby
     // advice and above any gripe or notice.
     const recycling = u.kind === "recycling" && !INERT_STATES.has(u.state)
-      ? () => recyclingLinesOf(header.population, port.recyclingCapacity(), port.recyclingFill(), port.recyclingDemandMet(), catalogOf(app).rules.advisesFixes)
+      ? () => recyclingLinesOf(port.recyclingCard(), catalogOf(app).rules.advisesFixes)
       : undefined;
     // The notice deadline counts down minute by minute while the key moves
     // hourly, so a card with a notice is read whole each time. Only a

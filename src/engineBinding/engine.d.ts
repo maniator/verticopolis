@@ -441,6 +441,7 @@ export class Engine {
      */
     quoteSkyBridge(floor: number, x: number): Float64Array;
     recyclingCapacity(): number;
+    recyclingCard(): Float64Array;
     recyclingDemandMet(): boolean;
     recyclingFill(): number;
     redo(): Float64Array;

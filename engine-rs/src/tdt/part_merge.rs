@@ -1,6 +1,8 @@
 //! Merge the per-floor parts a multi-story unit is stored as back into whole
-//! units (`tdtPartMerge.ts`): union-find over a tower's few dozen parts,
-//! split by floor window and by horizontal connectivity.
+//! units (`tdtPartMerge.ts`): union-find over a tower's parts, split by
+//! floor window and by horizontal connectivity.
+
+use std::collections::HashMap;
 
 use indexmap::IndexMap;
 
@@ -62,16 +64,71 @@ fn same_building(kind: Kind, stories: i64, a: &PartRecord, b: &PartRecord) -> bo
     (overlaps && within_stories) || screen_touch
 }
 
-/// Group `items` by union-find root, in order of first appearance.
+/// Group `items` into buildings (the connected parts under
+/// [`same_building`]), in order of first appearance, each in item order.
+///
+/// A sweep by left edge (#2086): parts on one floor that are still open at
+/// a left edge all overlap one another, so a new part needs joining only to
+/// the open part reaching furthest right on each floor of its story window,
+/// and a screen joins every auditorium that starts on its right edge. That is
+/// O(n log n) where comparing every pair was O(n^2) on a forged file. A part
+/// the floor walk never makes (`right <= left`) takes the pairwise path, so
+/// the buildings come out the same for any input.
 fn components<'a>(kind: Kind, stories: i64, items: &[&'a PartRecord]) -> Vec<Vec<&'a PartRecord>> {
     let mut parent: Vec<usize> = (0..items.len()).collect();
-    for i in 0..items.len() {
-        for j in i + 1..items.len() {
-            if same_building(kind, stories, items[i], items[j]) {
-                let ra = find(&mut parent, i);
-                let rb = find(&mut parent, j);
-                if ra != rb {
-                    parent[ra] = rb;
+    let join = |parent: &mut Vec<usize>, a: usize, b: usize| {
+        let ra = find(parent, a);
+        let rb = find(parent, b);
+        if ra != rb {
+            parent[ra] = rb;
+        }
+    };
+    if items.iter().any(|p| p.right <= p.left) {
+        for i in 0..items.len() {
+            for j in i + 1..items.len() {
+                if same_building(kind, stories, items[i], items[j]) {
+                    join(&mut parent, i, j);
+                }
+            }
+        }
+    } else {
+        // Overlaps within the story window. Per floor, the part seen so far
+        // whose right edge reaches furthest: it overlaps every later part
+        // that starts before that edge, and every part on its floor it could
+        // stand for, so joining it alone keeps the buildings whole.
+        let mut by_left: Vec<usize> = (0..items.len()).collect();
+        by_left.sort_by_key(|&i| items[i].left);
+        let mut furthest: HashMap<i64, (usize, i64)> = HashMap::new();
+        for &i in &by_left {
+            let p = items[i];
+            for floor in p.floor - stories + 1..p.floor + stories {
+                if let Some(&(open, right)) = furthest.get(&floor) {
+                    if right > p.left {
+                        join(&mut parent, i, open);
+                    }
+                }
+            }
+            let reach = furthest.entry(p.floor).or_insert((i, p.right));
+            if p.right > reach.1 {
+                *reach = (i, p.right);
+            }
+        }
+        // A theater's screen and the auditorium on its right: every screen
+        // ending where auditoriums start on its floor joins all of them.
+        if kind == Kind::Cinema {
+            let mut edges: HashMap<(i64, i64), (Vec<usize>, Vec<usize>)> = HashMap::new();
+            for (i, p) in items.iter().enumerate() {
+                if is_screen_part(p.type_id) {
+                    edges.entry((p.floor, p.right)).or_default().0.push(i);
+                } else {
+                    edges.entry((p.floor, p.left)).or_default().1.push(i);
+                }
+            }
+            for (screens, auditoriums) in edges.values() {
+                if let (Some(&first), false) = (screens.first(), auditoriums.is_empty()) {
+                    for &other in screens.iter().chain(auditoriums) {
+                        join(&mut parent, first, other);
+                    }
                 }
             }
         }
@@ -223,3 +280,7 @@ mod tests {
         assert_eq!(got, vec![(11, 12, 100, 131), (11, 12, 131, 162)]);
     }
 }
+
+#[cfg(test)]
+#[path = "part_merge_sweep_tests.rs"]
+mod sweep_tests;

@@ -80,6 +80,7 @@ mod migrate_v1;
 mod migrate_v4;
 mod migrate_v5;
 mod reader;
+mod unit_fields;
 
 pub(crate) use assemble::*;
 use coerce::*;

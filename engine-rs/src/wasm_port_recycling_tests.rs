@@ -1,4 +1,5 @@
-//! The recycling card's three engine reads answer from the census tally
+//! The recycling card's engine reads, the three single ones and the
+//! one-read card with its population, answer from the census tally
 //! (#1745, `view/tally.rs`). These follow them through the setters, the
 //! clock, an edit, an undo and a redo, a bulldoze and a load, each checked
 //! against a fresh count; `view/tally_tests.rs` covers each way through a
@@ -10,9 +11,10 @@ use crate::facilities::Kind;
 use crate::tower::UnitState;
 use crate::view::RecyclingCounts;
 
-/// The three reads, with the fill as its bits so two reads compare exactly.
+/// The reads, with the fill as its bits so two reads compare exactly.
 #[derive(Debug, PartialEq)]
 struct Reads {
+    population: i64,
     capacity: f64,
     fill: u64,
     met: bool,
@@ -27,19 +29,44 @@ impl Reads {
 /// What a fresh count of the tower gives.
 fn fresh(e: &Engine) -> Reads {
     Reads {
+        population: e.sim.recycling_population(),
         capacity: e.sim.recycling_capacity(),
         fill: e.sim.recycling_fill().to_bits(),
         met: e.sim.recycling_demand_met(),
     }
 }
 
-/// What the card's reads give, from the kept counts.
+/// What the card's reads give, from the kept counts. The one-read card
+/// answers what the three single reads answer, and the population it shows
+/// is the one its verdict used.
 fn read(e: &mut Engine) -> Reads {
-    Reads {
+    let single = Reads {
+        population: 0,
         capacity: e.port_recycling_capacity(),
         fill: e.port_recycling_fill().to_bits(),
         met: e.port_recycling_demand_met(),
-    }
+    };
+    let card = e.port_recycling_card();
+    assert_eq!(card.len(), 4);
+    let card = Reads {
+        population: card[0] as i64,
+        capacity: card[1],
+        fill: card[2].to_bits(),
+        met: match card[3] {
+            1.0 => true,
+            0.0 => false,
+            other => panic!("demandMet slot {other}"),
+        },
+    };
+    assert_eq!(
+        Reads {
+            population: 0,
+            ..card
+        },
+        single
+    );
+    assert!(card.met == (card.population as f64 <= card.capacity));
+    card
 }
 
 fn counted(e: &Engine) -> RecyclingCounts {

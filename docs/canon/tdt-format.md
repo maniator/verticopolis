@@ -610,6 +610,10 @@ point after the first import. Known canonical forms:
 - Exports before #2043 numbered every record, plain floor tiles included, so
   their venue table named the wrong units, and wrote no people for a party
   hall, which crashes the original. Re-export the tower to open it there.
+- The paving on a metro station's bottom row is written as the tunnel (type
+  45, state 0, no logical id), the way the original writes it beside the
+  station (#1503). The importer reads the tunnel as paving, so the tower comes
+  back the same. Exports before #1503 wrote plain floor tiles there.
 - A room the file's flags mark occupied but whose people the finance lines do not
   count comes back vacant and never lived in.
 - An infested hotel room is written as a dirty room (`0x20`) and comes back
