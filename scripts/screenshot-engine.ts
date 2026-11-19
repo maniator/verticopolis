@@ -34,14 +34,28 @@ import { type Page } from "playwright";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { staleEnginePackages } from "../src/build/engineCache.ts";
+import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
 
-/** The Rust render needs the engine package in the build this script serves.
- *  Say so up front instead of timing out on every game scene. A run against an
- *  already-served BASE_URL builds nothing here, so it is not checked. */
+/** The Rust render needs the engine package in the build this script serves,
+ *  built from the Rust sources in the tree. Say so up front instead of timing
+ *  out on every game scene, or rendering an old engine that only the CI drift
+ *  gate would catch (#1369). A run against an already-served BASE_URL builds
+ *  nothing here, so it is not checked. CI checks its package the same way
+ *  (.github/actions/engine-wasm-download), so this holds there too. */
 export function assertEnginePackage(): void {
   if (process.env.BASE_URL) return;
-  if (existsSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "public", "engine", "BUILD.json"))) return;
-  throw new Error("The gallery renders on the Rust engine, but src/public/engine/ has no engine package: run `npm run wasm:build`.");
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  if (!existsSync(resolve(root, "src", "public", "engine", "BUILD.json"))) {
+    throw new Error("The gallery renders on the Rust engine, but src/public/engine/ has no engine package: run `npm run wasm:build`.");
+  }
+  // The tooling package is what a VC_TOOLING=1 build serves, and dist/ is
+  // what RUN_SERVER's `vite preview` serves.
+  const dirs = ["src/public/engine", "engine-rs/pkg-web-tooling", ...(process.env.RUN_SERVER ? ["dist/engine"] : [])];
+  const stale = staleEnginePackages(root, engineSourceHash(resolve(root, "engine-rs")), dirs);
+  if (stale.length > 0) {
+    throw new Error(`The engine package was built from other Rust sources than the tree's: ${stale.join(", ")}. Run \`npm run wasm:build\`, then \`VC_TOOLING=1 npm run build\` again before a RUN_SERVER run.`);
+  }
 }
 
 /** The shots whose setup edits the tower in place (a unit's state or

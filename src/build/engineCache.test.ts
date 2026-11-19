@@ -11,6 +11,7 @@ import {
   recordedSources,
   restoreEnginePackage,
   saveEnginePackage,
+  staleEnginePackages,
   vercelEngineCache,
 } from "./engineCache";
 import { engineBuildRecord } from "../wasmhost/enginePackageRecord";
@@ -81,6 +82,18 @@ describe("recordedSources", () => {
     mkdirSync(join(dir, "bad"));
     writeFileSync(join(dir, "bad", "BUILD.json"), "{ not json");
     expect(recordedSources(join(dir, "bad"))).toBeUndefined();
+  });
+});
+
+describe("staleEnginePackages (#1369)", () => {
+  it("names each package built from other sources, and skips a folder with no record", () => {
+    writePackage(join(dir, "public/engine"), "abc");
+    writePackage(join(dir, "tooling"), "old");
+    mkdirSync(join(dir, "bad"));
+    writeFileSync(join(dir, "bad", "BUILD.json"), "{ not json");
+    const dirs = ["public/engine", "tooling", "bad", "absent"];
+    expect(staleEnginePackages(dir, "abc", dirs)).toEqual(["tooling (built from old)", "bad (built from unreadable sources)"]);
+    expect(staleEnginePackages(dir, "old", ["tooling"])).toEqual([]);
   });
 });
 

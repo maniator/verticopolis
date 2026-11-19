@@ -68,6 +68,22 @@ export function recordedSources(packageDir: string): string | undefined {
 }
 
 /**
+ * The packages among `dirs` (relative to `root`) whose BUILD.json names
+ * other sources than `sources`, each as "<dir> (built from <hash>)". A folder
+ * with no BUILD.json is left to whatever needs it to report as missing. The
+ * screenshot generator refuses a local run on a stale package (#1369).
+ */
+export function staleEnginePackages(root: string, sources: string, dirs: readonly string[]): string[] {
+  const stale: string[] = [];
+  for (const dir of dirs) {
+    if (!existsSync(join(root, dir, ENGINE_BUILD_RECORD))) continue;
+    const recorded = recordedSources(join(root, dir));
+    if (recorded !== sources) stale.push(`${dir} (built from ${recorded ?? "unreadable sources"})`);
+  }
+  return stale;
+}
+
+/**
  * Why a package folder does not match its own BUILD.json (a record that does
  * not parse, or a glue or binary whose size or SHA-256 differs from the
  * record's), or undefined when every file matches.
