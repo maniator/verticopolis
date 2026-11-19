@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: 💬 Ask a question or share an idea
+    url: https://github.com/Verticopolis/web/discussions
+    about: Questions, ideas and towers to show off go to Discussions. Issues are for bugs and planned work.
   - name: 🎮 Play Verticopolis
     url: https://verticopolis.com
     about: Try the live build before filing. The bug may already be fixed.

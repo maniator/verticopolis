@@ -62,7 +62,7 @@ When the game opens this manual (from its **Help** menu, a room card's **Help** 
 
 The bar goes away when you close the game. A page you reach from a search or a link someone sent you has no bar.
 
-Something not right, or an idea? [Report a problem](https://github.com/maniator/verticopolis/issues/new/choose). Curious how the engine works? Read the [engine docs](https://docs.verticopolis.com/).
+Something not right? [Report a problem](https://github.com/maniator/verticopolis/issues/new/choose). Have a question or an idea, or a tower to show off? Bring it to [Discussions](https://github.com/Verticopolis/web/discussions). Curious how the engine works? Read the [engine docs](https://docs.verticopolis.com/).
 
 ## Supporting Verticopolis
 

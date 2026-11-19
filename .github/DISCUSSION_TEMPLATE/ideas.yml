@@ -1,0 +1,21 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea for the game? Share it here and talk it through. Classic stays true to the 1994 game, so most new ideas belong in Modern. Once an idea is clear and has a home, it becomes an issue.
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like the game to do, and what would it make better?
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Modern
+        - Classic (something the 1994 game had that we're missing)
+        - Both
+        - Not sure

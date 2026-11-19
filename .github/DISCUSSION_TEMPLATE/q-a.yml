@@ -1,0 +1,25 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask anything about playing or building Verticopolis. The [manual](https://help.verticopolis.com/) answers a lot, so it's worth a quick look first. If the game is clearly doing something wrong, a [bug report](https://github.com/Verticopolis/web/issues/new/choose) gets it fixed faster.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and what happened?
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Classic
+        - Modern
+        - Both, or not about a tower
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The version line from the title screen or Help > About Verticopolis…, if your question is about the game.
