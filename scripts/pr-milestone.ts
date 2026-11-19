@@ -112,17 +112,27 @@ const pulls: PullSummary[] = sweep
 
 if (sweep)
   console.log(`${pulls.length} open pull request(s) without a milestone.`);
+// One pull request that fails (a GitHub error, a locked thread) must not
+// stop the sweep from reaching the older ones, so each is tried on its own
+// and the run fails at the end.
+let failed = 0;
 for (const pull of pulls) {
-  if (!Number.isInteger(pull.number) || pull.number <= 0)
-    throw new Error("PR is not a pull request number");
-  const outcome = milestonePullRequest(
-    { number: pull.number, body: pull.body ?? "" },
-    currentRelease,
-    port,
-  );
-  console.log(
-    outcome.set === null
-      ? `Nothing to do: ${outcome.reason}.`
-      : `${outcome.reason}; set.`,
-  );
+  try {
+    if (!Number.isInteger(pull.number) || pull.number <= 0)
+      throw new Error("PR is not a pull request number");
+    const outcome = milestonePullRequest(
+      { number: pull.number, body: pull.body ?? "" },
+      currentRelease,
+      port,
+    );
+    console.log(
+      outcome.set === null
+        ? `Nothing to do: ${outcome.reason}.`
+        : `${outcome.reason}; set.`,
+    );
+  } catch (error) {
+    failed += 1;
+    console.log(`::error::#${pull.number}: ${(error as Error).message}`);
+  }
 }
+if (failed > 0) process.exitCode = 1;

@@ -44,9 +44,10 @@ export interface WelcomeOutcome {
 }
 
 /**
- * The kind of item a GitHub event name opened. The workflow sends `issues`
- * for an opened issue and `pull_request` for a pull request the hourly sweep
- * found; anything else is a wiring mistake, so it throws rather than guess.
+ * The kind of item a GitHub event name opened. The workflow's issue step sends
+ * `issues`; the hourly sweep sets the kind itself. `pull_request` is accepted
+ * so one pull request can be run by hand with the same variables. Anything
+ * else is a wiring mistake, so it throws rather than guess.
  */
 export function contributionKind(eventName: string): ContributionKind {
   if (eventName === "pull_request") return "pull request";

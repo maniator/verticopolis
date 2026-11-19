@@ -123,13 +123,23 @@ const events: ContributionEvent[] = sweep
 
 if (sweep)
   console.log(`${events.length} pull request(s) opened in the sweep window.`);
+// One pull request that fails (a GitHub error, a locked thread) must not
+// stop the sweep from reaching the older ones, so each is tried on its own
+// and the run fails at the end.
+let failed = 0;
 for (const event of events) {
-  if (!Number.isInteger(event.number) || event.number <= 0)
-    throw new Error(`NUMBER is not an issue number`);
-  const outcome = welcomeFirstContribution(event, port);
-  console.log(
-    outcome.posted
-      ? `${outcome.reason[0].toUpperCase()}${outcome.reason.slice(1)}.`
-      : `No welcome for #${event.number}: ${outcome.reason}.`,
-  );
+  try {
+    if (!Number.isInteger(event.number) || event.number <= 0)
+      throw new Error(`NUMBER is not an issue number`);
+    const outcome = welcomeFirstContribution(event, port);
+    console.log(
+      outcome.posted
+        ? `${outcome.reason[0].toUpperCase()}${outcome.reason.slice(1)}.`
+        : `No welcome for #${event.number}: ${outcome.reason}.`,
+    );
+  } catch (error) {
+    failed += 1;
+    console.log(`::error::#${event.number}: ${(error as Error).message}`);
+  }
 }
+if (failed > 0) process.exitCode = 1;
