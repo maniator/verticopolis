@@ -1,4 +1,5 @@
 import { trackEvent } from "./analyticsCore";
+import type { MenuDismissHow, MenuOpenVia } from "./ui/menuBar";
 
 /**
  * The menu bar's events (owner, 2026-11-14: "analytics for every single part
@@ -65,14 +66,8 @@ export const MENU_ITEM_CODES = {
 /** An item's code; `other` for an item this list does not know yet. */
 export type MenuItemCode = (typeof MENU_ITEM_CODES)[keyof typeof MENU_ITEM_CODES] | "other";
 
-/** How a trip into the menus began: a click on a title, the keyboard on a
- *  focused title, or Alt with a title's underlined letter. */
-export type MenuOpenVia = "click" | "keys" | "alt";
 /** How an item was picked: a pointer (mouse, pen or finger) or the keyboard. */
 export type MenuPickVia = "pointer" | "keys";
-/** How a trip ended without a pick: a press outside the menus, Escape, Tab,
- *  a click on the open menu's own title, or the window losing focus. */
-export type MenuDismissHow = "outside" | "escape" | "tab" | "title" | "blur";
 /** Where the menus were used: over the title screen or over a tower. */
 export type MenuScreen = "title" | "tower";
 

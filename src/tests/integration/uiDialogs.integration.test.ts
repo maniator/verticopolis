@@ -526,6 +526,7 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
       titleBarClose: (cls, onClick) => ui.titleBarClose(cls, onClick),
       closeModal: () => ui.closeModal(),
       drainNotice: () => {},
+      engineStopped: () => false,
     });
 
     const titleId = MODAL_TITLE_ID;

@@ -1,5 +1,3 @@
-import { isEngineStopped } from "../game/interactionState";
-
 /**
  * The shared window grammar every modal is finished with: title-bar skinning,
  * the accessible-name wiring, the ✕, and the dismissal handlers. Extracted from
@@ -20,6 +18,9 @@ export interface ModalDeps {
   titleBarClose(className: string, onClick: () => void): HTMLButtonElement;
   closeModal(): void;
   drainNotice(box: HTMLElement): void;
+  /** A wasm-only engine-failure message is up (`isEngineStopped`,
+   *  `game/interactionState.ts`), so no modal may open over it. */
+  engineStopped(): boolean;
 }
 
 /** The grammar `UI.openModalTemplate` finishes every modal with: skin the
@@ -61,7 +62,7 @@ export function finishModal(dialog: HTMLDialogElement, box: HTMLElement, deps: M
   // Behind a wasm-only engine-failure message a late modal (an import
   // report that finished after the stop) would sit in the top layer and
   // cover the message's Reload button, so it never opens there.
-  if (!dialog.open && !isEngineStopped()) dialog.showModal();
+  if (!dialog.open && !deps.engineStopped()) dialog.showModal();
   if (h2 && !h2.querySelector(".modal-x")) {
     h2.appendChild(
       deps.titleBarClose("modal-x btn xs", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true }))),
