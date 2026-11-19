@@ -15,8 +15,10 @@
  *
  * A row it cannot read, or an issue it fails to relabel, is reported and the
  * rest still sync; the run then exits 1 so the failure shows on the workflow.
- * Rows that cite an issue that is not open are listed as warnings: the backlog's
- * rule says to true those rows up.
+ * Rows that cite an issue that is not open fail the run too, after the labels
+ * sync (#2081): the backlog's rule says a finished row clears its GH cell and an
+ * unfinished row has a live issue, so a red weekly run is the prompt to true the
+ * rows up.
  *
  * Usage: `node scripts/backlog-priority-labels.mjs [--dry-run]`. It talks to
  * GitHub through the `gh` CLI, which GitHub's runners ship with: the workflow
@@ -195,11 +197,11 @@ export async function run({
   if (priorities.size === 0) {
     if (errors.length === 0)
       log("no open backlog row cites an issue; nothing to sync");
-    return { ok: errors.length === 0, plan: [], failures: [], errors };
+    return { ok: errors.length === 0, plan: [], failures: [], errors, stale: [] };
   }
   const stop = (why) => {
     log(`error: ${why}`);
-    return { ok: false, plan: [], failures: [], errors: [...errors, why] };
+    return { ok: false, plan: [], failures: [], errors: [...errors, why], stale: [] };
   };
   // gh refuses to add a label the repository lacks, so a missing P label would
   // fail every issue one by one. Check once and stop with a clear reason.
@@ -223,10 +225,10 @@ export async function run({
     return stop(`could not list open issues: ${message(err)}`);
   }
   const stale = citedButNotOpen(priorities, open);
-  // A `::warning::` line becomes an annotation on the workflow run's summary.
+  // A `::error::` line becomes an annotation on the workflow run's summary.
   if (stale.length)
     log(
-      `::warning::backlog rows cite numbers that are not open issues (closed, or a pull request); true the rows up: ${stale.map((n) => `#${n}`).join(" ")}`,
+      `::error::backlog rows cite numbers that are not open issues (closed, or a pull request); true the rows up: ${stale.map((n) => `#${n}`).join(" ")}`,
     );
   const plan = planLabelChanges(priorities, open);
   log(
@@ -305,6 +307,7 @@ export async function run({
     plan,
     failures,
     errors,
+    stale,
   };
 }
 
@@ -326,7 +329,9 @@ async function main() {
     gh,
     dryRun: process.argv.includes("--dry-run"),
   });
-  if (!result.ok) process.exit(1);
+  // Stale rows fail the run only after every label has synced, so drift in
+  // the table never holds back the labels of the rows that are right.
+  if (!result.ok || result.stale.length) process.exit(1);
 }
 
 if (
