@@ -119,10 +119,10 @@ Verticopolis has **two test tiers**:
     tier and never in unit, and the pair covers every test with no gap.
     `npm run test:integration` runs only these.
     The engine comes from npm, pinned in `package.json`: `@verticopolis/engine`
-    (the player build the game ships) and, from the same engine release,
-    `@verticopolis/engine-tooling` (the build with the binding's tier 3 test
+    is the player build the game ships, and the same package carries
+    `@verticopolis/engine/tooling` (the build with the binding's tier 3 test
     ops, which `npm run dev`, a `VC_TOOLING=1` build and the WASM suites use)
-    and `@verticopolis/engine-conformance` (the conformance scenarios, their
+    and `@verticopolis/engine/conformance` (the conformance scenarios, their
     pinned hashes, the catalog digests and the fixtures). `npm install` copies
     the player build into `src/public/engine/` (`scripts/engine-install.ts`),
     which is build output and is not checked in. The conformance suite runs
@@ -133,7 +133,7 @@ Verticopolis has **two test tiers**:
     tests live in Verticopolis/engine, which owns every simulation rule (see
     its CONTRIBUTING.md); the rendering, audio, binding and host modules come
     from `@verticopolis/components`. To move the game to a new engine, raise
-    the three engine pins in `package.json` together and run `npm install`;
+    the `@verticopolis/engine` pin in `package.json` and run `npm install`;
     the suites check the rest.
 
     Every build (`npm run build`, a dev serve and the deploy alike) runs the
@@ -274,7 +274,7 @@ node scripts/screenshot-determinism-check.ts --all
 
 To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image (its
 `npm run build` needs the engine packages, which `npm install` on the host
-puts in `src/public/engine/` and `node_modules/@verticopolis/engine-tooling/`
+puts in `src/public/engine/` and `node_modules/@verticopolis/engine/tooling/`
 for a `VC_TOOLING=1` build; see the engine note above):
 
 ```bash
@@ -614,11 +614,10 @@ app tier is what a player would notice from the new engine or components, and
 at least `patch`, since the game players run changes (owner, 2026-11-19;
 `npm run version:check` enforces it).
 
-Raise the three engine pins together (`@verticopolis/engine` and the
-`engine-tooling` and `engine-conformance` tarballs of the same release), so
-the suites check the engine the game ships against that release's own
-conformance lock. `src/tests/enginePackagesAgree.test.ts` fails when the
-installed three are not the same release.
+The engine is one pin, `@verticopolis/engine`: its tooling build
+(`tooling/`) and its conformance suite (`conformance/`) ship inside the same
+package, so the suites always check the engine the game ships against that
+release's own conformance lock.
 
 ### The changelog, and the update label
 

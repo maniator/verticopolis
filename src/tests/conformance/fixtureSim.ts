@@ -7,4 +7,4 @@ import { CONFORMANCE_ROOT } from "../packagePaths";
 export const FIXTURES = readdirSync(resolve(CONFORMANCE_ROOT, "fixtures"))
   .filter((f) => f.endsWith(".vctower"))
   .sort()
-  .map((f) => `node_modules/@verticopolis/engine-conformance/fixtures/${f}`);
+  .map((f) => `node_modules/@verticopolis/engine/conformance/fixtures/${f}`);

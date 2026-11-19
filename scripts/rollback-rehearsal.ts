@@ -31,7 +31,7 @@ import { seedProfile, verifyProfile, AUTOSAVE_WAIT_SECONDS } from "./rollback-re
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_ALLOWED = join(root, "scripts", "rollback-allowed-losses.json");
 const DEFAULT_HOURS = 24;
-const FIXTURE_DIRS = ["node_modules/@verticopolis/engine-conformance/fixtures", "node_modules/@verticopolis/engine-conformance/fixtures/tdt-reddit"];
+const FIXTURE_DIRS = ["node_modules/@verticopolis/engine/conformance/fixtures", "node_modules/@verticopolis/engine/conformance/fixtures/tdt-reddit"];
 
 const fail = (message: string): never => {
   console.error(`rollback-rehearsal: ${message}`);

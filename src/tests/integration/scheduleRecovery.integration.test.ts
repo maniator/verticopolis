@@ -14,7 +14,7 @@ import { engineFromSave, look, noEngine } from "../portKit/rustEngine";
  * The review's rules on hand-built shafts are `src/game/scheduleRecovery.test.ts`.
  */
 
-const FIXTURES = "node_modules/@verticopolis/engine-conformance/fixtures";
+const FIXTURES = "node_modules/@verticopolis/engine/conformance/fixtures";
 const saveOf = (name: string) => JSON.stringify(decodeVctower(readFileSync(`${FIXTURES}/${name}.vctower`, "utf8")));
 
 const shaftsOf = (engine: EnginePort): ShaftFacts[] =>

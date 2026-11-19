@@ -16,7 +16,7 @@ declare const __TOOLING_BUILD__: boolean;
 declare const __HELP_ORIGIN__: string;
 /** True when the engine this run serves is the tooling package, with the
  *  binding's tier 3 ops (#1057): a tooling build, or a dev serve that found
- *  `@verticopolis/engine-tooling`. The boot check asks for those ops only then. */
+ *  `@verticopolis/engine/tooling`. The boot check asks for those ops only then. */
 declare const __TOOLING_ENGINE__: boolean;
 /** True only in a Vercel preview deployment's build (`VERCEL_ENV=preview`).
  *  The page then registers no service worker (see src/build/previewDeploy.ts

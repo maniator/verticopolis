@@ -92,7 +92,7 @@ describe("the engine package's tier 3 ops (#1057)", () => {
 
   it("refuses a tooling build that ships the player package", () => {
     expect(checkEngineBundle(bundle({ engineGlue: PLAYER_GLUE })).errors).toEqual([
-      "a tooling build ships the player engine package: its glue lacks setMoney, advanceClock, which the tooling tower calls (the web build of @verticopolis/engine-tooling should replace src/public/engine/)",
+      "a tooling build ships the player engine package: its glue lacks setMoney, advanceClock, which the tooling tower calls (the web build of @verticopolis/engine/tooling should replace src/public/engine/)",
     ]);
   });
 

@@ -95,7 +95,7 @@ function engineChoiceFor(command: "build" | "serve"): EngineChoice {
   // A VC_TOOLING=1 build and a dev serve take the tooling engine package in
   // place of the player one (#1057, src/build/toolingPublicDir.ts).
   const base = resolve(__dirname, "src/public");
-  const tooling = resolve(__dirname, "node_modules/@verticopolis/engine-tooling/web");
+  const tooling = resolve(__dirname, "node_modules/@verticopolis/engine/tooling/web");
   const choice = choosePublicDir({
     tooling: TOOLING_BUILD,
     serve: command === "serve",
@@ -105,7 +105,7 @@ function engineChoiceFor(command: "build" | "serve"): EngineChoice {
   });
   if (choice.kind === "missing-tooling") throw new Error(choice.why);
   if (choice.kind === "player") {
-    if (command === "serve" && !process.env.VITEST) console.warn("[serve] @verticopolis/engine-tooling is not installed, so this serve runs the player engine package: window.game's raw edits will fail. Run npm ci.");
+    if (command === "serve" && !process.env.VITEST) console.warn("[serve] @verticopolis/engine/tooling is not installed, so this serve runs the player engine package: window.game's raw edits will fail. Run npm ci.");
     return { publicDir: base, toolingEngine: false };
   }
   // A dev serve (and `vite preview`, which serves dist/ and ignores both)

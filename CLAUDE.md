@@ -99,7 +99,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   in [Verticopolis/engine](https://github.com/Verticopolis/engine) or
   [Verticopolis/components](https://github.com/Verticopolis/components), under
   that repository's CLAUDE.md, and reaches the game when a PR here raises the
-  pin in `package.json` (the three engine pins move together). Never copy
+  pin in `package.json` (the engine package carries its own tooling build
+  and conformance suite, so it is one pin). Never copy
   engine or component code back into this repository.
 - **Declare the version tier in a change note; never edit a version.** A PR that
   changes a deployed path adds `.changes/<branch-slug>.md` with `app:` keyed to

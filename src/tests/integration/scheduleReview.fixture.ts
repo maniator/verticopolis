@@ -16,7 +16,7 @@ import { engineFromSave } from "../portKit/rustEngine";
  * `scheduleReview.integration.test.ts` and `scheduleReviewClassic.integration.test.ts`.
  */
 
-export const load = (name: string) => decodeVctower(readFileSync(`node_modules/@verticopolis/engine-conformance/fixtures/${name}.vctower`, "utf8")) as SerializedGame;
+export const load = (name: string) => decodeVctower(readFileSync(`node_modules/@verticopolis/engine/conformance/fixtures/${name}.vctower`, "utf8")) as SerializedGame;
 export const memory = () => {
   const data = new Map<string, string>();
   return {

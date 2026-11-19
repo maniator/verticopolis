@@ -59,7 +59,7 @@ export function assertEnginePackage(): void {
   // The tooling package is what a VC_TOOLING=1 build serves, and dist/ is
   // what RUN_SERVER's `vite preview` serves.
   const pinned = recordedSources(resolve(root, "node_modules/@verticopolis/engine/web"));
-  const dirs = ["src/public/engine", "node_modules/@verticopolis/engine-tooling/web", ...(process.env.RUN_SERVER ? ["dist/engine"] : [])];
+  const dirs = ["src/public/engine", "node_modules/@verticopolis/engine/tooling/web", ...(process.env.RUN_SERVER ? ["dist/engine"] : [])];
   const stale = dirs.filter((d) => existsSync(resolve(root, d, "BUILD.json")) && recordedSources(resolve(root, d)) !== pinned);
   if (stale.length > 0) {
     throw new Error(`The served engine package is not the pinned @verticopolis/engine: ${stale.join(", ")}. Run \`npm install\`, then \`VC_TOOLING=1 npm run build\` again before a RUN_SERVER run.`);

@@ -7,7 +7,7 @@ import {
   readEngineIdentity,
 } from "@verticopolis/components/host/engineIdentity";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { ENGINE_TOOLING_ROOT } from "../packagePaths";
+import { ENGINE_ROOT } from "../packagePaths";
 
 /**
  * The real package's identity record (#963) read through the frontend's own
@@ -17,8 +17,9 @@ import { ENGINE_TOOLING_ROOT } from "../packagePaths";
  * same crate and flags a mismatch when it expects another.
  */
 
+// The tooling build ships inside the engine package, which holds the version.
 const installed = (
-  JSON.parse(readFileSync(resolve(ENGINE_TOOLING_ROOT, "package.json"), "utf8")) as { version: string }
+  JSON.parse(readFileSync(resolve(ENGINE_ROOT, "package.json"), "utf8")) as { version: string }
 ).version;
 
 describe.skipIf(!hasWasmPackage())(

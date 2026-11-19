@@ -16,7 +16,7 @@ import { hasWasmPackage } from "../conformance/wasmEngine";
 
 const last = <T,>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 const HOURS = 2;
-const FIXTURE_DIRS = ["node_modules/@verticopolis/engine-conformance/fixtures", "node_modules/@verticopolis/engine-conformance/fixtures/tdt-reddit"].map((d) => join(REPO_ROOT, d));
+const FIXTURE_DIRS = ["node_modules/@verticopolis/engine/conformance/fixtures", "node_modules/@verticopolis/engine/conformance/fixtures/tdt-reddit"].map((d) => join(REPO_ROOT, d));
 const ONLY = ["towerone-vip-pending.vctower", "split-tower.vctower", "TOWER5.TDT", "TOWER8.TDT"];
 
 describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () => {

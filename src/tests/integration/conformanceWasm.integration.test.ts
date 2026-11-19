@@ -11,12 +11,12 @@ import { writeAfterPassingRun, writeGoldenFile } from "../goldens/updateGate";
 
 /**
  * Engine conformance suite: every scenario of the installed
- * `@verticopolis/engine-conformance` runs on the installed engine through the
+ * `@verticopolis/engine/conformance` runs on the installed engine through the
  * WASM binding in Node and must reproduce that package's checkpoint hashes
  * (`expected.json`) and catalog digests (`catalog-digests.json`) exactly, so
  * the engine the game pins is the one the lock describes. The lock is written
  * in Verticopolis/engine, which owns it, so `VC_CONFORMANCE_UPDATE=1` refuses
- * to run here. The binding is the installed `@verticopolis/engine-tooling`;
+ * to run here. The binding is the installed `@verticopolis/engine/tooling`;
  * without it the suite skips.
  */
 
@@ -153,8 +153,8 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
   // for every scenario after it.
   it("refuses a scenario start it cannot honor with an error that leaves the module usable", () => {
     expect(() => startWasmEngine({ newGame: { seed: 1, mode: "arcade" as "classic" } })).toThrow(/classic or modern/);
-    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine-conformance/README.md" })).toThrow(/not a VCTOWER1 file/);
-    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine-conformance/fixtures/sixseven-december.vctower", mode: "arcade" as "classic" })).toThrow(/classic or modern/);
+    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine/conformance/README.md" })).toThrow(/not a VCTOWER1 file/);
+    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven-december.vctower", mode: "arcade" as "classic" })).toThrow(/classic or modern/);
     // The module still answers after the refusals: a fresh game founds and
     // hashes the same as the lock's starter.
     const want = pinned("starter-classic")?.[0];

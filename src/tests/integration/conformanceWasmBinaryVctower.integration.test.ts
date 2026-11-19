@@ -12,7 +12,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Engine } from "@verticopolis/engine-tooling/node/verticopolis_engine";
+import type { Engine } from "@verticopolis/engine/tooling/node/verticopolis_engine";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { CONFORMANCE_ROOT } from "../packagePaths";
 
