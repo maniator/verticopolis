@@ -206,6 +206,10 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
   };
 }
 
+/** The lowest star a played tower holds only after a favorable VIP visit
+ *  (`FAVORABLE_VIP_STAR` in engine-rs/src/scenario.rs). */
+export const FAVORABLE_VIP_STAR = 4;
+
 /** Start the Rust engine from a scenario's `start`: a new game by seed and mode, or a `.vctower`
  *  fixture through the import path with the mode overridden when given. */
 export const startWasmEngine: EngineStart = (start) => wasmEngine(startWasmHandle(start));
@@ -224,13 +228,20 @@ export function startWasmHandle(start: Start): WasmEngine {
   };
   if ("newGame" in start) {
     const founded = Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode);
-    // One star is the founded game itself (the other two runners do the same).
+    // One star is the founded game itself (the Rust runner, `start_sim` in
+    // engine-rs/src/scenario.rs, does the same).
     if (start.newGame.star === undefined || start.newGame.star === 1) return checked(founded, start.newGame.mode, "new game founded");
     // The binding has no star setter: save the founded game, raise the star and
-    // load it back, the route the other two runners take.
+    // load it back, the route the Rust runner takes.
     try {
-      const save = JSON.parse(founded.serialize()) as { star: number };
+      const save = JSON.parse(founded.serialize()) as { star: number; vipFavorable?: boolean; vipVisits?: number };
       save.star = start.newGame.star;
+      // A played tower reaches four stars only through a favorable VIP visit,
+      // so a start at four or five has had one, as a `.TDT` import does (#1288).
+      if (start.newGame.star >= FAVORABLE_VIP_STAR) {
+        save.vipFavorable = true;
+        save.vipVisits = 1;
+      }
       return checked(Engine.fromSave(JSON.stringify(save)), start.newGame.mode, "new game founded");
     } finally {
       founded.free();
