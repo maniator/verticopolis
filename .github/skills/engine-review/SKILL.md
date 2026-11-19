@@ -19,9 +19,9 @@ plumbing); it does not replace it.
 ## What to check, in order
 
 1. **An engine bump says what moved.** A change to the
-   `@verticopolis/engine` (or `-tooling`, `-conformance`) version in
-   `package.json` names the engine release and what changed in it, and the
-   three pins move together. A bump that moves a conformance hash or a save
+   `@verticopolis/engine` version in `package.json` names the engine release
+   and what changed in it. One pin covers the player build, the tooling
+   build (`tooling/`) and the conformance suite (`conformance/`). A bump that moves a conformance hash or a save
    field needs the matching game change in the same pull request (a refusal
    code, a card line, a fixture).
 2. **Old saves keep loading.** A change to how the game reads, writes,

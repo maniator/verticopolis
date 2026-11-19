@@ -117,7 +117,8 @@ jobs:
   # The tooling app (a VC_TOOLING=1 build, which serves the
   # @verticopolis/engine/tooling package to the browser projects, #1057),
   # built once and handed to the e2e jobs as a run artifact. npm ci installs
-  # both engine packages, so nothing here compiles Rust.
+  # the engine package, which carries the tooling build, so nothing here
+  # compiles Rust.
   tooling-app:
     needs: changes
     # Skipped only on a successful "false" from the filter (prose-only change).
