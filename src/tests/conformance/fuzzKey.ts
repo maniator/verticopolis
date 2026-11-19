@@ -22,9 +22,10 @@
  * fields are blanked) and the crate's, since a release PR (`npm run release`)
  * would otherwise restart the window with no simulation change. The engine part
  * hashes the crate through `releaseNeutral`, which drops the `[package]`
- * version from `Cargo.toml`, the crate's own version from both `Cargo.lock`
- * files, and `src/compat-record.json` (identity metadata the release rewrites,
- * not a simulation input).
+ * version from `Cargo.toml`, the crate's own version from `Cargo.lock`, and
+ * `src/compat-record.json` (identity metadata the release rewrites, not a
+ * simulation input). The consumer crate (`engine-rs/consumer/`) is outside
+ * the engine hash (#1945): a fuzz run never builds it.
  */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -167,7 +168,7 @@ function packageName(cargoToml: string): string | null {
 }
 
 /** The crate's files without what a release PR edits: its own version in the
- *  manifest and both lockfiles, and the compatibility record. A dependency's
+ *  manifest and the lockfile, and the compatibility record. A dependency's
  *  version, the edition and every other line still move the key. */
 export function releaseNeutral(crateToml: string): SourceView {
   const name = packageName(crateToml.replace(/\r\n/g, "\n"));
@@ -179,7 +180,7 @@ export function releaseNeutral(crateToml: string): SourceView {
       const i = packageVersionLine(lines);
       return i < 0 ? data : Buffer.from(lines.filter((_, j) => j !== i).join("\n"), "utf8");
     }
-    if ((label === "Cargo.lock" || label === "consumer/Cargo.lock") && own !== null) {
+    if (label === "Cargo.lock" && own !== null) {
       const lines = data.toString("utf8").split("\n");
       const drop = new Set<number>();
       lines.forEach((l, i) => {

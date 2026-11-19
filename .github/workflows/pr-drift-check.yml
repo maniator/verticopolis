@@ -244,7 +244,10 @@ jobs:
       # Advisory only (best-effort): a single sticky comment pointing the author at
       # the pending approval. Only posts when drift was actually computed, so a
       # failed capture (nondeterminism) never yields a misleading "no drift".
+      # continue-on-error keeps a failed comment from failing the drift check;
+      # the step after it turns that failure into a warning on the run (#976).
       - name: Advisory sticky comment
+        id: sticky
         if: ${{ !cancelled() && steps.drift.outcome == 'success' }}
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -267,6 +270,13 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
             }
+
+      # With continue-on-error, a failed comment leaves the step's conclusion
+      # green and only its outcome says so; without this warning the advisory
+      # would just stop appearing (#976). The drift result is unchanged.
+      - name: Warn when the advisory comment failed
+        if: ${{ !cancelled() && steps.sticky.outcome == 'failure' }}
+        run: echo "::warning title=Drift advisory not posted::The screenshot drift advisory comment failed to post; see the Advisory sticky comment step. The drift result above still stands."
 
   # Signal 2 (the approval gate). Runs ONLY when there is drift and the PR is from a
   # branch on this repo (a fork PR gets a read-only token and cannot be pushed to).

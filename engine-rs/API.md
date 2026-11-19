@@ -150,9 +150,18 @@ it, and nothing in the engine reads it or requires it:
 `sourceHash` is the SHA-256 over the engine's Rust sources and the files they
 include (`engineSourceHash` in `src/wasmhost/packageHash.ts`). A packager
 outside the web build computes the same value as follows. Take every file under
-the crate directory except `target/`, `pkg/`, hidden names, names ending in `~`
-and Markdown files, plus every file a plain `include_str!("...")` or
-`include_bytes!("...")` names. Label each file with its path relative to the
+the crate directory except build output (`target/`, `pkg/`, `pkg-player/` and
+`pkg-web-tooling/` at any depth), the `consumer/` crate at the top of the
+crate directory, hidden names, names ending in `~` and Markdown files. Add every
+file a plain `include_str!("...")` or `include_bytes!("...")` names, every module
+a plain `#[path = "..."]` attribute names (inside `cfg_attr` too, read relative
+to the naming file's folder; for such a module the
+walk did not take, also the files its own `mod name;` items load, found as rustc finds
+them), and every file under a folder a Cargo manifest's
+`path = "..."` names outside `[package.metadata]` and `[workspace.metadata]` (a
+path dependency, with the same exclusions apart from
+`consumer/`), following
+the files added in turn. Label each file with its path relative to the
 crate directory, using `/` (a file outside the crate is labeled
 `../conformance/...`). Sort the labels
 by UTF-16 code unit. For each file in that order, feed the SHA-256 the label, a

@@ -270,8 +270,11 @@ A run proves it measured the commit it names.
 4. On Linux, `git archive <sha> | tar -x -C <dir>` and
    `engineSourceHash` of `<dir>/engine-rs` must equal the recorded hash. **A
    mismatch voids the run.** The `.wasm` file's own SHA-256 is recorded for the
-   record only: the build embeds the builder's cargo registry paths, so the
-   binary differs across machines for the same sources (#1079).
+   record only. Since #1079 the build maps the checkout, the cargo home and the
+   toolchain to fixed names, so two Linux or macOS builds of one commit give
+   the same binary, but a Windows build is expected to keep `\` in the
+   remapped dependency paths, so a desktop binary can still differ from CI's
+   for the same sources.
 5. **A dirty tree voids the run.** The one exception is RUN-0a's declared
    patch (section 7). A harness at or after the cost-split PR (#1124) records
    what git reports in `environment.tree` and prints it in the report as a
