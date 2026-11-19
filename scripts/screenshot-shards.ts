@@ -173,7 +173,7 @@ export const SHARD_SECONDS: Record<string, number> = {
   appearance: 82,
   desk: 161,
   "elevator-auto": 25,
-  engine: 129,
+  engine: 271,
   features: 181,
   "fire-response": 89,
   "front-doors": 16,
@@ -184,7 +184,7 @@ export const SHARD_SECONDS: Record<string, number> = {
   "previous-versions": 32,
   showcase: 139,
   "star-up": 35,
-  "traffic-jump": 28,
+  "traffic-jump": 46,
 };
 
 /** The shards packed into {@link SHOOT_JOBS} jobs of about equal render time,
