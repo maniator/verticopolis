@@ -256,7 +256,14 @@ fn a_trip_cut_short_by_a_removed_elevator_is_no_give_up() {
 #[test]
 fn a_save_keeps_a_give_up_that_is_still_walking_back() {
     let mut sim = stranded_commuter(GameMode::Classic, 18);
-    advance(&mut sim.crowd, 0.1, &mut sim.tower);
+    // Patience runs out only in the line (#2386), so the rider walks to the
+    // shaft first and gives up there.
+    for _ in 0..600 {
+        if sim.crowd.people[0].gave_up {
+            break;
+        }
+        advance(&mut sim.crowd, 0.1, &mut sim.tower);
+    }
     assert!(sim.crowd.people[0].gave_up && sim.crowd.people[0].returning);
     let mut loaded = deserialize(&sim.serialize()).unwrap();
     assert!(loaded.crowd.people[0].gave_up, "the save carries it");

@@ -127,6 +127,8 @@ pub struct Person {
     pub dest_x: f64,
     pub wait: f64,
     pub trip_wait: f64,
+    /// The time this trip has spent waiting for a car, the clock its
+    /// patience runs on (#2386).
     pub age: f64,
     pub linger: f64,
     pub staff: bool,
@@ -479,3 +481,7 @@ impl Crowd {
 #[cfg(test)]
 #[path = "commute_stress_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "patience_tests.rs"]
+mod patience_tests;
