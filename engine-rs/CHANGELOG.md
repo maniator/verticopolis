@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.57.1 (2026-11-19)
+
+- A trip's patience (`GIVE_UP`, `STAFF_GIVE_UP`) counts only the time spent waiting for a car, in both modes, and the per-floor allowance at car speed is gone. A person's `age` is now that waiting time from the trip's start, and the give-up check runs only in the `Waiting` state (#2386).
+
 ## 1.57.0 (2026-11-19)
 
 - The monthly maintenance and Modern rent passes walk the rooms only, past the floor and lobby tiles that owe nothing, so the month roll costs 3 to 36 times less on a large tower (about 520 us to 24 us). The money, the ledger and the messages are unchanged (#1158).
