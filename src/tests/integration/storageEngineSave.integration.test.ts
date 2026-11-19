@@ -177,10 +177,11 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     const sim = load(leg, data);
     const after = JSON.parse(sim.save()) as Save;
     // The office's floor row folds into a run, so the engine stamps the
-    // floor-run version, 11. This build's newest, 12, is only for a tower
-    // with an elevator on Auto, which this one has not.
+    // floor-run version, 11. This build's newest, 13, is only for a tower
+    // whose elevators keep their 1994 settings (12 for one on Auto), which
+    // this one is not.
     const newest = parseEngineIdentity(readEngineIdentity(wasm()))!.saveVersion;
-    expect(newest).toBe(12);
+    expect(newest).toBe(13);
     expect(after.version).toBe(11);
     expect(after.money).toBe(data.money);
     expect(sim.state.tower.totalPopulation()).toBe(population);

@@ -269,6 +269,14 @@ Phases 1-3 deliver a fully working in-game scheduler on our own save format; Pha
   establish the layout before the exporter commits; until then TDT fidelity is
   best-effort with an honest report line. Owner input welcome on whether to run the
   spike now or ship Phases 1-3 first.
+  **Update 2026-11-18 (#305):** the game's own saves give the block's shape
+  without a game run: four 14-byte groups, each a weekday run and a weekend run
+  of seven (six periods and one unused byte), with the second group reading as
+  Waiting Car Response. The other groups' meanings stay unconfirmed
+  (the TDT byte map in Verticopolis/engine, `docs/tdt/tdt-byte-map.md` section 6.1). Phase 4 therefore keeps the block
+  verbatim: the importer stores a non-default block on its shaft
+  (`tdtSchedule`, save version 13) and the exporter writes it back byte for
+  byte. Decoding it into the hourly `schedule` still waits on the run.
 - **O2: default running-car count.** With no per-hour running cost in canon, a
   rational player would run all cars all the time, which makes the schedule a
   positioning tool more than an economy lever. Confirm we do not invent a running

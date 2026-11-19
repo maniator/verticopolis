@@ -32,10 +32,15 @@ describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () =
   it("makes a candidate-written save from a vctower and from an original .TDT", () => {
     expect(saves.map((s) => s.name).sort()).toEqual([...ONLY].sort());
     // A tower with a floor row in id order is written with floor runs
-    // (version 11); one with none keeps the plain stamp (7).
-    const versions = saves.map((s) => (JSON.parse(s.text) as { version: number }).version);
+    // (version 11); one with none keeps the plain stamp (7). A .TDT whose
+    // elevators keep their 1994 settings is written at 13 (#305), which a
+    // build before it refuses rather than drop the settings.
+    type Written = { version: number; transports?: { tdtSchedule?: string }[] };
+    const written = saves.map((s) => JSON.parse(s.text) as Written);
+    const keeps1994 = (w: Written) => (w.transports ?? []).some((t) => typeof t.tdtSchedule === "string");
     for (const s of saves) expect(JSON.parse(s.text), s.name).toMatchObject({ units: expect.any(Array) });
-    expect(versions.every((v) => v === 7 || v === 11), versions.join()).toBe(true);
+    const versions = written.map((w) => w.version);
+    expect(written.every((w) => (keeps1994(w) ? w.version === 13 : w.version === 7 || w.version === 11)), versions.join()).toBe(true);
     expect(versions).toContain(11);
   });
 
