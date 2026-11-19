@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 200">
+  <!-- The title screen's skyline for pages that draw it as an image (the docs
+       site's landing page). The game draws the same shapes inline
+       (src/ui/splashTemplate.ts) and colors them from the splash tokens in
+       src/styles/retro-tokens.css (an XML comment cannot hold two hyphens);
+       src/tests/splashSkyline.guard.test.ts keeps the shapes and colors equal. -->
+  <g fill="#201643" stroke="#0d0d10" stroke-width="1">
+    <path d="M-5 200 V120 h34 V98 h16 V120 h40 V200 z" />
+    <path d="M95 200 V80 h26 V56 h12 V80 h26 V200 z" />
+    <path d="M200 200 V54 h20 V30 h9 V10 h9 V30 h9 V54 h20 V200 z" />
+    <path d="M310 200 V92 h30 V68 h15 V92 h30 V200 z" />
+    <path d="M410 200 V60 h20 V36 h11 V60 h34 V200 z" />
+  </g>
+  <g fill="#ffdca0">
+    <rect x="8" y="130" width="3" height="4" /><rect x="8" y="146" width="3" height="4" />
+    <rect x="104" y="92" width="3" height="4" /><rect x="104" y="112" width="3" height="4" />
+    <rect x="214" y="66" width="3" height="4" /><rect x="214" y="90" width="3" height="4" />
+    <rect x="320" y="100" width="3" height="4" /><rect x="424" y="72" width="3" height="4" />
+  </g>
+</svg>

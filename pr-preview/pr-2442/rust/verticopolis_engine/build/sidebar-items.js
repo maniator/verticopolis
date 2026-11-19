@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["pays_for_floor"],"struct":["BuildResult","CanBuild"]};

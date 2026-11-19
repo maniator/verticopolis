@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ADD_CAR_COST","INVALID_REQUEST","TRANSPORT_FLOOR_COST"],"enum":["ExtendEnd"],"struct":["ChargeResult","ExtendResult"]};

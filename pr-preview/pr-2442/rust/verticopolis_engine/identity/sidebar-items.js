@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CRATE_NAME","IDENTITY_SCHEMA"],"fn":["crate_version","identity","identity_json"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CAR_RECORD","HEADER","PERSON_RECORD","ROOM_RECORD","RUN_RECORD","SHAFT_FIXED","STRUCTURE_HEADER","TRANSPORT_FIXED","UNIT_RECORD","VIEW_LAYOUT_VERSION"],"fn":["layout_json"],"mod":["car","header","person","room","run","shaft","structure","transport","unit"]};

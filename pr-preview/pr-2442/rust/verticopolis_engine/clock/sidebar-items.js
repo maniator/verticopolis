@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CANON","REAL_WORLD"],"enum":["CalendarKind","GameMode"],"fn":["resolve_calendar"],"struct":["Calendar","Clock"]};

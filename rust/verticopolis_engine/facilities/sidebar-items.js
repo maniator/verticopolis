@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["LOBBY_INTERVAL","LOT_WIDTH","MAX_FLOOR","MAX_LOBBY_HEIGHT","MIN_FLOOR","MODERN_ELEVATOR_SHAFT_CAP","MODERN_METRO_STATION_CAP","WALK_INS_ON"],"enum":["Kind"],"fn":["lot_flight_room","pools_for","transport_cap","transport_pools"],"static":["CLASSIC_VENUE_POOL","MODERN_POOLED_CAPS"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FLOOR","ID","KIND","WIDTH","X"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CATALOG_VERSION"],"enum":["Rent"],"fn":["catalog","catalog_digest","catalog_json","catalog_value"],"struct":["CalendarEntry","Catalog","Economy","ExterminatorFees","FacilityEntry","HaloEntry","MetroTrain","NoiseEntry","PoolEntry","Rules","Rung","SkyBridgeRule","World"]};

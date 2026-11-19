@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FLOOR_PAD"],"fn":["meta_since","structure_view"],"mod":["layout"],"struct":["PeopleWindow","ViewReader"]};
