@@ -101,6 +101,7 @@ mod pricing_split_snap;
 mod reflow_migration;
 mod remembered_waits;
 mod rental_nightclub_gripe;
+mod rental_star_coupling;
 mod retail_yardstick;
 mod review_fixes;
 mod save_hardening;
