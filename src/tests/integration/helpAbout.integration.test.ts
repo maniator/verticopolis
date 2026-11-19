@@ -264,7 +264,7 @@ describe("About… (About this game)", () => {
     expect(a.target).toBe("_blank");
     expect(a.rel).toContain("noopener");
     const url = new URL(a.href);
-    expect(url.origin + url.pathname).toBe("https://github.com/maniator/verticopolis/issues/new");
+    expect(url.origin + url.pathname).toBe("https://github.com/Verticopolis/web/issues/new");
     expect(url.searchParams.get("template")).toBe("bug_report.yml");
     expect(url.searchParams.get("version")).toMatch(/^v/);
     // The same text Copy diagnostics gives, from the block About shows.

@@ -15,7 +15,7 @@ const UA = {
 
 function fields(href: string): URLSearchParams {
   const url = new URL(href);
-  expect(url.origin + url.pathname).toBe("https://github.com/maniator/verticopolis/issues/new");
+  expect(url.origin + url.pathname).toBe("https://github.com/Verticopolis/web/issues/new");
   return url.searchParams;
 }
 

@@ -12,7 +12,7 @@ Please confirm an issue reproduces on the latest build before reporting.
 issues are visible to everyone and can put players at risk before a fix ships.
 
 Instead, report privately through GitHub's
-[Private Vulnerability Reporting](https://github.com/maniator/verticopolis/security/advisories/new):
+[Private Vulnerability Reporting](https://github.com/Verticopolis/web/security/advisories/new):
 
 1. Go to the repository's **Security** tab → **Report a vulnerability**, or use
    the link above.

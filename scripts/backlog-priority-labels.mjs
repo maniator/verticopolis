@@ -23,7 +23,7 @@
  * Usage: `node scripts/backlog-priority-labels.mjs [--dry-run]`. It talks to
  * GitHub through the `gh` CLI, which GitHub's runners ship with: the workflow
  * passes the job token as `GH_TOKEN`, and locally your `gh auth login` session
- * works. It targets `maniator/verticopolis`, whose issues the backlog cites
+ * works. It targets `Verticopolis/web`, whose issues the backlog cites
  * (in Actions, the job's `GITHUB_REPOSITORY`, which the workflow guards).
  * `--dry-run` prints the plan and changes nothing.
  *
@@ -318,7 +318,7 @@ async function main() {
   // Actions run reads GITHUB_REPOSITORY, which the job guards to this repo.
   const repo =
     (process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_REPOSITORY) ||
-    "maniator/verticopolis";
+    "Verticopolis/web";
   const backlog = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "../_bmad-output/implementation-artifacts/backlog.md",

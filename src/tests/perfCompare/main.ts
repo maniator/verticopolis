@@ -268,7 +268,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     resumes,
     interruptedAttempts,
     generatedAt: new Date().toISOString(),
-    issue: "maniator/verticopolis#972",
+    issue: "Verticopolis/web#972",
     config,
     environment,
     tsBaseline,

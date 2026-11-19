@@ -45,7 +45,7 @@ function results(ok: boolean, aa: "ts" | "wasm" | null = null): CompareResults {
   return {
     schema: 1,
     generatedAt: "2026-10-13T00:00:00.000Z",
-    issue: "maniator/verticopolis#972",
+    issue: "Verticopolis/web#972",
     config: config({ reps: 6, aa }),
     environment: {
       commit: "abc1234def",

@@ -913,7 +913,7 @@ engine source, so the engine source hash must still equal `b2786beb…`. No hand
 editing is needed: the commands below apply it with `git apply`.
 
 ```powershell
-git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "<home>\projects\vc-run0a"
+git -c core.autocrlf=false clone https://github.com/Verticopolis/web.git "<home>\projects\vc-run0a"
 cd "<home>\projects\vc-run0a"
 git checkout e25ec01
 git status --porcelain            # must print nothing
@@ -948,7 +948,7 @@ Run it after #1124 (the harness with the cost split) is merged. A/A mode has
 landed. The shape:
 
 ```powershell
-git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "<home>\projects\vc-run0b"
+git -c core.autocrlf=false clone https://github.com/Verticopolis/web.git "<home>\projects\vc-run0b"
 cd "<home>\projects\vc-run0b"
 git checkout <main-sha>
 git status --porcelain

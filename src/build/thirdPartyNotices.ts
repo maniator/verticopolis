@@ -468,7 +468,7 @@ export function renderNotices(packages: readonly NoticePackage[]): string {
     "This build of Verticopolis includes the open-source packages below.",
     "Each is listed with its version, its license and the license and notice",
     "files its authors ship with it. Verticopolis's own code is under the",
-    "license in the LICENSE file of https://github.com/maniator/verticopolis.",
+    "license in the LICENSE file of https://github.com/Verticopolis/web.",
     "",
     `Packages: ${unique.length}`,
     "",

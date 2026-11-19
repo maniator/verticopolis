@@ -66,6 +66,22 @@ The game cannot start without the engine package. On x86_64 Linux,
 `bash scripts/build-engine-wasm.sh` installs the pinned Rust toolchain and builds
 it in one step.
 
+## The Verticopolis repositories
+
+| Repository | What it holds |
+| --- | --- |
+| **[Verticopolis/web](https://github.com/Verticopolis/web)** (this one) | The game at [verticopolis.com](https://verticopolis.com), its player's manual and the release lane. Bugs and ideas from playing go here. |
+| [Verticopolis/engine](https://github.com/Verticopolis/engine) | The Rust engine as the `verticopolis-engine` crate and the `@verticopolis/engine` WebAssembly package, the conformance suite and the [engine docs](https://docs.verticopolis.com/) |
+| [Verticopolis/components](https://github.com/Verticopolis/components) | `@verticopolis/components`: the renderer, the Windows 95 windows and menus, the sprites and audio, and the engine binding |
+
+The engine and the components were split out of this repository with their
+history. Until the game builds from their packages, their code still lives
+here too (`engine-rs/`, `src/render/`, `src/ui/` and the rest), and changes
+to those folders are on hold in every repository. Each repository has its own
+issue forms; the organization-wide funding link, security policy and the
+shared PR template and issue form checks live in
+[Verticopolis/.github](https://github.com/Verticopolis/.github).
+
 ## Learn more
 
 | Playing | Building it |
