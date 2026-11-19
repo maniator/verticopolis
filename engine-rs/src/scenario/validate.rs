@@ -10,7 +10,9 @@ use serde_json::Value;
 /// classic or modern, "obj" a JSON object, "kind" any facility kind,
 /// "choice" fireRescue or bombThreat, "policy" a film policy, "target" a
 /// batch rent target (a finite number, default or noRate), "star" a whole
-/// number from 1 to 5. A trailing "?" marks the field optional.
+/// number from 1 to 5, "brush" floor or lobby, "tiles" a non-empty list of
+/// whole numbers no longer than the brush takes. A trailing "?" marks the
+/// field optional.
 fn field_fits(ty: &str, v: &Value) -> bool {
     let int = |v: &Value| v.as_i64().is_some();
     match ty {
@@ -44,6 +46,12 @@ fn field_fits(ty: &str, v: &Value) -> bool {
         }
         "end" => matches!(v.as_str(), Some("up") | Some("down")),
         "method" => matches!(v.as_str(), Some("sell") | Some("bulldoze")),
+        "brush" => matches!(v.as_str(), Some("floor") | Some("lobby")),
+        "tiles" => v.as_array().is_some_and(|tiles| {
+            !tiles.is_empty()
+                && tiles.len() <= crate::brush::BRUSH_TILE_LIMIT
+                && tiles.iter().all(|t| t.as_i64().is_some())
+        }),
         _ => unreachable!("field type {ty}"),
     }
 }
@@ -97,6 +105,12 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("floor", "int"),
             ("from", "int"),
             ("to", "int"),
+        ],
+        "paintBrush" => &[
+            ("kind", "brush"),
+            ("floor", "int"),
+            ("tiles", "tiles"),
+            ("placed", "int"),
         ],
         "buildTransport" => &[
             ("kind", "shaft"),

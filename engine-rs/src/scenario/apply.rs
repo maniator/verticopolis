@@ -54,6 +54,21 @@ pub(super) fn apply(sim: &mut Simulation, c: &Command, i: usize) -> Result<(), R
                 .map_err(failed)?;
             }
         }
+        Command::PaintBrush {
+            kind,
+            floor,
+            tiles,
+            placed,
+        } => {
+            let r = sim.paint_brush(kind_of(kind)?, *floor, tiles);
+            if r.placed != *placed {
+                return Err(failed(format!(
+                    "paintBrush {kind} @ {floor}: placed {}, expected {placed}{}",
+                    r.placed,
+                    r.reason.map(|why| format!(" ({why})")).unwrap_or_default()
+                )));
+            }
+        }
         Command::BuildTransport {
             kind,
             x,

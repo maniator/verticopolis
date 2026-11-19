@@ -47,6 +47,15 @@ pub enum Command {
         from: i64,
         to: i64,
     },
+    /// The floor and lobby brush (`Simulation::paint_brush`): `placed` is
+    /// the count the brush must lay, so a scenario says what it expects.
+    #[serde(rename = "paintBrush")]
+    PaintBrush {
+        kind: String,
+        floor: i64,
+        tiles: Vec<i64>,
+        placed: i64,
+    },
     #[serde(rename = "buildTransport")]
     BuildTransport {
         kind: String,

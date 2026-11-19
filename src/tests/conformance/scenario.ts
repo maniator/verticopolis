@@ -34,6 +34,7 @@ export type Command =
   | { op: "build"; kind: FacilityKind; floor: number; x: number; expectFail?: boolean; reason?: string }
   | { op: "buildRow"; kind: FacilityKind; floor: number; from: number; to: number }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number; expectFail?: boolean; reason?: string }
+  | { op: "paintBrush"; kind: "floor" | "lobby"; floor: number; tiles: number[]; placed: number }
   | ChargeCommand
   | TuneCommand
   | { op: "bombThreat" }
@@ -74,6 +75,7 @@ const OPS: Record<Command["op"], Spec> = {
   build: { kind: "place", floor: "int", x: "int", expectFail: "bool?", reason: "str?" },
   buildRow: { kind: "place", floor: "int", from: "int", to: "int" },
   buildTransport: { kind: "shaft", x: "int", bottom: "int", top: "int", expectFail: "bool?", reason: "str?" },
+  paintBrush: { kind: "brush", floor: "int", tiles: "tiles", placed: "int" },
   ...CHARGE_OPS,
   ...TUNE_OPS,
   bombThreat: {},
@@ -132,6 +134,9 @@ export interface ScenarioEngine extends ChargeEngine {
   setMoney(amount: number): void;
   build(kind: FacilityKind, floor: number, x: number): Outcome;
   buildTransport(kind: FacilityKind, x: number, bottom: number, top: number): Outcome;
+  /** The floor and lobby brush in one call: how many tiles it laid, and the
+   *  last refusal it met. */
+  paintBrush(kind: "floor" | "lobby", floor: number, tiles: number[]): { placed: number; reason?: string };
   sellAt(floor: number, x: number): boolean;
   /** The unit covering a tile, with the rent it charges right now. */
   unitAt(floor: number, x: number): { id: number; kind: string; rent: number } | null;
@@ -211,6 +216,13 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
     case "buildTransport": {
       const r = e.buildTransport(c.kind, c.x, c.bottom, c.top);
       expectOutcome(r, c, `buildTransport ${c.kind} @ x${c.x} ${c.bottom}-${c.top}`);
+      break;
+    }
+    case "paintBrush": {
+      // The brush lays what it can and skips the rest, so the scenario names
+      // the count it expects.
+      const r = e.paintBrush(c.kind, c.floor, c.tiles);
+      if (r.placed !== c.placed) throw new Error(`paintBrush ${c.kind} @ ${c.floor}: placed ${r.placed}, expected ${c.placed}${r.reason ? ` (${r.reason})` : ""}`);
       break;
     }
     case "addCar": case "removeCar": case "beginExtend": case "extendTransport": case "endExtend": case "removeFacility": applyCharge(e, c); break;

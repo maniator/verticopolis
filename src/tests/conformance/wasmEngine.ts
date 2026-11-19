@@ -138,6 +138,7 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     money: () => live().money(),
     setMoney: (amount) => live().setMoney(amount),
     build: (kind, floor, x) => outcome(live().build(kind, i32(floor, "floor"), i32(x, "x"))),
+    paintBrush: (kind, floor, tiles) => JSON.parse(live().paintBrush(kind, i32(floor, "floor"), JSON.stringify(tiles))) as { placed: number; reason?: string },
     buildTransport: (kind, x, bottom, top) => outcome(live().buildTransport(kind, i32(x, "x"), i32(bottom, "bottom"), i32(top, "top"))),
     // Read raw by the binding, which refuses a malformed argument itself (#996).
     sellAt: (floor, x) => live().sellAt(floor, x),

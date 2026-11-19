@@ -174,6 +174,26 @@ fn load_time_checks_match_the_typescript_runner() {
             r#"{"op":"build","kind":"office","floor":1e300,"x":4}"#,
             "floor must be int",
         ),
+        (
+            r#"{"op":"paintBrush","kind":"office","floor":2,"tiles":[1],"placed":1}"#,
+            "kind must be brush",
+        ),
+        (
+            r#"{"op":"paintBrush","kind":"floor","floor":2,"tiles":[],"placed":0}"#,
+            "tiles must be tiles",
+        ),
+        (
+            r#"{"op":"paintBrush","kind":"floor","floor":2,"tiles":[1.5],"placed":1}"#,
+            "tiles must be tiles",
+        ),
+        (
+            r#"{"op":"paintBrush","kind":"floor","floor":2,"tiles":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33],"placed":1}"#,
+            "tiles must be tiles",
+        ),
+        (
+            r#"{"op":"paintBrush","kind":"lobby","floor":1,"tiles":[1]}"#,
+            "placed must be int",
+        ),
     ] {
         assert!(scenario(bad).unwrap_err().contains(why), "{bad}");
     }

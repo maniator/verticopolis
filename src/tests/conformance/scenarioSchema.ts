@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readCatalog } from "../../engineBinding/catalog";
+import { MAX_BRUSH_TILES } from "../../simport/request";
 
 /** The Rust engine's Classic catalog as checked in (the file `catalogFor` in
  *  `src/tests/catalogFixture.ts` reads; `portReads.integration.test.ts` holds
@@ -23,9 +24,10 @@ const TRANSPORT_BY_KIND: ReadonlyMap<string, boolean> = new Map(
  *  that is not a transport, "shaft" a transport kind, "mode" classic or modern,
  *  "obj" a JSON object, "kind" any facility kind, "choice" fireRescue or
  *  bombThreat, "policy" a film policy, "target" a batch rent target (a finite
- *  number, default or noRate), "end" up or down, "method" sell or bulldoze, "star" a whole number from 1 to 5.
- *  A trailing "?" marks the field optional. */
-export type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target" | "end" | "method" | "star";
+ *  number, default or noRate), "end" up or down, "method" sell or bulldoze, "star" a whole number from 1 to 5,
+ *  "brush" floor or lobby, "tiles" a non-empty list of whole numbers no longer
+ *  than one brush takes (`MAX_BRUSH_TILES`). A trailing "?" marks the field optional. */
+export type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target" | "end" | "method" | "star" | "brush" | "tiles";
 
 function fits(type: FieldType, v: unknown): boolean {
   switch (type) {
@@ -47,6 +49,8 @@ function fits(type: FieldType, v: unknown): boolean {
     case "end": return v === "up" || v === "down";
     case "method": return v === "sell" || v === "bulldoze";
     case "star": return Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5;
+    case "brush": return v === "floor" || v === "lobby";
+    case "tiles": return Array.isArray(v) && v.length > 0 && v.length <= MAX_BRUSH_TILES && v.every((t) => Number.isInteger(t));
   }
 }
 
