@@ -19,11 +19,17 @@ import type { TrafficTier } from "../presentation/traffic";
  * touches.
  */
 
-/** @param stepRaises whether reading the engine finds a raised tower revision,
- *  as the Rust engine's undo and redo steps always leave it.
+/** @param stepRaises whether reading the engine finds a raised tower revision, as a step
+ *  that moved rooms or shafts leaves it (one that put back only settings raises none, #1802).
  *  @param won whether the tower the engine holds is already rated TOWER. */
 function standIn(tier: TrafficTier, stepRaises = true, won = false) {
-  const tower = { revision: 41, towerName: "Skyspire" };
+  const standing = new Set([7]);
+  const tower = {
+    revision: 41,
+    towerName: "Skyspire",
+    getUnit: (id: number) => (standing.has(id) ? { id } : undefined),
+    getTransport: (id: number) => (standing.has(id) ? { id } : undefined),
+  };
   return {
     lastTrafficTier: tier,
     frameErrors: [{ at: "t", message: "old tower" }],
@@ -37,8 +43,11 @@ function standIn(tier: TrafficTier, stepRaises = true, won = false) {
     // The refusal card the drag raised, still up.
     buildRefusalShowing: true,
     inspectAnchor: { tile: 3, floor: 2 } as unknown,
+    selected: null as { type: "unit" | "transport"; id: number } | null,
     clearSelection: vi.fn(),
-    inspector: { clear: vi.fn() },
+    refreshEditor: vi.fn(),
+    personCard: { close: vi.fn() },
+    inspector: { clear: vi.fn(), followStep: vi.fn() },
     onboarding: { adoptSim: vi.fn() },
     engine: { setSim: vi.fn(), followStep: vi.fn() },
     renderSim: undefined as unknown,
@@ -124,16 +133,48 @@ describe("followSwap and the tower's latches", () => {
 });
 
 describe("followSwap and what every follow refreshes", () => {
-  it("clears the selection, reads the star level and rebases the UI log for each follow kind", () => {
+  it("reads the star level and rebases the UI log for each follow kind, and clears the selection on another tower", () => {
     for (const follow of ["step", "restore", "swap"] as const) {
       const app = standIn(0);
       app.reader.header.star = 4;
       GameApp.prototype.followSwap.call(app as unknown as GameApp, follow);
-      expect(app.clearSelection, follow).toHaveBeenCalledOnce();
+      expect(app.clearSelection, follow).toHaveBeenCalledTimes(follow === "step" ? 0 : 1);
       expect((app as unknown as { lastStar: number }).lastStar, `${follow}: the palette's star level`).toBe(4);
       expect(app.ui.resetLog, `${follow}: old log entries do not replay as toasts`).toHaveBeenCalledOnce();
       expect(app.ui.update, follow).toHaveBeenCalledOnce();
     }
+  });
+});
+
+describe("followSwap and the selection through a step (#1802)", () => {
+  it("keeps a selection whose facility the step left, and reads its card again", () => {
+    for (const type of ["unit", "transport"] as const) {
+      const app = standIn(0);
+      app.selected = { type, id: 7 };
+      GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
+      expect(app.clearSelection, type).not.toHaveBeenCalled();
+      expect(app.refreshEditor, type).toHaveBeenCalledOnce();
+      expect(app.selected, type).toEqual({ type, id: 7 });
+    }
+  });
+
+  it("clears a selection whose facility the step took away", () => {
+    for (const type of ["unit", "transport"] as const) {
+      const app = standIn(0);
+      app.selected = { type, id: 8 };
+      GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
+      expect(app.clearSelection, type).toHaveBeenCalledOnce();
+      expect(app.refreshEditor, type).not.toHaveBeenCalled();
+    }
+  });
+
+  it("hands the inspector what still stands, and keeps its ✕-latch out of a reset", () => {
+    const app = standIn(0);
+    GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
+    expect(app.inspector.clear).not.toHaveBeenCalled();
+    const stands = vi.mocked(app.inspector.followStep).mock.calls[0][0] as (t: { type: "unit" | "transport"; id: number }) => boolean;
+    expect([stands({ type: "unit", id: 7 }), stands({ type: "transport", id: 7 }), stands({ type: "unit", id: 8 })]).toEqual([true, true, false]);
+    expect(app.personCard.close, "a person's card may name a room the step took").toHaveBeenCalledOnce();
   });
 });
 
@@ -173,13 +214,15 @@ describe("followSwap and the renderer", () => {
     expect([app.shownWin, app.lastTrafficTier]).toEqual([false, 0]);
   });
 
-  it("rebuilds the view under the same camera for a step that did not raise the revision", () => {
-    // The TypeScript reference engine restores a step into a fresh tower whose
-    // revision starts over, so a kept scene could miss it.
+  it("leaves the scene alone for a step that put back only settings and raised no revision (#1802)", () => {
     const app = standIn(2, false);
+    const view = { drawn: "the tower before the step" };
+    app.renderSim = view;
     GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
-    expect(app.engine.setSim).toHaveBeenCalledExactlyOnceWith(app.renderSim, { keepCamera: true });
+    expect(app.engine.setSim).not.toHaveBeenCalled();
     expect(app.engine.followStep).not.toHaveBeenCalled();
+    expect(app.renderSim).toBe(view);
+    expect(app.reader.update, "names reach the rooms through the reader").toHaveBeenCalledOnce();
     expect(app.shownWin, "still a step of the same tower").toBe(true);
   });
 });
@@ -220,6 +263,7 @@ describe("followSwap and a drag under way", () => {
       const order: string[] = [];
       app.ui.showInspector.mockImplementation(() => void order.push("refusal card"));
       app.inspector.clear.mockImplementation(() => void order.push("inspector"));
+      app.inspector.followStep.mockImplementation(() => void order.push("inspector"));
       app.engine.followStep.mockImplementation(() => void order.push("reset"));
       app.engine.setSim.mockImplementation(() => void order.push("reset"));
       app.keyboard.followTower.mockImplementation((tower: string) => void order.push(`follow: ${tower}`));

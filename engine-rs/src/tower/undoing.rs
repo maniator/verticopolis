@@ -197,9 +197,25 @@ impl Tower {
     /// there moves them into place, shifting the units after each up, in
     /// place ([`merge_appended`]); one reindex follows, so a step that
     /// returns a whole row costs one walk of the list and no second copy of
-    /// it.
-    pub(crate) fn insert_units_at(&mut self, mut inserts: Vec<(usize, Unit)>) {
+    /// it. An undo step runs it through
+    /// [`replace_units`](Self::replace_units); the tests call it alone.
+    #[cfg(test)]
+    pub(crate) fn insert_units_at(&mut self, inserts: Vec<(usize, Unit)>) {
+        self.insert_units_reindexing(inserts, usize::MAX);
+    }
+
+    /// [`insert_units_at`](Self::insert_units_at) on a list whose indexes
+    /// are stale from `stale_from` on (a removal not yet reindexed): the one
+    /// reindex starts at the first index stale or moved.
+    pub(crate) fn insert_units_reindexing(
+        &mut self,
+        mut inserts: Vec<(usize, Unit)>,
+        stale_from: usize,
+    ) {
         if inserts.is_empty() {
+            if stale_from < self.units.len() {
+                self.reindex_from(stale_from);
+            }
             return;
         }
         inserts.sort_by_key(|&(at, _)| at);
@@ -225,7 +241,7 @@ impl Tower {
         }
         self.units.extend(inserts.into_iter().map(|(_, u)| u));
         merge_appended(&mut self.units, old_len, &lands);
-        self.reindex_from(first);
+        self.reindex_from(first.min(stale_from));
         for &i in &lands {
             self.register(i);
             if self.units[i].kind == Kind::WeddingHall {

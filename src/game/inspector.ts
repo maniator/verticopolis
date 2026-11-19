@@ -40,6 +40,8 @@ export class InspectorController {
    *  by a tower swap (ids restart, so a stale latch would mute an unrelated
    *  card). */
   private inspectDismissed: { type: "unit" | "transport"; id: number } | null = null;
+  /** The pick the shown card was made from, read again after an undo or redo step. */
+  private shownPick: Picked | null = null;
 
   constructor(private readonly deps: InspectorDeps) {}
 
@@ -67,6 +69,7 @@ export class InspectorController {
       this.deps.setAnchor({ x: u.x + u.width, left: u.x, floor: u.floor + catalogFacility(kit.catalog(), u.kind).floors - 1 });
       const fresh = this.inspectTarget?.type !== "unit" || this.inspectTarget.id !== u.id;
       this.inspectTarget = { type: p.type, id: p.id };
+      this.shownPick = p;
       // The card body (title/label/status/census/diagnostics/satisfaction) is
       // the lit template in ui/templates/inspector.ts (E6-S2); the access
       // reachability, placement warnings, on-notice countdown, recycling
@@ -84,6 +87,7 @@ export class InspectorController {
       }
       this.deps.setAnchor({ x: t.x + t.width, left: t.x, floor: t.top });
       this.inspectTarget = { type: p.type, id: p.id };
+      this.shownPick = p;
       this.deps.ui.showInspector(transportInspectorTemplate(t, kit.catalog(), kit.diagnostics.transport(t.id)));
     }
   }
@@ -92,7 +96,19 @@ export class InspectorController {
   hide(): void {
     this.deps.setAnchor(null);
     this.inspectTarget = null;
+    this.shownPick = null;
     this.deps.ui.showInspector(null);
+  }
+
+  /** An undo or redo step changed the tower in place (#1802): ids stay, so the card is read
+   *  again for a facility that still `stands`, and hidden for one the step took away. The
+   *  ✕-latch stays on a facility that stands and goes with one that does not. */
+  followStep(stands: (target: { type: "unit" | "transport"; id: number }) => boolean): void {
+    if (this.inspectDismissed && !stands(this.inspectDismissed)) this.inspectDismissed = null;
+    const shown = this.shownPick;
+    if (!shown) return;
+    if (stands(shown)) this.inspectPicked(shown);
+    else this.hide();
   }
 
   /** Hide the inspector and drop the ✕-dismissal latch too — for hard resets

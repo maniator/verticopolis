@@ -1,7 +1,8 @@
 //! The undo's in-place merge, `merge_appended` in `tower/undoing.rs`, moves
 //! units that are already in the list, which the view's source scan counts
 //! as a reorder (`unit_writes`). Its one call puts back the units an undo
-//! step returns, inside `insert_units_at`, and that function moves the
+//! step returns, inside `insert_units_reindexing` (`insert_units_at` and
+//! `replace_units` both run it, #1802), and that function moves the
 //! revision after it, so every frame reader's next frame is full and no
 //! index logged before the move is read against the list after it.
 use super::source_scan_tests::{closing, engine_sources, squeeze};
@@ -20,16 +21,23 @@ fn the_undo_merge_moves_the_revision() {
     assert_eq!(callers, [UNDOING]);
     let code = &sources.iter().find(|s| s.rel == UNDOING).unwrap().code;
     assert_eq!(code.matches("merge_appended(").count(), 1, "one call");
-    let at = code.find("fn insert_units_at(").unwrap();
+    let at = code.find("fn insert_units_reindexing(").unwrap();
     let open = at + code[at..].find('{').unwrap();
     let body = &code[open..=closing(code, open).unwrap()];
-    let merge = body.find(MERGE).expect("the call is in insert_units_at");
+    let merge = body
+        .find(MERGE)
+        .expect("the call is in insert_units_reindexing");
     assert!(
-        body.starts_with("{if inserts.is_empty(){return;}"),
+        body.starts_with(
+            "{if inserts.is_empty(){if stale_from<self.units.len(){self.reindex_from(stale_from);}return;}"
+        ),
         "{body}"
     );
     let after = &body[merge..];
-    assert!(after.contains("self.reindex_from(first);"), "{after}");
+    assert!(
+        after.contains("self.reindex_from(first.min(stale_from));"),
+        "{after}"
+    );
     assert!(
         after.contains("self.revision+=lands.len()as i64;"),
         "{after}"

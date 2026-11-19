@@ -14,8 +14,8 @@ import { answerNumber, outcomeOf, STATUS_SLOT, type AnswerValue, type LineKind, 
  * the way the game sends them, with every answer pinned. A case starts a
  * tower the way the game does, runs a script of commands, reads and play,
  * and after each step records the answer (the command's record by its slot
- * names, without the generation a swap or an undo answers, which #1802
- * changes, plus the refusal text), the clock, the hashes of the state and
+ * names, without the generation slot of a swap's or an undo's answer,
+ * plus the refusal text), the clock, the hashes of the state and
  * crowd views and the hash and count of the events since the last step.
  * Each command in a script says whether it must land or be refused, so a
  * refresh cannot pin a setup build that failed or a malformed edit that
@@ -107,8 +107,9 @@ export interface SavedTransport {
 
 /** A mark the people who set out after it are told apart by: the id the
  *  crowd's next person takes at the mark, and the engine's generation,
- *  which a done swap, undo or redo moves (each can start the crowd's ids
- *  again from 1). */
+ *  which a done swap moves (it can start the crowd's ids again from 1). An
+ *  undo or redo keeps the generation and the people (#1802), so a mark
+ *  holds across one. */
 export interface PeopleMark {
   readonly nextId: number;
   readonly generation: number;
@@ -284,7 +285,7 @@ export class PortEditSession {
   /** The shafts on the routes of the people who set out after the mark
    *  and ride at least one shaft. Throws as `shaftsBetween` does. */
   ridersSince(since: PeopleMark): number[][] {
-    if (this.port.generation() !== since.generation) throw new Error(`${this.caseId}: a swap, undo or redo since the mark can start the crowd's ids again`);
+    if (this.port.generation() !== since.generation) throw new Error(`${this.caseId}: a swap since the mark can start the crowd's ids again`);
     return this.crowd()
       .people.filter((p) => p.id >= since.nextId && p.shafts.length > 0)
       .map((p) => [...p.shafts]);
@@ -301,12 +302,12 @@ export class PortEditSession {
   }
 
   /** The shafts of the route legs between two floors, either way, of the
-   *  people who set out after the mark. A swap, undo or redo since it
-   *  throws, as the ids can start again. */
+   *  people who set out after the mark. A swap since it throws, as the
+   *  ids can start again. */
   shaftsBetween(a: number, b: number, since: PeopleMark): number[] {
-    if (this.port.generation() !== since.generation) throw new Error(`${this.caseId}: a swap, undo or redo since the mark can start the crowd's ids again`);
+    if (this.port.generation() !== since.generation) throw new Error(`${this.caseId}: a swap since the mark can start the crowd's ids again`);
     const view = this.crowd();
-    if (view.nextId < since.nextId) throw new Error(`${this.caseId}: the crowd's next person id went from ${since.nextId} to ${view.nextId} with no swap, undo or redo`);
+    if (view.nextId < since.nextId) throw new Error(`${this.caseId}: the crowd's next person id went from ${since.nextId} to ${view.nextId} with no swap`);
     return shaftsBetween(view, a, b, since.nextId);
   }
 

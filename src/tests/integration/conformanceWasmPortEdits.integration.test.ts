@@ -158,31 +158,28 @@ describe.skipIf(!hasWasmPackage())("the port-edit golden on the Rust engine", ()
     expect(() => withSession((s) => s.play(0))).toThrow(/play needs a positive number of minutes, and got 0/);
   });
 
-  it("refuses to tell new people apart across a swap, an undo or a redo, or after the next person id went down, and keeps the mark across an undo or redo with nothing to step", () => {
+  it("refuses to tell new people apart across a swap or after the next person id went down, and keeps the mark across an undo or a redo", () => {
     const acrossSwap = (s: PortEditSession) => {
       const mark = s.markPeople();
       s.restore("restore the tower", s.port.serialize());
       s.shaftsBetween(0, 1, mark);
     };
-    // The escalator bulldoze as the tools send it, its own undo step.
+    expect(() => withSession(acrossSwap)).toThrow(/a swap since the mark can start the crowd's ids again/);
+    // An undo or redo keeps the generation and the crowd's ids (#1802), so
+    // the mark holds, whether it steps or has nothing to step. The crowd is
+    // grown first and plays on after, so an id that started again would show.
     const acrossStep = (which: "undo" | "redo") => (s: PortEditSession) => {
       s.capture("Bulldoze");
       s.done("bulldoze the escalator at floor 1, x 234", "demolish", s.shaftAt(1, 234).id, BULLDOZE);
       s.commit("close the bulldoze's undo step");
       if (which === "redo") s.history("undo the bulldoze", "undo", "done");
+      s.play(30);
       const mark = s.markPeople();
+      expect(mark.nextId, "people set out before the mark").toBeGreaterThan(1);
       s.history(`${which} the bulldoze`, which, "done");
+      s.play(30);
       s.shaftsBetween(0, 1, mark);
     };
-    const arms: [string, (s: PortEditSession) => void][] = [
-      ["a restore", acrossSwap],
-      ["an undo", acrossStep("undo")],
-      ["a redo", acrossStep("redo")],
-    ];
-    for (const [step, arm] of arms) expect(() => withSession(arm), `across ${step}`).toThrow(/a swap, undo or redo since the mark can start the crowd's ids again/);
-    // An undo or redo with nothing to step keeps the generation and the
-    // crowd's ids, so the mark holds. The crowd is grown first and plays on
-    // after, so an id that started again would show.
     const acrossNothing = (which: "undo" | "redo") => (s: PortEditSession) => {
       s.play(30);
       const mark = s.markPeople();
@@ -191,11 +188,14 @@ describe.skipIf(!hasWasmPackage())("the port-edit golden on the Rust engine", ()
       s.play(30);
       s.shaftsBetween(0, 1, mark);
     };
-    for (const which of ["undo", "redo"] as const) expect(() => withSession(acrossNothing(which)), `across ${which} with nothing to step`).not.toThrow();
+    for (const which of ["undo", "redo"] as const) {
+      expect(() => withSession(acrossStep(which)), `across ${which}`).not.toThrow();
+      expect(() => withSession(acrossNothing(which)), `across ${which} with nothing to step`).not.toThrow();
+    }
     const aheadOfTheCrowd = (s: PortEditSession) => {
       const mark = s.markPeople();
       s.shaftsBetween(0, 1, { ...mark, nextId: mark.nextId + 1 });
     };
-    expect(() => withSession(aheadOfTheCrowd)).toThrow(/the crowd's next person id went from \d+ to \d+ with no swap, undo or redo/);
+    expect(() => withSession(aheadOfTheCrowd)).toThrow(/the crowd's next person id went from \d+ to \d+ with no swap/);
   });
 });

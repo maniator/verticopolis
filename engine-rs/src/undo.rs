@@ -253,6 +253,19 @@ impl Step {
     pub(crate) fn weight(&self) -> usize {
         self.units.len() + self.transports.len()
     }
+
+    /// Whether applying the step moves anything the structure is read from:
+    /// a room or a shaft out or back, any shaft's settings, or a room's
+    /// subtype (a sky bridge's look is drawn from it). A step that puts back
+    /// only a room's rent, name, No Rate, films or ticket price moves none
+    /// (#1802).
+    pub(crate) fn moves_structure(&self) -> bool {
+        !self.transports.is_empty()
+            || self.units.iter().any(|img| match &img.change {
+                UnitChange::Restore { want, left } => want.subtype != left.subtype,
+                UnitChange::TakeOut(_) | UnitChange::PutBack(_) => true,
+            })
+    }
 }
 
 /// How far apart two builds' ages sit (`Returns::age_of`): room for every

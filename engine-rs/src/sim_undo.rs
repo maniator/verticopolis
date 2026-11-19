@@ -281,7 +281,10 @@ impl Simulation {
         // An elevator's extend gesture bills each floor once against its
         // high-water mark; a step moves the span, so the mark goes with it.
         self.end_extend();
-        self.tower.revision += 1;
+        // Settings alone raise no revision, as their edits raise none (#1802).
+        if step.moves_structure() {
+            self.tower.revision += 1;
+        }
         self.tower.meta_revision += 1;
         back.caps_held = caps_held(&self.tower, &back);
         back.lobby_roots = joined_roots(&self.tower, &back);
@@ -337,7 +340,7 @@ impl Simulation {
                 built: img.built,
             });
         }
-        self.tower.remove_units(&out);
+        // Settings while every index stands, then one walk of the tail (#1802).
         for (k, id, want, left) in put {
             self.tower.put_unit_facts(id, want, left);
             if let (Some(u), UnitChange::Restore { left, .. }) =
@@ -346,7 +349,7 @@ impl Simulation {
                 *left = UnitFacts::of(u);
             }
         }
-        self.tower.insert_units_at(inserts);
+        self.tower.replace_units(&out, inserts);
         for img in &step.units {
             match self.tower.get_unit(img.id) {
                 Some(u) if u.state == UnitState::Construction => {
