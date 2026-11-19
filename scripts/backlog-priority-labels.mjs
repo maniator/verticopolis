@@ -23,7 +23,7 @@
  * Usage: `node scripts/backlog-priority-labels.mjs [--dry-run]`. It talks to
  * GitHub through the `gh` CLI, which GitHub's runners ship with: the workflow
  * passes the job token as `GH_TOKEN`, and locally your `gh auth login` session
- * works. It targets `maniator/verticopolis`, whose issues the backlog cites
+ * works. It targets `Verticopolis/web`, whose issues the backlog cites
  * (in Actions, the job's `GITHUB_REPOSITORY`, which the workflow guards).
  * `--dry-run` prints the plan and changes nothing.
  *
@@ -42,7 +42,9 @@ const HEADER =
   "| Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |";
 
 /** Issue number to the priority its row records. Rows without a `#N` in the GH
- *  column (finished rows carry `—`) are skipped; backlogIssueMirror.test.ts
+ *  column (finished rows carry `—`) are skipped, and so are rows citing
+ *  `Verticopolis/engine#N` or `Verticopolis/components#N`: those issues live in
+ *  another repository, which this job's token cannot label; backlogIssueMirror.test.ts
  *  already fails CI on any other GH value and on a malformed row. A row whose
  *  Priority is not P1/P2/P3 is reported in `errors` rather than guessed. Pipes
  *  escaped as `\|` inside Notes do not split cells, matching that test. */
@@ -318,7 +320,7 @@ async function main() {
   // Actions run reads GITHUB_REPOSITORY, which the job guards to this repo.
   const repo =
     (process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_REPOSITORY) ||
-    "maniator/verticopolis";
+    "Verticopolis/web";
   const backlog = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "../_bmad-output/implementation-artifacts/backlog.md",

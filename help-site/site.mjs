@@ -36,7 +36,7 @@ export function siteHref(href, base = HELP_BASE, gameOrigin = GAME_ORIGIN) {
  *  rules as code. */
 export const ENGINE_DOCS = "https://docs.verticopolis.com/";
 
-export const GITHUB_ISSUES = "https://github.com/maniator/verticopolis/issues/new/choose";
+export const GITHUB_ISSUES = "https://github.com/Verticopolis/web/issues/new/choose";
 
 /** The owner's GitHub Sponsors page, the tip jar the game's splash also links
  *  (SPONSOR_URL in src/ui/splashTemplate.ts; a test holds the two equal). */

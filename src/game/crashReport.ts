@@ -183,5 +183,5 @@ export function bugReportUrl(details: Pick<CrashDetails, "version" | "crash">): 
       "I am attaching it to this issue by dragging the zip file into this text box.",
     ].join("\n"),
   });
-  return `https://github.com/maniator/verticopolis/issues/new?${params.toString()}`;
+  return `https://github.com/Verticopolis/web/issues/new?${params.toString()}`;
 }

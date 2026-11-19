@@ -194,7 +194,7 @@ describe.each(Object.entries(WELCOME_MESSAGES))(
     const posted = renderWelcome(
       readFileSync(resolve(root, path), "utf8"),
       "newcomer",
-      "maniator/verticopolis",
+      "Verticopolis/web",
     );
     const links = [...posted.matchAll(/\]\((https:\/\/[^)]+)\)/g)].map(
       (m) => m[1],
@@ -208,7 +208,7 @@ describe.each(Object.entries(WELCOME_MESSAGES))(
 
     it("links CONTRIBUTING.md and the good first issue and help wanted lists", () => {
       expect(links).toContain(
-        "https://github.com/maniator/verticopolis/blob/main/CONTRIBUTING.md",
+        "https://github.com/Verticopolis/web/blob/main/CONTRIBUTING.md",
       );
       const linked = links.flatMap((link) => {
         const m = /label%3A%22(.+?)%22/.exec(link);
@@ -220,7 +220,7 @@ describe.each(Object.entries(WELCOME_MESSAGES))(
     it("links only files and labels that exist", () => {
       for (const link of links) {
         expect(
-          link.startsWith("https://github.com/maniator/verticopolis/"),
+          link.startsWith("https://github.com/Verticopolis/web/"),
           link,
         ).toBe(true);
         const blob = /\/blob\/main\/(.+)$/.exec(link);

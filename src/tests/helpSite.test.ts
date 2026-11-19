@@ -70,7 +70,7 @@ describe("the side menu", () => {
     const entries = flatten(sidebar);
     const byLabel = (label: string) => entries.find((e) => "label" in e && e.label === label);
     expect(byLabel("Release notes")).toMatchObject({ link: "/changelog/" });
-    expect(byLabel("Report a problem")).toMatchObject({ link: expect.stringContaining("github.com/maniator/verticopolis/issues") });
+    expect(byLabel("Report a problem")).toMatchObject({ link: expect.stringContaining("github.com/Verticopolis/web/issues") });
     expect(entries.some((e) => "slug" in e && e.slug === "privacy")).toBe(true);
   });
 
@@ -303,7 +303,7 @@ describe("a help page's links in each build", () => {
   });
 
   it("never touches a link to another site, a section or a relative path", () => {
-    for (const href of ["https://github.com/maniator/verticopolis", "//cdn.example/x.js", "#spa", "hotels/", "mailto:a@b.c"]) {
+    for (const href of ["https://github.com/Verticopolis/web", "//cdn.example/x.js", "#spa", "hotels/", "mailto:a@b.c"]) {
       expect(siteHref(href, "", "https://verticopolis.com")).toBe(href);
     }
   });
@@ -385,7 +385,7 @@ describe("isSponsorLink (the help site's sponsor_click listener)", () => {
   });
 
   it("ignores every other link, including look-alike paths and hosts", () => {
-    expect(isSponsorLink("https://github.com/maniator/verticopolis")).toBe(false);
+    expect(isSponsorLink("https://github.com/Verticopolis/web")).toBe(false);
     expect(isSponsorLink("https://github.com/sponsors/maniatorx")).toBe(false);
     expect(isSponsorLink("https://github.com/sponsors")).toBe(false);
     expect(isSponsorLink("https://example.com/sponsors/maniator")).toBe(false);
@@ -422,7 +422,7 @@ describe("sponsorTapListener (the help site's sponsor_click listener)", () => {
     const track = vi.fn();
     const listen = sponsorTapListener(track);
     listen(tap("auxclick", linkTo(SPONSOR_URL), 2));
-    listen(tap("click", linkTo("https://github.com/maniator/verticopolis")));
+    listen(tap("click", linkTo("https://github.com/Verticopolis/web")));
     listen(tap("click", document.createElement("p")));
     expect(track).not.toHaveBeenCalled();
   });

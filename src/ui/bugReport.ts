@@ -18,7 +18,7 @@ import type { GameMode } from "../shared/types";
  * every field on GitHub, and only their own submit sends the report.
  */
 
-const NEW_ISSUE = "https://github.com/maniator/verticopolis/issues/new";
+const NEW_ISSUE = "https://github.com/Verticopolis/web/issues/new";
 
 /** The bug form's Browser choices (.github/ISSUE_TEMPLATE/bug_report.yml). */
 export const BROWSER_OPTION = {

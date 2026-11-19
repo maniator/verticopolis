@@ -79,7 +79,7 @@ describe("crash report packaging", () => {
 
   it("bugReportUrl targets the bug-report form with the version and attach instructions prefilled", () => {
     const url = new URL(bugReportUrl({ version: "1.20.0", crash: { ...CRASH, repeat: true } }));
-    expect(url.origin + url.pathname).toBe("https://github.com/maniator/verticopolis/issues/new");
+    expect(url.origin + url.pathname).toBe("https://github.com/Verticopolis/web/issues/new");
     expect(url.searchParams.get("template")).toBe("bug_report.yml");
     expect(url.searchParams.get("version")).toBe("1.20.0");
     const what = url.searchParams.get("what-happened")!;

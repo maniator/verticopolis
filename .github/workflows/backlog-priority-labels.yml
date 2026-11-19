@@ -50,7 +50,7 @@ concurrency:
 
 jobs:
   sync:
-    if: github.repository == 'maniator/verticopolis' && github.ref == 'refs/heads/main'
+    if: github.repository == 'Verticopolis/web' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # A full relabel of every row-cited issue is about 400 paced writes.
     timeout-minutes: 30

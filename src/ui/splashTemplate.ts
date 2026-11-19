@@ -23,9 +23,10 @@ import { trackAppAction } from "../analytics";
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
 
 /** Where the splash's Sponsor link goes: the owner's GitHub Sponsors page, the
- *  same account `.github/FUNDING.yml` names. The help site's Support page links
- *  the same address (help-site/site.mjs, SPONSOR_URL), and a test holds the two
- *  equal. The game stays free and nothing in it is locked; this is a tip jar. */
+ *  same account the org-wide `.github/FUNDING.yml` (in Verticopolis/.github)
+ *  names. The help site's Support page links the same address
+ *  (help-site/site.mjs, SPONSOR_URL), and a test holds the two equal. The game stays
+ *  free and nothing in it is locked; this is a tip jar. */
 export const SPONSOR_URL = "https://github.com/sponsors/maniator";
 
 /** sessionStorage key that remembers this tab launched as the Android app, so

@@ -7,11 +7,17 @@ contact_links:
     url: https://verticopolis.com
     about: Try the live build before filing. The bug may already be fixed.
   - name: 🔎 Search existing issues
-    url: https://github.com/maniator/verticopolis/issues?q=is%3Aissue
+    url: https://github.com/Verticopolis/web/issues?q=is%3Aissue
     about: Check whether your bug or idea has already been reported.
+  - name: ⚙️ Report a problem in the simulation engine
+    url: https://github.com/Verticopolis/engine/issues/new/choose
+    about: For developers building on the engine package. A problem you saw while playing goes here in this repository.
+  - name: 🧩 Report a problem in the components package
+    url: https://github.com/Verticopolis/components/issues/new/choose
+    about: For developers building on @verticopolis/components. A problem you saw while playing goes here in this repository.
   - name: 📖 Engine docs
     url: https://docs.verticopolis.com
     about: The Rust engine's developer docs, for building a frontend or tool on the engine package.
   - name: 🔐 Report a security vulnerability
-    url: https://github.com/maniator/verticopolis/security/advisories/new
+    url: https://github.com/Verticopolis/web/security/advisories/new
     about: Privately disclose a security issue. Please don't open a public issue for vulnerabilities; see SECURITY.md.

@@ -27,6 +27,10 @@ const BACKLOG = resolve(
   "../../_bmad-output/implementation-artifacts/backlog.md",
 );
 
+/** A GH cell: `#N` here, or `Verticopolis/engine#N` / `Verticopolis/components#N`
+ *  for an issue that moved in the repository split. */
+const ISSUE_REF = /^(?:Verticopolis\/(?:engine|components))?#\d+$/;
+
 const HEADER = "| Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |";
 const SEPARATOR = "| ---- | ----- | -- | ---- | ---- | -------- | -------- | ----- | ------ | ----- |";
 /** Columns per HEADER; rows split into COLUMNS + 2 parts (edge-pipe empties). */
@@ -79,7 +83,7 @@ describe("backlog issue mirror", () => {
   it("every unresolved row carries a GitHub issue reference in the GH column", () => {
     const bad = tableRows()
       .filter((r) => r.cells.length === PARTS && UNRESOLVED.has(r.cells[9].toLowerCase()))
-      .filter((r) => !/^#\d+$/.test(r.cells[3]));
+      .filter((r) => !ISSUE_REF.test(r.cells[3]));
     expect(bad.map((r) => `${r.cells[2]} [${r.cells[9]}] GH=${JSON.stringify(r.cells[3])}`)).toEqual([]);
   });
 
@@ -92,7 +96,7 @@ describe("backlog issue mirror", () => {
 
   it("no two rows share an issue number", () => {
     const refs = tableRows()
-      .filter((r) => r.cells.length === PARTS && /^#\d+$/.test(r.cells[3]))
+      .filter((r) => r.cells.length === PARTS && ISSUE_REF.test(r.cells[3]))
       .map((r) => r.cells[3]);
     const dupes = refs.filter((n, i) => refs.indexOf(n) !== i);
     expect([...new Set(dupes)]).toEqual([]);

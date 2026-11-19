@@ -19,7 +19,7 @@ You are free to:
 Suggested attribution:
 
 > "Verticopolis" assets by maniator
-> (https://github.com/maniator/verticopolis), licensed under CC BY 4.0.
+> (https://github.com/Verticopolis/web), licensed under CC BY 4.0.
 
 - Human-readable summary: https://creativecommons.org/licenses/by/4.0/
 - Full legal code: https://creativecommons.org/licenses/by/4.0/legalcode

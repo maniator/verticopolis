@@ -90,7 +90,7 @@ describe("crash screen wording and wiring", () => {
   it("Reload fires the recovery callback, the report link is prefilled, and focus lands in the dialog", () => {
     const { opts, card } = show();
     const link = card.querySelector<HTMLAnchorElement>('[data-act="report"]')!;
-    expect(link.href).toContain("github.com/maniator/verticopolis/issues/new");
+    expect(link.href).toContain("github.com/Verticopolis/web/issues/new");
     expect(link.href).toContain("template=bug_report.yml");
     const reload = card.querySelector<HTMLButtonElement>('[data-act="reload"]')!;
     expect(document.activeElement).toBe(reload);

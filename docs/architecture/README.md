@@ -8,7 +8,7 @@ diagrams. The pages here go deeper into one system each.
 
 ```mermaid
 flowchart LR
-    subgraph repo["maniator/verticopolis"]
+    subgraph repo["Verticopolis/web"]
         Engine["engine-rs/<br/>Rust simulation"]
         Web["src/<br/>the web game (TypeScript)"]
         Help["help-site/<br/>player manual"]

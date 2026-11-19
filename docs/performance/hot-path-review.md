@@ -285,7 +285,7 @@ engine did, #1875). Every other removal is a finding.
 The table lists the caches, indexes and counters on the hot paths today. Its
 TypeScript column is a record of where each one came from: that engine was
 deleted in #1875, so its paths resolve only at commit
-[`a5d0048`](https://github.com/maniator/verticopolis/tree/a5d004820ae620e1f70663449286bbf733772962/src/engine),
+[`a5d0048`](https://github.com/Verticopolis/web/tree/a5d004820ae620e1f70663449286bbf733772962/src/engine),
 the last before #1956 removed `src/engine/`. Rows with "none" there are
 Rust-only,
 with their Rust status at 9cd44d1 (`main` once #1139 merged) unless a row
