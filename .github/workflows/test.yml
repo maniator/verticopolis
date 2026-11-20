@@ -208,6 +208,12 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
         run: npm run typecheck
 
+      # The docs site's skyline image is written from the shapes the splash
+      # draws and the splash colors; a stale copy shows as a diff here.
+      - name: Splash skyline image
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
+        run: npm run skyline:check
+
       # This job only proves the bundle builds, so it opts out of the engine
       # requirement scripts/verify-precache.ts puts on every build (the
       # e2e-general job's player build covers the engine package). The build

@@ -39,6 +39,7 @@
     "verify:dist": "node scripts/gen-third-party-notices.ts && node scripts/verify-public-files.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-engine-bundle.ts && node scripts/verify-assetlinks.ts",
     "release": "node scripts/release.ts",
     "version:check": "node scripts/version-check.ts",
+    "skyline:check": "node scripts/gen-splash-skyline.ts && git diff --exit-code -- src/public/splash-skyline.svg",
     "pr:check": "node scripts/pr-template-check.ts",
     "issue:check": "node scripts/issue-form-check.ts",
     "test:wasm": "npm run test:wasm:host && npm run test:port",
