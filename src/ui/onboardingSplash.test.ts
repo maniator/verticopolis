@@ -245,7 +245,7 @@ describe("a tower swapped in without the player choosing it (#874)", () => {
   }
   const sim = {} as Parameters<OnboardingController["adoptSim"]>[0];
 
-  it("keeps the title screen up for the WASM engine's fallback or an undo restore", () => {
+  it("keeps the title screen up for the engine's fallback or an undo restore", () => {
     const { ctl, opts } = controllerWithSplash();
     const pauses = opts.pauseForSplash.mock.calls.length; // the splash's own
     ctl.adoptSim(sim, true);

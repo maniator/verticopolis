@@ -38,7 +38,7 @@ describe("buildDiagnostics", () => {
     expect(r.text).toContain("Verticopolis diagnostics");
   });
 
-  it("names no engine, and no TypeScript engine, when the Rust engine is not running (#1875)", () => {
+  it("names no engine when the Rust engine is not running", () => {
     const r = buildDiagnostics({ ...base, boot: { build: "wasm-only", engine: "none", failure: null } });
     expect(r.state).toBe("not-running");
     expect(row(r, "Engine in use")).toEqual(["not running"]);
@@ -46,7 +46,7 @@ describe("buildDiagnostics", () => {
     expect(r.text).not.toMatch(/TypeScript|fallback/i);
   });
 
-  it("reports a healthy WASM engine with every field of its record", () => {
+  it("reports a healthy Rust engine with every field of its record", () => {
     const r = buildDiagnostics({
       ...base,
       boot: wasmBoot(),

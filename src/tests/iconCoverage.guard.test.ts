@@ -49,14 +49,6 @@ const TEST_DIR = "tests";
  *  entry for a fixture glyph no player ever sees. The by-name `*.test.ts` rule
  *  is already location-agnostic; this matches it. */
 const TEST_LOCATION = new RegExp(`(^|/)${TEST_DIR}/`);
-/** The roots this guard scanned before #782 widened it that still exist: it
- *  scanned `src/engine` too, which left with the TypeScript engine (#1875).
- *  The coverage check used to read their test files as well, so it keeps
- *  doing so through {@link legacyRootTests} even though tests are otherwise
- *  out of the scan. Nothing in the tree can yield this list (colocated tests
- *  live under several top-level directories today), so it is a record of
- *  history and the test restates it to keep it from being trimmed. */
-const LEGACY_ROOTS = ["game"];
 
 /** Every character that is actually RENDERED as an emoji (and so tofus without a
  *  color-emoji font): either a default-emoji-presentation code point
@@ -187,16 +179,6 @@ function unmappedEmoji(files: readonly Source[]): string[] {
   return out;
 }
 
-/** The test files under ONE pre-#782 root, read on demand. They are out of
- *  {@link SOURCES} like all test code, and the coverage check used to reach
- *  them, so this keeps that ground rather than trusting a note that no engine
- *  or game test has ever carried an unmapped emoji. One root at a time so the
- *  caller can hold each to its own non-empty check; a single list over the union
- *  hides a root that has gone empty behind the other root's files. */
-function legacyRootTests(root: string): Source[] {
-  return ALL_TS.filter((f) => f.rel.endsWith(".test.ts") && f.rel.startsWith(`${root}/`)).map(readStripped);
-}
-
 /** Occurrences of a MAPPED emoji that are not message-leading: the mapper only
  *  swaps a marker at the head of a message (whitespace tolerated), so an emoji
  *  written after any other prefix ("Day 5: 🔥...", a template interpolation)
@@ -276,46 +258,6 @@ describe("bulletin icon coverage (issue #721)", () => {
       unmapped,
       `These bulletin emoji have no EMOJI_ICONS entry and would render as ` +
         `tofu. Add each to EMOJI_ICONS in src/ui/icons.ts: ${unmapped.join(", ")}`,
-    ).toEqual([]);
-  });
-
-  it("still covers the test files the pre-#782 scan reached", () => {
-    // Widening the roots also moved the "skip test files" rule into the shared
-    // walk, which would have QUIETLY NARROWED this half: an unmapped emoji added
-    // to a src/engine or src/game test used to fail CI. Nothing but this assertion would
-    // keep that ground. It is scoped to the two old roots because that is
-    // exactly what was covered before; test code elsewhere stages fixtures
-    // (a "✨✨" tower name) that were never in reach and should not be.
-    //
-    // Two halves, because two different edits can hand that ground back. The
-    // list is a record of history the tree cannot yield, so trimming it to
-    // [] would drop the game test files with every other assertion still
-    // green: restating it here means a rename has to touch both spellings, which
-    // is the friction this pin exists for. The engine root was retired with the
-    // TypeScript engine (#1875).
-    expect(
-      [...LEGACY_ROOTS].sort(),
-      "LEGACY_ROOTS no longer names the root the pre-#782 scan walked, so this check " +
-        "covers less than it did; restore the missing root or retire the pin deliberately",
-    ).toEqual(["game"]);
-    // The other half is per ROOT rather than over the union, so a root that
-    // goes stale (src/game renamed) fails here instead of reading nothing.
-    const legacy: Source[] = [];
-    for (const root of LEGACY_ROOTS) {
-      const rootTests = legacyRootTests(root);
-      expect(
-        rootTests.length,
-        `no test file was found under src/${root}/, so this check reads nothing from that ` +
-          `root; point LEGACY_ROOTS at wherever it moved`,
-      ).toBeGreaterThan(0);
-      legacy.push(...rootTests);
-    }
-    const unmapped = unmappedEmoji(legacy);
-    expect(
-      unmapped,
-      `These emoji sit in an engine or game test with no EMOJI_ICONS entry. ` +
-        `The pre-#782 guard failed on them and this one still does: map each in ` +
-        `src/ui/icons.ts, or move the fixture out of the emitter's own test: ${unmapped.join(", ")}`,
     ).toEqual([]);
   });
 

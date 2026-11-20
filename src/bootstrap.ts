@@ -278,7 +278,7 @@ function afterFirstFrame(work: () => void): void {
  *  imports no `GameApp` value and stays cycle-free. */
 export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
   if (typeof document === "undefined") return Promise.resolve();
-  // Async so the WASM engine can load before the game constructs. The rethrow
+  // Async so the engine can load before the game constructs. The rethrow
   // below therefore becomes a REJECTION rather than a
   // synchronous throw, which is still captured: `installErrorTracking` binds
   // `unhandledrejection` alongside `error` (see analyticsErrors.ts), and it is
@@ -507,7 +507,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     }
   };
   // Returns the boot promise rather than firing and forgetting it. `boot` became
-  // async so the WASM engine can load before the game constructs, and
+  // async so the engine can load before the game constructs, and
   // its rethrow would otherwise be a floating rejection nothing could observe:
   // not the caller, and not a test.
   //

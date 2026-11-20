@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { activeEngine, engineSuffix, refreshSplashVersion, versionLine } from "./engineLabel";
+import { engineHosted, engineSuffix, refreshSplashVersion, versionLine } from "./engineLabel";
 import { IDENTITY_FIXTURE } from "./engineIdentity.fixture";
 import { deferEngineIdentity, publishBootState, type EngineBootState } from "./engineBoot";
 import { shortId } from "@verticopolis/engine/host/enginePackageRecord";
 
 describe("engine label", () => {
   it("names the Rust engine before it reports anything, since it is the only engine", () => {
-    expect(activeEngine({})).toBe("ts");
+    expect(engineHosted({})).toBe(false);
     expect(engineSuffix({})).toBe(" · Rust engine");
     expect(versionLine("2.29.0", {})).toBe("v2.29.0 · Rust engine");
   });
@@ -23,7 +23,7 @@ describe("engine label", () => {
     ).toBe(" · Rust engine");
   });
 
-  it("never names the TypeScript engine, which no build carries (#1875), and says when the Rust engine stopped", () => {
+  it("says when the Rust engine stopped", () => {
     const hash = "cd".repeat(32);
     const v = IDENTITY_FIXTURE.crate.version;
     const identity = JSON.stringify(IDENTITY_FIXTURE);
@@ -59,11 +59,11 @@ describe("engine label", () => {
     expect(engineSuffix({ __vcEngineBoot: { build: "switchable", engine: "ts" } })).toBe(" · Rust engine");
   });
 
-  it("names the WASM engine only while a tower is hosted", () => {
+  it("reads the engine as hosted only while a tower is attached, and names it the same either way", () => {
     const hosted = { __vcEngine: { status: { hosted: true } } };
     const idle = { __vcEngine: { status: { hosted: false } } };
-    expect(activeEngine(hosted)).toBe("wasm");
-    expect(activeEngine(idle)).toBe("ts");
+    expect(engineHosted(hosted)).toBe(true);
+    expect(engineHosted(idle)).toBe(false);
     expect(versionLine("2.29.0", hosted)).toBe("v2.29.0 · Rust engine");
     expect(versionLine("2.29.0", idle)).toBe("v2.29.0 · Rust engine");
   });
