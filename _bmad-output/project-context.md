@@ -51,7 +51,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   injection seam, no host-command bridge, no shell save store, no desktop consent
   flow and no `/api/ingest/desktop` route. Do not reintroduce a build mode or a
   wrapper-detection branch: other frontends consume the Rust engine
-  (`engine-rs/`, the `verticopolis-engine` crate) directly rather than wrapping
+  (`engine-rs/` in Verticopolis/engine, the `verticopolis-engine` crate) directly rather than wrapping
   this web build. Historical planning documents that describe the wrapper epics
   stay as records.
 - Store configs, CI signing, and anything monetization-shaped never live here.
@@ -59,14 +59,15 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   stays `web`.
 
 ## Where the truth lives (engine)
-- **The Rust engine (`engine-rs/`) is the source of truth for gameplay rules, caps and
+- **The Rust engine (`engine-rs/` in [Verticopolis/engine](https://github.com/Verticopolis/engine);
+  every `engine-rs/` path in this file is in that repository) is the source of truth for gameplay rules, caps and
   tuning**: `engine-rs/src/facilities.rs` (lot 375 wide, floors −9…100, per-facility
   cost/width/minStar/population, build caps), `engine-rs/src/star.rs` (`STAR_THRESHOLDS`,
   `TOWER_POPULATION`) and `engine-rs/src/rules.rs` with its `rules/` submodules (the Classic and Modern rule values).
   The web UI reads them through the engine's catalog. Quote numbers from there, never
   hard-code duplicates.
 - The TypeScript reference engine (`src/engine/`) was deleted in #1875; every rule and
-  its tests live in `engine-rs/`. Where things are:
+  its tests live in `engine-rs/` in Verticopolis/engine. Where things are:
   - `engine-rs/src/sim.rs`, `sim_loop.rs`, `clock.rs`, `fixed_step.rs`: the clock, the step
     loop and pacing; `star.rs`: star evaluation; `events*.rs`: VIP, fire, bomb, thief.
   - `engine-rs/src/tower.rs` and `tower/`: placement and geometry (`is_supported`),
@@ -140,7 +141,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
-  The Rust engine in `engine-rs/` follows these rules with no grandfathered
+  The Rust engine (`engine-rs/` in Verticopolis/engine) follows these rules with no grandfathered
   comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Version tier in a change note:** a PR never edits a version. It adds

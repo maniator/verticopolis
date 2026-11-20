@@ -40,12 +40,14 @@ the PR that adds one adds it to the table too (owner, 2026-11-19, #1203).
 
 The game is built from three repositories, and this page governs all three.
 A row's paths are in Verticopolis/web unless its surface names another
-repository.
+repository. Every `engine-rs/` path on this page, in this section, the later
+sections and the cache table, is in Verticopolis/engine.
 
 | Surface | Paths |
 | --- | --- |
 | Rust engine and its build (Verticopolis/engine) | `engine-rs/src/`, `engine-rs/Cargo.toml`, `Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
 | WASM binding (Verticopolis/engine) | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs` |
+| The package's TypeScript layer (Verticopolis/engine) | `packages/verticopolis-engine/src/` (the binding, the host, the port, the model and the catalog reads), apart from `testing/` and `fixtures/` |
 | Binding and hosts (Verticopolis/components) | `src/engineBinding/`, `src/wasmhost/`, `src/simport/` |
 | Rendering and audio (Verticopolis/components) | `src/render/`, `src/presentation/`, `src/catalog/`, `src/model/`, `src/events/`, `src/audio/` |
 | App build settings (which engine and code paths ship) | `vite.config.ts`, `src/build/` (the build modules it imports) |
