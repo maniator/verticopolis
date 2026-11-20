@@ -1,0 +1,83 @@
+name: CodeQL
+
+# Code scanning with the same shape as Verticopolis/engine and
+# Verticopolis/components: the default query suite, no build
+# (build-mode none), dependency caching, a weekly scheduled run, and one
+# category per language (/language:<name>). The repository's Python
+# (vendored agent tooling and the SimTower harness scripts) and the harness's
+# one C file are local tools that ship nothing, so they are not analyzed.
+#
+# - A push to main always analyzes, so main has an analysis for every commit
+#   and a pull request is compared against it.
+# - Every pull request runs each Analyze job, so the checks always report and
+#   can be required. When every changed file is Markdown, the steps after
+#   Scope skip and the job finishes green without an analysis: no CodeQL
+#   extractor reads Markdown, so the result could not change. A new step here
+#   needs the same `if`.
+# - No merge queue is in use. If one is turned on and these checks are
+#   required, add the merge_group event here as test.yml has it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "29 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  # The event keeps a scheduled run from superseding a pending push to main.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, javascript-typescript]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The scope check diffs the merge commit against its base parent.
+          fetch-depth: 2
+      - name: Scope
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          run=true
+          if [ "$EVENT" = pull_request ]; then
+            # A pull request checks out its merge commit; its first parent is
+            # the base it merges into, so this is exactly what the PR changes.
+            if changed="$(git diff --name-only --no-renames HEAD^1 HEAD)" && [ -n "$changed" ]; then
+              echo "Changed files:"; echo "$changed"
+              if ! grep -vE '\.md$' <<<"$changed" >/dev/null; then run=false; fi
+            else
+              echo "::warning::the pull request's diff could not be read; running every step"
+            fi
+          fi
+          echo "run=$run"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+      - if: steps.scope.outputs.run == 'true'
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          dependency-caching: true
+      - if: steps.scope.outputs.run == 'true'
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
