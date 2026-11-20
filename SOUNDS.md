@@ -18,11 +18,12 @@ Sources, and which one wins when they disagree:
 - **The SPEC** (`_bmad-output/specs/spec-human-audio-theme/`) and the
   crowd-din-ambience GDD (`_bmad-output/planning-artifacts/gdds/`) are the
   design record for the intended note data.
-- **The audio plan**
-  (`_bmad-output/planning-artifacts/architecture/architecture-audio-events-2026-10-13.md`)
+- **The audio plan** (in Verticopolis/components,
+  `_bmad-output/planning-artifacts/architecture/architecture-audio-events-2026-10-13.md`)
   decides where cues come from, who owns the simulation's event drain, and
-  which new sounds get built next. Its stages are tracked in the backlog
-  (`_bmad-output/implementation-artifacts/backlog.md`), one GitHub issue each.
+  which new sounds get built next. Its stages are tracked in that
+  repository's backlog (`_bmad-output/implementation-artifacts/backlog.md`),
+  one GitHub issue each.
 
 Below, "the engine" means the simulation and "the audio engine" means the
 components' `ToneAudioEngine`.

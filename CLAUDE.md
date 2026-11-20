@@ -137,9 +137,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **Screenshots**.
 - **The backlog mirrors to GitHub issues (standing rule, 2026-07-15).** Every
   unresolved curated row in `_bmad-output/implementation-artifacts/backlog.md`
-  carries its issue number in the `GH` column (`#N`, or
-  `Verticopolis/engine#N` / `Verticopolis/components#N` for an issue that
-  moved in the repository split): create the matching issue when a
+  carries its issue number in the `GH` column (`#N`; work on the engine or
+  the components lives in those repositories' own backlogs since 2026-11-20):
+  create the matching issue when a
   row lands (a plain title, a type label and a `P1`-`P3` label, row notes as
   the body) and close the issue when the row finishes. The row's `Priority`
   owns the P label: `backlog-priority-labels.yml` re-syncs it whenever a push

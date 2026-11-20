@@ -1,6 +1,7 @@
 /**
  * The 2.0 "Ground floor" recognition: a thank-you to players who were here
  * before 2.0: status over stuff, no cash, no nag. The record is decision D21 in
+ * Verticopolis/engine's
  * `_bmad-output/planning-artifacts/gdds/gdd-verticopolis-2026-07-23-modern-rental-living/decision-log.md`.
  *
  * The Founder STATUS itself lives IN THE SAVE (`sim.founder`, detected once at

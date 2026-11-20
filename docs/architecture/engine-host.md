@@ -98,7 +98,7 @@ flowchart LR
 - **Commands.** A build or edit is one `EnginePort` call that answers a result
   record: done or refused, the money moved, and the engine's reason
   (`lastReason()`). The full contract is in
-  [`engine-port-contract.md`](../../_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md),
+  [`engine-port-contract.md`](https://github.com/Verticopolis/engine/blob/main/_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md),
   and `port/enginePort.types.test.ts` in Verticopolis/engine holds the
   binding to the `EnginePort` type.
 - **Faults.** A WASM trap in a command, a tick or a save is told apart from a

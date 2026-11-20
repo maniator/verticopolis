@@ -1,13 +1,14 @@
 # Project Context: Verticopolis (AI agent rules)
 
-Foundational context every BMAD agent (bmm / cis / **gds game agents**) must carry.
-Concise on purpose. Only the non-obvious rules an LLM needs reminding of. For the
+Foundational context every BMAD agent (bmm / cis / **gds game agents**) must carry
+when working in Verticopolis/web, the web game. Concise on purpose. Only the non-obvious rules an LLM needs reminding of. For the
 full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 
 ## What this is
 - **Verticopolis**: a from-scratch, browser-native clone of **SimTower (1994, Maxis/OPeNBooK)**.
 - **The single source of truth is SimTower 1994**, specifically the GameFAQs/Kiwizoid
-  FAQ (summarized with attribution under `_bmad-output/planning-artifacts/reviews/faq-parity-2026-06-30/faq-canon.md`).
+  FAQ (summarized with attribution in Verticopolis/engine under
+  `_bmad-output/planning-artifacts/reviews/faq-parity-2026-06-30/faq-canon.md`).
   For **Classic**, the bar is **gameplay parity**, not reinvention: Classic is
   parity-locked to 1994 and new mechanics are out of scope there.
 
@@ -27,7 +28,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 - **Connected / multi-tower** ideas remain an **owner-gated epic** (the 375-wide
   single-lot `LOT_WIDTH` and save format make it a rewrite, not a Modern toggle),
   not part of the standing Modern-sandbox sanction.
-- The living plan for Modern additions is
+- The living plan for Modern additions is in Verticopolis/engine,
   `_bmad-output/planning-artifacts/gdds/gdd-modern-expansion-2026-07-22.md`.
 
 ## Stack: NOT a Unity/Unreal/Godot game
@@ -51,66 +52,29 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   injection seam, no host-command bridge, no shell save store, no desktop consent
   flow and no `/api/ingest/desktop` route. Do not reintroduce a build mode or a
   wrapper-detection branch: other frontends consume the Rust engine
-  (`engine-rs/` in Verticopolis/engine, the `verticopolis-engine` crate) directly rather than wrapping
+  (the `verticopolis-engine` crate in Verticopolis/engine) directly rather than wrapping
   this web build. Historical planning documents that describe the wrapper epics
   stay as records.
 - Store configs, CI signing, and anything monetization-shaped never live here.
   This does not loosen the parity scope: no new mechanics, `primary_platform`
   stays `web`.
 
-## Where the truth lives (engine)
-- **The Rust engine (`engine-rs/` in [Verticopolis/engine](https://github.com/Verticopolis/engine);
-  every `engine-rs/` path in this file is in that repository) is the source of truth for gameplay rules, caps and
-  tuning**: `engine-rs/src/facilities.rs` (lot 375 wide, floors −9…100, per-facility
-  cost/width/minStar/population, build caps), `engine-rs/src/star.rs` (`STAR_THRESHOLDS`,
-  `TOWER_POPULATION`) and `engine-rs/src/rules.rs` with its `rules/` submodules (the Classic and Modern rule values).
-  The web UI reads them through the engine's catalog. Quote numbers from there, never
-  hard-code duplicates.
-- The TypeScript reference engine (`src/engine/`) was deleted in #1875; every rule and
-  its tests live in `engine-rs/` in Verticopolis/engine. Where things are:
-  - `engine-rs/src/sim.rs`, `sim_loop.rs`, `clock.rs`, `fixed_step.rs`: the clock, the step
-    loop and pacing; `star.rs`: star evaluation; `events*.rs`: VIP, fire, bomb, thief.
-  - `engine-rs/src/tower.rs` and `tower/`: placement and geometry (`is_supported`),
-    removal (`removal_reason`), served-floor reachability; `tower_query.rs`: staff
-    connectivity (`staff_connected`).
-  - `engine-rs/src/economy.rs`, `econ.rs`, `rent.rs`, `housekeeping*.rs`, `crowd/`: money,
-    rent, housekeeping and routing.
-  - `engine-rs/src/dispatch*.rs`: the elevator car controller (`ElevatorDispatch`).
-    Transport-kind predicates (`is_staff_only_transport` and the rest) are on `Kind` in
-    `engine-rs/src/facilities/predicates.rs`.
-
-## Canon rules that are easy to get wrong
-- **Star ladder** (population + gates): 2★ 300 · 3★ 1,000 (Security) · 4★ 5,000
-  (Medical + Recycling + >1 Suite + a favorable VIP) · 5★ 10,000 (Metro). **TOWER = 15,000.**
-- **Rating census** counts office workers + condo residents + commercial venue
-  customers. Commercial counts LIVE customers (`Unit.customersIn`, whoever is
-  eating right now, often 0); the catalog values (fast food 25 / restaurant 35 /
-  shop 20, chosen per footprint) are what TDT export writes, not a flat census
-  add. `Unit::census_count` (`engine-rs/src/tower_query_state.rs`) owns the rule.
-  **Hotel guests count while climbing up through 4★, then drop out**
-  (`rating_population`, `engine-rs/src/star.rs`).
-- **Two-ride rule:** a trip uses at most **two** transport rides (one sky-lobby transfer);
-  floors reachable only via 3+ rides draw no commuters. Sky lobbies go every ~15 floors.
-- **Parking** has a **Ramp** + **Spaces**; a space only functions when chained (contiguous
-  spaces) back to a ramp. Unconnected spaces are dead ("red X").
-- **Office noise** caps adjacent hotel/condo satisfaction (≤0.6). In **Classic** that is all it does (canon: caps but never evicts). In **Modern** it also erodes below the cap and can eventually evict (`noise_erosion_scale` in `engine-rs/src/rules/satisfaction.rs` gates this; Classic returns 0).
-- **Cinemas** book an average (~$150k) or **blockbuster** (~$300k, bigger crowd) film monthly.
-- Emergencies (fire-rescue / bomb-ransom) are **player choices** via a modal that **pauses** the sim.
-- **Service elevators are staff-only**: tenants never route through or board them, and they
-  do **not** count toward served-floor reachability. Staff (housekeepers) route over the staff
-  network (service elevators + stairs + escalators) and **service elevators win route ties**
-  (build order must not decide). Staff-only shafts answer **only real staff calls**, never the
-  statistical tenant-demand estimate.
-- **Housekeeping never cleans instantly**: a room stays `dirty` (distinct art) until a
-  housekeeper physically arrives over the staff network. Capacity is finite (~20 rooms/crew/day);
-  over-capacity and can't-reach conditions each have their own player advisory. Don't collapse
-  them, and don't let the cockroach event be the only symptom.
-- **Stairs/escalators are fixed two-floor flights**: one-tap placement (no drag-to-size), a
-  span cap enforced on **every** path including resize/extend, and stacking allowed only with an
-  exact-footprint match (same x/width) sharing the landing floor.
-- **Structure needs support both ways**: a floor above the ground story requires the story
-  below fully built beneath it, and bulldozing is refused when it would leave the story above
-  hanging (`Tower.isSupported` / `removalReason`).
+## Where the truth lives: the engine and the components
+- Each Verticopolis repository has its own BMAD setup (2026-11-20). This file
+  covers the web game. Gameplay rules, caps, tuning, canon and parity live in
+  [Verticopolis/engine](https://github.com/Verticopolis/engine): its
+  `_bmad-output/project-context.md` holds the canon rules that are easy to get
+  wrong, `docs/parity.md` how a Classic tower matches 1994, and its backlog
+  the engine's open work. The renderer, the Win95 windows and desk, the sprites
+  and the audio live in
+  [Verticopolis/components](https://github.com/Verticopolis/components), with
+  its own context, design system and backlog.
+- The web UI reads every rule through the engine's catalog. Quote numbers from
+  there, never hard-code duplicates, and never add a TypeScript copy of a rule
+  (the TypeScript reference engine was deleted in #1875).
+- A change to a rule, the binding, the renderer, the sprites or the audio is
+  planned and reviewed in that repository, under its BMAD setup, and reaches
+  the game when a PR here raises the pin.
 
 ## Ratified divergences from canon (intentional: do NOT "fix")
 - **Wedding Hall** on floor 100 stands in for the original **Cathedral** (religion-neutral clean-room choice); mechanics are identical.
@@ -119,6 +83,10 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 
 ## Artifacts & working conventions
 - BMAD output lives under `_bmad-output/` (`planning-artifacts/prds`, `.../reviews`).
+  On 2026-11-20 the records and backlog rows about the engine moved to
+  Verticopolis/engine's `_bmad-output/`, and those about the renderer, sprites,
+  audio and shared windows to Verticopolis/components', each with its git
+  history. Records dated before then may name paths that moved with them.
 - **Shift-left + regression testing** (full rule in `AGENTS.md` -> Testing
   discipline): every bug fix ships a regression test pinning the failure,
   including the shift into and out of the failing condition; pin each invariant
@@ -141,13 +109,10 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
-  The Rust engine (`engine-rs/` in Verticopolis/engine) follows these rules with no grandfathered
-  comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Version tier in a change note:** a PR never edits a version. It adds
   `.changes/<branch-slug>.md` with `app:` by player impact (see CONTRIBUTING.md
-  "Versioning" for major, minor, patch and none) and `crate:` for the engine
-  crate, and the release PR (`npm run release`) raises the versions. A
+  "Versioning" for major, minor, patch and none), and the release PR (`npm run release`) raises the versions. A
   player-facing change with `app: none`, or a missing note, is a review finding.
   See `.changes/README.md`.
 - **Deep adversarial review is MANDATORY and runs in the SAME session that writes the
@@ -193,22 +158,16 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   refresh run over the whole tower every step or frame, and towers reach tens of thousands of units
   (most of them floor tiles), up to 110 floors and thousands of people (the page's section 2 has
   the measured reference sizes and their date). Look up
-  entities by id (`Tower.getUnit` / `getTransport`, `get_unit` / `get_transport`), hoist
+  entities by id (`get_unit` / `get_transport`), hoist
   tower-wide facts out of per-unit and per-person loops, keep counters instead of re-scanning, and
-  memoize per-`revision` work (see `Tower.stopsOf`). The checklist,
+  memoize per-`revision` work. The checklist,
   `docs/performance/hot-path-review.md` (HP-1 to HP-12), applies to Rust and TypeScript alike, to
   ported, rewritten, moved and inherited code, and to scans hidden in helpers. The deep review flags a
   whole-collection scan under any HP-2 multiplier and resolves it under that page's section 7:
   fixed, or deferred with evidence and an issue, never dismissed as pre-existing. The review
   skills load the page through `_bmad/custom/gds-code-review.toml` and
-  `_bmad/custom/bmad-code-review.toml`.
-- **Excalibur physics is deliberately disabled** (nothing uses it; enabled, it froze phones on
-  big towers at high speed). Do not re-enable it.
-- **Never draw one oversized surface**: tall shafts and the ground plane are tiled into
-  texture-size-safe bands or mobile GPUs render them as black rectangles. Keep new large
-  visuals banded the same way.
-- **WebGL context loss auto-recovers in place**. Don't add "refresh the page" dead-ends; a
-  frame-exception guard already keeps one bad frame from freezing the game.
-- Dispatch must be fed the live crowd: pass `crowd.elevatorCalls(tower)` into
-  `ElevatorDispatch` (`accumulate` once per outer step, `moveCars` per sub-step) or visible
-  waiters get stranded when statistical demand rounds to zero.
+  `_bmad/custom/bmad-code-review.toml`. The page stays one page here and governs
+  every Verticopolis repository; their review overrides read it from this repository.
+- The renderer's platform gotchas (Excalibur physics stays off, large visuals
+  are banded, WebGL context loss recovers in place) live in Verticopolis/components'
+  project context, with the renderer.
