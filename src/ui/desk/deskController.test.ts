@@ -101,7 +101,7 @@ describe("DeskController", () => {
     const tasks = [...doc.querySelectorAll<HTMLElement>(".desk-task")].map((b) => b.dataset.win);
     // Tower Info is closed, and so is the Control Panel.
     expect(tasks).toEqual(["tower", "info", "tools", "map", "bulletin"]);
-    expect(trackAppActionOnce).toHaveBeenCalledWith("desk_shown");
+    expect(trackAppActionOnce).toHaveBeenCalledWith("desk_shown", "desk");
   });
 
   it("stays off after ?desk=off, the testing switch (there is no player switch)", () => {

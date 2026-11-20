@@ -2,8 +2,10 @@
 
 On a computer (a window at least 1024 by 600 whose main pointer is a mouse or trackpad, touchscreen laptops included, tablets with a pen or a keyboard trackpad left out; `?desk=on` turns it on on any screen 768 wide or more, such as a phone in its browser's desktop mode) the game runs as a
 1994 desktop: each part of the game is its own window on a teal desk with a
-taskbar. Phones, tablets, small windows and the title screen keep the
-ordinary layout. The code is `src/ui/desk/` here and `windows/desk/*` from
+taskbar. A touchscreen gets the desk too (owner's pick, 2026-11-20): a
+sideways tablet the same desk with touch chrome, a phone or an upright tablet
+the pocket desk (below). Small computer windows and the title screen keep
+the ordinary layout. The code is `src/ui/desk/` here and `windows/desk/*` from
 `@verticopolis/components`; the numbers below live in the components'
 `src/ui/desk/deskGeometry.ts` and its tests.
 
@@ -73,3 +75,55 @@ ordinary layout. The code is `src/ui/desk/` here and `windows/desk/*` from
   `sounds` or `settings`. The Window menu's picks are `menu_pick` events with `menu`
   `window` and `window_*` item codes. The title screen's own buttons are
   `title_pick` (`src/game/titlePicks.ts`).
+
+## Touchscreens and the pocket desk
+
+The components' `windows/desk/deskPocket` decides the mode (`deskMode`) and
+draws the pocket grid (`pocketBody`), and their `desk-pocket.css` lays it out.
+`deskController.ts` moves the game's elements into it.
+
+```mermaid
+flowchart TD
+  A[Screen] --> B{?desk switch}
+  B -- off --> N[No desk]
+  B -- pocket --> P[Pocket desk]
+  B -- on, 768+ wide --> D[Full desk]
+  B -- none --> C{Computer, DESK_MQ?}
+  C -- yes --> D
+  C -- no --> T{Touchscreen?}
+  T -- no --> N
+  T -- yes --> R{1024 by 600 or more?}
+  R -- yes --> DT[Full desk, touch chrome]
+  R -- no --> P
+```
+
+- **Touch chrome** (`body.desk-touch`, every desk on a touchscreen): a 44 px
+  taskbar with 38 px buttons above the home indicator, 44 px rows in the
+  Verticopolis and window menus, 26 px title bars whose buttons take a 44 px
+  touch, and white title text on every window (3:1 or better on the gray).
+- **The pocket desk** (`body.desk-pocket`): the tower window fills the desk
+  and never moves. Inside it, `.desk-pocket-body` is a grid that holds
+  `#topbar` (Info), `#palette` (Tools) and `#stage`: Info across the top,
+  Tools along the bottom of an upright phone (one row of tabs, one row of
+  tools with their prices, about 76 px), and at the left of a sideways
+  phone or an upright tablet. Inspect and Bulldoze, pinned at the start of
+  the strip, show their icons alone. There are no Info or Tools windows, so
+  the Window menu leaves them out; the status bar is hidden, and the taskbar
+  names the tower alone. The tower has no Minimize or Maximize, and its
+  taskbar button only brings it to the front.
+- The Map stays in `#stage` and is not a desk window: it floats over the
+  tower exactly as it does on a phone without the desk (a 150 by 216 card at
+  the top-left on a phone, 200 by 288 at the bottom-right on a tablet), with
+  its own ✕ and Map pill, and has no taskbar button. It opens with the
+  pocket desk, and Window > Map opens it again after its ✕.
+- The Bulletin, Tower Info and the Control Panel open over the whole desk
+  and the tower stays laid out under them. A Bulletin the game opens by
+  itself (news, the welcome note) waits minimized on the taskbar; one the
+  player asks for from the Window menu, Tower > Bulletin or the taskbar
+  comes up.
+- The pocket desk saves no places and runs no resize pass: its stylesheet
+  places every window. Turning a tablet between pocket and full desk takes
+  the old desk down and puts the new one up.
+- `?desk=pocket` puts the pocket desk on any screen, a computer's included
+  (`vc-desk` = `pocket`).
+

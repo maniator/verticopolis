@@ -1,16 +1,9 @@
 import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
 import { browserStorage } from "../overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../paletteCollapse";
-import {
-  defaultLayout,
-  fitRect,
-  parseLayout,
-  TOOLS_LIMITS,
-  TOWER_LIMITS,
-  type DeskRect,
-  type DeskWindowId,
-} from "@verticopolis/components/windows/desk/deskGeometry";
+import { TOOLS_LIMITS, TOWER_LIMITS, type DeskWindowId } from "@verticopolis/components/windows/desk/deskGeometry";
 import { read, write, type Store } from "./deskStore";
+import { DESK_KEY, DeskLayout } from "./deskLayout";
 import { DeskTitle } from "./deskTitle";
 import { buildControlPanel } from "./deskControlPanel";
 import {
@@ -24,6 +17,16 @@ import {
   trackWindowMenuPick,
 } from "./deskAnalytics";
 import { DeskTaskbar, type TaskEntry } from "./deskTaskbar";
+import {
+  deskMode,
+  DESK_POCKET_CLASS,
+  DESK_TOUCH_CLASS,
+  TOUCH_DESK_MQ,
+  TOUCH_MQ,
+  type DeskMode,
+  type DeskSwitch,
+  pocketBody,
+} from "@verticopolis/components/windows/desk/deskPocket";
 import { runWindowCommand, windowMenuState } from "@verticopolis/components/windows/desk/deskWindowMenu";
 import {
   buildFrame,
@@ -39,14 +42,17 @@ import { onMenuItem } from "../../game/menuBarHost";
  * every part of the game is its own window on a teal desktop with a taskbar,
  * the way the 1994 original opened a tower. The tower window holds the menu
  * bar, the tower and the status bar; Info, Tools, the Map, the Bulletin and
- * Tower Info are windows of their own beside it. Phones, tablets and small
- * windows keep today's layout, and so does the title screen.
+ * Tower Info are windows of their own beside it. A sideways tablet gets the
+ * same desk with touch chrome; phones and upright tablets get the pocket desk
+ * (`windows/desk/deskPocket` in the components). Small computer windows keep today's layout, and so does
+ * the title screen.
  *
  * The desk moves the game's own elements into its windows and puts them back
  * when it goes away, so every id, listener and test that knows them keeps
  * working. It turns on when the page is wide and tall enough with a mouse
- * (`DESK_MQ`) and no title screen is up. There is no player switch (owner,
- * 2026-11-15): `?desk=on` and `?desk=off` are for testing.
+ * (`DESK_MQ`), or on a touchscreen, and no title screen is up. There is no
+ * player switch (owner, 2026-11-15 and 2026-11-20): `?desk=on`,
+ * `?desk=pocket` and `?desk=off` are for testing.
  *
  * Cost: nothing per frame. A MutationObserver hears the few elements whose
  * open state the game owns (the Map, Bulletin, Tower Info, Tools, the title
@@ -64,8 +70,7 @@ export const DESK_MQ = "(min-width: 1024px) and (min-height: 600px) and (pointer
 export const DESK_CLASS = "desk";
 /** The event the desk sends on the document when it comes up or goes away. */
 export const DESK_CHANGE_EVENT = "vc-desk-change";
-/** Storage keys: the testing switch, the windows' places, the maximized tower. */
-export const DESK_KEY = { enabled: "vc-desk", layout: "vc-desk-places", max: "vc-desk-max" } as const;
+export { DESK_KEY };
 
 /** The stored value `?desk=on` writes: the desk on any screen. */
 export const DESK_ANY_SCREEN = "any";
@@ -90,8 +95,13 @@ interface Moved {
 export class DeskController {
   private readonly mq: MediaQueryList | null;
   private readonly wideMq: MediaQueryList | null;
+  private readonly touchMq: MediaQueryList | null;
+  private readonly roomyMq: MediaQueryList | null;
+  /** The desk showing now, or the one about to come up. */
+  private mode: DeskMode = null;
   private readonly store: Store | null = browserStorage();
-  private wins = new Map<DeskWindowId, DeskWindow>();
+  private readonly wins = new Map<DeskWindowId, DeskWindow>();
+  private readonly layout: DeskLayout;
   private moved: Moved[] = [];
   private desk: HTMLElement | null = null;
   private taskbar: DeskTaskbar | null = null;
@@ -99,61 +109,70 @@ export class DeskController {
   /** Renames the tower window (lit touches its title only when it changed). */
   private setTowerTitle: ((title: string) => void) | null = null;
   private infoFrame: HTMLElement | null = null;
-  /** True while the saved maximize comes back at start, which is not a click. */
-  private restoring = false;
-  /** Small windows the maximized tower pushed below its menu bar. */
-  private readonly steppedDown = new Map<DeskWindowId, { from: DeskRect; to: DeskRect }>();
   private watcher: MutationObserver | null = null;
   private syncControl: (() => void) | null = null;
   private active: DeskWindow | null = null;
   private z = 100;
   private readonly movedOnce = new Set<DeskWindowId>();
-  private resizeFrame: number | null = null;
+  /** The window the player just asked for from the Window menu, which the
+   *  watcher brings up even on the pocket desk. */
+  private asked: DeskWindowId | null = null;
 
   constructor(private readonly doc: Document = document) {
     this.title = new DeskTitle(doc);
-    this.mq = typeof window.matchMedia === "function" ? window.matchMedia(DESK_MQ) : null;
-    this.wideMq = typeof window.matchMedia === "function" ? window.matchMedia(DESK_ANY_SCREEN_MQ) : null;
+    this.layout = new DeskLayout(doc, this.store, this.wins);
+    const media = (q: string) => (typeof window.matchMedia === "function" ? window.matchMedia(q) : null);
+    this.mq = media(DESK_MQ);
+    this.wideMq = media(DESK_ANY_SCREEN_MQ);
+    this.touchMq = media(TOUCH_MQ);
+    this.roomyMq = media(TOUCH_DESK_MQ);
   }
 
   /** Watch for the moments the desk should come or go, and decide now. */
   start(): void {
-    // Testing switches: `?desk=on` turns the desk on on any screen, a phone
-    // or tablet included, so it can be tried there; `?desk=off` turns it off
-    // until `?desk=on` (the screenshot and e2e runs use it).
+    // Testing switches: `?desk=on` turns the full desk on on any screen at
+    // least tablet-wide, `?desk=pocket` the pocket desk on any screen (a
+    // computer's included, to try it), and `?desk=off` turns the desk off
+    // until one of the others (the screenshot and e2e runs use it).
     const ask = new URL(this.doc.location?.href ?? "http://x/").searchParams.get("desk");
     if (ask === "on") write(this.store, DESK_KEY.enabled, DESK_ANY_SCREEN);
-    else if (ask === "off") write(this.store, DESK_KEY.enabled, "off");
-    this.mq?.addEventListener("change", () => this.decide());
-    this.wideMq?.addEventListener("change", () => this.decide());
+    else if (ask === "pocket" || ask === "off") write(this.store, DESK_KEY.enabled, ask);
+    for (const mq of [this.mq, this.wideMq, this.touchMq, this.roomyMq])
+      mq?.addEventListener("change", () => this.decide());
     // The title screen's class on <body> decides too.
     new MutationObserver(() => this.decide()).observe(this.doc.body, { attributes: true, attributeFilter: ["class"] });
     this.wireMenuItems();
     this.decide();
   }
 
-  /** Off only after `?desk=off`. */
-  private enabled(): boolean {
-    return read(this.store, DESK_KEY.enabled) !== "off";
-  }
-
-  /** The desk is on on any screen at least tablet-wide (`?desk=on`): a phone
-   *  in its browser's desktop mode, a tablet. A phone held upright keeps its
-   *  own layout, which the desk cannot share. */
-  private anyScreen(): boolean {
-    return read(this.store, DESK_KEY.enabled) === DESK_ANY_SCREEN && !!this.wideMq?.matches;
+  /** The desk this screen gets now (`windows/desk/deskPocket` in the components). */
+  private screenMode(): DeskMode {
+    const stored = read(this.store, DESK_KEY.enabled);
+    const forced: DeskSwitch = stored === DESK_ANY_SCREEN || stored === "pocket" || stored === "off" ? stored : null;
+    return deskMode({
+      forced,
+      computer: !!this.mq?.matches,
+      wide: !!this.wideMq?.matches,
+      touch: !!this.touchMq?.matches,
+      roomy: !!this.roomyMq?.matches,
+    });
   }
 
   private decide(): void {
-    const screenFits = !!this.mq?.matches || this.anyScreen();
-    const fits = screenFits && this.enabled();
+    const mode = this.screenMode();
     const splash = this.doc.body.classList.contains("splash-up");
-    const want = fits && !splash && !!this.doc.getElementById("stage");
-    // The title screen sits in its own window on the desk.
-    if (fits && splash) this.title.show();
+    const want = mode !== null && !splash && !!this.doc.getElementById("stage") ? mode : null;
+    // The title screen sits in its own window on the full desk.
+    if (mode === "desk" && splash) this.title.show();
     else this.title.hide();
+    // Turning a tablet can change the desk: the old one goes first.
+    if (this.desk && want !== this.mode) this.down();
+    this.mode = want;
     if (want && !this.desk) this.up();
-    else if (!want && this.desk) this.down();
+  }
+
+  private get pocket(): boolean {
+    return this.mode === "pocket";
   }
 
   private wireMenuItems(): void {
@@ -162,13 +181,27 @@ export class DeskController {
     for (const item of this.doc.querySelectorAll<HTMLElement>("[data-desk-win]")) {
       onMenuItem(item.id, () => this.show(item.dataset.deskWin as DeskWindowId), this.doc);
     }
+    // Tower > Bulletin is the player asking too, so the pocket desk brings it up.
+    onMenuItem("mb-win-bulletin", () => this.ask("bulletin"), this.doc);
+  }
+
+  /** Mark `id` as asked for until the game's answer to the pick has been heard. */
+  private ask(id: DeskWindowId): void {
+    this.asked = id;
+    this.doc.defaultView?.setTimeout(() => {
+      if (this.asked === id) this.asked = null;
+    }, 0);
   }
 
   /** Bring window `id` up: opened the game's own way if it is closed, back
    *  from the taskbar if minimized, and in front. */
   private show(id: DeskWindowId): void {
+    // The pocket desk's Map is the game's own card in the tower's view.
+    if (this.pocket && id === "map" && this.doc.getElementById("overview-map")?.hidden)
+      this.doc.getElementById("mb-win-map")?.click();
     const w = this.wins.get(id);
     if (!w) return;
+    this.ask(id);
     if (!w.spec.isOpen()) w.spec.open?.();
     this.bringUp(id);
   }
@@ -185,7 +218,10 @@ export class DeskController {
     const doc = this.doc;
     const app = doc.getElementById("app");
     if (!app) return;
+    const pocket = this.pocket;
     doc.body.classList.add(DESK_CLASS);
+    doc.body.classList.toggle(DESK_POCKET_CLASS, pocket);
+    doc.body.classList.toggle(DESK_TOUCH_CLASS, pocket || !!this.touchMq?.matches);
     const desk = doc.createElement("div");
     desk.id = "desk";
     desk.className = "desk-area";
@@ -202,28 +238,38 @@ export class DeskController {
     });
     this.setTowerTitle = tower.setTitle;
     desk.appendChild(tower.root);
+    const palette = doc.getElementById("palette");
+    const map = doc.getElementById("overview-map");
     // The bar's host lays out as if it were not there, so the bar sits in the
     // tower window as its first row.
     this.move(doc.getElementById("menubar-host"), tower.body);
-    this.move(doc.getElementById("stage"), tower.body);
+    if (pocket) {
+      // Info, Tools and the tower share the tower window; the Map stays in
+      // the tower's view, floating at its phone size.
+      const grid = pocketBody(doc);
+      tower.body.appendChild(grid);
+      for (const id of ["topbar", "palette", "stage"]) this.move(doc.getElementById(id), grid);
+    } else this.move(doc.getElementById("stage"), tower.body);
     this.move(doc.getElementById("statusbar"), tower.body);
 
     // Info: the rating, date, time, funds, people and speed.
     const info = buildFrame(doc, "desk-win-info", "Info");
-    this.infoFrame = info.root;
-    desk.appendChild(info.root);
-    this.move(doc.getElementById("topbar"), info.body);
+    if (!pocket) {
+      this.infoFrame = info.root;
+      desk.appendChild(info.root);
+      this.move(doc.getElementById("topbar"), info.body);
+    }
     // Status Bar and Full Screen join the Window menu while the desk is up.
     const windowMenu = doc.getElementById("mb-window-menu");
     if (windowMenu)
       for (const id of ["mb-win-statusbar", "mb-fullscreen"]) this.move(doc.getElementById(id), windowMenu);
+    // Info and Tools are always in the pocket tower window, so its Window menu leaves them out.
+    for (const id of ["mb-dw-info", "mb-dw-tools"]) doc.getElementById(id)?.toggleAttribute("hidden", pocket);
 
     // Tools and the small windows the game already draws.
-    const palette = doc.getElementById("palette");
-    const map = doc.getElementById("overview-map");
     const bulletin = doc.getElementById("bulletin-win");
     const towerInfo = doc.getElementById("tower-win");
-    for (const el of [palette, map, towerInfo, bulletin]) this.move(el, desk);
+    for (const el of pocket ? [towerInfo, bulletin] : [palette, map, towerInfo, bulletin]) this.move(el, desk);
     // Tools never folds on the desk: a window folded off the desk opens.
     if (palette?.classList.contains(PALETTE_COLLAPSED_CLASS)) doc.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.click();
     const item = (id: string) => () => doc.getElementById(id)?.click();
@@ -246,7 +292,7 @@ export class DeskController {
     });
     const add = (s: DeskWindowSpec) => this.wins.set(s.id, new DeskWindow(s));
     add(
-      spec("tower", tower.root, () => this.towerTitleText(), {
+      spec("tower", tower.root, () => (pocket ? this.towerName() : this.towerTitleText()), {
         layer: "app",
         limits: TOWER_LIMITS,
         canMax: true,
@@ -254,10 +300,10 @@ export class DeskController {
         close: () => doc.getElementById("mb-close")?.click(),
       }),
     );
-    add(spec("info", info.root, () => "Info", { isOpen: () => true }));
-    if (palette)
+    if (!pocket) add(spec("info", info.root, () => "Info", { isOpen: () => true }));
+    if (palette && !pocket)
       add(spec("tools", palette, () => "Tools", { limits: TOOLS_LIMITS, heightOnly: true, isOpen: () => true }));
-    if (map)
+    if (map && !pocket)
       add(
         spec("map", map, () => "Map", {
           isOpen: () => !map.hidden,
@@ -334,19 +380,19 @@ export class DeskController {
     // The small windows start stacked above the tower, in their own order.
     for (const w of this.wins.values()) if (w.spec.layer === "tool") w.spec.el.style.zIndex = String(++this.z);
     this.wins.get("tower")!.spec.el.style.zIndex = "1";
-    this.layOut();
-    doc.defaultView?.addEventListener("resize", this.onResize);
+    // The pocket desk opens with the Map over the tower, and a Bulletin
+    // already open waits on the taskbar.
+    if (pocket && map?.hidden) item("mb-win-map")();
+    if (pocket && bulletin && !bulletin.hidden) this.wins.get("bulletin")?.minimize();
+    if (!pocket) this.layout.up(desk, this.infoFrame);
     this.watch([palette, map, bulletin, towerInfo, control.root]);
     this.focus(this.wins.get("tower") ?? null, false);
-    trackAppActionOnce("desk_shown");
+    trackAppActionOnce("desk_shown", pocket ? "pocket" : "desk");
     doc.dispatchEvent(new CustomEvent(DESK_CHANGE_EVENT));
   }
 
   private down(): void {
-    this.doc.defaultView?.removeEventListener("resize", this.onResize);
-    if (this.resizeFrame !== null) this.doc.defaultView?.cancelAnimationFrame(this.resizeFrame);
-    this.resizeFrame = null;
-    this.steppedDown.clear();
+    this.layout.down();
     this.watcher?.disconnect();
     this.watcher = null;
     for (const w of this.wins.values()) w.dispose();
@@ -365,88 +411,9 @@ export class DeskController {
     this.infoFrame = null;
     this.setTowerTitle = null;
     this.active = null;
-    this.doc.body.classList.remove(DESK_CLASS);
+    for (const id of ["mb-dw-info", "mb-dw-tools"]) this.doc.getElementById(id)?.removeAttribute("hidden");
+    this.doc.body.classList.remove(DESK_CLASS, DESK_POCKET_CLASS, DESK_TOUCH_CLASS);
     this.doc.dispatchEvent(new CustomEvent(DESK_CHANGE_EVENT));
-  }
-
-  // ---------- layout ----------
-
-  private layOut(): void {
-    const desk = this.desk;
-    if (!desk) return;
-    const w = desk.clientWidth;
-    const h = desk.clientHeight;
-    const saved = parseLayout(read(this.store, DESK_KEY.layout));
-    // Info's strip takes the width between Tools and the column first, so the
-    // tower opens under it at the height the strip really has.
-    if (this.infoFrame) this.infoFrame.style.width = `${defaultLayout(w, h).info.w}px`;
-    const first = defaultLayout(
-      w,
-      h,
-      this.infoFrame?.offsetHeight || undefined,
-      this.wins.get("map")?.spec.el.offsetHeight || undefined,
-    );
-    for (const [id, win] of this.wins) {
-      win.place(fitRect(saved[id] ?? first[id], w, h, win.spec.limits));
-    }
-    if (read(this.store, DESK_KEY.max) === "tower") {
-      this.restoring = true;
-      this.wins.get("tower")?.toggleMax();
-      this.restoring = false;
-    }
-  }
-
-  /** The browser window changed size: pull every window back onto the desk,
-   *  once per frame at most. A maximized tower already fills it. */
-  private readonly onResize = (): void => {
-    const view = this.doc.defaultView;
-    if (!view || this.resizeFrame !== null) return;
-    this.resizeFrame = view.requestAnimationFrame(() => {
-      this.resizeFrame = null;
-      const desk = this.desk;
-      if (!desk) return;
-      for (const win of this.wins.values()) {
-        if (win.maximized || !win.spec.isOpen()) continue;
-        const now = win.rect();
-        const fit = fitRect(now, desk.clientWidth, desk.clientHeight, win.spec.limits);
-        if (fit.x !== now.x || fit.y !== now.y || fit.w !== now.w || fit.h !== now.h) win.place(fit);
-      }
-    });
-  };
-
-  private save(): void {
-    const out: Partial<Record<DeskWindowId, DeskRect>> = {};
-    for (const [id, win] of this.wins) if (win.spec.isOpen() && !win.minimized) out[id] = win.rect();
-    const old = parseLayout(read(this.store, DESK_KEY.layout));
-    write(this.store, DESK_KEY.layout, JSON.stringify({ ...old, ...out }));
-  }
-
-  /** A maximized tower keeps its title bar and menus in reach: a small window
-   *  over them steps down below the menu bar while the tower is maximized, and
-   *  steps back up on restore unless the player has moved it since. */
-  private clearTowerChrome(): void {
-    const desk = this.desk;
-    const bar = this.doc.getElementById("menubar");
-    if (!desk || !bar) return;
-    const top = bar.getBoundingClientRect().bottom - desk.getBoundingClientRect().top + 2;
-    for (const [id, win] of this.wins) {
-      if (win.spec.layer !== "tool" || !win.spec.isOpen() || win.minimized) continue;
-      const r = win.rect();
-      if (r.y >= top) continue;
-      const next = fitRect({ ...r, y: top }, desk.clientWidth, desk.clientHeight, win.spec.limits);
-      win.place(next);
-      this.steppedDown.set(id, { from: r, to: win.rect() });
-    }
-  }
-
-  /** The tower is back to its size: the small windows it pushed go back up. */
-  private restoreSteppedDown(): void {
-    for (const [id, { from, to }] of this.steppedDown) {
-      const win = this.wins.get(id);
-      const now = win?.rect();
-      if (win && now && now.x === to.x && now.y === to.y) win.place(from);
-    }
-    this.steppedDown.clear();
   }
 
   // ---------- focus and the taskbar ----------
@@ -486,7 +453,9 @@ export class DeskController {
   private taskPressed(id: DeskWindowId): void {
     const w = this.wins.get(id);
     if (!w) return;
-    const result = deskTaskResult(w.minimized, w === this.active);
+    const pressed = deskTaskResult(w.minimized, w === this.active);
+    // The pocket tower fills the screen and has no Minimize, so its button only brings it to the front.
+    const result = this.pocket && id === "tower" && pressed === "min" ? "front" : pressed;
     trackDeskTask(id, result);
     if (result === "restore") this.bringUp(id);
     else if (result === "min") w.minimize();
@@ -494,15 +463,8 @@ export class DeskController {
   }
 
   private changed(id: DeskWindowId, what: DeskChange): void {
-    if (what === "move" || what === "resize") this.save();
-    if (what === "max" || what === "unmax")
-      write(this.store, DESK_KEY.max, what === "max" && id === "tower" ? "tower" : "");
-    if (what === "max" && id === "tower") this.clearTowerChrome();
-    if (what === "unmax" && id === "tower" && this.steppedDown.size) {
-      this.restoreSteppedDown();
-      this.save();
-    }
-    if (this.restoring) return;
+    this.layout.changed(id, what);
+    if (this.layout.restoring) return;
     if (what !== "move" || !this.movedOnce.has(id)) trackDeskWindow(id, what);
     if (what === "move") this.movedOnce.add(id);
     if (what === "min") this.focusNext();
@@ -520,8 +482,10 @@ export class DeskController {
       entries.push({ id, label: w.spec.label(), active: w === this.active, minimized: w.minimized });
     }
     this.taskbar?.render(entries);
+    const pocketMap = this.pocket ? this.doc.getElementById("overview-map") : null;
     for (const item of this.doc.querySelectorAll<HTMLElement>("[data-desk-win]")) {
-      const open = String(!!this.wins.get(item.dataset.deskWin as DeskWindowId)?.spec.isOpen());
+      const id = item.dataset.deskWin as DeskWindowId;
+      const open = String(pocketMap && id === "map" ? !pocketMap.hidden : !!this.wins.get(id)?.spec.isOpen());
       if (item.getAttribute("aria-checked") !== open) item.setAttribute("aria-checked", open);
     }
     this.taskbar?.syncSound();
@@ -539,14 +503,17 @@ export class DeskController {
         if (!id) continue;
         const w = this.wins.get(id);
         if (!w) continue;
-        // A window the game just opened comes up in front, unminimized.
-        if (
+        // A window the game just opened comes up in front, unminimized. On the
+        // pocket desk the Bulletin covers the tower, so news the game posts
+        // waits on the taskbar until the player asks for it.
+        const opened =
           w.spec.isOpen() &&
-          (r.oldValue?.includes(PALETTE_COLLAPSED_CLASS) || (r.attributeName === "hidden" && r.oldValue !== null))
-        )
-          this.bringUp(id);
+          (r.oldValue?.includes(PALETTE_COLLAPSED_CLASS) || (r.attributeName === "hidden" && r.oldValue !== null));
+        if (opened && this.pocket && id === "bulletin" && this.asked !== id) w.minimize();
+        else if (opened) this.bringUp(id);
         else if (!w.spec.isOpen() && w === this.active) this.focusNext();
       }
+      this.asked = null;
       this.refresh();
     });
     for (const el of els)
