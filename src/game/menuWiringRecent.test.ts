@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mountPage } from "../ui/testing/litTestUtils";
+import { html } from "lit-html";
 import type { GameApp } from "../main";
 
 const map = vi.hoisted(() => ({ open: false, set: vi.fn() }));
@@ -47,9 +49,9 @@ import { wireMenus, drawMenuBar } from "./menuWiring";
 
 /** The File menu with Open Recent as index.html lays it out. */
 function mount(): void {
-  document.body.innerHTML = `
+  mountPage(html`
     <div id="menubar-host"></div>
-    <main id="stage"></main>`;
+    <main id="stage"></main>`);
   drawMenuBar();
 }
 
@@ -72,7 +74,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
+  document.body.replaceChildren();
 });
 
 /** Split from menuWiring.test.ts (the 500-line ceiling). */

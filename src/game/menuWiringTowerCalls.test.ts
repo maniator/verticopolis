@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { drawElement, mountPage } from "../ui/testing/litTestUtils";
+import { html } from "lit-html";
 import type { GameApp } from "../main";
 
 const map = vi.hoisted(() => ({ open: false, set: vi.fn() }));
@@ -46,7 +48,7 @@ import { wireMenus, drawMenuBar } from "./menuWiring";
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */
 function mount(): void {
-  document.body.innerHTML = `
+  mountPage(html`
     <div id="menubar-host"></div>
     <div id="palette"></div>
     <button id="btn-palette-collapse"></button>
@@ -56,7 +58,7 @@ function mount(): void {
     </main>
     <input id="tower-name" />
     <button id="btn-undo" aria-disabled="true"></button>
-    <button id="btn-redo"></button>`;
+    <button id="btn-redo"></button>`);
   drawMenuBar();
 }
 
@@ -89,7 +91,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
+  document.body.replaceChildren();
 });
 
 /** Split from menuWiring.test.ts (the 500-line ceiling): the Tower menu's
@@ -137,11 +139,10 @@ describe("wireMenus: the Tower menu's calls for help", () => {
   it("on the title screen, an item whose title-screen button is missing runs its own command", () => {
     const { app } = fakeApp();
     const bar = wireMenus(app)!;
-    const splash = document.createElement("div");
-    splash.id = "splash";
+    const splash = drawElement(html`<div id="splash"></div>`);
     document.body.append(splash);
     const gameNew = vi.fn();
-    $("btn-new").addEventListener("click", gameNew);
+    $("btn-new").addEventListener("click", gameNew); // the game's own New, wired as UI.ts wires it
     bar.open($("mb-file") as HTMLButtonElement, false);
     $("btn-new").click();
     expect(gameNew).toHaveBeenCalledOnce();
@@ -153,11 +154,8 @@ describe("wireMenus: the Tower menu's calls for help", () => {
     const bar = wireMenus(app)!;
     files.showOpenDialog.mockClear();
     const splashLoad = vi.fn();
-    const splash = document.createElement("div");
-    splash.id = "splash";
-    splash.innerHTML = `<button data-splash="load"></button>`;
+    const splash = drawElement(html`<div id="splash"><button data-splash="load" @click=${splashLoad}></button></div>`);
     document.body.append(splash);
-    splash.querySelector("button")!.addEventListener("click", splashLoad);
     bar.open($("mb-file") as HTMLButtonElement, false);
     $("mb-import").click();
     expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app, "menu");

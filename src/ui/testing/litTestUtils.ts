@@ -40,6 +40,24 @@ export function renderToFragment(result: TemplateResult | ModalView): DocumentFr
   return frag;
 }
 
+/** Draw a lit template into a fresh fragment, ready to place on a test page.
+ *  A fresh fragment each time keeps lit from reusing an earlier render. */
+export function drawFragment(template: TemplateResult, doc: Document = document): DocumentFragment {
+  const frag = doc.createDocumentFragment();
+  render(template, frag);
+  return frag;
+}
+
+/** Draw a template with one top-level element and hand that element back. */
+export function drawElement<T extends Element = HTMLElement>(template: TemplateResult, doc: Document = document): T {
+  return drawFragment(template, doc).firstElementChild as T;
+}
+
+/** Replace a test page's body with the page a lit template draws. */
+export function mountPage(template: TemplateResult, doc: Document = document): void {
+  doc.body.replaceChildren(drawFragment(template, doc));
+}
+
 /** Fire a bubbling, cancelable event on a rendered node so a test can prove an
  *  inline `@click`/`@change`/`@input` binding called back. It is a plain `Event`
  *  (no mouse/input fields); a test that needs `event.target.value` sets the

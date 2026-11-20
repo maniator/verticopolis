@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
+import { html } from "lit-html";
+import { mountPage } from "./testing/litTestUtils";
 import { BACK_TO_GAME_LABEL, PLAY_LABEL, wireHelpMenu, type HelpMenuDeps } from "./helpSiteMenu";
 
 /** The host MenuBar.astro gives the bar. */
 function mountBar(): HTMLElement {
-  document.body.innerHTML = `<div id="host"></div>`;
+  mountPage(html`<div id="host"></div>`);
   return document.getElementById("host")!;
 }
 
