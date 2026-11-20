@@ -254,8 +254,7 @@ jobs:
   # years of hourly ticks, about 60 s locally, 390 s under coverage against its
   # 300 s limit) and roomCountsEngine (a check after every step on three
   # conformance towers, 225 s under coverage against 300 s). The engine
-  # conformance suite runs on the Rust engine (conformanceWasm, in
-  # test:wasm:host on the test-engine (host) shards).
+  # conformance suite runs in Verticopolis/engine, through the same binding.
   test-shard:
     name: test (shard ${{ matrix.shard }} of 4)
     needs: changes
