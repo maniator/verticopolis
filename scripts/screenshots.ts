@@ -379,6 +379,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
           throw new Error(
             `window.game never appeared on ${scene.id}, but the served dist does publish the handle: ` +
               `a boot failure on this page, not a missing VC_TOOLING flag. Original: ${original}`,
+            { cause: err },
           );
         }
         throw new MissingHandleError(

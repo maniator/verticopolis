@@ -27,7 +27,7 @@ export async function mapForShot(page: Page, where: string, crop: string | undef
     const win = (
       window as unknown as { overviewMap?: { isOpen(): boolean; setOpen(open: boolean, remember: boolean): void } }
     ).overviewMap;
-    let target: Element | null = null;
+    let target: Element | null;
     try {
       target = selector === null ? null : document.querySelector(selector);
     } catch {

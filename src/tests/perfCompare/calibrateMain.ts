@@ -81,7 +81,7 @@ export function main(argv: string[], repo: string, now: () => string = () => new
     try {
       results = JSON.parse(text.toString("utf8").replace(/^\uFEFF/, "")) as CompareResults | WorkerPass;
     } catch (e) {
-      throw new Error(`${file} is not valid JSON: ${(e as Error).message}`);
+      throw new Error(`${file} is not valid JSON: ${(e as Error).message}`, { cause: e });
     }
     const r = results as Partial<CompareResults> | null;
     const worker = isWorkerResults(r);

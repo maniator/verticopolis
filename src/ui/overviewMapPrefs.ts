@@ -44,7 +44,7 @@ type WriteStore = Pick<Storage, "setItem">;
 /** The player's stored choice for a layout class, or null when there is none
  *  (or storage cannot be read, or holds something else). */
 export function storedMapOpen(storage: ReadStore | null | undefined, layout: MapLayoutClass): boolean | null {
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = storage ? storage.getItem(MAP_OPEN_STORAGE_KEY[layout]) : null;
   } catch {

@@ -216,7 +216,7 @@ export async function simRun(arg: {
   let depth = 0;
   const stepMs = new Array<number>(arg.steps);
   const gcAvailable = typeof (globalThis as any).gc === "function";
-  let t0 = 0;
+  let t0: number;
   try {
     if (attributing) {
       const e = h;

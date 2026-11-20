@@ -386,7 +386,7 @@ function rehearseCaseUnguarded(
   }
   steps.push({ step: "previous-load", ok: true });
   const engine = loaded.engine;
-  let played = "";
+  let played: string;
   try {
     const read = serialized(engine, previous.label);
     if (read.error) {
