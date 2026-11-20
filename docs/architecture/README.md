@@ -1,8 +1,11 @@
 # Architecture pages
 
 Start with [ARCHITECTURE.md](../../ARCHITECTURE.md) at the repository root: the
-layers, the frame loop, the engine's subsystems, input and persistence, in
-diagrams. The pages here go deeper into one system each.
+repositories, the layers, the frame loop, input and persistence, in diagrams.
+The pages here go deeper into one of the game's systems each. The engine and
+the components have their own tours:
+[engine](https://github.com/Verticopolis/engine/blob/main/ARCHITECTURE.md) and
+[components](https://github.com/Verticopolis/components/blob/main/ARCHITECTURE.md).
 
 ## The system at a glance
 
@@ -10,11 +13,12 @@ diagrams. The pages here go deeper into one system each.
 flowchart LR
     subgraph engine["Verticopolis/engine"]
         Engine["src/<br/>Rust simulation"]
+        EngTS["packages/verticopolis-engine/<br/>TypeScript host layer"]
         Conf["conformance/<br/>the lock the engine is held to"]
         DocsSite["docs/engine-site/<br/>engine docs"]
     end
     subgraph components["Verticopolis/components"]
-        Comp["renderer, sprites, audio,<br/>binding and hosts"]
+        Comp["renderer, sprites, windows,<br/>styles, audio"]
     end
     subgraph repo["Verticopolis/web"]
         Web["src/<br/>the web game (TypeScript)"]
@@ -22,6 +26,7 @@ flowchart LR
     end
 
     Engine -->|"engine release"| Registries["npm · crates.io<br/>@verticopolis/engine"]
+    EngTS --> Registries
     Conf -.checks.-> Engine
     Comp -->|"components release"| NpmComp["npm<br/>@verticopolis/components"]
     Registries -->|"npm install"| Web
@@ -50,11 +55,18 @@ Elsewhere:
   engine guides for hosts are on [docs.verticopolis.com](https://docs.verticopolis.com/).
 - [docs/analytics-data-map.md](../analytics-data-map.md): every analytics
   event and what it carries.
-- The sprite atlas: [Verticopolis/components](https://github.com/Verticopolis/components), which holds the art and bakes it.
+- The sprite atlas, the design system and the audio layer:
+  [Verticopolis/components](https://github.com/Verticopolis/components)
+  (`docs/atlas.md`, `docs/design-system.md`, `docs/audio.md`), which holds the
+  art, the stylesheet and the sounds.
+- [docs/ui/](../ui/): the 1994 desk's window rules and how the game builds
+  windows in code.
 - [docs/performance/hot-path-review.md](../performance/hot-path-review.md):
   the complexity checklist for hot paths.
-- [SOUNDS.md](../../SOUNDS.md): the audio modules and cues.
-- [PARITY.md](../../PARITY.md): how Classic mode tracks the 1994 game.
+- [SOUNDS.md](../../SOUNDS.md): where the game's sounds are fired from.
+- [docs/parity.md](https://github.com/Verticopolis/engine/blob/main/docs/parity.md)
+  in Verticopolis/engine: how Classic mode tracks the 1994 game, with the
+  dated rule audits in its `docs/canon/`.
 
 ## Historical records
 

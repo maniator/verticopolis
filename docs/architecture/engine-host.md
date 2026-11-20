@@ -3,12 +3,15 @@
 How the web game loads the Rust engine, runs it each frame and reads it back.
 The engine itself is built and published from
 [Verticopolis/engine](https://github.com/Verticopolis/engine) and described on
-the docs site; this page covers the browser side. The host, the binding,
-the port and the catalog ship in the engine package, and the game imports
-them from `@verticopolis/engine` (`host/*`, `binding/*`, `port/*`,
-`catalog/*`). The game's own boot files (`engineBoot`, `engineChoice`,
-`engineDiagnostics`, `engineLabel`, `engineRepair`, `slotPopulation`) are in
-`src/engineHost/`, and `src/bootstrap.ts` and `src/game/` are in this
+the docs site, and its own tour is
+[ARCHITECTURE.md](https://github.com/Verticopolis/engine/blob/main/ARCHITECTURE.md)
+there; this page covers the browser side. The TypeScript a host needs ships
+in the engine package as subpaths (`host/*`, `binding/*`, `port/*`,
+`catalog/*`, `model/*`, `events/*`), from
+`packages/verticopolis-engine/src/` in Verticopolis/engine. The game's own
+boot files (`engineBoot`, `engineChoice`, `engineDiagnostics`, `engineLabel`,
+`engineRepair`, `slotPopulation`) are in `src/engineHost/`, and
+`src/bootstrap.ts`, `src/engineRender.ts` and `src/game/` are in this
 repository too. The renderer reads the engine through the render model of
 [Verticopolis/components](https://github.com/Verticopolis/components), which
 depends on no simulation. The engine version
@@ -43,32 +46,32 @@ sequenceDiagram
     Note over Page: any failure throws EngineBootError with a reason code,<br/>shown on the stop screen and in window.__vcEngineBoot
 ```
 
-- **One load path.** `src/wasmhost/loadEngineModule.ts` is the only code that
+- **One load path.** `host/loadEngineModule` is the only code that
   turns the served package into a running module. It fetches `BUILD.json`, the
   glue and the binary once each, and `enginePackageCheck.ts` refuses unless
   their hashes are the package this shell was built with, so a cache that
   mixes two deployments cannot start a mismatched engine. A development serve
   skips the byte check.
-- **The binding check.** `checkBinding` (`src/engineBinding/binding.ts`)
-  refuses a package that lacks a method the shell calls. `engine.d.ts` is
-  generated from the Rust binding in Verticopolis/engine and checked in
-  beside `checkBinding` in Verticopolis/components, so a renamed method fails the typecheck first.
-- **The catalogs.** `rustBootTower` (`src/wasmhost/rustEngine.ts`) reads the
+- **The binding check.** `checkBinding` (`binding/binding`)
+  refuses a package that lacks a method the shell calls. It is typed against
+  the declaration wasm-bindgen writes for the package, so a renamed method
+  fails the typecheck first.
+- **The catalogs.** `rustBootTower` (`host/rustEngine`) reads the
   Classic and Modern catalogs before it builds an engine and refuses a
   package whose kinds or world this build cannot draw. Every price, size and
-  rule the UI shows comes from them (`src/catalog/`). It then hands the fresh
+  rule the UI shows comes from them (`catalog/*`). It then hands the fresh
   engine's port to the boot the game passes in (`bootTower` from
-  `src/game/bootTower.ts`, with `BOOT_SEED`), so `src/wasmhost/` never
+  `src/game/bootTower.ts`, with `BOOT_SEED`), so the engine package never
   imports the game's save code.
 - **Failure.** A failure is an `EngineBootError` with a reason from a closed
-  list (`FALLBACK_REASONS` in `src/wasmhost/engineBoot.ts`), reported to
+  list (`FALLBACK_REASONS` in `host/bootError`, read by `src/engineHost/engineBoot.ts`), reported to
   analytics as `engine_status` and published on `window.__vcEngineBoot`. The
   game stops with recovery steps; **Repair engine files**
-  (`src/wasmhost/engineRepair.ts`) refetches and checks the three engine files
+  (`src/engineHost/engineRepair.ts`) refetches and checks the three engine files
   and writes them over a damaged cache entry.
 - **Offline.** The service worker precaches the engine files with a Workbox
   integrity on each, so an installed game starts offline and a half-updated
-  cache is never used (`vite.config.ts`, `src/wasmhost/engineAssets.ts`).
+  cache is never used (`vite.config.ts`, `host/engineAssets`).
 
 ## Each frame
 
@@ -78,15 +81,16 @@ flowchart LR
     Port -->|steps run, new carry| Loop
     Loop -->|"update()"| Reader["viewReader"]
     Reader -->|"viewStructure (on a revision)<br/>viewFrame (every frame)"| Port
-    Reader --> Render["render/ painters"]
+    Reader --> Join["src/engineRender.ts"]
+    Join --> Render["components render/ painters"]
     Reader --> HUD["ui/ HUD and windows<br/>(about 6 Hz)"]
     Loop -->|drainGameplayEvents| Events["audio, Bulletin, analytics"]
 ```
 
 - **Time.** `runFrame` (`src/game/frameLoop.ts`) hands the engine the real
   milliseconds, the speed and the carry; the engine paces and steps the owed
-  minutes itself (`src/fixed_step.rs` in Verticopolis/engine).
-- **The view.** `src/simport/viewReader.ts` decodes the engine's
+  minutes itself (`FrameStepper`, `src/fixed_step.rs` in Verticopolis/engine).
+- **The view.** `port/viewReader` decodes the engine's
   `Float64Array`s using the slots and code tables of `viewLayout()`. The
   structure is decoded only when the tower revision moves; the frame patches
   the rooms that changed and rewrites people and cars in place, so a frame
@@ -95,10 +99,10 @@ flowchart LR
   record: done or refused, the money moved, and the engine's reason
   (`lastReason()`). The full contract is in
   [`engine-port-contract.md`](../../_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md),
-  and `src/simport/enginePort.types.test.ts` holds the binding to the
-  `EnginePort` type.
+  and `port/enginePort.types.test.ts` in Verticopolis/engine holds the
+  binding to the `EnginePort` type.
 - **Faults.** A WASM trap in a command, a tick or a save is told apart from a
-  clean refusal (`isEngineTrap`, `src/wasmhost/hostFault.ts`). The first trap
+  clean refusal (`isEngineTrap`, `host/hostFault`). The first trap
   is latched in `src/game/engineFault.ts` and goes to the handler boot
   installs, which stops the game and reloads it from its last autosave
   (#1422). Every save after a trap is refused (`engineTrapped()` in
@@ -110,15 +114,42 @@ flowchart LR
 The engine writes and reads every save; the host only keeps the bytes. See
 [save-paths.md](./save-paths.md).
 
+## The goldens
+
+Two goldens pin what the engine does when this game drives it, and
+`npm run test:wasm` checks both:
+
+- **The frame-day golden** (`src/tests/goldens/frame-days.json`): the engine
+  plays each case through its own `advance`, as the game's frame loop calls it,
+  and must reproduce every checkpoint (the start, the first frame, each hour
+  and the end of the day). `VC_FRAME_DAYS_UPDATE=1` rewrites it from the
+  pinned engine. To find the field behind a moved hash,
+  `VC_FRAME_DAYS_DUMP=<dir> VC_FRAME_DAYS_CASE=<case id>` writes the case's
+  canonical views at each checkpoint under `<dir>/rust/`, to diff against a run
+  of the build before the change.
+- **The port-edit golden** (`src/tests/goldens/port-edits.json`): each case
+  sends the player's edits as the game's port commands and pins every answer,
+  with the view hashes and events after each step and at every hour of play
+  between them (`conformanceWasmPortEdits`). It also steps the undo trail and
+  restores an earlier save. `VC_PORT_EDITS_UPDATE=1` rewrites it, and
+  `VC_PORT_EDITS_DUMP=<dir> VC_PORT_EDITS_CASE=<case id>` dumps a case's views
+  at each line the same way.
+
+An engine pin raise that changes how the game plays moves them in the same
+pull request.
+
 ## Where to look
 
 | Path | What |
 | --- | --- |
 | `src/bootstrap.ts` | Boot: WebGL probe, engine load, the app, the service worker |
-| `src/wasmhost/` | Loading and checking the package, boot state, repair, diagnostics, the frame decode helpers |
-| `src/engineBinding/` | The binding's declaration (`engine.d.ts`), the method lists and their tiers |
-| `src/simport/` | `EnginePort`, the view reader, typed reads (cards, panels, schedules) |
-| `src/catalog/` | The catalog handle the UI reads prices, sizes and rules from |
+| `src/engineHost/` | Boot state and its failure screen, repair, diagnostics, the catalog per tower |
+| `src/engineRender.ts` | The engine's frame and catalog typed as the components' render model, with no copy |
+| `src/game/frameLoop.ts`, `src/game/portLifecycle.ts`, `src/game/engineFault.ts` | The per-frame advance, swaps and saves, the trap latch |
+| `host/*` in `@verticopolis/engine` | Loading and checking the package, boot errors, faults, the frame decode helpers |
+| `binding/*` in `@verticopolis/engine` | `checkBinding`, the method lists and their tiers |
+| `port/*` in `@verticopolis/engine` | `EnginePort`, the view and frame readers, typed reads (cards, panels, schedules) |
+| `catalog/*` in `@verticopolis/engine` | The catalog's types the UI reads prices, sizes and rules from |
 | `src/wasm.rs`, `src/wasm/`, `src/wasm_port*.rs` in Verticopolis/engine | The Rust side of the binding |
 
 A worker host was tried and not adopted; its record is
