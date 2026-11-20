@@ -5,10 +5,10 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 /**
  * Every integration suite that needs the engine package must be on the
- * `test:wasm:host` list. The main test job runs without the package, and the
- * engine host shards run only that list, so a suite gated on
- * `hasWasmPackage()` and left off it is skipped by every required job and
- * passes without running (review of #2054: the tall lobby suite did).
+ * `test:wasm:host` list, so `npm run test:wasm` runs the whole engine subset
+ * locally. CI's test shards run every suite with the package installed and
+ * fail without it, so this list no longer decides what CI runs (it once did:
+ * review of #2054 found the tall lobby suite skipped by every required job).
  * Vitest matches each list entry as a substring of a file's path.
  */
 
@@ -23,7 +23,7 @@ function integrationSuites(dir: string): string[] {
   });
 }
 
-describe("the engine host shards run every suite that needs the engine package", () => {
+describe("npm run test:wasm:host lists every suite that needs the engine package", () => {
   const script = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { scripts: Record<string, string> })
     .scripts["test:wasm:host"];
   const filters = script
