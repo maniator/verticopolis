@@ -10,10 +10,11 @@
  * - **Pages** come from the network first, so a reader online always gets the
  *   live manual, and from the saved copy when the network fails or is slow.
  *   A page missing from the copy gets a short "not saved yet" page.
- * - **Pictures** (the screenshots and sprites) are saved the first time they
- *   are shown, so offline a page shows the pictures already seen and the
- *   captions of the rest.
- * - **Activate** deletes older copies, and the caches a game worker left on
+ * - **Pictures** (the screenshots, {@link ManualConfig.pictures}) are saved
+ *   the first time they are shown, so offline a page shows the pictures
+ *   already seen and the captions of the rest.
+ * - **Activate** deletes older copies, the saved pictures this build no
+ *   longer shows, and the caches a game worker left on
  *   the manual's host when that host still served the game; a page such a
  *   worker answered is reloaded, so it comes back as the manual.
  *
@@ -36,6 +37,10 @@ export interface ManualConfig {
   /** A digest of the whole list, which names the saved copy. */
   readonly version: string;
   readonly files: readonly ManualFile[];
+  /** The pictures the pages show, under the manual's base: saved the first
+   *  time each is shown, never at install. Their names carry a digest, so a
+   *  saved one is never stale, and one missing here is deleted. */
+  readonly pictures: readonly string[];
 }
 
 /** The Cache Storage calls the worker makes, so a test can stand in. */
@@ -64,9 +69,6 @@ const INSTALL_PARALLEL = 6;
 /** Paths under the scope the worker never answers: the analytics relay,
  *  Vercel's own scripts and the worker itself. */
 const PASS_THROUGH = /^(?:api\/|_vercel\/|sw\.js$)/;
-
-/** File endings saved as pictures when they are shown. */
-const PICTURE = /\.(?:png|webp|jpe?g|gif|svg|avif)$/i;
 
 /** The saved copy's cache name for `version`. */
 export function pagesCacheName(version: string): string {
@@ -161,12 +163,12 @@ export async function installManual(config: ManualConfig, deps: ManualDeps): Pro
 }
 
 /**
- * Delete every saved copy but this version's, and any cache a game worker
- * left at this same scope (Workbox ends each cache's name with its worker's
- * scope). A game that shares the origin, with the manual under /help/, has
- * its worker at the origin's root, so its caches are never touched. Returns
- * whether a game cache was there, which means pages open now were the
- * game's and should be reloaded.
+ * Delete every saved copy but this version's, the saved pictures `config` no
+ * longer lists, and any cache a game worker left at this same scope (Workbox
+ * ends each cache's name with its worker's scope). A game that shares the
+ * origin, with the manual under /help/, has its worker at the origin's root,
+ * so its caches are never touched. Returns whether a game cache was there,
+ * which means pages open now were the game's and should be reloaded.
  */
 export async function activateManual(
   config: ManualConfig,
@@ -178,6 +180,14 @@ export async function activateManual(
     if (name.startsWith(GAME_CACHE_PREFIX) && name.endsWith(deps.scope)) foundGame = true;
     else if (!name.startsWith(PAGES_CACHE_PREFIX) || name === keep) continue;
     await deps.caches.delete(name).catch(() => false);
+  }
+  if (await deps.caches.has(MEDIA_CACHE)) {
+    const media = await deps.caches.open(MEDIA_CACHE);
+    const shown = listedPictures(config);
+    const scope = new URL(deps.scope).pathname;
+    for (const request of await media.keys()) {
+      if (!shown.has(new URL(request.url).pathname.slice(scope.length))) await media.delete(request);
+    }
   }
   return foundGame;
 }
@@ -222,6 +232,7 @@ async function pictureResponse(request: Request, deps: ManualDeps): Promise<Resp
 }
 
 const listedSets = new WeakMap<ManualConfig, ReadonlySet<string>>();
+const pictureSets = new WeakMap<ManualConfig, ReadonlySet<string>>();
 
 /** The paths `config` saves, as a set made once per config. */
 function listedPaths(config: ManualConfig): ReadonlySet<string> {
@@ -233,10 +244,20 @@ function listedPaths(config: ManualConfig): ReadonlySet<string> {
   return set;
 }
 
+/** The pictures `config` saves as they are shown, as a set made once per config. */
+function listedPictures(config: ManualConfig): ReadonlySet<string> {
+  let set = pictureSets.get(config);
+  if (!set) {
+    set = new Set(config.pictures);
+    pictureSets.set(config, set);
+  }
+  return set;
+}
+
 /**
  * How the worker answers `request`, or null to leave it to the browser: a
  * request that is not a GET, is for another site or sits outside the scope,
- * a pass-through path, or a file the manual neither saves nor shows as a
+ * a pass-through path, or a file the manual neither saves nor lists as a
  * picture.
  */
 export function respond(request: Request, config: ManualConfig, deps: ManualDeps): Promise<Response> | null {
@@ -249,7 +270,7 @@ export function respond(request: Request, config: ManualConfig, deps: ManualDeps
   if (request.mode === "navigate") return pageResponse(request, config, deps);
   const listed = new URL(savedKey(request.url)).pathname.slice(scope.pathname.length);
   if (listedPaths(config).has(listed)) return savedFirst(request, config, deps);
-  if (PICTURE.test(path)) return pictureResponse(request, deps);
+  if (listedPictures(config).has(listed)) return pictureResponse(request, deps);
   return null;
 }
 

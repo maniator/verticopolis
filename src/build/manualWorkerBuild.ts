@@ -40,6 +40,11 @@ const SAVED = [
  *  the share cards, sitemaps and robots.txt are for other sites. */
 const NEVER = /\.map$/;
 
+/** Built pictures the pages show, saved the first time each is shown: the
+ *  screenshots and any other picture the build bundles, whose names carry a
+ *  digest. */
+const PICTURE = /^_astro\/[^/]+\.(?:png|webp|jpe?g|gif|svg|avif)$/;
+
 /** The address a built file is saved under, relative to the manual's base:
  *  a page's folder ("rooms/hotels/") for its index.html, the front page as
  *  "", and any other file as its path. */
@@ -54,15 +59,24 @@ function digest(bytes: Uint8Array | string): string {
   return createHash("sha256").update(bytes).digest("hex").slice(0, 16);
 }
 
+/** Sorts addresses in code-point order, so a build lists them the same way
+ *  on every machine. */
+const byAddress = (a: string, b: string) => Number(a > b) - Number(a < b);
+
 /** The worker's config for the manual's built `files`: what it saves, sorted
- *  by address, each with a digest of its contents, and a version that changes
- *  whenever any of them does. */
+ *  by address, each with a digest of its contents, the pictures it saves as
+ *  they are shown, and a version that changes whenever any of them does. */
 export function manualConfig(files: readonly BuiltFile[]): ManualConfig {
+  const isSaved = (path: string) => !NEVER.test(path) && SAVED.some((rule) => rule.test(path));
   const saved: ManualFile[] = files
-    .filter((f) => !NEVER.test(f.path) && SAVED.some((rule) => rule.test(f.path)))
+    .filter((f) => isSaved(f.path))
     .map((f) => ({ url: savedPath(f.path), revision: digest(f.bytes) }))
-    .sort((a, b) => Number(a.url > b.url) - Number(a.url < b.url));
-  return { version: digest(JSON.stringify(saved)), files: saved };
+    .sort((a, b) => byAddress(a.url, b.url));
+  const pictures = files
+    .map((f) => f.path)
+    .filter((path) => PICTURE.test(path) && !isSaved(path))
+    .sort(byAddress);
+  return { version: digest(JSON.stringify({ saved, pictures })), files: saved, pictures };
 }
 
 /**

@@ -36,6 +36,8 @@ function fakeCaches(): CacheStorage & { stores: Map<string, Map<string, Response
       put: async (req: RequestInfo | URL, res: Response) => {
         s.set(key(req), res);
       },
+      keys: async () => [...s.keys()].map((address) => new Request(address)),
+      delete: async (req: RequestInfo | URL) => s.delete(key(req)),
     } as unknown as Cache;
   };
   return {
@@ -55,6 +57,7 @@ const CONFIG: ManualConfig = {
     { url: "rooms/hotels/", revision: "hotels1" },
     { url: "_astro/page.js", revision: "js1" },
   ],
+  pictures: ["_astro/desk.webp", "_astro/missing.webp"],
 };
 
 /** A network that answers each address with its own path, or fails. */
@@ -117,7 +120,10 @@ describe("installManual", () => {
 
   it("copies files whose revision did not change from the last finished copy", async () => {
     const d = deps();
-    await installManual({ version: "v1", files: [...CONFIG.files.slice(1), { url: "", revision: "home1" }] }, d);
+    await installManual(
+      { ...CONFIG, version: "v1", files: [...CONFIG.files.slice(1), { url: "", revision: "home1" }] },
+      d,
+    );
     d.fetch = network();
     await installManual(CONFIG, d);
     // Only the front page changed revision, so only it is downloaded again.
@@ -158,6 +164,23 @@ describe("activateManual", () => {
     expect([...d.caches.stores.keys()].sort()).toEqual([MEDIA_CACHE, "other", pagesCacheName("v2")].sort());
   });
 
+  it("deletes the saved pictures this build no longer shows and keeps the rest", async () => {
+    const d = deps();
+    const media = await d.caches.open(MEDIA_CACHE);
+    await media.put(`${SCOPE}_astro/desk.webp`, new Response("kept"));
+    await media.put(`${SCOPE}_astro/desk-old.webp`, new Response("gone"));
+    await activateManual(CONFIG, d);
+    expect([...d.caches.stores.get(MEDIA_CACHE)!.keys()]).toEqual([`${SCOPE}_astro/desk.webp`]);
+  });
+
+  it("matches saved pictures to the list under a /help/ scope", async () => {
+    const d = deps({ scope: "https://game.example/help/" });
+    const media = await d.caches.open(MEDIA_CACHE);
+    await media.put("https://game.example/help/_astro/desk.webp", new Response("kept"));
+    await activateManual(CONFIG, d);
+    expect(d.caches.stores.get(MEDIA_CACHE)!.size).toBe(1);
+  });
+
   it("never touches the caches of a game that shares the origin with the manual under /help/", async () => {
     const d = deps({ scope: "https://game.example/help/" });
     const game = ["workbox-precache-v2-https://game.example/", "workbox-runtime-https://game.example/"];
@@ -183,6 +206,7 @@ describe("respond", () => {
       new Request(`${SCOPE}_vercel/insights/script.js`),
       new Request(`${SCOPE}sw.js`),
       new Request(`${SCOPE}robots.txt`),
+      new Request(`${SCOPE}cards/index.png`),
     ])
       expect(respond(request, CONFIG, d)).toBeNull();
   });

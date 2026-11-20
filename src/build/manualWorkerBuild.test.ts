@@ -59,6 +59,14 @@ describe("manualConfig", () => {
     expect(rev(after, "")).not.toBe(rev(before, ""));
     expect(rev(after, "rooms/hotels/")).toBe(rev(before, "rooms/hotels/"));
   });
+
+  it("lists the screenshots to save as they are shown, and a new screenshot changes the version", () => {
+    const before = manualConfig(BUILT);
+    expect(before.pictures).toEqual(["_astro/desk-windows.webp"]);
+    const after = manualConfig([...BUILT, file("_astro/lobby.webp")]);
+    expect(after.pictures).toEqual(["_astro/desk-windows.webp", "_astro/lobby.webp"]);
+    expect(after.version).not.toBe(before.version);
+  });
 });
 
 describe("manualWorkerSource", () => {
@@ -73,7 +81,7 @@ describe("manualWorkerSource", () => {
   });
 
   it("escapes < in file names so the config cannot close anything", () => {
-    const source = manualWorkerSource({ version: "v", files: [{ url: "</script>", revision: "r" }] }, "");
+    const source = manualWorkerSource({ version: "v", files: [{ url: "</script>", revision: "r" }], pictures: [] }, "");
     expect(source).not.toContain("</script>");
   });
 });
@@ -84,7 +92,9 @@ describe("manualWorkerProblem", () => {
     expect(manualWorkerProblem("// Verticopolis manual host: no service worker")).toMatch(
       /not the manual's offline worker/,
     );
-    expect(manualWorkerProblem(manualWorkerSource({ version: "v", files: [] }, ""))).toMatch(/front page/);
+    expect(manualWorkerProblem(manualWorkerSource({ version: "v", files: [], pictures: [] }, ""))).toMatch(
+      /front page/,
+    );
     expect(manualWorkerProblem(`// ${MANUAL_WORKER_MARKER}\nself.__VC_MANUAL__ = {;\n`)).toMatch(/does not read/);
   });
 });

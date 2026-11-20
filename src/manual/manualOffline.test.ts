@@ -21,8 +21,12 @@ function cookieJar(initial = "") {
   };
 }
 
-function workers() {
-  return { register: vi.fn(async () => ({})), ready: Promise.resolve({}) };
+/** Workers whose ready registration has `readyScope`, the manual's own by default. */
+function workers(readyScope = "https://h/help/") {
+  return {
+    register: vi.fn(async () => ({ scope: "https://h/help/" })),
+    ready: Promise.resolve({ scope: readyScope }),
+  };
 }
 
 describe("manualCookie", () => {
@@ -77,6 +81,14 @@ describe("saveManualOffline", () => {
     expect(w.register).toHaveBeenCalledWith("/sw.js", { scope: "/" });
   });
 
+  it("marks nothing while only the game's worker is ready for a page under /help", async () => {
+    const doc = cookieJar();
+    const track = vi.fn();
+    await saveManualOffline("/help", { workers: workers("https://h/"), doc, host: "h", track });
+    expect(doc.cookie).toBe("");
+    expect(track).not.toHaveBeenCalled();
+  });
+
   it("refreshes the mark on a later page without counting again", async () => {
     const doc = cookieJar("vc_manual=help.verticopolis.com");
     const track = vi.fn();
@@ -97,7 +109,7 @@ describe("saveManualOffline", () => {
     await saveManualOffline("", { workers: null, doc, host: "h", track: () => {} });
     const refused = {
       register: vi.fn(async () => Promise.reject(new DOMException("no", "SecurityError"))),
-      ready: new Promise(() => {}),
+      ready: new Promise<{ scope: string }>(() => {}),
     };
     await expect(saveManualOffline("", { workers: refused, doc, host: "h", track: () => {} })).resolves.toBeUndefined();
     expect(doc.cookie).toBe("");

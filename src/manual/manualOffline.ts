@@ -41,10 +41,15 @@ export function manualSavedFor(cookies: string, host: string): boolean {
   return cookies.split(";").some((part) => part.trim() === `${MANUAL_COOKIE}=${host}`);
 }
 
+/** A worker registration, as far as the manual reads it. */
+interface Registration {
+  readonly scope: string;
+}
+
 /** The service worker calls the manual's pages make, so a test can stand in. */
 export interface ManualWorkerHost {
-  register(url: string, options: { scope: string }): Promise<unknown>;
-  readonly ready: Promise<unknown>;
+  register(url: string, options: { scope: string }): Promise<Registration>;
+  readonly ready: Promise<Registration>;
 }
 
 /** What {@link saveManualOffline} needs from the page. */
@@ -61,16 +66,18 @@ export interface SaveManualDeps {
 
 /**
  * Register the manual's worker at `base` (the site's base, "" or "/help"),
- * and once a worker is active (its install saved every page), mark the
- * manual saved, counting it the first time. Refreshes the cookie's life on
+ * and once that worker is active (its install saved every page), mark the
+ * manual saved, counting it the first time. A page under /help also sits in
+ * the game worker's scope, so a ready registration with another scope says
+ * nothing about the manual and marks nothing. Refreshes the cookie's life on
  * every page. Never throws: a refused worker or blocked cookies leave the
  * manual online only, as before.
  */
 export async function saveManualOffline(base: string, deps: SaveManualDeps): Promise<void> {
   if (!deps.workers) return;
   try {
-    await deps.workers.register(`${base}/sw.js`, { scope: `${base}/` });
-    await deps.workers.ready;
+    const manual = await deps.workers.register(`${base}/sw.js`, { scope: `${base}/` });
+    if ((await deps.workers.ready).scope !== manual.scope) return;
     const first = !manualSavedFor(deps.doc.cookie, deps.host);
     deps.doc.cookie = manualCookie(deps.host);
     if (first && manualSavedFor(deps.doc.cookie, deps.host)) deps.track();
