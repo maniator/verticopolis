@@ -96,7 +96,12 @@ export const SHARDS: Record<string, string[]> = {
   // two shots each, about 11s together, and the venue flights tower (two
   // shots of one small frozen tower), the metro line (three shots) and the
   // split lot (one small frozen tower run a few engine minutes).
-  engine: ["engine", "metro", "metro-line", "first-run", "first-run-mobile", "preview-rooms", "install-affordance", "tall-lobby-classic", "tall-lobby-modern-sky", "tall-lobby-split-halls", "tall-lobby-flights", "tall-lobby-phone", "venue-flights", "split-lot-street", "sky-bridge", "sky-bridge-looks"],
+  engine: ["engine", "metro", "metro-line", "first-run", "first-run-mobile", "preview-rooms", "install-affordance"],
+  // The tall lobbies, the venue flights, the split lot and the sky bridge:
+  // small frozen towers, one to four shots each, about 130s a leg together
+  // in CI. They rode in `engine` until that shard passed 4 minutes
+  // (November 2026), the slowest capture on a pull request.
+  lobbies: ["tall-lobby-classic", "tall-lobby-modern-sky", "tall-lobby-split-halls", "tall-lobby-flights", "tall-lobby-phone", "venue-flights", "split-lot-street", "sky-bridge", "sky-bridge-looks"],
   // ~71s before the Tools window fit: anchored by the tablet shots (the
   // heaviest drawSettle scene) plus the small scenes + the mobile
   // install-affordance shot (its engine-tower sibling) + the overview Map
@@ -173,18 +178,19 @@ export const SHARD_SECONDS: Record<string, number> = {
   appearance: 82,
   desk: 161,
   "elevator-auto": 25,
-  engine: 129,
+  engine: 140,
   features: 181,
   "fire-response": 89,
   "front-doors": 16,
   "linked-folder": 37,
+  lobbies: 145,
   misc: 152,
   "not-found": 17,
   "open-recent": 34,
   "previous-versions": 32,
   showcase: 139,
   "star-up": 35,
-  "traffic-jump": 28,
+  "traffic-jump": 46,
 };
 
 /** The shards packed into {@link SHOOT_JOBS} jobs of about equal render time,
