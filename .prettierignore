@@ -12,3 +12,6 @@ _bmad/
 _bmad-output/
 .agents/
 .claude/
+# The help site writes its content types here on every check and build;
+# help-site/.gitignore lists them, and Prettier reads only the root .gitignore.
+help-site/.astro/
