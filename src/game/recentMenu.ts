@@ -5,7 +5,8 @@ import { canLinkFolder, linkedFolder } from "../storage/linkedFolder";
 import { dropRecentTower, keepRecentTowers, recentTowers, RECENT_MAX, type RecentTower } from "../storage/recentTowers";
 import { openTowersFile } from "./fileSpaceCommands";
 import { openLinkedRow } from "./linkedFolderCommands";
-import { onMenuItem } from "./menuBarHost";
+import { html } from "lit-html";
+import { onMenuItem, setMenuState, type MenuEntryState } from "./menuBarHost";
 
 /**
  * File > Open Recent (owner, 2026-11-16): the last towers opened or saved,
@@ -70,30 +71,24 @@ function standing(t: RecentTower): "show" | "hide" | "gone" {
  * a read of the kept link id). Lines whose files are gone come off the list
  * for good; a line from another tab's newer link is hidden, never dropped.
  */
-export function fillRecentMenu(root: ParentNode = document): void {
+export function fillRecentMenu(doc: Document = document): void {
   const list = recentTowers();
   const standings = list.map(standing);
   const kept = list.filter((_, i) => standings[i] !== "gone");
   if (kept.length !== list.length) keepRecentTowers(kept);
   shown = list.filter((_, i) => standings[i] === "show");
-  const doc = root instanceof Document ? root : (root as Node).ownerDocument;
+  const states: Record<string, MenuEntryState> = { [RECENT_NONE_ID]: { hidden: shown.length > 0 } };
   for (let n = 1; n <= RECENT_MAX; n++) {
-    const item = root.querySelector<HTMLElement>(`#${RECENT_ITEM_ID(n)}`);
-    if (!item) continue;
     const t = shown[n - 1];
-    item.hidden = !t;
-    item.replaceChildren();
-    if (!t || !doc) continue;
-    const num = doc.createElement("u");
-    num.textContent = String(n);
-    const name = doc.createElement("span");
-    name.className = "mb-recent-name";
-    name.textContent = recentLabel(t);
-    item.append(num, name);
-    item.title = t.place === "folder" ? `In the linked folder "${linkedFolder.state()?.name ?? ""}"` : "In My Towers";
+    states[RECENT_ITEM_ID(n)] = t
+      ? {
+          hidden: false,
+          content: html`<u>${n}</u><span class="mb-recent-name">${recentLabel(t)}</span>`,
+          title: t.place === "folder" ? `In the linked folder "${linkedFolder.state()?.name ?? ""}"` : "In My Towers",
+        }
+      : { hidden: true };
   }
-  const none = root.querySelector<HTMLElement>(`#${RECENT_NONE_ID}`);
-  if (none) none.hidden = shown.length > 0;
+  setMenuState(states, doc);
 }
 
 /** A file found gone at its pick: off the list, counted. */

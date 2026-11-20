@@ -18,6 +18,7 @@ import {
   type MenuBarOptions,
   type MenuEntryModel,
 } from "@verticopolis/components/windows/menuBar";
+import type { TemplateResult } from "lit-html";
 import { gameMenuModel } from "./menuModel";
 import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";
 import { trackAppAction } from "../analytics";
@@ -25,14 +26,24 @@ import { trackAppAction } from "../analytics";
 /** What an item does when it is picked. */
 export type MenuAction = (event: MouseEvent) => void;
 
-/** What a page changes on a drawn entry: an item's check mark, an item's or
- *  submenu's gray, and whether an entry, or a whole menu by its title's id,
- *  shows. A field left out keeps what the model or an earlier state said. */
+/** What a page changes on a drawn entry: an item's check mark, tooltip and
+ *  content, an item's or submenu's gray, and whether an entry, or a whole
+ *  menu by its title's id, shows. A field left out keeps what the model or an
+ *  earlier state said. */
 export interface MenuEntryState {
   readonly checked?: boolean;
   readonly disabled?: boolean;
   readonly hidden?: boolean;
+  readonly title?: string;
+  readonly content?: TemplateResult;
 }
+
+const sameState = (a: MenuEntryState, b: MenuEntryState): boolean =>
+  a.checked === b.checked &&
+  a.disabled === b.disabled &&
+  a.hidden === b.hidden &&
+  a.title === b.title &&
+  a.content === b.content;
 
 /** A drawn bar: the bar, the model it was drawn from, the entries' states,
  *  the hooks {@link wireMenus} attaches, and each item's actions by id. */
@@ -114,7 +125,7 @@ export function setMenuState(changes: Readonly<Record<string, MenuEntryState>>, 
   for (const [id, change] of Object.entries(changes)) {
     const was = drawn.states.get(id) ?? {};
     const next = { ...was, ...change };
-    if (next.checked === was.checked && next.disabled === was.disabled && next.hidden === was.hidden) continue;
+    if (sameState(was, next)) continue;
     drawn.states.set(id, next);
     changed = true;
   }
@@ -141,6 +152,10 @@ function entriesWith<E extends MenuEntryModel>(
     const own = entry.kind === "submenu" ? { ...entry, items: entriesWith(entry.items, states) } : entry;
     if (!state) return own;
     if (own.kind === "separator") return state.hidden === undefined ? own : { ...own, hidden: state.hidden };
+    if (own.kind === "submenu") {
+      const { disabled, hidden } = state;
+      return { ...own, ...(disabled === undefined ? {} : { disabled }), ...(hidden === undefined ? {} : { hidden }) };
+    }
     return { ...own, ...state };
   });
 }
