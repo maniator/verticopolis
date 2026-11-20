@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { newViewReader } from "../../game/portAccess";
 import { acknowledgementKey, shortFleets, type ShaftFacts } from "../../game/scheduleRecovery";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import { scheduleFromSlots } from "@verticopolis/components/port/scheduleSlots";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import { scheduleFromSlots } from "@verticopolis/engine/port/scheduleSlots";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { engineFromSave, look, noEngine } from "../portKit/rustEngine";
 

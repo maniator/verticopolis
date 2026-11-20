@@ -5,8 +5,8 @@ import medium from "@verticopolis/engine/conformance/fixtures/sixseven_2.vctower
 import ownersSave from "@verticopolis/engine/conformance/fixtures/split-tower-4.vctower?raw";
 import starFour from "@verticopolis/engine/conformance/fixtures/towerone-star4.vctower?raw";
 import { catalogFor } from "../catalogFixture";
-import type { SerializedGame, Unit } from "@verticopolis/components/shared/types";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import type { SerializedGame, Unit } from "@verticopolis/engine/model/types";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { walkedStats } from "../fixtures/walkedStats";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 

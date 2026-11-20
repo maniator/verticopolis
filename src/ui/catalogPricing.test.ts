@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CatalogCalendar, CatalogRent } from "@verticopolis/components/catalog/catalogTypes";
+import type { CatalogCalendar, CatalogRent } from "@verticopolis/engine/catalog/catalogTypes";
 import { catalogFor } from "../tests/catalogFixture";
 import { catalogCalendar, priceOptionsFor, priceOptionsFromRent, rentPerCollection, unitPrice } from "./catalogPricing";
 

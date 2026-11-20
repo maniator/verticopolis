@@ -1,5 +1,5 @@
-import { checkEvent } from "@verticopolis/components/events/gameplayCatalog";
-import { GAMEPLAY_EVENT_RULES } from "@verticopolis/components/events/gameplayEventRules";
+import { checkEvent } from "@verticopolis/engine/events/gameplayCatalog";
+import { GAMEPLAY_EVENT_RULES } from "@verticopolis/engine/events/gameplayEventRules";
 import type { ScenarioEngine } from "./scenario";
 
 /**

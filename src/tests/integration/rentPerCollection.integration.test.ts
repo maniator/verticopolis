@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { catalogOn } from "@verticopolis/components/catalog/towerCatalog";
+import { catalogOn } from "../../engineHost/towerCatalog";
 import { newViewReader } from "../../game/portAccess";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import type { CalendarKind } from "@verticopolis/components/shared/engineTypes";
-import { Cards } from "@verticopolis/components/port/cards";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import type { CalendarKind } from "@verticopolis/engine/model/engineTypes";
+import { Cards } from "@verticopolis/engine/port/cards";
 import { catalogCalendar, rentPerCollection } from "../../ui/catalogPricing";
 import { MID, layTile, mustBuild, newSeededDraft, placeUnit } from "../portKit/draftFixtures";
 import { engineFromSave, noEngine } from "../portKit/rustEngine";

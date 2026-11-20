@@ -1,6 +1,6 @@
 import { createAppHistory, type AppHistory } from "./game/appHistory";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
-import type { TransportView, UnitView } from "@verticopolis/components/port/view";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
+import type { TransportView, UnitView } from "@verticopolis/engine/port/view";
 import { TowerEngine, type Picked } from "@verticopolis/components/render/excalibur/TowerEngine";
 import { endArrowDrag } from "@verticopolis/components/render/excalibur/pressLifecycle";
 import { AudioEngine } from "@verticopolis/components/audio/Audio";
@@ -63,16 +63,16 @@ import { adoptToolingSim, followToolingEdit, syncToolingSim, toolingSim } from "
 import type { ToolingTower } from "./game/toolingTower";
 import { followEngineTower, type TowerFollow } from "./game/towerFollow";
 import { arrivalLine } from "./game/arrivalLine";
-import { ViewReader } from "@verticopolis/components/port/viewReader";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import { PortEvents } from "@verticopolis/components/port/portEvents";
+import { ViewReader } from "@verticopolis/engine/port/viewReader";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import { PortEvents } from "@verticopolis/engine/port/portEvents";
 import type { FrameReader } from "@verticopolis/engine/port/frameReader";
 import { toRenderSim } from "./engineRender";
 import { hudSource } from "./game/hudSource";
 import { catalogOf, newRenderSim, newViewReader } from "./game/portAccess";
 import type { BootTower } from "./game/bootTower";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render

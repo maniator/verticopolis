@@ -1,8 +1,8 @@
 import type { GameApp } from "../main";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { dragRemoves } from "./bulldozeDrag";
 import { TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { snapX } from "../ui/placement";
 import { classifyGesture, isPaintKind } from "./gesture";
 import {

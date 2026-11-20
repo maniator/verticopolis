@@ -1,5 +1,5 @@
-import type { GameMode, SerializedView } from "@verticopolis/components/shared/types";
-import type { CalendarKind } from "@verticopolis/components/shared/engineTypes";
+import type { GameMode, SerializedView } from "@verticopolis/engine/model/types";
+import type { CalendarKind } from "@verticopolis/engine/model/engineTypes";
 import { SaveGame } from "../storage/SaveGame";
 import { isStorageWriteError } from "../storage/saveFailureCopy";
 import { SaveFailureNotice, type SaveWarningSurface } from "./saveFailureNotice";
@@ -19,9 +19,9 @@ import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow } from "./exportFlow";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
-import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
-import type { PortCodes } from "@verticopolis/components/port/portCodes";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import type { EnginePort, PortRecord } from "@verticopolis/engine/port/enginePort";
+import type { PortCodes } from "@verticopolis/engine/port/portCodes";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import {
   NEWER_SAVE_REFUSAL,
   SWAP_REFUSED,
@@ -34,7 +34,7 @@ import {
   swapDone,
 } from "./portLifecycle";
 import { currentStamp } from "../storage/saveStamp";
-import { exportFacts, importFacts } from "@verticopolis/components/port/tdtRecords";
+import { exportFacts, importFacts } from "@verticopolis/engine/port/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
 import type { SwapKind } from "./keepOutgoing";

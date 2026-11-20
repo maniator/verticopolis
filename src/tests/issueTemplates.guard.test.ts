@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { repoRoot } from "./guardFiles";
-import { versionLine } from "@verticopolis/components/host/engineLabel";
+import { versionLine } from "../engineHost/engineLabel";
 import { IDENTITY_FIXTURE } from "./engineFixtures/engineIdentity.fixture";
 
 /**

@@ -1,4 +1,4 @@
-import type { AutoTuneProposal } from "@verticopolis/components/port/enginePort";
+import type { AutoTuneProposal } from "@verticopolis/engine/port/enginePort";
 import type { SchedState } from "./templates/elevatorSchedule";
 
 /**

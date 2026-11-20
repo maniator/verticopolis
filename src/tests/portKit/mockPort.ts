@@ -2,7 +2,7 @@ import { COMPONENT_FIXTURES } from "../packagePaths";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { vi } from "vitest";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 
 /**
  * A mock engine port for the port's unit tests (`src/simport/`). Each method a

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { catalogFor } from "../tests/catalogFixture";
-import { towerCatalog, useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import { PortRenderSim } from "@verticopolis/components/port/portRenderSim";
-import type { SimView } from "@verticopolis/components/port/view";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import { towerCatalog, useTowerCatalogSource } from "../engineHost/towerCatalog";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import { FrameReader } from "@verticopolis/engine/port/frameReader";
+import type { SimView } from "@verticopolis/engine/port/view";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import { catalogOf, floorsOfPort, isUnlocked, newRenderSim, newViewReader, quoteBuild, quoteShaft } from "./portAccess";
 import { bindViewKinds, isHotelKind, resetViewKindsForTests } from "@verticopolis/components/presentation/viewKinds";
 import { code, frame, mockPort, record, structure } from "../tests/portKit/mockPort";
@@ -140,7 +140,7 @@ describe("newRenderSim", () => {
       towerCatalog(sim as { mode: "classic" | "modern" }).facilities.find((f) => f.key === "weddingHall")?.floors;
     expect(hall(newRenderSim(engine, reader))).toBe(7);
     // A render sim built bare reads the fallback, not the engine's source.
-    expect(hall(new PortRenderSim(engine, reader))).toBe(catalogFacility(catalogFor("classic"), "weddingHall").floors);
+    expect(hall(new FrameReader(engine, reader))).toBe(catalogFacility(catalogFor("classic"), "weddingHall").floors);
   });
 });
 

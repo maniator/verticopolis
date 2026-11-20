@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
 import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
 import { decodeVctower } from "./vctowerContainer";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";

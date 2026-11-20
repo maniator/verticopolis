@@ -1,7 +1,7 @@
-import { checkEvent } from "@verticopolis/components/events/gameplayCatalog";
-import { GAMEPLAY_EVENT_RULES } from "@verticopolis/components/events/gameplayEventRules";
+import { checkEvent } from "@verticopolis/engine/events/gameplayCatalog";
+import { GAMEPLAY_EVENT_RULES } from "@verticopolis/engine/events/gameplayEventRules";
 import type { GameplayEvent } from "@verticopolis/engine/events/gameplayEvents";
-import type { GameplayEventSource } from "@verticopolis/components/port/portEvents";
+import type { GameplayEventSource } from "@verticopolis/engine/port/portEvents";
 import { RateLimiter } from "./analyticsRateLimit";
 import { gameplaySession } from "./analyticsSession";
 import { nextAnalyticsTower } from "./analyticsTower";

@@ -3,7 +3,7 @@ import { isCrashed, isEngineStopped, isRecoveringGraphics, isSplashUp, isDialogO
 import { flushPrefsSave } from "./audioPrefs";
 import { isPrimaryPress, noButtonHeld } from "@verticopolis/components/windows/overviewMapInput";
 import { keyId } from "../ui/overviewMapKeys";
-import { isSpaceKey, wheelZoomDelta } from "@verticopolis/components/shared/inputEvents";
+import { isSpaceKey, wheelZoomDelta } from "@verticopolis/components/model/inputEvents";
 import { heldEnter } from "./heldEnter";
 
 /**

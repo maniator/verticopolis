@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { VACATE_REASON_TEXT } from "@verticopolis/components/shared/vacateReasonText";
+import { VACATE_REASON_TEXT } from "@verticopolis/components/model/vacateReasonText";
 import {
   accessCopy,
   farWalkCopy,

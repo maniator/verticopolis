@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { catalogFor } from "../tests/catalogFixture";
 import type { CardKit } from "./cardKit";
 import { InspectorController, type InspectorDeps } from "./inspector";
 
-vi.mock("@verticopolis/components/port/headerClock", () => ({ clockOf: () => ({ hour: 14 }) }));
+vi.mock("../engineHost/headerClock", () => ({ clockOf: () => ({ hour: 14 }) }));
 vi.mock("../ui/templates/inspector", () => ({
   unitInspectorTemplate: vi.fn((u: { id: number }, _c: unknown, hour: number, diag: unknown) => ({
     unit: u.id,

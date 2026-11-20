@@ -1,4 +1,4 @@
-import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import type { WasmEngine } from "@verticopolis/engine/binding/binding";
 
 /**
  * Engine traps for the runtime fallback's integration tests (#874). A trap is

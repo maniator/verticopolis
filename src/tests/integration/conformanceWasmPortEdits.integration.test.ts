@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { WasmEngine } from "@verticopolis/components/binding/binding";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { WasmEngine } from "@verticopolis/engine/binding/binding";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import type { FrameDayStart } from "../goldens/frameDays";

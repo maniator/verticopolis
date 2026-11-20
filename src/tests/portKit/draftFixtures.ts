@@ -1,4 +1,4 @@
-import type { FacilityKind, Unit } from "@verticopolis/components/shared/types";
+import type { FacilityKind, Unit } from "@verticopolis/engine/model/types";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { draftTower, type Draft } from "./portSim";
 

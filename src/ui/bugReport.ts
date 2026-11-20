@@ -1,4 +1,4 @@
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { GameMode } from "@verticopolis/engine/model/types";
 
 /**
  * About this game's "Report a problem": GitHub's bug form with what the game

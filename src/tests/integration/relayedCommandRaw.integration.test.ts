@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INVALID_COMMAND } from "@verticopolis/components/port/request";
+import { INVALID_COMMAND } from "@verticopolis/engine/port/request";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { draftTower } from "../portKit/portSim";
 

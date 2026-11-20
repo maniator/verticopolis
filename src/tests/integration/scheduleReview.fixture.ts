@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { decodeVctower } from "../../storage/vctowerContainer";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
-import { scheduleFromSlots } from "@verticopolis/components/port/scheduleSlots";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
+import { scheduleFromSlots } from "@verticopolis/engine/port/scheduleSlots";
 import { createAppHistory } from "../../game/appHistory";
 import { createCardKit } from "../../game/cardKit";
 import { newViewReader } from "../../game/portAccess";

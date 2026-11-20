@@ -16,7 +16,7 @@ import {
   forwardGameplayEvents,
   resetEngineBridge,
 } from "./analyticsEngineBridge";
-import type { GameplayEventSource } from "@verticopolis/components/port/portEvents";
+import type { GameplayEventSource } from "@verticopolis/engine/port/portEvents";
 
 // The analytics engine bridge (#873 phase 2): the engine's drained gameplay
 // events, checked against the catalog and folded into today's wire events.

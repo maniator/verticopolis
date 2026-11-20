@@ -4,9 +4,9 @@ import { resolve } from "node:path";
 import { CONFORMANCE_DIR, loadScenario, runScenario } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { HEATMAP_MODES, probedWasmStart } from "../conformance/panelProbe";
-import { statsReport } from "@verticopolis/components/port/statsSheet";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import { statsReport } from "@verticopolis/engine/port/statsSheet";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import type { WasmEngine } from "@verticopolis/engine/binding/binding";
 
 /**
  * The Rust panel getters on the conformance corpus (facade slice 6b, #1214).

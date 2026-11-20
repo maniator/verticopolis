@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { SerializedGame } from "@verticopolis/components/shared/serializedGame";
+import type { SerializedGame } from "@verticopolis/engine/model/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 
 /** Every tower the harnesses can run, small to large by people with the

@@ -39,9 +39,9 @@
  * Switching views never pauses the game (the original's tinted views do;
  * whether ours should is a check on the PC reference, parity plan item 7).
  */
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { NO_GESTURE } from "../game/appHistory";
-import { NO_ROOM_TIERS, type RoomTiers } from "@verticopolis/components/port/roomTiers";
+import { NO_ROOM_TIERS, type RoomTiers } from "@verticopolis/engine/port/roomTiers";
 import type { MapLayout } from "@verticopolis/components/render/overviewMap/geometry";
 import {
   buildHotelMarks,
@@ -69,7 +69,7 @@ import {
   type HeatCellView,
   type HeatViewId,
 } from "@verticopolis/components/render/overviewMap/heatView";
-import type { HeatmapMode } from "@verticopolis/components/shared/engineTypes";
+import type { HeatmapMode } from "@verticopolis/engine/model/engineTypes";
 import type { MapDom } from "./overviewMapDom";
 import { MapLegend } from "./overviewMapLegend";
 import { MapViewPicker } from "./overviewMapPicker";

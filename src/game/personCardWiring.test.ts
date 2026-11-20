@@ -16,7 +16,7 @@ const catalog = vi.hoisted(() => ({ rules: { fedUpWait: 120 } }));
 vi.mock("@verticopolis/components/render/excalibur/personFocus", () => focus);
 vi.mock("@verticopolis/components/render/excalibur/crowdLook", () => ({ waitMood }));
 vi.mock("./portAccess", () => ({ catalogOf: () => catalog }));
-vi.mock("@verticopolis/components/port/personCards", () => ({
+vi.mock("@verticopolis/engine/port/personCards", () => ({
   PersonCards: class {
     person = person;
   },

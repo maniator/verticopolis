@@ -1,7 +1,7 @@
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import type { FrameReader } from "@verticopolis/engine/port/frameReader";
 import { newRenderSim } from "./portAccess";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import type { HudSource } from "../ui/uiStatus";
 import { ToolingTower, type ToolingEngine } from "./toolingTower";
 

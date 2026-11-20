@@ -1,13 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import {
-  catalogBuildKind,
-  catalogFacility,
-  catalogTileCost,
-  type Catalog,
-} from "@verticopolis/components/catalog/catalogTypes";
+import { catalogBuildKind, catalogTileCost, type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { isCommercialKind } from "@verticopolis/components/presentation/viewKinds";
 import { facilityDescription } from "@verticopolis/components/presentation/facilityPresentation";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { groupDigits } from "@verticopolis/components/windows/format";
 import type { DragClears } from "../../game/bulldozeDrag";
 

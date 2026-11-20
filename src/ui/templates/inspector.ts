@@ -1,13 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { isTenanted } from "@verticopolis/components/shared/unitState";
+import { isTenanted } from "@verticopolis/engine/model/unitState";
 import { isCommercialKind, isElevatorKind } from "@verticopolis/components/presentation/viewKinds";
-import {
-  catalogFacility,
-  catalogOpenAt,
-  catalogResidents,
-  type Catalog,
-} from "@verticopolis/components/catalog/catalogTypes";
-import type { TransportDetail, UnitDetail } from "@verticopolis/components/port/panels";
+import { catalogResidents, type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility, catalogOpenAt } from "@verticopolis/components/render/catalogIndex";
+import type { TransportDetail, UnitDetail } from "@verticopolis/engine/port/panels";
 import { floorTag } from "@verticopolis/components/windows/format";
 import { occupantsText } from "../../game/cardLines";
 

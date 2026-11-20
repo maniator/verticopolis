@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { UNDO_DONE, UNDO_NOTHING_TO_STEP, UNDO_REFUSED } from "@verticopolis/components/port/enginePort";
+import { UNDO_DONE, UNDO_NOTHING_TO_STEP, UNDO_REFUSED } from "@verticopolis/engine/port/enginePort";
 import { canonicalJson } from "../conformance/canonical";
 import type { FrameDayStart } from "./frameDays";
 import { writeGoldenFile } from "./updateGate";

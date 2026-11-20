@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../analyticsActions", () => ({ trackAppAction: vi.fn() }));
 import { trackAppAction } from "../analyticsActions";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { catalogFor } from "../tests/catalogFixture";
 import { LAYOUT, mockPort } from "../tests/portKit/mockPort";
 import { groupDigits } from "@verticopolis/components/windows/format";
 import { BuildActions, type BuildActionsDeps } from "./buildActions";
 import { pickSkyBridgeLook } from "../ui/skyBridgeLookStrip";
-import type { SkyBridgeView } from "@verticopolis/components/port/view";
+import type { SkyBridgeView } from "@verticopolis/engine/port/view";
 import {
   finishesHalfBridge,
   quoteSkyBridge,

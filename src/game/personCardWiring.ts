@@ -7,7 +7,7 @@ import {
   notePersonPlace,
   setFollow,
 } from "@verticopolis/components/render/excalibur/personFocus";
-import { PersonCards } from "@verticopolis/components/port/personCards";
+import { PersonCards } from "@verticopolis/engine/port/personCards";
 import { PersonCardController } from "./personCard";
 import { catalogOf } from "./portAccess";
 

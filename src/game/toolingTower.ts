@@ -1,5 +1,5 @@
-import type { SerializedGame } from "@verticopolis/components/shared/types";
-import { unfoldFloorRuns } from "@verticopolis/components/shared/floorRuns";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
+import { unfoldFloorRuns } from "@verticopolis/engine/model/floorRuns";
 
 /**
  * The tower the tooling harnesses (the screenshot scenes and the e2e specs)

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { JUMP_ZOOM, jumpFrame, jumpToTraffic, lineSpan, wireTrafficJump } from "./trafficHud";
 import { trafficSpotlightFloor } from "@verticopolis/components/render/excalibur/trafficSpotlight";
-import type { TransportView } from "@verticopolis/components/port/view";
+import type { TransportView } from "@verticopolis/engine/port/view";
 import type { GameApp } from "../main";
 
 const track = vi.hoisted(() => vi.fn());

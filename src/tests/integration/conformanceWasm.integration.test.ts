@@ -10,7 +10,7 @@ import {
   type EngineStart,
 } from "../conformance/scenario";
 import { hasWasmPackage, startWasmEngine, startWasmHandle, wasm, wasmEngine } from "../conformance/wasmEngine";
-import { CATALOG_VERSION, readCatalog } from "@verticopolis/components/binding/catalog";
+import { CATALOG_VERSION, readCatalog } from "@verticopolis/engine/binding/catalog";
 import { catalogLockView } from "../conformance/catalogLockView";
 import { canonicalJson, digest } from "../conformance/canonical";
 import { done } from "../engineFixtures/engineSubject.fixture";

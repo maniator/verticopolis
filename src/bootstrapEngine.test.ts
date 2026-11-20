@@ -53,7 +53,7 @@ import * as pwa from "./pwa";
 import { SaveGame } from "./storage/SaveGame";
 import { setSlotPopulationReader, slotPopulation } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
-import { EngineBootError } from "@verticopolis/components/host/engineBoot";
+import { EngineBootError } from "./engineHost/engineBoot";
 import { engineTrapped, noteEngineThrow, watchEngineTraps } from "./game/engineFault";
 import { CRASH_FRESH_CROWD_KEY, countRustCrash, reloadSoon } from "./engineCrash/crashReload";
 

@@ -1,6 +1,6 @@
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
-import { clockOf } from "@verticopolis/components/port/headerClock";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
+import { clockOf } from "../engineHost/headerClock";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import type { CardKit } from "./cardKit";
 import type { Picked } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";

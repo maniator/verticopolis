@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newSeededDraft } from "../portKit/draftFixtures";
-import type { FacilityKind, SerializedGame, Transport, Unit } from "@verticopolis/components/shared/types";
+import type { FacilityKind, SerializedGame, Transport, Unit } from "@verticopolis/engine/model/types";
 import {
   TDT_DEFAULT_VIEW_X,
   TDT_DEFAULT_VIEW_Y,
@@ -25,10 +25,10 @@ import {
 } from "../fixtures/tdtLayout";
 import { LegacyExportError, buildTDT, describeWithCodec, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { catalogFor } from "../catalogFixture";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { parseEngineIdentity, readEngineIdentity } from "@verticopolis/components/host/engineIdentity";
+import { parseEngineIdentity, readEngineIdentity } from "@verticopolis/engine/host/engineIdentity";
 
 /** The Classic catalog, the engine's published table for the 1994 mode. */
 const CATALOG = catalogFor("classic");

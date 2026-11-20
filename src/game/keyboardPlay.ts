@@ -1,14 +1,15 @@
-import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import { type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import type { SkyBridgeClick } from "./skyBridgeTool";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import type { Picked, TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { Tool, UI } from "../ui/UI";
 import type { AudioEngine } from "@verticopolis/components/audio/Audio";
 import { announceForPlacement, snapX, stepCursor, type PlaceOutcome } from "../ui/placement";
 import type { BuildActions } from "./buildActions";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import { outcome, type PortCodes } from "@verticopolis/components/port/portCodes";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import { outcome, type PortCodes } from "@verticopolis/engine/port/portCodes";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import { quoteShaft } from "./portAccess";
 
 /**

@@ -1,4 +1,4 @@
-import type { EngineBootFailure } from "@verticopolis/components/host/engineBoot";
+import type { EngineBootFailure } from "../engineHost/engineBoot";
 import type { KeyValueStore } from "./crashReload";
 
 /**

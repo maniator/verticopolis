@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { PriceRung } from "@verticopolis/components/shared/engineTypes";
+import type { PriceRung } from "@verticopolis/engine/model/engineTypes";
 import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**

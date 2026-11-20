@@ -6,7 +6,7 @@ import {
   watchGameplayCommands,
   type PlaySample,
 } from "./analyticsEngagement";
-import type { EnginePortCommands } from "@verticopolis/components/port/enginePort";
+import type { EnginePortCommands } from "@verticopolis/engine/port/enginePort";
 
 const playing = (clock: number): PlaySample => ({ visible: true, blocked: false, clock });
 

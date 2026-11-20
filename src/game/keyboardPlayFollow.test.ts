@@ -11,7 +11,7 @@ vi.mock("../ui/placement", () => ({
   snapX: (_catalog: unknown, _kind: unknown, tile: number) => tile,
   announceForPlacement: () => "",
 }));
-vi.mock("@verticopolis/components/catalog/catalogTypes", () => ({ catalogFacility: () => ({ name: "Elevator" }) }));
+vi.mock("@verticopolis/components/render/catalogIndex", () => ({ catalogFacility: () => ({ name: "Elevator" }) }));
 vi.mock("./portAccess", () => ({ quoteShaft: () => ({ ok: true }) }));
 
 /**

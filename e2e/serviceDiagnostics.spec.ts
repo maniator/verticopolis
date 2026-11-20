@@ -7,7 +7,7 @@ import {
   withHotelState,
   type FixtureBuilder,
 } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
 import { buildInPage, expectEngineHosted } from "./helpers";
 
 /**

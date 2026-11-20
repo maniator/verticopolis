@@ -1,4 +1,4 @@
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { GameMode } from "@verticopolis/engine/model/types";
 import { appendMessageWithIcons } from "@verticopolis/components/windows/icons";
 import { RULE_SET_NAME } from "./ruleSetName";
 

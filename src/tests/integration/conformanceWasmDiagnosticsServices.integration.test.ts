@@ -1,11 +1,11 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import type { SerializedGame, Unit } from "@verticopolis/components/shared/types";
-import { isOperational } from "@verticopolis/components/shared/unitState";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import type { SerializedGame, Unit } from "@verticopolis/engine/model/types";
+import { isOperational } from "@verticopolis/engine/model/unitState";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { catalogFor } from "../catalogFixture";
-import type { ServiceDiagnosticFacts } from "@verticopolis/components/port/enginePort";
+import type { ServiceDiagnosticFacts } from "@verticopolis/engine/port/enginePort";
 import {
   CONFORMANCE_DIR,
   firstDivergence,
@@ -15,7 +15,7 @@ import {
   type ScenarioEngine,
 } from "../conformance/scenario";
 import { hasWasmPackage, reloadWasmHandle, startWasmHandle, wasmEngine } from "../conformance/wasmEngine";
-import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import type { WasmEngine } from "@verticopolis/engine/binding/binding";
 import viewLayout from "../engineFixtures/viewLayout.json";
 
 /**

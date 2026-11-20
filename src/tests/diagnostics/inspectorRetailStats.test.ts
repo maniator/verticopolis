@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { html } from "lit-html";
 import { retailDisplayLines } from "../../game/portServiceDiagnostics";
-import type { ServiceDiagnosticFacts } from "@verticopolis/components/port/enginePort";
+import type { ServiceDiagnosticFacts } from "@verticopolis/engine/port/enginePort";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 import { groupDigits } from "@verticopolis/components/windows/format";
 

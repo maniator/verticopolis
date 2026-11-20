@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { unfoldFloorRuns } from "@verticopolis/components/shared/floorRuns";
+import { unfoldFloorRuns } from "@verticopolis/engine/model/floorRuns";
 
 /**
  * The renderer-facing view (facade slice 6a, #1213) through the real

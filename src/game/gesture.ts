@@ -1,6 +1,7 @@
 import type { Tool } from "../ui/UI";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
-import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
+import { type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 
 /**
  * Build tools that lay a contiguous RUN by dragging — the original's floor tool.

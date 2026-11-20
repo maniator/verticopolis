@@ -60,7 +60,7 @@ import {
   ENGINE_DIR,
   ENGINE_GLUE,
   ENGINE_WASM,
-} from "@verticopolis/components/host/enginePackageNames";
+} from "@verticopolis/engine/host/enginePackageNames";
 import { readLicenseFiles } from "./license-files.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");

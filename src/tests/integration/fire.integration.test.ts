@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
-import { isOperational } from "@verticopolis/components/shared/types";
+import { isOperational } from "@verticopolis/engine/model/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** A floor-2 tower served by an elevator, with `n` occupied offices — the only

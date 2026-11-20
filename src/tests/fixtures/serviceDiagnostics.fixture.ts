@@ -1,4 +1,4 @@
-import type { GameMode, SerializedGame, Unit } from "@verticopolis/components/shared/types";
+import type { GameMode, SerializedGame, Unit } from "@verticopolis/engine/model/types";
 
 /**
  * Deterministic service-diagnostics towers, shared by the Rust/WASM

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SimView } from "@verticopolis/components/port/view";
+import type { SimView } from "@verticopolis/engine/port/view";
 import {
   type MakeEngine,
   type Subject,
@@ -21,7 +21,7 @@ import {
   subject,
   LOT_WIDTH,
 } from "./engineSubject.fixture";
-import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
+import { scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
 
 /**
  * The command contract of `EnginePort` on the Rust engine (PR 5e part 4

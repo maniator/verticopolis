@@ -1,10 +1,10 @@
 import { expect } from "vitest";
 import { floorsOfPort } from "../../game/portAccess";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import type { Draft } from "../portKit/drafts";
 import { newSeededDraft } from "../portKit/draftFixtures";
-import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
-import { ViewReader } from "@verticopolis/components/port/viewReader";
+import type { EnginePort, PortRecord } from "@verticopolis/engine/port/enginePort";
+import { ViewReader } from "@verticopolis/engine/port/viewReader";
 import layoutJson from "./viewLayout.json";
 
 /** The engine's view layout as checked in (`portReads.integration.test.ts`

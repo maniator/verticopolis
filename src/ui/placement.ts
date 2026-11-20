@@ -1,8 +1,9 @@
 // The lot geometry comes from the view's world (bound from the tower's
 // catalog), and facility widths and names from the catalog itself (#921).
 import { viewWorld } from "@verticopolis/components/presentation/viewWorld";
-import { catalogBuildKind, catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { catalogBuildKind, type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 
 /**
  * Placement geometry and announce copy for the build tools — pure functions of

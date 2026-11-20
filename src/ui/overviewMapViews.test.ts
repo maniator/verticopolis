@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import type { FacilityKind, UnitState } from "@verticopolis/components/shared/types";
+import type { FacilityKind, UnitState } from "@verticopolis/engine/model/types";
 import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
 import { extentFloors, fitLayout, mapExtent } from "@verticopolis/components/render/overviewMap/geometry";
 import { HOTEL_VIEW_STYLE } from "@verticopolis/components/render/overviewMap/hotelView";

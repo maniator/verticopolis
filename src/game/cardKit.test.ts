@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { isOperational, type UnitState } from "@verticopolis/components/shared/types";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import { isOperational, type UnitState } from "@verticopolis/engine/model/types";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import { createCardKit, INERT_STATES } from "./cardKit";
 import { refreshEditorCard, type EditorCardApp } from "./editorCard";
 import { LAYOUT, code, mockPort, record } from "../tests/portKit/mockPort";

@@ -1,4 +1,4 @@
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { GameMode } from "@verticopolis/engine/model/types";
 
 /**
  * The rule set's name as the UI says it (the Tower panel badge, the status bar,

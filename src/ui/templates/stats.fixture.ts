@@ -1,8 +1,8 @@
 import type { TemplateResult } from "lit-html";
 import { portOf } from "../../game/cardKit.fixture";
 import { catalogOf, newViewReader } from "../../game/portAccess";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import { statsReport } from "@verticopolis/components/port/statsSheet";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import { statsReport } from "@verticopolis/engine/port/statsSheet";
 import type { Draft } from "../../tests/portKit/drafts";
 import { statsScreen, statsTemplate, type StatsScreen } from "./stats";
 

@@ -5,10 +5,10 @@ import { digest } from "./canonical";
 import type { CheckpointDetail, FxSlot } from "./checkpointDetail";
 import { type EngineStart, type Outcome, type ScenarioEngine, type Start } from "./scenario";
 import type { ChargeOutcome } from "./chargeOps";
-import { decodeHeader } from "@verticopolis/components/host/frameView";
-import { checkBinding, type WasmEngine, type WasmModule } from "@verticopolis/components/binding/binding";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
-import type { GameMode } from "@verticopolis/components/shared/types";
+import { decodeHeader } from "@verticopolis/engine/host/frameView";
+import { checkBinding, type WasmEngine, type WasmModule } from "@verticopolis/engine/binding/binding";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
+import type { GameMode } from "@verticopolis/engine/model/types";
 import { ENGINE_TOOLING_ROOT, conformanceFile } from "../packagePaths";
 
 /**

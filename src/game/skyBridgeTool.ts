@@ -1,6 +1,6 @@
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import type { PortCodes } from "@verticopolis/components/port/portCodes";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import type { PortCodes } from "@verticopolis/engine/port/portCodes";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 
 /**
  * The Sky Bridge tool (Modern; party, 2026-11-16): one click on the open air

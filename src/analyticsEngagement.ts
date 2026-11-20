@@ -1,4 +1,4 @@
-import type { EnginePortCommands, PortRecord } from "@verticopolis/components/port/enginePort";
+import type { EnginePortCommands, PortRecord } from "@verticopolis/engine/port/enginePort";
 
 /**
  * The shared engagement detector (#1090, the analytics packet's section 3,

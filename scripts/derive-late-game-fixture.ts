@@ -38,7 +38,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MAX_BRUSH_TILES } from "@verticopolis/components/port/request";
+import { MAX_BRUSH_TILES } from "@verticopolis/engine/port/request";
 import { deflate } from "../src/storage/saveCompression";
 import { wasm } from "../src/tests/conformance/wasmEngine";
 import { CONFORMANCE_ROOT } from "../src/tests/packagePaths";

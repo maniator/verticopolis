@@ -13,9 +13,9 @@ import {
   type BatchRungHandlers,
 } from "./templates/batchPricing";
 import { syncRungSelects } from "./templates/rungPicker";
-import type { BatchTarget, BatchRentOptions, BatchRentResult } from "@verticopolis/components/shared/engineTypes";
-import type { PriceOptions, PriceRung } from "@verticopolis/components/shared/engineTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { BatchTarget, BatchRentOptions, BatchRentResult } from "@verticopolis/engine/model/engineTypes";
+import type { PriceOptions, PriceRung } from "@verticopolis/engine/model/engineTypes";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**

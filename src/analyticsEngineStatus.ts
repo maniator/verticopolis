@@ -1,14 +1,9 @@
 import { trackEvent, type GameplayEvents } from "./analyticsCore";
 import { APP_VERSION } from "./appVersion";
 import type { EngagedBy } from "./analyticsEngagement";
-import {
-  FALLBACK_REASONS,
-  type BootStage,
-  type FallbackReason,
-  type FallbackStage,
-} from "@verticopolis/components/host/engineBoot";
-import type { EngineChoice } from "@verticopolis/components/host/engineChoice";
-import type { TrapKind } from "@verticopolis/components/host/hostFault";
+import { FALLBACK_REASONS, type BootStage, type FallbackReason, type FallbackStage } from "./engineHost/engineBoot";
+import type { EngineChoice } from "./engineHost/engineChoice";
+import type { TrapKind } from "@verticopolis/engine/host/hostFault";
 
 /**
  * The reliability instrument (release plan 4.1, step A1; issue #1081): one

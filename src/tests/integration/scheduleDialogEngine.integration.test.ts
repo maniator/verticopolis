@@ -3,7 +3,7 @@ import { mountAppDom, makeUI } from "../uiFixture";
 import { catalogFor } from "../catalogFixture";
 import { scheduleDialogUX } from "../../ui/scheduleDialogRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
-import type { PresetProposal, ScheduleFacts } from "@verticopolis/components/port/enginePort";
+import type { PresetProposal, ScheduleFacts } from "@verticopolis/engine/port/enginePort";
 import { rustScheduleEngine } from "../fixtures/autoTuneDouble";
 import { noEngine } from "../portKit/rustEngine";
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
 import { MID, newSeededDraft } from "../portKit/draftFixtures";
-import { UNDO_NOTHING_TO_STEP, type EnginePort, type PortRecord } from "@verticopolis/components/port/enginePort";
+import { UNDO_NOTHING_TO_STEP, type EnginePort, type PortRecord } from "@verticopolis/engine/port/enginePort";
 import {
   type MakeEngine,
   type Subject,
@@ -21,7 +21,7 @@ import {
   ticketPrice,
   subject,
 } from "./engineSubject.fixture";
-import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
+import { scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
 
 /**
  * The lifecycle half of the `EnginePort` contract, and the commands that need

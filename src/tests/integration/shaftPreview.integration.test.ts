@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isUnlocked, newViewReader, quoteShaft } from "../../game/portAccess";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { MID, layTile, newSeededDraft } from "../portKit/draftFixtures";
 import { engineFromSave, noEngine } from "../portKit/rustEngine";
 

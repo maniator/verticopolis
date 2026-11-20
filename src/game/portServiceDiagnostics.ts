@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { ServiceDiagnosticFacts } from "@verticopolis/components/port/enginePort";
+import type { ServiceDiagnosticFacts } from "@verticopolis/engine/port/enginePort";
 import type { SupplementalLines } from "./portUnitDiagnostics";
 import { groupDigits } from "@verticopolis/components/windows/format";
 

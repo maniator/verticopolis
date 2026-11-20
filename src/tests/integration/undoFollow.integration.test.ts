@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { createAppHistory } from "../../game/appHistory";
 import { floorsOfPort, newRenderSim } from "../../game/portAccess";
-import { outcome } from "@verticopolis/components/port/portCodes";
-import { ViewReader } from "@verticopolis/components/port/viewReader";
+import { outcome } from "@verticopolis/engine/port/portCodes";
+import { ViewReader } from "@verticopolis/engine/port/viewReader";
 import { engineFromSave, look, must, noEngine, smallTower } from "../portKit/rustEngine";
 
 /**

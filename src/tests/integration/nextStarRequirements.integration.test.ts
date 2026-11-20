@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { catalogFor } from "../catalogFixture";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, draftTower, type Draft } from "../portKit/portSim";
 

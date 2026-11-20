@@ -1,4 +1,4 @@
-import type { FacilityKind, Unit } from "@verticopolis/components/shared/types";
+import type { FacilityKind, Unit } from "@verticopolis/engine/model/types";
 import { kindFacts } from "./catalogKinds";
 import { paintSettledUnit } from "@verticopolis/components/render/regionPaint";
 import { FLOOR, TILE } from "@verticopolis/components/render/scale";

@@ -1,8 +1,8 @@
 import { it, expect } from "vitest";
 import { newSeededDraft, lay, mustBuild, placeUnit, LOT_WIDTH } from "../portKit/draftFixtures";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { catalogFor } from "../catalogFixture";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** The Classic condo price rules that need a price written mid-run, on both

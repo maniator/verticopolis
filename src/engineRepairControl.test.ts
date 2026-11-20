@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { showEngineFailure } from "./bootstrap";
 import { runEngineRepair } from "./engineRepairControl";
-import type { RepairResult } from "@verticopolis/components/host/engineRepair";
+import type { RepairResult } from "./engineHost/engineRepair";
 
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 

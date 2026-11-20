@@ -32,7 +32,7 @@ import {
   ENGINE_RUNTIME_FILES,
   ENGINE_WASM,
   glueLoads,
-} from "@verticopolis/components/host/engineAssets";
+} from "@verticopolis/engine/host/engineAssets";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const SW = resolve(DIST, "sw.js");

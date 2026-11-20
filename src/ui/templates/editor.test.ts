@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { html, type TemplateResult } from "lit-html";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { transportLoadLines } from "../../game/cardLines";
-import type { TransportDetail, UnitDetail } from "@verticopolis/components/port/panels";
-import type { CalendarKind } from "@verticopolis/components/shared/engineTypes";
-import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
+import type { TransportDetail, UnitDetail } from "@verticopolis/engine/port/panels";
+import type { CalendarKind } from "@verticopolis/engine/model/engineTypes";
+import type { FacilityKind, GameMode } from "@verticopolis/engine/model/types";
 import { catalogFor } from "../../tests/catalogFixture";
 import { stopRows, transportDetail, unitDetail } from "../../tests/fixtures/detailCards";
 import { groupDigits } from "@verticopolis/components/windows/format";

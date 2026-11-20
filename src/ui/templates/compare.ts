@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit-html";
 import * as classicVsModern from "../../../help-site/src/content/docs/classic-vs-modern.md";
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { GameMode } from "@verticopolis/engine/model/types";
 import { fromGameHref } from "../fromGame";
 import { helpUrl } from "../../helpAddress";
 import { RULE_SET_NAME } from "../ruleSetName";

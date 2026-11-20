@@ -6,7 +6,7 @@ import {
   roomTierShape,
   type EvalTier,
   type RentTier,
-} from "@verticopolis/components/port/roomTiers";
+} from "@verticopolis/engine/port/roomTiers";
 
 const SHAPE = roomTierShape(
   JSON.stringify({

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { catalogFor } from "../tests/catalogFixture";
-import { SCHEDULE_HOURS, scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
+import { SCHEDULE_HOURS, scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
 import { LAYOUT } from "../tests/portKit/mockPort";
-import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
+import type { ElevatorSchedule } from "@verticopolis/engine/model/engineTypes";
 import { acknowledgementKey, isElevator, recoveredSchedule, shortFleets, type ShaftFacts } from "./scheduleRecovery";
 
 /**

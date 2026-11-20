@@ -1,7 +1,7 @@
 import type { UI } from "./UI";
 import { settingsTemplate } from "./templates/settings";
 import { trackAppAction } from "../analytics";
-import { engineSuffix } from "@verticopolis/components/host/engineLabel";
+import { engineSuffix } from "../engineHost/engineLabel";
 import { isSplashUp } from "../game/interactionState";
 
 /**

@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { createPortUnitDiagnostics } from "../../game/portUnitDiagnostics";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
 import { CONFORMANCE_ROOT } from "../packagePaths";
 
 /**

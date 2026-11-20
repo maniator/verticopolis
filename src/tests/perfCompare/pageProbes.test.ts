@@ -1,8 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { srcFile } from "../packagePaths";
-import { publishBootState, type EngineBootState } from "@verticopolis/components/host/engineBoot";
+import { publishBootState, type EngineBootState } from "../../engineHost/engineBoot";
 import { installEngineBootProbe, installProbes } from "./page";
 
 type ProbedWindow = { __perfMarks: Record<string, number>; __vcEngineBoot?: unknown };
@@ -50,15 +49,15 @@ describe("the boot point the engine-loaded mark stamps (#1254)", () => {
   });
 
   it("is written only by publishBootState, which only bootstrap.ts calls", () => {
-    // The host's engineBoot module (components package) defines and writes
-    // the mark; in the game, only bootstrap.ts calls it and nothing writes it.
+    // engineHost/engineBoot.ts defines and writes the mark (and re-publishes
+    // a state it already holds); in the rest of the game only bootstrap.ts
+    // calls it, and nothing else writes it.
     const files = (readdirSync(join(__dirname, "../.."), { recursive: true }) as string[]).filter(
       (f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f) && !f.split(/[\\/]/).includes("tests"),
     );
     const writers = files.filter((f) => /__vcEngineBoot\s*=[^=]/.test(read(f)));
     const callers = files.filter((f) => read(f).includes("publishBootState("));
-    expect(writers).toEqual([]);
-    expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual(["bootstrap.ts"]);
-    expect(readFileSync(srcFile("wasmhost/engineBoot.ts"), "utf8")).toMatch(/__vcEngineBoot\s*=[^=]/);
+    expect(writers.map((f) => f.replace(/\\/g, "/"))).toEqual(["engineHost/engineBoot.ts"]);
+    expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual(["bootstrap.ts", "engineHost/engineBoot.ts"]);
   });
 });

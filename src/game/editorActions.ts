@@ -1,25 +1,25 @@
 import { isElevatorKind, isHotelKind } from "@verticopolis/components/presentation/viewKinds";
 import {
-  catalogFacility,
   catalogFilmRebook,
   catalogTicketPrice,
   filmEditAction,
   filmPolicyEditAction,
-} from "@verticopolis/components/catalog/catalogTypes";
+} from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { priceOptionsFor } from "../ui/catalogPricing";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
-import type { BatchRentResult } from "@verticopolis/components/shared/engineTypes";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
+import type { BatchRentResult } from "@verticopolis/engine/model/engineTypes";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "@verticopolis/components/audio/Audio";
 import type { BuildActions } from "./buildActions";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import { outcome, type PortCodes } from "@verticopolis/components/port/portCodes";
-import { clockOf } from "@verticopolis/components/port/headerClock";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import { outcome, type PortCodes } from "@verticopolis/engine/port/portCodes";
+import { clockOf } from "../engineHost/headerClock";
 import { scheduleDialogUX } from "../ui/scheduleDialogRules";
-import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import { scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import { groupDigits } from "@verticopolis/components/windows/format";
-import { NOT_ENOUGH_MONEY } from "@verticopolis/components/port/request";
+import { NOT_ENOUGH_MONEY } from "@verticopolis/engine/port/request";
 import { sayHeldRefusal, type HeldRefusal } from "./dragRefusal";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 import { rememberPlayerText } from "../analyticsPlayerText";

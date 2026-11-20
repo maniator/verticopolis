@@ -1,10 +1,10 @@
-import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
-import type { LogEntry } from "@verticopolis/components/shared/types";
+import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import type { LogEntry } from "@verticopolis/engine/model/types";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { ImportReport } from "../storage/tdtImportReport";
-import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
-import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
-import type { CalendarKind } from "@verticopolis/components/shared/engineTypes";
+import type { FacilityKind, GameMode } from "@verticopolis/engine/model/types";
+import type { ElevatorSchedule } from "@verticopolis/engine/model/engineTypes";
+import type { CalendarKind } from "@verticopolis/engine/model/engineTypes";
 import type { UpdateInfo } from "../pwa";
 import { downloadFile } from "./downloadFile";
 import { render, type TemplateResult } from "lit-html";

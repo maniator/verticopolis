@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { DiagnosticsReport, DiagnosticsRow } from "@verticopolis/components/host/engineDiagnostics";
-import { buildDiagnostics } from "@verticopolis/components/host/engineDiagnostics";
+import type { DiagnosticsReport, DiagnosticsRow } from "../engineHost/engineDiagnostics";
+import { buildDiagnostics } from "../engineHost/engineDiagnostics";
 import { aboutRows, withComponents } from "./aboutDiagnostics";
 import { IDENTITY_FIXTURE } from "../tests/engineFixtures/engineIdentity.fixture";
 

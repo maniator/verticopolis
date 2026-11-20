@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import type { SimView } from "@verticopolis/components/port/view";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import type { SimView } from "@verticopolis/engine/port/view";
 import { catalogFor } from "../tests/catalogFixture";
 import { mockPort, record } from "../tests/portKit/mockPort";
 import { clearToasts, onHistoryClick, resetLog, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
-import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import type { GameMode } from "@verticopolis/engine/model/types";
 import type { UI } from "./UI";
 import { useGermanDefaultLocale } from "../tests/localeStub";
 import { SAVE_WARNING_ID, showSaveWarning } from "./saveWarning";

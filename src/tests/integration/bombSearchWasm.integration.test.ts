@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeHeader } from "@verticopolis/components/host/frameView";
+import { decodeHeader } from "@verticopolis/engine/host/frameView";
 import { hasWasmPackage, startWasmHandle } from "../conformance/wasmEngine";
 
 /**

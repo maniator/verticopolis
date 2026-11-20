@@ -1,6 +1,6 @@
 import { html, nothing, svg, type TemplateResult } from "lit-html";
 import { iconTemplate } from "@verticopolis/components/windows/icons";
-import { versionLine } from "@verticopolis/components/host/engineLabel";
+import { versionLine } from "../engineHost/engineLabel";
 import { platformLabel } from "../analyticsEnrichment";
 import { trackAppAction } from "../analytics";
 import {

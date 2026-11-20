@@ -15,9 +15,9 @@
  * kept per layout class (`ui/overviewMapSpot.ts`).
  */
 import type { GameApp } from "../main";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { findViewKind } from "@verticopolis/components/presentation/viewKinds";
-import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "@verticopolis/components/port/roomTiers";
+import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "@verticopolis/engine/port/roomTiers";
 import { lobbyHalls, type HallRun } from "@verticopolis/components/render/lobbyHalls";
 import { FLOOR, TILE } from "@verticopolis/components/render/scale";
 import { browserStorage, type MapLayoutClass } from "../ui/overviewMapPrefs";

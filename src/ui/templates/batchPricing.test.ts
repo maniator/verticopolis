@@ -12,7 +12,7 @@ import {
   type BatchRungState,
   type BatchRungHandlers,
 } from "./batchPricing";
-import type { BatchRentResult, PriceRung } from "@verticopolis/components/shared/engineTypes";
+import type { BatchRentResult, PriceRung } from "@verticopolis/engine/model/engineTypes";
 import { catalogFor } from "../../tests/catalogFixture";
 import { priceOptionsFor } from "../catalogPricing";
 import { renderToFragment, click, change, input } from "../testing/litTestUtils";

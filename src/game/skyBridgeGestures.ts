@@ -9,7 +9,7 @@ import {
   type ArmedSkyBridge,
   type SkyBridgeClick,
 } from "./skyBridgeTool";
-import { finishedSkyBridgeAt } from "@verticopolis/components/port/skyBridgeView";
+import { finishedSkyBridgeAt } from "@verticopolis/engine/port/skyBridgeView";
 import { groupDigits } from "@verticopolis/components/windows/format";
 
 /**

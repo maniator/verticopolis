@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
-import type { SimView } from "@verticopolis/components/port/view";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
+import type { SimView } from "@verticopolis/engine/port/view";
 import { trackAppAction } from "../analytics";
 import { holdTowerFrames } from "@verticopolis/components/render/excalibur/frameHold";
 import { reducedMotionActive } from "../storage/Prefs";

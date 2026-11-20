@@ -1,10 +1,10 @@
 import { vi } from "vitest";
 import type { GameApp } from "../main";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { catalogFor } from "../tests/catalogFixture";
 import { mockPort } from "../tests/portKit/mockPort";
-import { catalogOn, useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
-import type { CatalogEconomy } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogOn, useTowerCatalogSource } from "../engineHost/towerCatalog";
+import type { CatalogEconomy } from "@verticopolis/engine/catalog/catalogTypes";
 import { SaveFailureNotice } from "./saveFailureNotice";
 
 /**

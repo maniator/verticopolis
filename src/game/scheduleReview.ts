@@ -1,13 +1,13 @@
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import type { AudioEngine } from "@verticopolis/components/audio/Audio";
 import type { UI } from "../ui/UI";
 import type { ReviewRow } from "../ui/templates/scheduleReview";
 import { keepAct, recoverAct, reviewAct } from "../ui/templates/scheduleReview";
 import { floorTag } from "@verticopolis/components/windows/format";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import { outcome } from "@verticopolis/components/port/portCodes";
-import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import { outcome } from "@verticopolis/engine/port/portCodes";
+import { scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import { isDialogOpen, isSplashUp } from "./interactionState";
 import type { CardKit } from "./cardKit";
 import {
