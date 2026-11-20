@@ -382,7 +382,7 @@ describe("unit tests mock the engine; integration tests run it", () => {
       .filter(([rel, chain]) => chain !== null && !allow.has(rel));
     expect(
       found.map(([, chain]) => chain),
-      "A unit test mocks the engine port with vi.fn spies and canned JSON answers. Move a test that needs the real engine to a *.integration.test.ts file (and add it to test:wasm:host when it needs the package), or rewrite it against a mock.",
+      "A unit test mocks the engine port with vi.fn spies and canned JSON answers. Move a test that needs the real engine to a *.integration.test.ts file (and to the local test:wasm:host list when it needs the package), or rewrite it against a mock.",
     ).toEqual([]);
   });
 });

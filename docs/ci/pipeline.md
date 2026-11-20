@@ -19,15 +19,13 @@ flowchart TD
     Lane -->|full| Shards["test shards: unit + integration<br/>under coverage, four runners"]
     Lint --> Fast["test: merges the shard reports,<br/>applies the coverage floors"]
     Shards --> Fast
-    Lane -->|full| EngineLegs["test-engine (unit) · (port-kit)<br/>test-engine (host) shards"]
     Lane -->|full| E2E["e2e-serial: visual baselines, perf gate"]
     Lane -->|full| E2EG["e2e-general shards<br/>(split by measured time)"]
     Drift --> Shoot["shoot jobs: shards packed by render time,<br/>each shard rendered twice and byte-compared"]
     Shoot --> Verify["drift-gate: the gallery must match"]
 ```
 
-**Required checks** (branch rules on `main`): `test`, `test-engine (unit)`,
-`test-engine (port-kit)`, `test-engine (host)`, `e2e-serial`, `e2e-general`,
+**Required checks** (branch rules on `main`): `test`, `e2e-serial`, `e2e-general`,
 `drift-gate`, `Analyze (actions)` and `Analyze (javascript-typescript)`. The engine's own checks (`cargo test`, the conformance
 referee, the fuzzers, the coverage floor) run in Verticopolis/engine. Each sharded job reports through one result
 job with the required name, so a shard count can change without touching the

@@ -1,6 +1,7 @@
 /**
  * Run the suites converted to the engine port (`src/tests/portKit/converted.txt`).
- * They skip without the engine package; CI builds it first. `npm run test:port`.
+ * They skip without the engine package, which `npm ci` installs. CI runs them
+ * in the test shards. `npm run test:port`.
  */
 import { spawnSync } from "node:child_process";
 import { convertedSuites } from "../src/tests/portKit/convertedList.ts";

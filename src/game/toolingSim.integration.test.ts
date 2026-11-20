@@ -7,8 +7,8 @@ import type { ToolingEngine, ToolingTowerClass } from "./toolingTower";
 
 // The tower drives the real Rust engine, so this is an integration suite: a
 // unit test mocks the engine instead of running it. It runs where the engine
-// package is built (a local build, `test:wasm:host` on the test-engine (host)
-// shards) and skips without one.
+// package is installed (`npm ci`, and CI's `test` shards fail without it) and
+// skips without one.
 
 interface Unit {
   id: number;
