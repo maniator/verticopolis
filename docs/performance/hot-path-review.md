@@ -47,7 +47,7 @@ repository.
 | Rust engine and its build (Verticopolis/engine) | `engine-rs/src/`, `engine-rs/Cargo.toml`, `Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
 | WASM binding (Verticopolis/engine) | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs` |
 | Binding and hosts (Verticopolis/components) | `src/engineBinding/`, `src/wasmhost/`, `src/simport/` |
-| Rendering and audio (Verticopolis/components) | `src/render/`, `src/presentation/`, `src/catalog/`, `src/shared/`, `src/events/`, `src/audio/` |
+| Rendering and audio (Verticopolis/components) | `src/render/`, `src/presentation/`, `src/catalog/`, `src/model/`, `src/events/`, `src/audio/` |
 | App build settings (which engine and code paths ship) | `vite.config.ts`, `src/build/` (the build modules it imports) |
 | Saves (load per command, autosave on a timer) | `src/storage/` |
 | Frame loop and UI | `src/game/`, `src/ui/` |

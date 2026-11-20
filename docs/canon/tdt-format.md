@@ -81,7 +81,8 @@ field, with offsets and grades, see the byte map,
 
 The floor map starts at byte 560. Our exporter writes the live camera view into
 the window position when the save has one, else 1105, 3491 (opens on the ground
-lobby); see `viewWordsFromView` in `src/storage/tdtFormat.ts`.
+lobby); see `view_words_from_view` in `engine-rs/src/tdt/format.rs` in
+[Verticopolis/engine](https://github.com/Verticopolis/engine).
 
 ## 3. Money scale
 

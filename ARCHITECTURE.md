@@ -29,7 +29,8 @@ as npm packages and pins their versions in `package.json`:
   Classic/Modern presentation rules (`src/presentation/`), audio
   (`src/audio/`), the WASM binding (`src/engineBinding/`), the engine host
   (`src/wasmhost/`), `EnginePort` (`src/simport/`), the catalog handle
-  (`src/catalog/`), shared types (`src/shared/`), the stylesheet and the
+  (`src/catalog/`), the tower model types (`src/model/`, which the package
+  exports as `shared/*` and, after 0.2.2, as `model/*`), the stylesheet and the
   Win95 window chrome.
 - **Verticopolis/web** (this repository): the game itself.
 
