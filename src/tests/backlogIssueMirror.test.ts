@@ -27,9 +27,9 @@ const BACKLOG = resolve(
   "../../_bmad-output/implementation-artifacts/backlog.md",
 );
 
-/** A GH cell: `#N` here, or `Verticopolis/engine#N` / `Verticopolis/components#N`
- *  for an issue that moved in the repository split. */
-const ISSUE_REF = /^(?:Verticopolis\/(?:engine|components))?#\d+$/;
+/** A GH cell: `#N`, an issue in this repository. Engine and components work
+ *  lives in those repositories' own backlogs. */
+const ISSUE_REF = /^#\d+$/;
 
 const HEADER = "| Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |";
 const SEPARATOR = "| ---- | ----- | -- | ---- | ---- | -------- | -------- | ----- | ------ | ----- |";
