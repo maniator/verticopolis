@@ -138,10 +138,11 @@ The fixture builder is part of the engine, so run these from a
 the save paths pointing at this repository's `tools/simtower/saves/`.
 
 ```bash
-cargo run --release --features conformance --bin tdt_fixtures -- claim1     tools/simtower/saves/TOWER5.TDT
-cargo run --release --features conformance --bin tdt_fixtures -- claim7     tools/simtower/saves/TOWER4.TDT
-cargo run --release --features conformance --bin tdt_fixtures -- express740 tools/simtower/saves/TOWER2.TDT
-cargo run --release --features conformance --bin tdt_fixtures -- infested1629 tools/simtower/saves/TOWER2.TDT
+WEB=/path/to/your/web/checkout
+cargo run --release --features conformance --bin tdt_fixtures -- claim1     "$WEB"/tools/simtower/saves/TOWER5.TDT
+cargo run --release --features conformance --bin tdt_fixtures -- claim7     "$WEB"/tools/simtower/saves/TOWER4.TDT
+cargo run --release --features conformance --bin tdt_fixtures -- express740 "$WEB"/tools/simtower/saves/TOWER2.TDT
+cargo run --release --features conformance --bin tdt_fixtures -- infested1629 "$WEB"/tools/simtower/saves/TOWER2.TDT
 ```
 
 Each command reads a real save you supply (the ones you made in the game land in `tools/simtower/saves/`), re-exports it through the shipped Rust codec, edits one
