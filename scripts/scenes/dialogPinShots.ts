@@ -95,7 +95,7 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         if (left <= strip.offsetHeight) throw new Error("Settings did not overflow enough for the pin to be doing anything");
         if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Settings footer is not pinned; this shot would prove nothing");
       });
-      await page.evaluate(pgAssertSettingsContentVisible, "visible-only");
+      await page.evaluate(pgAssertSettingsContentVisible, "visible-only" as const);
     },
     wait: 300,
   },

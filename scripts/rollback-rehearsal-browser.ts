@@ -223,7 +223,7 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
       }
     }
 
-    const stored = await page.evaluate(([keys, unreadable]) => ({ saves: Object.fromEntries((keys as string[]).map((k) => [k, localStorage.getItem(k)])), kept: localStorage.getItem(unreadable as string) !== null }), [[AUTO_KEY, ...SLOT_KEYS], UNREADABLE_KEY] as const);
+    const stored = await page.evaluate(([keys, unreadable]) => ({ saves: Object.fromEntries((keys as readonly string[]).map((k) => [k, localStorage.getItem(k)])), kept: localStorage.getItem(unreadable as string) !== null }), [[AUTO_KEY, ...SLOT_KEYS], UNREADABLE_KEY] as const);
     const rewritten: VerifyReport["rewritten"] = [];
     const rewrittenLabels: string[] = [];
     const toReview: VerifyReport["toReview"] = [];

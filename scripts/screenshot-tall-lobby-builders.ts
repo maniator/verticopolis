@@ -80,7 +80,7 @@ export function buildTallLobbyTower(): void {
     // the shorter hall beside the taller hall's top story.
     for (let f = lobbyInterval + short; f < lobbyInterval + sky; f++) row("floor", f, door, right - 4);
     for (let f = lobbyInterval + sky; f < lobbyInterval + sky + 3; f++) row("floor", f, left + 4, right - 4);
-    const halls: number[] = Array.from(port.lobbyHeights()).slice(-8);
+    const halls = Array.from(port.lobbyHeights() as ArrayLike<number>).slice(-8);
     const want = [lobbyInterval, left + 4, cx, sky, lobbyInterval, door, right - 4, short];
     if (halls.join() !== want.join()) throw new Error(`the split halls are ${halls.join()}, not ${want.join()}`);
   } else if (sky) {
