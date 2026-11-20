@@ -2,19 +2,16 @@ import { renameSync, writeFileSync } from "node:fs";
 import { afterAll, type RunnerTask } from "vitest";
 
 /**
- * The refresh rule every golden here keeps: its own switch writes it only from
- * a run in which every test in the writing file ran and passed, never in CI.
- * Each golden has its own switch, and each switch names one writer, so a
- * refresh of one golden (or of the conformance lock, `VC_CONFORMANCE_UPDATE=1`)
- * never rewrites another, and no run has two suites writing the same file:
- * - `VC_FRAME_DAYS_UPDATE=1`: the frame-day golden, from the Rust engine;
- * - `VC_PORT_EDITS_UPDATE=1`: the port-edit golden, from the Rust engine;
+ * The refresh rule the card-text golden keeps: its own switch writes it only
+ * from a run in which every test in the writing file ran and passed, never in
+ * CI, and the switch names one writer:
  * - `VC_CARD_TEXT_UPDATE=rust`: the card-text lines, from the Rust sweep, on
  *   the committed towers.
+ * The frame-day and port-edit goldens live in the engine's glue lane
+ * (Verticopolis/engine, `packages/verticopolis-engine/glue/goldens/`).
  */
 
-/** A switch's value, or undefined when it is unset, empty or "0" (off, as
- *  for `VC_CONFORMANCE_UPDATE`). */
+/** A switch's value, or undefined when it is unset, empty or "0" (off). */
 function refreshSwitch<T extends string>(name: string, values: readonly T[]): T | undefined {
   const value = process.env[name];
   if (value === undefined || value === "" || value === "0") return undefined;
@@ -23,12 +20,6 @@ function refreshSwitch<T extends string>(name: string, values: readonly T[]): T 
     throw new Error(`${name} must be ${values.join(" or ")}, not ${JSON.stringify(value)}`);
   return value as T;
 }
-
-/** `VC_FRAME_DAYS_UPDATE=1`: the Rust run writes the frame-day golden. */
-export const FRAME_DAYS_UPDATE = refreshSwitch("VC_FRAME_DAYS_UPDATE", ["1"]) === "1";
-
-/** `VC_PORT_EDITS_UPDATE=1`: the Rust run writes the port-edit golden. */
-export const PORT_EDITS_UPDATE = refreshSwitch("VC_PORT_EDITS_UPDATE", ["1"]) === "1";
 
 /** `VC_CARD_TEXT_UPDATE=rust`: the Rust sweep writes the card-text lines.
  *  The value names the writer, as it did while a TypeScript referee could

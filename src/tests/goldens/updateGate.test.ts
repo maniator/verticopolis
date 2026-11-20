@@ -76,7 +76,7 @@ describe("the end of a writing run", () => {
     const unfinished = vi.fn(() => missing);
     let error: unknown;
     try {
-      finishWritingRun("frame-day golden", writing, unfinished, write, task);
+      finishWritingRun("card-text golden", writing, unfinished, write, task);
     } catch (e) {
       error = e;
     }
@@ -100,7 +100,7 @@ describe("the end of a writing run", () => {
   it("refuses a call below the file before it reads the switch", () => {
     for (const writing of [false, true]) {
       const r = run(writing, nested);
-      expect(r.error).toBe("writeAfterPassingRun for the frame-day golden belongs at the top level of the test file");
+      expect(r.error).toBe("writeAfterPassingRun for the card-text golden belongs at the top level of the test file");
       expect(r.write).not.toHaveBeenCalled();
     }
   });
@@ -108,7 +108,7 @@ describe("the end of a writing run", () => {
   it("refuses to write when a test did not pass, naming it", () => {
     const r = run(true, failing);
     expect(r.error).toBe(
-      "frame-day golden NOT written; every test in the file has to run and pass, and these did not: src/w.test.ts > one (fail)",
+      "card-text golden NOT written; every test in the file has to run and pass, and these did not: src/w.test.ts > one (fail)",
     );
     expect(r.unfinished).not.toHaveBeenCalled();
     expect(r.write).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe("the end of a writing run", () => {
 
   it("refuses to write when a case did not finish, naming it", () => {
     const r = run(true, passing, ["case-a", "case-b"]);
-    expect(r.error).toBe("frame-day golden NOT written; these cases did not finish: case-a, case-b");
+    expect(r.error).toBe("card-text golden NOT written; these cases did not finish: case-a, case-b");
     expect(r.write).not.toHaveBeenCalled();
   });
 });

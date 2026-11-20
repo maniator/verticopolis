@@ -116,27 +116,13 @@ The engine writes and reads every save; the host only keeps the bytes. See
 
 ## The goldens
 
-Two goldens pin what the engine does when this game drives it, and
-`npm run test:wasm` checks both:
-
-- **The frame-day golden** (`src/tests/goldens/frame-days.json`): the engine
-  plays each case through its own `advance`, as the game's frame loop calls it,
-  and must reproduce every checkpoint (the start, the first frame, each hour
-  and the end of the day). `VC_FRAME_DAYS_UPDATE=1` rewrites it from the
-  pinned engine. To find the field behind a moved hash,
-  `VC_FRAME_DAYS_DUMP=<dir> VC_FRAME_DAYS_CASE=<case id>` writes the case's
-  canonical views at each checkpoint under `<dir>/rust/`, to diff against a run
-  of the build before the change.
-- **The port-edit golden** (`src/tests/goldens/port-edits.json`): each case
-  sends the player's edits as the game's port commands and pins every answer,
-  with the view hashes and events after each step and at every hour of play
-  between them (`conformanceWasmPortEdits`). It also steps the undo trail and
-  restores an earlier save. `VC_PORT_EDITS_UPDATE=1` rewrites it, and
-  `VC_PORT_EDITS_DUMP=<dir> VC_PORT_EDITS_CASE=<case id>` dumps a case's views
-  at each line the same way.
-
-An engine pin raise that changes how the game plays moves them in the same
-pull request.
+The frame-day and port-edit goldens pin what the engine does when a frame
+loop drives it through the port: a day on every fixture at every speed, and
+the player's edits with undo and redo, each checked step by step. They live
+with the engine, in its glue lane
+([`conformance/README.md`](https://github.com/Verticopolis/engine/blob/main/conformance/README.md)),
+and an engine change that moves them refreshes them in the same engine pull
+request, so a pin raise here carries them already moved.
 
 ## Where to look
 

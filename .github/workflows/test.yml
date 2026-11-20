@@ -401,8 +401,8 @@ jobs:
         if: ${{ needs.changes.outputs.code != 'false' && matrix.leg == 'port-kit' }}
         run: npm run test:port
 
-  # The suites that start the Rust engine themselves (conformance, the
-  # goldens, perf comparison), run once per PR; the test:wasm script's
+  # The suites that start the Rust engine themselves (saves, the
+  # card-text golden, perf comparison), run once per PR; the test:wasm script's
   # test:port half runs on the port-kit leg. Vitest splits the files across three shards, so a slow
   # runner no longer pushes the whole set past its timeout, and the
   # engine-host-result job reports them as the one required
