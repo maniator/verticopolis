@@ -428,8 +428,8 @@ export async function runMode(opts: RunnerOptions, rep: number, slot: ModeName, 
       if (m.type() === "error") note(`console: ${m.text()}`);
     });
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ev = <A, R>(page: Page, label: string, fn: (arg: A) => R | Promise<R>, arg: A): Promise<R> =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     within(label, page.evaluate(fn as any, arg) as Promise<R>);
   const slowRate = Math.max(...config.throttles);
   let browser: Browser | null = null;

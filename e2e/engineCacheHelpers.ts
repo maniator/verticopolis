@@ -36,9 +36,12 @@ export async function tamperCache(page: Page, which: Which, how: "salt" | "flip"
               kind === "wasm"
                 ? new Uint8Array([...bytes, ...salt])
                 : new Uint8Array([...bytes, ...new TextEncoder().encode("\n// salt\n")]);
-          else if (how === "flip")
-            bytes = bytes.map((b, i) => (i === bytes.length - 1 ? (b === 0x20 ? 0x0a : 0x20) : b));
-          else
+          else if (how === "flip") {
+            // Swap the last byte between a space and a newline.
+            const last = bytes.length - 1;
+            bytes = bytes.slice();
+            bytes[last] = bytes[last] === 0x20 ? 0x0a : 0x20;
+          } else
             bytes = new TextEncoder().encode(
               JSON.stringify({ ...JSON.parse(new TextDecoder().decode(bytes)), package: "e".repeat(64) }),
             );

@@ -318,8 +318,8 @@ export async function runProcess(
   };
   // Every page call is bounded, so a hung engine fails the repetition
   // instead of stalling the benchmark.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ev = <A, R>(page: Page, label: string, fn: (arg: A) => R | Promise<R>, arg: A): Promise<R> =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     within(label, page.evaluate(fn as any, arg) as Promise<R>);
   const slowRate = Math.max(...config.throttles);
   // The CPU probe under a throttle, kept by "<where>:<rate>".

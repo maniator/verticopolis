@@ -44,15 +44,12 @@ async function scrollers(page: Page, inner?: string) {
     const box = modal.querySelector(".modal-box") as HTMLElement;
     const live = [...modal.querySelectorAll<HTMLElement>("*")]
       .filter((el) => /auto|scroll/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight)
-      .map((el) =>
-        el === box
-          ? ".modal-box"
-          : innerClass && el.classList.contains(innerClass)
-            ? `.${innerClass}`
-            : el.id
-              ? `#${el.id}`
-              : `.${[...el.classList].join(".")}`,
-      );
+      .map((el) => {
+        if (el === box) return ".modal-box";
+        if (innerClass && el.classList.contains(innerClass)) return `.${innerClass}`;
+        if (el.id) return `#${el.id}`;
+        return `.${[...el.classList].join(".")}`;
+      });
     return {
       overflow: [style.overflowX, style.overflowY],
       boxOverflows: box.scrollHeight > box.clientHeight,

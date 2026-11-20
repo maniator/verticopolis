@@ -97,7 +97,11 @@ test("File > Open… shows the window while My Towers is still opening, and fill
           (req as any)[event] = (e: Event) => (held[event] as ((e: Event) => void) | undefined)?.call(req, e);
       };
       return new Proxy(held, {
-        get: (t, k) => (k === "result" ? req?.result : k === "error" ? req?.error : t[k as string]),
+        get: (t, k) => {
+          if (k === "result") return req?.result;
+          if (k === "error") return req?.error;
+          return t[k as string];
+        },
       }) as unknown as IDBOpenDBRequest;
     }) as typeof indexedDB.open;
   });

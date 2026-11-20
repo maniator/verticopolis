@@ -80,7 +80,9 @@ function parseWindow(v) {
 // (as the unit tests do) can never parse the host process's argv or exit it.
 function resolveWindow() {
   const flagged = (name) => process.argv.some((a) => a === `--${name}` || a.startsWith(`--${name}=`));
-  const raw = flagged("window") ? arg("window", "") : flagged("days") ? arg("days", "") : "30";
+  let raw = "30";
+  if (flagged("window")) raw = arg("window", "");
+  else if (flagged("days")) raw = arg("days", "");
   try {
     return parseWindow(raw);
   } catch (err) {
@@ -238,6 +240,13 @@ function buildFilteredCountQuery(event, where, hours) {
   );
 }
 
+// What a failed query's HTTP status most likely means.
+const HTTP_HINTS = {
+  401: "unauthorized (check POSTHOG_PERSONAL_API_KEY)",
+  403: "forbidden (key lacks query:read on this project)",
+  429: "rate limited (too many queries)",
+};
+
 /** POST a HogQL query. Never throws: returns a tagged result so a caller can
  *  render a skipped section instead of aborting the whole report. */
 async function runQuery(query) {
@@ -259,14 +268,7 @@ async function runQuery(query) {
     json = { raw: text };
   }
   if (!res.ok) {
-    const generic =
-      res.status === 401
-        ? "unauthorized (check POSTHOG_PERSONAL_API_KEY)"
-        : res.status === 403
-          ? "forbidden (key lacks query:read on this project)"
-          : res.status === 429
-            ? "rate limited (too many queries)"
-            : `HTTP ${res.status}`;
+    const generic = HTTP_HINTS[res.status] ?? `HTTP ${res.status}`;
     return { ok: false, status: res.status, hint: json?.detail || json?.error?.message || generic, json };
   }
   return { ok: true, status: res.status, json };

@@ -216,12 +216,9 @@ export async function startDeployments(
     const target = req.url ?? "/";
     // Origin-form only, one leading slash, nothing that names a drive or stream.
     const path = /^\/(?!\/)/.test(target) ? new URL(target, "http://localhost").pathname : "/\0";
-    const from =
-      engineOverride && path.startsWith("/engine/")
-        ? engineOverride
-        : pageOverride && path === "/index.html"
-          ? pageOverride
-          : current;
+    let from = current;
+    if (engineOverride && path.startsWith("/engine/")) from = engineOverride;
+    else if (pageOverride && path === "/index.html") from = pageOverride;
     const root = roots[from];
     requests.push({ path, from });
     if (networkFails === "all" || (networkFails === "engine" && path.startsWith("/engine/"))) {
