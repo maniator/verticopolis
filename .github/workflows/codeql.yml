@@ -3,8 +3,9 @@ name: CodeQL
 # Code scanning with the same shape as Verticopolis/engine and
 # Verticopolis/components: the default query suite, no build
 # (build-mode none), dependency caching, a weekly scheduled run, and one
-# category per language (/language:<name>). The repository's Python is
-# vendored agent tooling, so it is not analyzed.
+# category per language (/language:<name>). The repository's Python
+# (vendored agent tooling and the SimTower harness scripts) and the harness's
+# one C file are local tools that ship nothing, so they are not analyzed.
 #
 # - A push to main always analyzes, so main has an analysis for every commit
 #   and a pull request is compared against it.
