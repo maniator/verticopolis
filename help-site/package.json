@@ -7,11 +7,15 @@
     "sync": "node scripts/sync-assets.mjs",
     "dev": "node scripts/sync-assets.mjs && astro dev",
     "build": "node scripts/sync-assets.mjs && astro build",
-    "typecheck": "astro sync && tsc --noEmit"
+    "typecheck": "astro check"
   },
   "dependencies": {
     "@astrojs/markdown-satteri": "0.4.9",
     "@astrojs/starlight": "0.42.7",
     "astro": "7.4.12"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "typescript": "5.9.3"
   }
 }
