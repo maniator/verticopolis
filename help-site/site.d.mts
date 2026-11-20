@@ -9,7 +9,7 @@ export function siteHref(href: string, base?: string, gameOrigin?: string): stri
 export const ENGINE_DOCS: string;
 export const GITHUB_ISSUES: string;
 export const SPONSOR_URL: string;
-export const sharedHead: { tag: string; attrs: Record<string, string> }[];
+export const sharedHead: { tag: "meta" | "link"; attrs: Record<string, string> }[];
 export type SidebarEntry =
   | { label: string; link: string; attrs?: Record<string, string> }
   | { slug: string }
