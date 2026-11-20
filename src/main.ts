@@ -91,10 +91,8 @@ import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
  * `window.game` surface: e2e/ and the screenshot scenes (scripts/scenes/*,
  * scripts/screenshot-page-ops.ts) reach this instance at runtime, in dev serves
  * and VC_TOOLING=1 builds only (bootstrap.ts gates the publish; production
- * bundles carry none): the public fields (sim, engine, speed, grid) plus, via
- * any-cast, `selectPicked`, `selected`, `refreshEditor`, `onUpdateAvailable`,
- * `setSpeed`, `onboarding.dismissSplash`, `refreshTraffic` (pins the traffic
- * chip) and `jumpToTraffic` (the chip's tap, answering whether it went); renaming any needs every consumer updated (TypeScript won't catch it).
+ * bundles carry none). `tooling-window.d.ts` types it for them as this class,
+ * so `npm run typecheck` catches a rename that breaks one.
  */
 class GameApp implements GameAppPorts {
   /** The engine (either one, through the port), its view and code tables. */

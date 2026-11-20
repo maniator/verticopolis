@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { hostedGame } from "./offlineHelpers";
 import { ENGINE_PATH, SALT_SECTION, installed, tamperCache } from "./engineCacheHelpers";
@@ -16,7 +15,7 @@ test.setTimeout(90_000);
 const repairButton = (page: Page) => page.locator('#engine-failure [data-act="repair-engine"]');
 const status = (page: Page) => page.locator("#engine-failure .engine-failure-repair-status");
 const refused = (page: Page) =>
-  page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, {
+  page.waitForFunction(() => window.__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, {
     timeout: 30_000,
   });
 
@@ -63,7 +62,7 @@ test("repairs a corrupted cached binary in place, and the next Reload boots the 
 
   await page.reload();
   await hostedGame(page);
-  expect(await page.evaluate(() => (window as any).__vcEngineBoot)).toMatchObject({ engine: "wasm", failure: null });
+  expect(await page.evaluate(() => window.__vcEngineBoot)).toMatchObject({ engine: "wasm", failure: null });
 });
 
 test("repairs a corrupted cached glue and a cached record the same way", async ({ page }) => {

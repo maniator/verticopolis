@@ -44,10 +44,10 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
         clock: 10,
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as unknown as { game: any }).game;
-            const escs = g.sim.tower.transports.filter((t: any) => t.kind === "escalator");
+            const g = window.game;
+            const escs = g.sim.tower.transports.filter((t) => t.kind === "escalator");
             if (escs.length < 3) throw new Error("Modern escalator run did not stage all three flights");
-            if (!escs.some((t: any) => t.top >= 3)) throw new Error("no escalator reaches an office floor");
+            if (!escs.some((t) => t.top >= 3)) throw new Error("no escalator reaches an office floor");
           });
         },
         wait: 400,
@@ -67,9 +67,9 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
         clock: 10,
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as unknown as { game: any }).game;
-            const escs = g.sim.tower.transports.filter((t: any) => t.kind === "escalator");
-            if (escs.some((t: any) => t.top >= 3)) throw new Error("Classic tower has an escalator on an office floor");
+            const g = window.game;
+            const escs = g.sim.tower.transports.filter((t) => t.kind === "escalator");
+            if (escs.some((t) => t.top >= 3)) throw new Error("Classic tower has an escalator on an office floor");
           });
         },
         wait: 400,
@@ -92,8 +92,8 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
         clock: 10,
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as unknown as { game: any }).game;
-            const cinema = g.sim.tower.units.find((u: any) => u.kind === "cinema");
+            const g = window.game;
+            const cinema = g.sim.tower.units.find((u) => u.kind === "cinema");
             if (!cinema) throw new Error("Modern tower has no theater to select");
             g.selected = { type: "unit", id: cinema.id };
             g.engine.selectedId = cinema.id;
@@ -125,8 +125,8 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
         clock: 10,
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as unknown as { game: any }).game;
-            const cinema = g.sim.tower.units.find((u: any) => u.kind === "cinema");
+            const g = window.game;
+            const cinema = g.sim.tower.units.find((u) => u.kind === "cinema");
             if (!cinema) throw new Error("Classic tower has no theater to select");
             g.selected = { type: "unit", id: cinema.id };
             g.engine.selectedId = cinema.id;

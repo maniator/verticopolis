@@ -20,7 +20,9 @@
  *  straight-flight comparison. Every venue is opened (no construction
  *  scaffolding). Fails closed when anything is refused. */
 export function buildVenueFlightsTower(): void {
-  const w = window as unknown as { game: any; __vcShotVenueFlights?: any };
+  const w = window as Window & {
+    __vcShotVenueFlights?: { mode?: Parameters<Window["game"]["saveLoad"]["newGame"]>[0] };
+  };
   const g = w.game;
   const opts = w.__vcShotVenueFlights ?? {};
   g.saveLoad.newGame(opts.mode ?? "modern");
@@ -29,7 +31,8 @@ export function buildVenueFlightsTower(): void {
   save.star = 4;
   port.restore(JSON.stringify(save));
   port.setMoney(50_000_000);
-  const kind = (k: string): number => g.portCodes.kind(k);
+  type Kind = Parameters<typeof g.portCodes.kind>[0];
+  const kind = (k: Kind): number => g.portCodes.kind(k);
   const why = (): string => port.lastReason?.() ?? "";
   const must = (res: Float64Array, what: string): void => {
     if (res[0] !== 1) throw new Error(`${what} was refused: ${why()}`);
@@ -40,12 +43,12 @@ export function buildVenueFlightsTower(): void {
   const right = cx + 29;
   for (let x = cx; x <= right; x++) port.buildAt(kind("lobby"), 1, x);
   for (let x = cx - 1; x >= left; x--) port.buildAt(kind("lobby"), 1, x);
-  const row = (k: string, floor: number, lo: number, hi: number): void => {
+  const row = (k: Kind, floor: number, lo: number, hi: number): void => {
     for (let x = lo; x <= hi; x++) port.buildAt(kind(k), floor, x);
   };
   for (let f = 2; f <= 5; f++) row("floor", f, left + 2, right - 2);
   for (let f = 0; f >= -2; f--) row("floor", f, left + 2, right - 2);
-  const width = (k: string): number => g.getCatalog().facilities.find((f: any) => f.key === k).width;
+  const width = (k: string): number => g.getCatalog().facilities.find((f) => f.key === k)!.width;
   const cinemaX = cx - Math.floor(width("cinema") / 2);
   must(port.buildAt(kind("cinema"), 2, cinemaX), "the cinema");
   must(port.buildShaft(kind("stairs"), cinemaX - width("stairs"), 2, 3), "the stairs by the cinema");

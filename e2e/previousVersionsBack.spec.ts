@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 
 /**
@@ -12,13 +11,13 @@ test.setTimeout(90_000);
 
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, {
+  await page.waitForFunction(() => !!window.__vcEngine?.status.hosted && !!window.game, undefined, {
     timeout: 30_000,
   });
   await page.evaluate(() => document.getElementById("splash")?.remove());
   // Two tower files, so the row the player picked is not simply the only one.
   await page.evaluate(async () => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(0);
     await g.saveFile("Harbour Point");
     await g.saveFile("Sky Hotel");

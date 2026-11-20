@@ -21,7 +21,7 @@
  *  are left on `window.__vcShotSplitLot`. Fails closed when a lobby is
  *  refused or the two lobbies touch. */
 export function buildSplitLotTower(): void {
-  const w = window as unknown as { game: any; __vcShotSplitLot?: unknown };
+  const w = window as Window & { __vcShotSplitLot?: unknown };
   const g = w.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(7300, "modern");
@@ -55,7 +55,7 @@ export function buildSplitLotTower(): void {
         x += 1;
         continue;
       }
-      const u = s.tower.getUnit(r.unitId);
+      const u = s.tower.getUnit(r.unitId)!;
       u.state = "occupied";
       u.everOccupied = true;
       if (people > 0) u.occupants = people;
@@ -67,7 +67,8 @@ export function buildSplitLotTower(): void {
   const c = s.clock;
   c.minutes = c.minutes - c.minuteOfDay + 12 * 60;
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx + 6, 3, 1.25);
   g.speed = 0;
   g.engine.paused = false;
@@ -79,7 +80,7 @@ export function buildSplitLotTower(): void {
  *  (`scripts/scenes/overviewMap.ts`). Fails closed when a lobby is refused
  *  or two towers touch. */
 export function buildSplitGapTowers(): void {
-  const w = window as unknown as { game: any };
+  const w = window;
   const g = w.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(7301, "modern");
@@ -111,7 +112,7 @@ export function buildSplitGapTowers(): void {
           x += 1;
           continue;
         }
-        x += s.tower.getUnit(r.unitId).width;
+        x += s.tower.getUnit(r.unitId)!.width;
       }
     }
   }
@@ -121,7 +122,8 @@ export function buildSplitGapTowers(): void {
     }
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 8, 0.6);
   g.speed = 0;
   g.engine.paused = false;

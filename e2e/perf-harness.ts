@@ -6,8 +6,6 @@
  * evaluate boundary), so the node-identity check runs entirely in-page.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export interface UiUpdateSample {
   n: number;
   batch: number;
@@ -36,7 +34,7 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
   // more than asked and report a misleading count. The spec also guards this at
   // collection; enforcing it here keeps the helper honest for any other caller.
   if (n % batch !== 0) throw new Error(`n (${n}) must be divisible by batch (${batch})`);
-  const g = (window as any).game;
+  const g = window.game;
   const advance = () => g.enginePort.tick(1); // one minute on
   for (let i = 0; i < 50; i++) {
     advance();
@@ -79,7 +77,7 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
  * stalled loop fails the assertion fast rather than hanging to the test timeout.
  */
 export function measureSimSpeed(windowMs: number): Promise<number> {
-  const g = (window as any).game;
+  const g = window.game;
   return new Promise<number>((resolve) => {
     const startClock = g.reader.header.minutes as number;
     const startWall = performance.now();
@@ -121,7 +119,7 @@ export function checkNodeIdentity(pumps: number): {
   towerStatsContainerStable: boolean;
   towerStatsChildStable: boolean;
 } {
-  const g = (window as any).game;
+  const g = window.game;
   const el = g.ui.el;
   const before = {
     money: el.money,

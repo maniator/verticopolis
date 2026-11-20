@@ -140,7 +140,7 @@ export { isPhoneViewport } from "../src/tests/phoneTier.ts";
 export async function assertReady(page: Page, minUnits: number): Promise<void> {
   const state = await page.evaluate(() => ({
     splash: !!document.getElementById("splash"),
-    units: (window as unknown as { game?: any }).game?.sim?.tower?.units?.length ?? 0,
+    units: window.game?.sim?.tower?.units?.length ?? 0,
   }));
   if (state.splash) throw new Error("splash leaked (not dismissed)");
   if (minUnits > 0 && state.units < minUnits) throw new Error(`tower too small (${state.units} < ${minUnits} units)`);

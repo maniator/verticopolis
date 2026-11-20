@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { startDeployments, type Deployments } from "./deployments";
 import { engineEntries, expectEngineIs, newContext } from "./engineDeployHelpers";
@@ -34,10 +33,10 @@ test.afterEach(() => {
 const repairButton = (page: Page) => page.locator('#engine-failure [data-act="repair-engine"]');
 const status = (page: Page) => page.locator("#engine-failure .engine-failure-repair-status");
 const refused = (page: Page) =>
-  page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, {
+  page.waitForFunction(() => window.__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, {
     timeout: 60_000,
   });
-const bootFailure = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null);
+const bootFailure = (page: Page) => page.evaluate(() => window.__vcEngineBoot?.failure ?? null);
 
 /** The first build installed and controlling this page, on the engine. */
 async function installedFirst(page: Page): Promise<void> {
@@ -57,10 +56,10 @@ test("a repair leaves a save that was made online, and the repaired engine loads
     const page = await context.newPage();
     await installedFirst(page);
     const built = await page.evaluate(async () => {
-      const g = (window as any).game;
+      const g = window.game;
       g.sim.money = 1e9;
       const ok = g.sim.build("lobby", 1, 160).ok;
-      (window as any).game.syncSim();
+      window.game.syncSim();
       const id = (await g.saveFile("Repair test")) as string;
       // This test is about the My Towers file: another tower comes in, so the
       // reload resumes that one and "Repair test" is a file to open.
@@ -84,8 +83,8 @@ test("a repair leaves a save that was made online, and the repaired engine loads
     expect(await lobbyAt(page, 160), "the booted game does not already hold the lobby").toBe(false);
 
     const loaded = await page.evaluate(async (id) => {
-      await (window as any).game.openFile(id);
-      return (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some(
+      await window.game.openFile(id);
+      return (JSON.parse(window.__vcEngine!.port.serialize()).units as { kind: string; x: number }[]).some(
         (u) => u.kind === "lobby" && u.x === 160,
       );
     }, built.id);

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
 
@@ -39,7 +38,7 @@ function contrast(a: number[], b: number[]): number {
 test("the page's markup carries the sweep's names and live regions", async ({ page }) => {
   await onGame(page);
   // Past the title screen, which holds the page under it inert.
-  await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
+  await page.evaluate(() => window.game.onboarding.dismissSplash());
   // The toast rail announces politely, never assertively (AUD-020).
   await expect(page.locator("#toast-wrap")).toHaveAttribute("aria-live", "polite");
   // The tower name field, in the Tower Info window, has an accessible name (PROD-001).
@@ -93,7 +92,7 @@ test.describe("on a touch screen", () => {
     await onGame(page);
     await page.evaluate(() => {
       document.getElementById("splash")?.remove();
-      (window as any).game.ui.showAbout();
+      window.game.ui.showAbout();
     });
     const close = page.locator("#modal .modal-x");
     await expect(close).toBeVisible();

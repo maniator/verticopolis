@@ -71,8 +71,8 @@ export const FEATURE_SCENES: Scene[] = [
           // day's garbage (emptied only by the morning truck).
           await page.evaluate(pgSetClock, 15);
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const rec = g.sim.tower.units.find((u: any) => u.kind === "recycling");
+            const g = window.game;
+            const rec = g.sim.tower.units.find((u) => u.kind === "recycling");
             if (rec) g.engine.setCamera(rec.x + rec.width / 2, rec.floor, 2.2);
           });
         },
@@ -85,8 +85,8 @@ export const FEATURE_SCENES: Scene[] = [
           // Frame the basement road decks (B1/B2) where the collection truck
           // drives, wide enough that it's in view wherever along the deck it sits.
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const ramp = g.sim.tower.units.find((u: any) => u.kind === "parkingRamp");
+            const g = window.game;
+            const ramp = g.sim.tower.units.find((u) => u.kind === "parkingRamp");
             g.engine.setCamera(ramp ? ramp.x + 40 : Math.floor(g.grid.width / 2), 0, 1.5);
           });
         },
@@ -96,8 +96,8 @@ export const FEATURE_SCENES: Scene[] = [
         name: "inspector-recycling",
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const rec = g.sim.tower.units.find((u: any) => u.kind === "recycling");
+            const g = window.game;
+            const rec = g.sim.tower.units.find((u) => u.kind === "recycling");
             if (rec) {
               g.engine.setCamera(rec.x + rec.width, rec.floor, 2.0);
               g.inspector.inspectPicked({ type: "unit", id: rec.id, kind: "recycling" });
@@ -167,8 +167,8 @@ export const FEATURE_SCENES: Scene[] = [
           // priced-office ladder this shot documents).
           await page.evaluate(pgClearTransients, false);
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const office = g.sim.tower.units.find((u: any) => u.kind === "office" && u.state === "occupied");
+            const g = window.game;
+            const office = g.sim.tower.units.find((u) => u.kind === "office" && u.state === "occupied");
             if (!office) throw new Error("stats tower has no occupied office to select for the editor crop");
             g.selected = { type: "unit", id: office.id };
             g.engine.selectedId = office.id;
@@ -198,16 +198,16 @@ export const FEATURE_SCENES: Scene[] = [
           // off-market. Staged here (not in buildStatsTower) so the earlier
           // stats shots stay untouched.
           await page.evaluate(() => {
-            const g = (window as any).game;
+            const g = window.game;
             g.speed = 0;
             g.engine.paused = true;
           });
           await page.evaluate(pgClearTransients, false);
           await page.evaluate(() => {
-            const g = (window as any).game;
+            const g = window.game;
             const offices = g.sim.tower.units
-              .filter((u: any) => u.kind === "office")
-              .sort((a: any, b: any) => a.floor - b.floor || a.x - b.x);
+              .filter((u) => u.kind === "office")
+              .sort((a, b) => a.floor - b.floor || a.x - b.x);
             if (offices.length < 5)
               throw new Error(`stats tower staged only ${offices.length} offices (need 5 for the vacancy split)`);
             for (let i = 0; i < 5; i++) {
@@ -260,8 +260,8 @@ export const FEATURE_SCENES: Scene[] = [
           await page.evaluate(pgStepNoDraw, 330);
           await page.evaluate(pgSetClock, 12.7);
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const m = g.sim.tower.units.find((u: any) => u.kind === "metro");
+            const g = window.game;
+            const m = g.sim.tower.units.find((u) => u.kind === "metro")!;
             g.engine.setCamera(m.x + m.width / 2, -3, 1.7);
           });
           // Three drawn frames put the train and camera where the pins left them.
@@ -279,8 +279,8 @@ export const FEATURE_SCENES: Scene[] = [
           await page.evaluate(pgStepNoDraw, 420);
           await page.evaluate(pgSetClock, 13 + 7 / 60);
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const m = g.sim.tower.units.find((u: any) => u.kind === "metro");
+            const g = window.game;
+            const m = g.sim.tower.units.find((u) => u.kind === "metro")!;
             g.engine.setCamera(m.x + m.width / 2, -3, 1.7);
           });
           // Three drawn frames put the train and camera where the pins left them.
@@ -314,8 +314,8 @@ export const FEATURE_SCENES: Scene[] = [
         // Center on the station the train is calling at, so the Map window
         // never hides it; its neighbors show their empty platforms.
         await page.evaluate((stop) => {
-          const g = (window as any).game;
-          const stations = g.sim.tower.units.filter((u: any) => u.kind === "metro").sort((a: any, b: any) => a.x - b.x);
+          const g = window.game;
+          const stations = g.sim.tower.units.filter((u) => u.kind === "metro").sort((a, b) => a.x - b.x);
           const u = stations[stop];
           g.engine.setCamera(u.x + u.width / 2, -3, 1);
         }, calling);
@@ -338,7 +338,7 @@ export const FEATURE_SCENES: Scene[] = [
         crop: "#topbar",
         wait: 0,
         setup: async (page) => {
-          await page.evaluate(async () => (window as any).game.refreshTraffic());
+          await page.evaluate(async () => window.game.refreshTraffic());
           await expectTrafficLevel(page, "Smooth");
         },
       },
@@ -399,7 +399,7 @@ export const FEATURE_SCENES: Scene[] = [
         // edge (the awning hangs just outside it), rather than hardcode a tile.
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
+            const g = window.game;
             let min = Infinity;
             for (const u of g.sim.tower.units) {
               if (u.kind === "lobby" && u.floor === 1) min = Math.min(min, u.x);
@@ -414,7 +414,7 @@ export const FEATURE_SCENES: Scene[] = [
         wait: 500,
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
+            const g = window.game;
             let max = -Infinity;
             for (const u of g.sim.tower.units) {
               if (u.kind === "lobby" && u.floor === 1) max = Math.max(max, u.x + u.width);
@@ -460,7 +460,7 @@ export const FEATURE_SCENES: Scene[] = [
         crop: "#modal .modal-box",
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
+            const g = window.game;
             g.speed = 0;
             g.engine.paused = true;
             (document.getElementById("modal") as HTMLDialogElement | null)?.close();
@@ -488,7 +488,7 @@ export const FEATURE_SCENES: Scene[] = [
         crop: "#modal .modal-box",
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
+            const g = window.game;
             (document.getElementById("modal") as HTMLDialogElement | null)?.close();
             g.ui.showUpdatePrompt(
               () => {},

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { buildToStar, expectEngineHosted } from "./helpers";
 
 // Every test must end with its tower still on the engine.
@@ -13,17 +13,17 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  */
 test("zoom cull hides the moving layer, restores it, and survives a rebuild", async ({ page }) => {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game?.sim && (window as any).game?.ui));
+  await page.waitForFunction(() => Boolean(window.game?.sim && window.game?.ui));
   // Decorative passers-by are Modern-only (#2091), so the walker half of the
   // cull needs a Modern tower, with the Settings switch (off by default) on.
-  await page.evaluate(() => (window as any).game.saveLoad.newGame("modern"));
-  await page.waitForFunction(() => (window as any).game.reader.header.mode === "modern");
+  await page.evaluate(() => window.game.saveLoad.newGame("modern"));
+  await page.waitForFunction(() => window.game.reader.header.mode === "modern");
   await page.evaluate(() => {
-    (window as any).game.engine.passersBy = true;
+    window.game.engine.passersBy = true;
   });
   await page.evaluate(buildToStar, 2); // a tower with floors, passers-by, crowd
   await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     document.getElementById("splash")?.remove();
     // The star-2 fixture carries no transports; add one shaft so the cull has
     // real elevator-car actors to hide and restore. A relayed build, so on the
@@ -32,7 +32,7 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
   });
   await expectEngineHosted(page);
   await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     // The fixture freezes game speed, so no routed people spawn on their own.
     // Run the clock a minute at a time, on the engine itself, until someone
     // the render draws is out walking (a rider shows only in the car's count),
@@ -44,10 +44,10 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     // how many are in: a passer-by of rank r shows once its floor holds 16 * r
     // people. Office workers now commute in one by one, so wait until some
     // passer-by's floor holds enough people for it to show.
-    const walking = () => (g.reader.update(), g.engine.sim.crowd.people.some((p: any) => p.state !== "riding"));
+    const walking = () => (g.reader.update(), g.engine.sim.crowd.people.some((p) => p.state !== "riding"));
     const inOn = (floor: number) =>
-      g.engine.sim.tower.units.reduce((n: number, u: any) => (u.floor === floor ? n + u.occupants : n), 0);
-    const atWork = () => g.engine.walkers.some((w: any) => inOn(w.floor) >= 16 * w.rank);
+      g.engine.sim.tower.units.reduce((n, u) => (u.floor === floor ? n + u.occupants : n), 0);
+    const atWork = () => g.engine.walkers.some((w) => inOn(w.floor) >= 16 * w.rank);
     const ready = () => walking() && atWork();
     for (let minute = 0; minute < 24 * 60 && !ready(); minute++) g.sim.tick(1);
     if (!ready()) throw new Error("no one walked the tower while anyone was at work, in a day");
@@ -59,15 +59,15 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     g.engine.paused = false;
   });
   // Let one frame pass at a normal zoom so the moving layer exists and shows.
-  await page.evaluate(() => (window as any).game.engine.setCamera(190, 2, 1));
+  await page.evaluate(() => window.game.engine.setCamera(190, 2, 1));
   await page.waitForTimeout(300);
   const visibleBefore = await page.evaluate(() => {
-    const e = (window as any).game.engine;
+    const e = window.game.engine;
     return {
       culled: e.crowdCulled,
-      carsShown: e.carActors.filter((c: any) => c.actor.graphics.isVisible).length,
-      walkersShown: e.walkers.filter((w: any) => w.actor.graphics.isVisible).length,
-      crowdShown: [...e.crowdActors.values()].filter((r: any) => r.actor.graphics.isVisible).length,
+      carsShown: e.carActors.filter((c) => c.actor.graphics.isVisible).length,
+      walkersShown: e.walkers.filter((w) => w.actor.graphics.isVisible).length,
+      crowdShown: [...e.crowdActors.values()].filter((r) => r.actor.graphics.isVisible).length,
     };
   });
   expect(visibleBefore.culled).toBe(false);
@@ -78,16 +78,17 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
   expect(visibleBefore.crowdShown).toBeGreaterThan(0);
 
   // Zoom out past the threshold: the whole moving layer hides within a frame.
-  await page.evaluate(() => (window as any).game.engine.setCamera(190, 20, 0.06));
+  await page.evaluate(() => window.game.engine.setCamera(190, 20, 0.06));
   await page.waitForTimeout(300);
   const culled = await page.evaluate(() => {
-    const e = (window as any).game.engine;
-    const hidden = (arr: any[]) => arr.every((x: any) => !x.actor.graphics.isVisible);
+    const e = window.game.engine;
+    const hidden = (arr: readonly { actor: { graphics: { isVisible: boolean } } }[]) =>
+      arr.every((x) => !x.actor.graphics.isVisible);
     return {
       culled: e.crowdCulled,
       cars: hidden(e.carActors),
       walkers: hidden(e.walkers),
-      crowd: [...e.crowdActors.values()].every((r: any) => !r.actor.graphics.isVisible),
+      crowd: [...e.crowdActors.values()].every((r) => !r.actor.graphics.isVisible),
     };
   });
   expect(culled).toEqual({ culled: true, cars: true, walkers: true, crowd: true });
@@ -97,8 +98,8 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
   // actually happened (fresh, untagged actors) and was born hidden; without
   // that the leg would pass vacuously if syncMotion never fired.
   await page.evaluate(() => {
-    const g = (window as any).game;
-    for (const c of g.engine.carActors) c.preRebuild = true;
+    const g = window.game;
+    for (const c of g.engine.carActors) (c as typeof c & { preRebuild?: boolean }).preRebuild = true;
     // One floor above the star-2 fixture's roof (its structure tops out at
     // floor 6, so floor 7 is empty and supported); the relayed build bumps
     // tower.revision, which is what trips the structural rebuild.
@@ -106,12 +107,13 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
   });
   await page.waitForTimeout(300);
   const afterRebuild = await page.evaluate(() => {
-    const e = (window as any).game.engine;
+    const e = window.game.engine;
     return {
       culled: e.crowdCulled,
-      rebuilt: e.carActors.length > 0 && e.carActors.every((c: any) => !c.preRebuild),
-      anyCarShown: e.carActors.some((c: any) => c.actor.graphics.isVisible),
-      anyWalkerShown: e.walkers.some((w: any) => w.actor.graphics.isVisible),
+      rebuilt:
+        e.carActors.length > 0 && e.carActors.every((c) => !(c as typeof c & { preRebuild?: boolean }).preRebuild),
+      anyCarShown: e.carActors.some((c) => c.actor.graphics.isVisible),
+      anyWalkerShown: e.walkers.some((w) => w.actor.graphics.isVisible),
     };
   });
   expect(afterRebuild.culled).toBe(true);
@@ -120,16 +122,16 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
   expect(afterRebuild.anyWalkerShown).toBe(false);
 
   // Zoom back in past the re-show threshold: cars return.
-  await page.evaluate(() => (window as any).game.engine.setCamera(190, 2, 1));
+  await page.evaluate(() => window.game.engine.setCamera(190, 2, 1));
   await page.waitForTimeout(300);
   const restored = await page.evaluate(() => {
-    const e = (window as any).game.engine;
+    const e = window.game.engine;
     return {
       culled: e.crowdCulled,
-      carsShown: e.carActors.filter((c: any) => c.actor.graphics.isVisible).length,
+      carsShown: e.carActors.filter((c) => c.actor.graphics.isVisible).length,
       // Re-show leaves the people map to reconcileCrowd (stale-corpse guard),
       // so this proves the live walkers really came back through that path.
-      crowdShown: [...e.crowdActors.values()].filter((r: any) => r.actor.graphics.isVisible).length,
+      crowdShown: [...e.crowdActors.values()].filter((r) => r.actor.graphics.isVisible).length,
     };
   });
   expect(restored.culled).toBe(false);

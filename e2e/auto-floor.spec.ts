@@ -4,8 +4,6 @@ import { expectEngineHosted } from "./helpers";
 // Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 /**
  * End-to-end coverage for the auto-floor bridge (backlog `auto-floor-build` (2)):
  * placing a module through the REAL build controller (`game.build`, the same
@@ -27,14 +25,14 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
 
     await page.goto("/");
     await page.waitForFunction(() => {
-      const g = (window as any).game;
+      const g = window.game;
       const canvas = document.querySelector<HTMLCanvasElement>("#view");
       return Boolean(g?.sim && g.engine && g.build && canvas && canvas.width > 0 && canvas.height > 0);
     });
     await page.evaluate(() => document.getElementById("splash")?.remove());
 
     const result = await page.evaluate(async () => {
-      const g = (window as any).game;
+      const g = window.game;
       const s = g.sim;
       const t = s.tower;
       g.speed = 0; // freeze time so the crowd sim can't churn the setup
@@ -50,7 +48,7 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       // no-error assertion clean, not sim.build directly.
       await g.build.tryBuild("office", 2, x0, true); // A: [x0, x0+9)
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).game.syncSim();
+      window.game.syncSim();
       const gapBare = t.structureKindAt(2, x0 + 11); // still empty before B
       // Read the quoted cost from the sim itself, not a hard-coded catalog value,
       // so a future balance tweak doesn't rot this test.
@@ -58,7 +56,7 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       const moneyBeforeB = s.money;
       await g.build.tryBuild("office", 2, x0 + 15, true); // B: [x0+15, x0+24)
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).game.syncSim();
+      window.game.syncSim();
       const gap: (string | undefined)[] = [];
       for (let i = 9; i < 15; i++) gap.push(t.structureKindAt(2, x0 + i));
       return {
@@ -88,13 +86,13 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
   test("refuses a module when it plus its bridge floor is unaffordable", async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-      const g = (window as any).game;
+      const g = window.game;
       return Boolean(g?.sim && g.build);
     });
     await page.evaluate(() => document.getElementById("splash")?.remove());
 
     const out = await page.evaluate(async () => {
-      const g = (window as any).game;
+      const g = window.game;
       const s = g.sim;
       const t = s.tower;
       g.speed = 0;
@@ -111,7 +109,7 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       s.money = cost - 1; // one dollar short of the whole run
       await g.build.tryBuild("office", 2, x0 + 15, true);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).game.syncSim();
+      window.game.syncSim();
       return {
         placed: Boolean(t.unitAt(2, x0 + 15)),
         gapFilled: t.structureKindAt(2, x0 + 11) !== undefined,
@@ -128,13 +126,13 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
   test("bridges a detached ground concourse lobby with lobby tiles, not floor", async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-      const g = (window as any).game;
+      const g = window.game;
       return Boolean(g?.sim && g.build);
     });
     await page.evaluate(() => document.getElementById("splash")?.remove());
 
     const out = await page.evaluate(async () => {
-      const g = (window as any).game;
+      const g = window.game;
       const s = g.sim;
       const t = s.tower;
       g.speed = 0;
@@ -151,7 +149,7 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       // ground tile that would otherwise float land connected.
       await g.build.tryBuild("lobby", 1, x0 + 45, true);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).game.syncSim();
+      window.game.syncSim();
       const kinds: (string | undefined)[] = [];
       for (let i = 40; i <= 45; i++) kinds.push(t.structureKindAt(1, x0 + i));
       return { kinds };
@@ -166,13 +164,13 @@ test.describe("sky-lobby canon (e2e)", () => {
   test("claims floor 15 with a lobby, then refuses a plain floor tile there", async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-      const g = (window as any).game;
+      const g = window.game;
       return Boolean(g?.sim && g.build);
     });
     await page.evaluate(() => document.getElementById("splash")?.remove());
 
     const out = await page.evaluate(async () => {
-      const g = (window as any).game;
+      const g = window.game;
       const s = g.sim;
       const t = s.tower;
       g.speed = 0;
@@ -194,12 +192,12 @@ test.describe("sky-lobby canon (e2e)", () => {
       // Claim floor 15 by placing a lobby there (goes through the real gesture).
       await g.build.tryBuild("lobby", 15, x0 + 20, true);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).game.syncSim();
+      window.game.syncSim();
       const claimed = t.floorHasLobby(15);
       // Now try to drop a plain floor tile elsewhere on floor 15.
       await g.build.tryBuild("floor", 15, x0 + 5, true);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).game.syncSim();
+      window.game.syncSim();
       const kindAfterFloorAttempt = t.structureKindAt(15, x0 + 5);
       return { claimed, kindAtLobby: t.structureKindAt(15, x0 + 20), kindAfterFloorAttempt };
     });
@@ -215,13 +213,13 @@ test.describe("sky-lobby canon (e2e)", () => {
   test("refuses to bulldoze a lobby tile through the real build controller", async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-      const g = (window as any).game;
+      const g = window.game;
       return Boolean(g?.sim && g.build);
     });
     await page.evaluate(() => document.getElementById("splash")?.remove());
 
     const out = await page.evaluate(async () => {
-      const g = (window as any).game;
+      const g = window.game;
       const s = g.sim;
       const t = s.tower;
       g.speed = 0;
@@ -234,10 +232,11 @@ test.describe("sky-lobby canon (e2e)", () => {
       }
       // The concourse has a lobby at (1, x0).
       const lobby = t.unitAt(1, x0);
-      const kindBefore = lobby?.kind;
+      if (!lobby) throw new Error(`no lobby at (1, ${x0})`);
+      const kindBefore = lobby.kind;
       const removed = await g.build.tryRemoveUnit(lobby, "bulldoze");
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).game.syncSim();
+      window.game.syncSim();
       const kindAfter = t.unitAt(1, x0)?.kind;
       return { kindBefore, removed, kindAfter };
     });
@@ -250,13 +249,13 @@ test.describe("sky-lobby canon (e2e)", () => {
   test("the default Classic tower's catalog withholds the preview reason", async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
-      const g = (window as any).game;
+      const g = window.game;
       return Boolean(g?.sim && g.build);
     });
     await page.evaluate(() => document.getElementById("splash")?.remove());
 
     // Default new tower is Classic, so the catalog the preview reads names no refusal.
-    const classic = await page.evaluate(() => (window as any).game.getCatalog().rules.previewNamesRefusal);
+    const classic = await page.evaluate(() => window.game.getCatalog().rules.previewNamesRefusal);
     expect(classic).toBe(false);
   });
 });

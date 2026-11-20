@@ -20,7 +20,7 @@ async function fullModernPalette(page: Page): Promise<void> {
   });
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
-    const g = (window as any).game;
+    const g = window.game;
     g.sim = g.sim.constructor.newGame(4400, "modern");
     g.sim.money = 500_000_000;
     g.sim.star = 5;

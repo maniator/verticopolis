@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
 import {
@@ -29,16 +28,16 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /** Advance the clock on the engine, build, save to My Towers and load it back. */
 async function playSaveAndLoad(page: Page): Promise<void> {
-  await page.evaluate(() => (window as any).game.setSpeed(1));
-  const before = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
-  await page.waitForFunction((b) => (window as any).game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
+  await page.evaluate(() => window.game.setSpeed(1));
+  const before = await page.evaluate(() => window.game.sim.clock.minutes as number);
+  await page.waitForFunction((b) => window.game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
   const built = await page.evaluate(async () => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(0);
     g.sim.money = 1e9;
     const ok = g.sim.build("lobby", 1, 160).ok;
-    (window as any).game.syncSim();
-    const host = (window as any).__vcEngine;
+    window.game.syncSim();
+    const host = window.__vcEngine!;
     const lobbyAt = (x: number) =>
       (JSON.parse(host.port.serialize()).units as { kind: string; x: number }[]).some(
         (u) => u.kind === "lobby" && u.x === x,

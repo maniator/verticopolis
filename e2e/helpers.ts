@@ -54,13 +54,12 @@ export async function expectEngineHosted(page: Page): Promise<void> {
   // Leave an already-failed test's own failure on top of the report.
   if (info.status === "failed" || info.status === "timedOut" || info.status === "interrupted") return;
   const state = await page.evaluate(() => {
-    const w = window as any;
-    const h = w.__vcEngine;
+    const h = window.__vcEngine;
     return {
       host: Boolean(h),
-      hosted: Boolean(h?.status?.hosted),
-      lastError: h?.status?.lastError ?? null,
-      onEngine: Boolean(h?.port) && w.game?.enginePort === h.port,
+      hosted: Boolean(h?.status.hosted),
+      lastError: h?.status.lastError ?? null,
+      onEngine: Boolean(h?.port) && window.game?.enginePort === h?.port,
     };
   });
   expect(state, "the live tower must run on the WASM engine").toEqual({
@@ -90,7 +89,7 @@ export async function dispatchTouch(
 ): Promise<void> {
   await page.evaluate(
     ({ type, id, x, y }) => {
-      const ex = (window as any).game?.engine?.engine;
+      const ex = window.game?.engine?.engine;
       const startFrame = Number.isFinite(ex?.stats?.currFrame?.id) ? ex.stats.currFrame.id : null;
       const canvas = document.getElementById("view") as HTMLCanvasElement;
       const r = canvas.getBoundingClientRect();
@@ -113,7 +112,7 @@ export async function dispatchTouch(
         let settled = false;
         const frameAdvanced = () => {
           if (startFrame === null) return false;
-          const now = (window as any).game?.engine?.engine?.stats?.currFrame?.id;
+          const now = window.game?.engine?.engine?.stats?.currFrame?.id;
           return Number.isFinite(now) && now > startFrame;
         };
         const finish = (ok: boolean, reason: string) => {
@@ -175,7 +174,7 @@ export async function buildInPage<T extends object, E extends object = Record<ne
 
 export async function engineSave(page: Page): Promise<Record<string, any> | null> {
   return page.evaluate(() => {
-    const port = (window as any).__vcEngine?.port;
+    const port = window.__vcEngine?.port;
     return port ? JSON.parse(port.serialize()) : null;
   });
 }
@@ -186,7 +185,7 @@ export async function engineSave(page: Page): Promise<Record<string, any> | null
  * whose edits otherwise reach the engine when the task ends.
  */
 export function syncEngine(): void {
-  (window as any).game.syncSim();
+  window.game.syncSim();
 }
 
 /**
@@ -204,14 +203,14 @@ export function syncEngine(): void {
  * does.
  */
 export function buildToStar(target: number): number {
-  const g = (window as any).game;
-  const sync = () => (window as any).game.syncSim();
+  const g = window.game;
+  const sync = () => window.game.syncSim();
   const scratch = () => {
     const Sim = g.sim.constructor;
     return Sim.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
   };
   const W = g.grid.width;
-  const port = (window as any).__vcEngine?.port;
+  const port = window.__vcEngine?.port;
   // The Rust engine is the only engine, so a tower it does not hold would be
   // scripted into the read model alone: fail loudly instead.
   if (!port || g.enginePort !== port) throw new Error("buildToStar: no engine host holds the tower");
@@ -238,7 +237,7 @@ export function buildToStar(target: number): number {
   for (let f = 2; f <= structTop; f++) for (let x = 4; x < W - 4; x++) t.place("floor", f, x);
   for (let f = 3; f <= officeTop; f++) for (let x = 34; x + 9 <= W - 4; x += 9) t.place("office", f, x);
 
-  for (const u of t.units as any[]) {
+  for (const u of t.units) {
     if (u.kind === "office" || u.kind === "condo") {
       u.state = "occupied";
       u.everOccupied = true;
@@ -290,11 +289,11 @@ export function buildToStar(target: number): number {
     if (!r.ok) throw new Error(`wedding hall refused: ${r.reason ?? "unknown"}`);
     sync();
     const s2 = scratch();
-    const wh = (s2.tower.units as any[]).find((u) => u.kind === "weddingHall");
+    const wh = s2.tower.units.find((u) => u.kind === "weddingHall");
     if (wh && wh.state === "construction") wh.state = "empty"; // done building
-    if (!(s2.vipVisitDay > s2.clock.day))
+    if (!(s2.vipVisitDay! > s2.clock.day))
       throw new Error(`the hall scheduled no VIP visit ahead (vipVisitDay ${s2.vipVisitDay}, day ${s2.clock.day})`);
-    s2.clock.minutes = s2.vipVisitDay * 24 * 60 - 1;
+    s2.clock.minutes = s2.vipVisitDay! * 24 * 60 - 1;
     g.adoptSim(s2, true);
     g.speed = 0;
     port.tick(1);
@@ -314,14 +313,14 @@ export function buildToStar(target: number): number {
  * current zoom from two world points since there's no absolute-zoom setter.
  */
 export function fitCamera(): void {
-  const g = (window as any).game;
+  const g = window.game;
   const e = g.engine;
   const FLOOR = 34;
   e.center();
   const cur = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(0)) / FLOOR;
   let minF = 1;
   let maxF = 1;
-  for (const u of g.sim.tower.units as any[]) {
+  for (const u of g.sim.tower.units) {
     if (u.floor < minF) minF = u.floor;
     if (u.floor > maxF) maxF = u.floor;
   }

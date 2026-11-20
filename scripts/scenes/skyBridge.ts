@@ -23,7 +23,7 @@ async function armSkyBridge(page: Page): Promise<void> {
  *  the gap: the preview the pointer draws there. */
 async function hoverGap(page: Page, dFloor: number): Promise<void> {
   await page.evaluate((dFloor) => {
-    const w = window as unknown as { game: any; __vcShotSkyBridge?: { cx: number; sky: number } };
+    const w = window as Window & { __vcShotSkyBridge?: { cx: number; sky: number } };
     const at = w.__vcShotSkyBridge;
     if (!at) throw new Error("the sky bridge towers were not built");
     w.game.engine.setCamera(at.cx, at.sky, 1.6);
@@ -35,7 +35,7 @@ async function hoverGap(page: Page, dFloor: number): Promise<void> {
 /** Lay the bridge a click in the gap lays, and drop the ghost. */
 async function layBridge(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const w = window as unknown as { game: any; __vcShotSkyBridge?: { cx: number; sky: number } };
+    const w = window as Window & { __vcShotSkyBridge?: { cx: number; sky: number } };
     const at = w.__vcShotSkyBridge!;
     const laid = w.game.build.buildSkyBridge(at.cx, at.sky);
     if (!laid.ok) throw new Error(`the bridge was refused: ${laid.reason}`);

@@ -10,7 +10,7 @@ import { pgStepNoDraw } from "../screenshot-builders.ts";
 export async function trafficLabel(page: Page): Promise<string> {
   return page.evaluate(async () => {
     // The chip draws once the port answers.
-    await (window as any).game?.refreshTraffic();
+    await window.game?.refreshTraffic();
     return document.getElementById("traffic-label")?.textContent ?? "";
   });
 }

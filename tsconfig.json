@@ -23,6 +23,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vitest/globals"]
   },
-  "include": ["src/**/*.ts", "*.d.ts"],
+  "include": ["src/**/*.ts", "vite-env.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -20,6 +20,14 @@
  * Keep this file ERASABLE (no enums / namespaces / parameter properties).
  */
 
+/** Excalibur's clock once `debug.useTestClock()` swapped in its TestClock,
+ *  which steps by hand; the engine's type names only the base Clock. A type
+ *  (erased), so the helpers below stay self-contained. */
+export type SteppedClock = Window["game"]["engine"]["engine"]["clock"] & { step?(ms: number): void };
+
+/** A unit's state, as the harness tower types it. */
+type UnitState = Window["game"]["sim"]["tower"]["units"][number]["state"];
+
 /** Sweep transient chrome just before a capture: toasts always go; a stray
  *  event/emergency dialog (a random fire the running sim popped) goes unless the
  *  shot is deliberately showing a modal. Runs in the browser. */
@@ -116,7 +124,7 @@ export function pgAssertSettingsContentVisible(mode: "require-all" | "visible-on
  *  has no engine: gallery/preview), or "failed" (an engine exists but the
  *  clock could not be swapped, e.g. an Excalibur API change). */
 export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
-  const w = window as unknown as { game?: any };
+  const w = window;
   const te = w.game?.engine;
   const eng = te?.engine;
   if (!eng) return "none";
@@ -125,11 +133,12 @@ export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
   // to the resets below rather than returning early: the resets are idempotent
   // and skipping them on re-entry would leave a boot-dependent decorative clock
   // or wall-time accumulator in place, reintroducing the very drift this guards.
-  if (typeof eng.clock?.step !== "function") {
+  const stepped = (): SteppedClock | undefined => eng.clock;
+  if (typeof stepped()?.step !== "function") {
     // Prefer Excalibur's sanctioned frame-by-frame debug path; it stops the
     // running clock, converts it, and re-assigns it in one place.
     if (typeof eng.debug?.useTestClock === "function") eng.debug.useTestClock();
-    if (typeof eng.clock?.step !== "function") return "failed";
+    if (typeof stepped()?.step !== "function") return "failed";
   }
   // Zero the decorative animation clock via the engine's own reset (it
   // accumulated a boot-dependent amount before adoption). Fall back to the
@@ -208,18 +217,19 @@ export function pgFlushFrames(): Promise<void> {
  *  invalid request: no stepping, returns false, so a bad caller can't mistake
  *  "did nothing" for "advanced time" and quietly void determinism. */
 export function pgStep(frames: number): boolean {
-  const w = window as unknown as { game?: any };
-  const clock = w.game?.engine?.engine?.clock;
-  if (!clock || typeof clock.step !== "function") return false;
+  const w = window;
+  const clock: SteppedClock | undefined = w.game?.engine?.engine?.clock;
+  const step = clock?.step?.bind(clock);
+  if (!step) return false;
   const n = Math.floor(frames);
   if (!Number.isFinite(n) || n <= 0) return false;
-  for (let i = 0; i < n - 1; i++) clock.step(1000 / 60);
+  for (let i = 0; i < n - 1; i++) step(1000 / 60);
   // A meal-overlay change waits up to MEAL_SYNC_MS for its scene sync in play
   // (#1747); a shot shows the settled tower, so the final frame takes any
   // change still waiting, as pgStepNoDraw does.
   const tower = w.game?.engine;
   if (tower && typeof tower.lastSceneSyncAt === "number") tower.lastSceneSyncAt = -Infinity;
-  clock.step(1000 / 60);
+  step(1000 / 60);
   return true;
 }
 
@@ -248,24 +258,26 @@ export function pgStep(frames: number): boolean {
  *  expected, so a future Excalibur rename degrades to slow-but-correct. Returns false
  *  in the same no-clock cases as pgStep. Runs in the browser. */
 export function pgStepNoDraw(frames: number): boolean {
-  const w = window as unknown as { game?: any };
+  const w = window;
   const eng = w.game?.engine?.engine;
-  const clock = eng?.clock;
-  if (!clock || typeof clock.step !== "function") return false;
+  const clock: SteppedClock | undefined = eng?.clock;
+  const step = clock?.step?.bind(clock);
+  if (!eng || !step) return false;
   const n = Math.floor(frames);
   if (!Number.isFinite(n) || n <= 0) return false;
-  const originalDraw = eng._draw;
+  // Excalibur's private per-frame draw hook, reached by name.
+  const originalDraw: unknown = Reflect.get(eng, "_draw");
   if (typeof originalDraw !== "function") {
     // Draw hook not where expected (Excalibur internals changed): step normally,
     // drawing every frame. Slower, but always correct.
-    for (let i = 0; i < n; i++) clock.step(1000 / 60);
+    for (let i = 0; i < n; i++) step(1000 / 60);
     return true;
   }
   try {
-    eng._draw = () => {};
-    for (let i = 0; i < n - 1; i++) clock.step(1000 / 60);
+    Reflect.set(eng, "_draw", () => {});
+    for (let i = 0; i < n - 1; i++) step(1000 / 60);
   } finally {
-    eng._draw = originalDraw;
+    Reflect.set(eng, "_draw", originalDraw);
   }
   // Sync the camera's draw-phase cull position (drawPos) to its logical position
   // before the final, only, draw, so OffscreenSystem culls against the real camera
@@ -283,7 +295,7 @@ export function pgStepNoDraw(frames: number): boolean {
   // change still waiting.
   const tower = w.game?.engine;
   if (tower && typeof tower.lastSceneSyncAt === "number") tower.lastSceneSyncAt = -Infinity;
-  clock.step(1000 / 60);
+  step(1000 / 60);
   return true;
 }
 
@@ -293,7 +305,7 @@ export function pgStepNoDraw(frames: number): boolean {
  *  step; one explicit refresh right before capture pins it to the final state.
  *  The traffic chip draws once the port answers, so this waits for it. */
 export async function pgRefreshUi(): Promise<void> {
-  const g = (window as unknown as { game?: any }).game;
+  const g = window.game;
   if (!g) return;
   g.reader?.update?.();
   g.ui?.update?.({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
@@ -308,7 +320,7 @@ export function pgDismissSplash(): void {
   } catch {
     /* ignore */
   }
-  const w = window as unknown as { game?: any };
+  const w = window;
   document
     .querySelector("#splash [data-splash='continue'], #splash [data-splash='new']")
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -325,12 +337,12 @@ export function pgDismissSplash(): void {
 
 /** Fill a row of `kind` from x0 up to x1, reading each placed unit's CANON width
  *  to advance so rooms sit flush without overlap regardless of the width table. */
-export function pgFillRow(kind: string, floor: number, x0: number, x1: number, state: string): void {
-  const s = (window as unknown as { game: any }).game.sim;
+export function pgFillRow(kind: string, floor: number, x0: number, x1: number, state: UnitState): void {
+  const s = window.game.sim;
   for (let x = x0; x + 1 <= x1;) {
     const r = s.tower.place(kind, floor, x);
     if (r.ok) {
-      const u = s.tower.getUnit(r.unitId);
+      const u = s.tower.getUnit(r.unitId)!;
       u.state = state;
       u.everOccupied = true;
       x += u.width; // canon width of what actually got placed
@@ -344,31 +356,26 @@ export function pgFillRow(kind: string, floor: number, x0: number, x1: number, s
  *  is 08:30), into the next day when the clock is already past that time.
  *
  *  The clock moves and nothing runs: whatever pass the move skips is owed and
- *  runs on the next tick. When the page is hosted on the Rust engine,
- *  `game.sim` is a copy of its save, so the engine's own clock moves
- *  (`advanceClock`, the counterpart of `clock.advance`), with no load, so the
- *  crowd stays. The crowd, the latches and the owed passes stay as they are.
- *  When the page is not hosted, the fallback advances `game.sim.clock`
- *  directly. */
+ *  runs on the next tick. `game.sim` is a copy of the Rust engine's save, so
+ *  the engine's own clock moves (`advanceClock`), with no load, so the crowd
+ *  stays. The crowd, the latches and the owed passes stay as they are. A page
+ *  whose engine is not hosted (stopped by a trap) has no clock to move, and
+ *  the call throws. */
 export function pgSetClock(hour: number): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const c = g.sim.clock;
   let delta = hour * 60 - c.minuteOfDay;
   if (delta < 0) delta += 1440;
-  const vc = (window as unknown as { __vcEngine?: { status?: { hosted?: boolean }; port?: any } }).__vcEngine;
-  const hosted = Boolean(vc?.status?.hosted) && g.enginePort === vc?.port;
-  if (!hosted) {
-    c.advance(delta);
-    // The renderer reads the clock through the app's view, which follows the
-    // engine once per frame after the step. Bring it up now, as the app does
-    // after its own edits, so the first settle frame already shows this hour.
-    g.reader?.update?.();
-    return;
-  }
+  const vc = window.__vcEngine;
+  if (!vc?.status.hosted || g.enginePort !== vc.port)
+    throw new Error("pgSetClock: the Rust engine is not hosting the page");
   if (delta === 0) return;
   g.syncSim();
-  vc!.port.advanceClock(delta);
-  g.reader?.update?.();
+  vc.port.advanceClock(delta);
+  // The renderer reads the clock through the app's view, which follows the
+  // engine once per frame after the step. Bring it up now, as the app does
+  // after its own edits, so the first settle frame already shows this hour.
+  g.reader.update();
 }
 
 /** Drive the Map's real View dropdown so the shot exercises the shipped
@@ -383,7 +390,7 @@ export function pgSetMapView(view: string): void {
 
 /** Center the Excalibur camera on the lot. */
 export function pgFrame(arg: { tile: number | null; floor: number; zoom: number }): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const tile = arg.tile ?? Math.floor(g.grid.width / 2);
   g.engine.setCamera(tile, arg.floor, arg.zoom);
 }

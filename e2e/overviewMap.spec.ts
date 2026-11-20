@@ -11,8 +11,6 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * with the map open.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 
@@ -20,16 +18,16 @@ const PHONE = { width: 390, height: 844 };
  *  the map has rooms to draw and the camera room to move. */
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game));
+  await page.waitForFunction(() => Boolean(window.game));
   await page.evaluate(() => document.getElementById("splash")?.remove());
   await page.evaluate(buildToStar, 3);
-  await page.evaluate(() => (window as any).game.engine.setCamera((window as any).game.grid.width / 2, 6, 1));
+  await page.evaluate(() => window.game.engine.setCamera(window.game.grid.width / 2, 6, 1));
 }
 
 /** The camera's center, in tiles and floors. */
 async function camera(page: Page): Promise<{ tile: number; floor: number }> {
   return page.evaluate(() => {
-    const v = (window as any).game.engine.viewState();
+    const v = window.game.engine.viewState();
     return { tile: v.tile, floor: v.floor };
   });
 }
@@ -65,7 +63,7 @@ async function floorAfterClickAt(page: Page, x: number, y: number): Promise<numb
 /** The world canvas's pixel height of one floor at the current zoom. */
 async function floorPx(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const e = (window as any).game.engine;
+    const e = window.game.engine;
     return Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
   });
 }
@@ -157,8 +155,8 @@ test.describe("overview map on the desktop", () => {
   test("a focused map keeps the game's build keys out of the world", async ({ page }) => {
     await boot(page);
     await page.click('.pal-item[data-kind="office"]');
-    const units = () => page.evaluate(() => (window as any).game.sim.tower.units.length);
-    const cursor = () => page.evaluate(() => (window as any).game.keyboard.cursor());
+    const units = () => page.evaluate(() => window.game.sim.tower.units.length);
+    const cursor = () => page.evaluate(() => window.game.keyboard.cursor());
     const before = await units();
     await page.locator("#overview-map .overview-map-view").focus();
     // The build cursor's move, commit and bulldoze keys.
@@ -185,7 +183,7 @@ test.describe("overview map on the desktop", () => {
       await page.setViewportSize(size);
       await boot(page);
       await page.evaluate(() => {
-        const g = (window as any).game;
+        const g = window.game;
         g.onboarding.arm(g.enginePort);
         // The longest step's hint, so the check covers the most lines.
         document.getElementById("hint")!.textContent = "x ".repeat(82);
@@ -265,16 +263,16 @@ test.describe("overview map on the desktop", () => {
     await page.mouse.up();
     await cameraFloorSettles(page, (f) => f > start.floor + 2);
     // A click on an office opens its editor.
-    await page.evaluate(() => (window as any).game.engine.setCamera((window as any).game.grid.width / 2, 6, 1));
+    await page.evaluate(() => window.game.engine.setCamera(window.game.grid.width / 2, 6, 1));
     await nextFrames(page);
     const at = await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       const e = g.engine;
       // The office on floor 6 nearest the camera's center.
       const mid = g.grid.width / 2;
       const office = g.sim.tower.units
-        .filter((u: { kind: string; floor: number }) => u.kind === "office" && u.floor === 6)
-        .sort((a: any, b: any) => Math.abs(a.x + a.width / 2 - mid) - Math.abs(b.x + b.width / 2 - mid))[0];
+        .filter((u) => u.kind === "office" && u.floor === 6)
+        .sort((a, b) => Math.abs(a.x + a.width / 2 - mid) - Math.abs(b.x + b.width / 2 - mid))[0];
       const r = (document.getElementById("view") as HTMLCanvasElement).getBoundingClientRect();
       const fpx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       return { x: r.left + e.worldToScreenX(office.x + office.width / 2), y: r.top + e.worldToScreenY(6) + fpx / 2 };
@@ -286,28 +284,28 @@ test.describe("overview map on the desktop", () => {
   test("the world still builds with the map open", async ({ page }) => {
     await boot(page);
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.sim.money = 1e9;
       g.syncSim();
       g.setSpeed(1); // Classic builds only while the clock runs (#1936)
     });
     await page.click('.pal-item[data-kind="office"]');
-    const before = await page.evaluate(() => (window as any).game.sim.tower.units.length);
+    const before = await page.evaluate(() => window.game.sim.tower.units.length);
     // Bare floor on floor 4, left of the offices (which start at tile 34) and
     // clear of the map window.
-    await page.evaluate(() => (window as any).game.engine.setCamera(20, 4, 1));
+    await page.evaluate(() => window.game.engine.setCamera(20, 4, 1));
     // setCamera moves the camera at once; the frames let the renderer draw
     // the new view before the click below lands on it.
     await nextFrames(page);
     const at = await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       const e = g.engine;
       const r = (document.getElementById("view") as HTMLCanvasElement).getBoundingClientRect();
       const floorPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       return { x: r.left + e.worldToScreenX(20), y: r.top + e.worldToScreenY(4) + floorPx / 2 };
     });
     await page.mouse.click(at.x, at.y);
-    await expect.poll(() => page.evaluate(() => (window as any).game.sim.tower.units.length)).toBeGreaterThan(before);
+    await expect.poll(() => page.evaluate(() => window.game.sim.tower.units.length)).toBeGreaterThan(before);
   });
 
   test("a closed map stays closed on the next visit", async ({ page }) => {
@@ -315,7 +313,7 @@ test.describe("overview map on the desktop", () => {
     await page.click("#overview-map .overview-map-close");
     await expect(page.locator("#overview-map")).toBeHidden();
     await page.reload();
-    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.waitForFunction(() => Boolean(window.game));
     await expect(page.locator("#btn-map")).toBeVisible();
     await expect(page.locator("#overview-map")).toBeHidden();
   });
@@ -324,8 +322,8 @@ test.describe("overview map on the desktop", () => {
     await boot(page);
     await page.click("#overview-map .overview-map-close");
     await expect(page.locator("#overview-map")).toBeHidden();
-    await page.evaluate(() => (window as any).game.saveLoad.newGame("modern"));
-    await page.waitForFunction(() => (window as any).game.reader.header.mode === "modern");
+    await page.evaluate(() => window.game.saveLoad.newGame("modern"));
+    await page.waitForFunction(() => window.game.reader.header.mode === "modern");
     await nextFrames(page);
     await expect(page.locator("#btn-map")).toBeVisible();
     await expect(page.locator("#overview-map")).toBeHidden();
@@ -625,8 +623,8 @@ test.describe("overview map on a phone", () => {
     if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
     await expect(page.locator("#btn-map")).toBeHidden();
     await page.evaluate(() => {
-      const g = (window as any).game;
-      const unit = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+      const g = window.game;
+      const unit = g.sim.tower.units.find((u) => u.kind === "office")!;
       g.selectPicked({ type: "unit", id: unit.id, kind: unit.kind });
     });
     await expect(page.locator("#editor .win-title")).toBeVisible();
@@ -711,12 +709,12 @@ test.describe("overview map on a phone", () => {
     // The office on floor 6 nearest the camera's center, which the camera
     // keeps in the middle of the world view, below the card.
     const at = await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       const e = g.engine;
       const mid = g.grid.width / 2;
       const office = g.sim.tower.units
-        .filter((u: { kind: string; floor: number }) => u.kind === "office" && u.floor === 6)
-        .sort((a: any, b: any) => Math.abs(a.x + a.width / 2 - mid) - Math.abs(b.x + b.width / 2 - mid))[0];
+        .filter((u) => u.kind === "office" && u.floor === 6)
+        .sort((a, b) => Math.abs(a.x + a.width / 2 - mid) - Math.abs(b.x + b.width / 2 - mid))[0];
       const r = (document.getElementById("view") as HTMLCanvasElement).getBoundingClientRect();
       const fpx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       return { x: r.left + e.worldToScreenX(office.x + office.width / 2), y: r.top + e.worldToScreenY(6) + fpx / 2 };
@@ -758,8 +756,8 @@ test.describe("overview map on a phone", () => {
     await page.setViewportSize({ width: 320, height: 568 });
     await boot(page);
     await page.evaluate(() => {
-      const g = (window as any).game;
-      const office = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+      const g = window.game;
+      const office = g.sim.tower.units.find((u) => u.kind === "office")!;
       g.selectPicked({ type: "unit", id: office.id, kind: office.kind });
     });
     await expect(page.locator("#editor")).toBeVisible();
@@ -793,7 +791,7 @@ test.describe("overview map on a phone", () => {
   test("a Map opened during onboarding sits above the Getting Started card and still closes", async ({ page }) => {
     await boot(page);
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.onboarding.arm(g.enginePort);
     });
     await expect(page.locator("#onboard")).toBeVisible();
@@ -820,7 +818,7 @@ test.describe("overview map on a phone", () => {
     await page.setViewportSize({ width: PHONE.height, height: PHONE.width });
     await boot(page);
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.onboarding.arm(g.enginePort);
     });
     await expect(page.locator("#onboard")).toBeVisible();
@@ -835,8 +833,8 @@ test.describe("overview map on a phone", () => {
     expect(closed.width).toBeLessThanOrEqual(300);
     // An editor card opened under it keeps its close button on top.
     await page.evaluate(() => {
-      const g = (window as any).game;
-      const office = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+      const g = window.game;
+      const office = g.sim.tower.units.find((u) => u.kind === "office")!;
       g.selectPicked({ type: "unit", id: office.id, kind: office.kind });
     });
     await expect(page.locator("#editor")).toBeVisible();

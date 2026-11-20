@@ -44,7 +44,7 @@ test.afterEach(async () => {
 /** Load the game with a fresh tower on the Rust engine. */
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
   await page.evaluate(() => {
@@ -113,18 +113,18 @@ test("after a reload the folder comes back in Look in, and a tower opens from it
   await page.locator(".fd-primary").click();
   await expect(page.locator(".fd")).toBeHidden();
   // Another tower comes in, so "Kept" is a file to open again, not the tower being played.
-  await page.evaluate(() => (window as any).game.saveLoad.newGame("modern"));
+  await page.evaluate(() => window.game.saveLoad.newGame("modern"));
 
   await page.reload();
   await boot(page);
-  const before = await page.evaluate(() => (window as any).game.enginePort.generation());
+  const before = await page.evaluate(() => window.game.enginePort.generation());
   await fileMenu(page, /^Open…/);
   await page.locator(".fd-look").click();
   await page.getByRole("menuitem", { name: `${FOLDER} on this computer` }).click();
   await expect.poll(() => rowNames(page)).toEqual(["Kept"]);
   await page.locator(".fd-row", { hasText: "Kept" }).dblclick();
   await expect(page.locator(".fd")).toBeHidden();
-  await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, {
+  await page.waitForFunction((gen) => window.game.enginePort.generation() !== gen, before, {
     timeout: 10_000,
   });
 
@@ -157,13 +157,13 @@ test("the autosave writes a linked tower's own file there, and that file opens t
   const saved = await file("Kept.vctower");
 
   // Play on, autosave, and read the tower as it is.
-  await page.evaluate(() => (window as any).game.setSpeed(3));
-  const start = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
-  await page.waitForFunction((m) => (window as any).game.reader.header.minutes > m + 30, start, { timeout: 45_000 });
-  await page.evaluate(() => (window as any).game.setSpeed(0));
-  await page.evaluate(() => (window as any).game.saveLoad.autosave());
+  await page.evaluate(() => window.game.setSpeed(3));
+  const start = await page.evaluate(() => window.game.reader.header.minutes as number);
+  await page.waitForFunction((m) => window.game.reader.header.minutes > m + 30, start, { timeout: 45_000 });
+  await page.evaluate(() => window.game.setSpeed(0));
+  await page.evaluate(() => window.game.saveLoad.autosave());
   const left = await page.evaluate(() => {
-    const save = JSON.parse((window as any).game.enginePort.serialize());
+    const save = JSON.parse(window.game.enginePort.serialize());
     delete save.savedAt;
     delete save.appVersion;
     return save;
@@ -181,17 +181,17 @@ test("the autosave writes a linked tower's own file there, and that file opens t
     await w.write(bytes);
     await w.close();
   }, FOLDER);
-  await page.evaluate(() => (window as any).game.saveLoad.newGame("modern"));
-  const before = await page.evaluate(() => (window as any).game.enginePort.generation());
+  await page.evaluate(() => window.game.saveLoad.newGame("modern"));
+  const before = await page.evaluate(() => window.game.enginePort.generation());
   await fileMenu(page, /^Open…/);
   await expect.poll(() => rowNames(page)).toContain("Autosaved");
   await page.locator(".fd-row", { hasText: "Autosaved" }).dblclick();
   await expect(page.locator(".fd")).toBeHidden();
-  await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, {
+  await page.waitForFunction((gen) => window.game.enginePort.generation() !== gen, before, {
     timeout: 10_000,
   });
   const opened = await page.evaluate(() => {
-    const save = JSON.parse((window as any).game.enginePort.serialize());
+    const save = JSON.parse(window.game.enginePort.serialize());
     delete save.savedAt;
     delete save.appVersion;
     return save;

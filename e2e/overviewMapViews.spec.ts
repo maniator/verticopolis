@@ -16,8 +16,6 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * with the sidebar's Floor heatmap and its main-view tint gone.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 /** A tower whose top floor plus the sky headroom lands right on a band line,
@@ -29,7 +27,7 @@ const HOTEL_ROOMS = 12;
 /** Boot the game and drop the title screen. */
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game && (window as any).overviewMap));
+  await page.waitForFunction(() => Boolean(window.game && window.overviewMap));
   await page.evaluate(() => document.getElementById("splash")?.remove());
 }
 
@@ -40,7 +38,7 @@ async function boot(page: Page): Promise<void> {
  * camera sits on the rooms. Runs in the page.
  */
 function foundHotelTower(rooms: number): void {
-  const g = (window as any).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   const s = Sim.newGame(5, "classic");
   s.money = 1e9;
@@ -56,7 +54,7 @@ function foundHotelTower(rooms: number): void {
     const r = s.tower.place("hotelSingle", 2, left + i * 4);
     if (!r.ok) throw new Error(`hotel single refused: ${r.reason ?? "unknown"}`);
   }
-  for (const u of s.tower.units as any[]) {
+  for (const u of s.tower.units) {
     if (u.kind !== "hotelSingle") continue;
     u.state = "asleep";
     u.everOccupied = true;
@@ -72,7 +70,7 @@ function foundHotelTower(rooms: number): void {
  *  lobby up to `floors`.
  *  Runs in the page. */
 function foundTallTower(floors: number): void {
-  const g = (window as any).game;
+  const g = window.game;
   const s = g.sim.constructor.newGame(5, "classic");
   s.money = 1e12;
   s.star = 5;
@@ -90,9 +88,13 @@ function foundTallTower(floors: number): void {
  *  the map, in CSS pixels: positive when the legend hides part of a floor. */
 async function legendOverTower(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const g = (window as any).game;
-    const map = (window as any).overviewMap;
-    const layout = map.model.layout;
+    const g = window.game;
+    // The window's model is private: read its layout by name.
+    const model: { layout: { extent: { topLine: number }; pxPerFloor: number } } = Reflect.get(
+      window.overviewMap!,
+      "model",
+    );
+    const layout = model.layout;
     const canvas = document.querySelector("#overview-map .overview-map-tower") as HTMLCanvasElement;
     const box = canvas.getBoundingClientRect();
     const scale = box.height / canvas.height;
@@ -206,7 +208,7 @@ test.describe("the map's View dropdown on the desktop", () => {
     await expect(select).toHaveValue("edit");
     await expect(page.locator("#overview-map .overview-map-legend:visible")).toHaveCount(0);
     // A build key on the focused dropdown stays out of the world.
-    const cursor = () => page.evaluate(() => (window as any).game.keyboard.cursor());
+    const cursor = () => page.evaluate(() => window.game.keyboard.cursor());
     await page.click('.pal-item[data-kind="office"]');
     await select.focus();
     await page.keyboard.press("d");
@@ -220,9 +222,9 @@ test.describe("the map's View dropdown on the desktop", () => {
     await select.selectOption("hotel");
     await expect(legend("hotel")).toBeVisible();
     await expect(map).toBeFocused();
-    const before = await page.evaluate(() => (window as any).game.engine.viewState().floor);
+    const before = await page.evaluate(() => window.game.engine.viewState().floor);
     await page.keyboard.press("ArrowUp");
-    await expect.poll(() => page.evaluate(() => (window as any).game.engine.viewState().floor)).toBeGreaterThan(before);
+    await expect.poll(() => page.evaluate(() => window.game.engine.viewState().floor)).toBeGreaterThan(before);
   });
 
   test("with the dropdown, the open map still clears the menu bar, the status bar, the palette and the hint", async ({
@@ -239,18 +241,18 @@ test.describe("the map's View dropdown on the desktop", () => {
     const legend = page.locator('#overview-map .overview-map-legend[data-view="hotel"]');
     await expect(legend).toHaveText("Dirty: 0Infested: 0");
     expect(await redPixels(page)).toBe(0);
-    const revision = await page.evaluate(() => (window as any).game.reader.header.revision);
+    const revision = await page.evaluate(() => window.game.reader.header.revision);
     // Half an hour on: the 8:00 checkout turns every room dirty. Only the
     // rooms' states move, never the tower's revision.
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.enginePort.tick(31);
       g.reader.update();
     });
-    expect(
-      await page.evaluate(() => (window as any).game.reader.rooms.filter((r: any) => r.state === "dirty").length),
-    ).toBe(HOTEL_ROOMS);
-    expect(await page.evaluate(() => (window as any).game.reader.header.revision)).toBe(revision);
+    expect(await page.evaluate(() => window.game.reader.rooms.filter((r) => r.state === "dirty").length)).toBe(
+      HOTEL_ROOMS,
+    );
+    expect(await page.evaluate(() => window.game.reader.header.revision)).toBe(revision);
     await expect(legend).toHaveText(`Dirty: ${HOTEL_ROOMS}Infested: 0`);
     await expect.poll(() => redPixels(page)).toBeGreaterThan(HOTEL_ROOMS);
     // The Edit view draws no red rooms (the tower has no service elevator).
@@ -271,8 +273,9 @@ test.describe("the map's View dropdown on the desktop", () => {
     // Raise one room's rate from the inspector, with the game paused: no
     // revision moves and no game hour turns, yet the view follows.
     await page.evaluate(() => {
-      const g = (window as any).game;
-      const room = (g.reader.rooms as any[]).find((r) => r.kind === "hotelSingle");
+      const g = window.game;
+      const room = g.reader.rooms.find((r) => r.kind === "hotelSingle");
+      if (!room) throw new Error("the tower has no hotel single");
       g.selected = { type: "unit", id: room.id };
       return g.editor.handleEditAction("rentUp", document.body);
     });

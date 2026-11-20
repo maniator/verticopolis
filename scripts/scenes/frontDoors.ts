@@ -12,7 +12,7 @@ import { buildFrontDoorTowers } from "../screenshot-builders.ts";
 /** Both towers' ground floors, from the left grand entrance to the right service door. */
 async function frameBoth(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const g = (window as unknown as { game: any }).game;
+    const g = window.game;
     g.engine.setCamera(Math.floor(g.grid.width / 2) + 4, 2, 1.5);
   });
 }

@@ -53,12 +53,11 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 // catch selector/media-query/composition regressions the canvas drift shots can't.
 
 test.describe("dialog chrome", () => {
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   test.beforeEach(async ({ page }) => {
     // These shots are of the dialogs. The Map (#343) opens by default on desktop, so hide it first.
     await hideMapBeforeLoad(page);
     await page.goto("/");
-    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.waitForFunction(() => Boolean(window.game));
     // Same setup as the milestones progression: drop the splash overlay
     // without resetting the sim, then grow a real 1★ tower. buildToStar
     // freezes time (speed 0) and fixes funds, so the only nondeterministic
@@ -74,7 +73,7 @@ test.describe("dialog chrome", () => {
     // from the engine, which is why the gallery's pgSetClock moves the
     // engine's clock too, with the binding's advanceClock.)
     await page.evaluate(() => {
-      ((window as any).game.sim.clock as { minutes: number }).minutes = 7 * 60;
+      (window.game.sim.clock as { minutes: number }).minutes = 7 * 60;
     });
   });
 
@@ -104,14 +103,14 @@ test.describe("dialog chrome", () => {
     // the structure and give it one tall shaft: the dialog's height comes from
     // its per-floor grid, and a 30-floor span is what makes it overflow.
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       const W = g.grid.width;
       // On the WASM engine the ten thousand builds go on a scratch copy of the
       // engine's tower, which the engine then loads in one step, as buildToStar
       // hands its tower over: built one at a time through the engine, each
       // build would read the engine's whole state back, far past the test's
       // budget.
-      const port = (window as any).__vcEngine?.port;
+      const port = window.__vcEngine?.port;
       const hosted = Boolean(port) && g.enginePort === port;
       const s = hosted ? g.sim.constructor.deserialize(JSON.parse(JSON.stringify(g.sim.serialize()))) : g.sim;
       for (let f = 4; f <= 30; f++) {
@@ -128,10 +127,10 @@ test.describe("dialog chrome", () => {
       }
       // The merge also copies the engine's clock over the beforeEach pin, so
       // pin it again (the dialog shot is of a paused game at 07:00).
-      (window as any).game.syncSim();
+      window.game.syncSim();
       g.sim.clock.minutes = 7 * 60;
       const t = g.sim.tower;
-      const shaft = t.transports.find((x: { kind: string }) => x.kind === "elevatorStandard");
+      const shaft = t.transports.find((x) => x.kind === "elevatorStandard")!;
       g.selected = { type: "transport", id: shaft.id };
       g.engine.selectedId = shaft.id;
       g.refreshEditor();
@@ -170,8 +169,8 @@ test.describe("dialog chrome", () => {
   test("editor card matches baseline", async ({ page }) => {
     // Select an office through the same path a canvas click takes.
     await page.evaluate(() => {
-      const g = (window as any).game;
-      const office = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+      const g = window.game;
+      const office = g.sim.tower.units.find((u) => u.kind === "office")!;
       g.selectPicked({ type: "unit", id: office.id, kind: office.kind });
     });
     await expect(page.locator("#editor")).toHaveScreenshot("editor-card.png");
@@ -183,7 +182,7 @@ test.describe("dialog chrome", () => {
     // in pwa.ts, out of the test graph) so the "Build …" line is stable. The
     // activate callback is a no-op so the page doesn't reload.
     await page.evaluate(() =>
-      (window as any).game.onUpdateAvailable(async () => {}, { version: "1.1.1", sha: "abc1234", notes: [] }),
+      window.game.onUpdateAvailable(async () => {}, { version: "1.1.1", sha: "abc1234", notes: [] }),
     );
     await page.waitForSelector("#modal[open]");
     // The muted build-id line is present and reads the incoming build.
@@ -192,12 +191,12 @@ test.describe("dialog chrome", () => {
     // While the prompt is open the sim is FROZEN — even at full speed the clock
     // must not advance, so a player reading it can't lose game-hours. (Restore
     // speed 0 afterward so the shot stays deterministic like the sibling tests.)
-    await page.evaluate(() => (window as any).game.setSpeed(3));
-    const before = await page.evaluate(() => (window as any).game.sim.clock.minutes);
+    await page.evaluate(() => window.game.setSpeed(3));
+    const before = await page.evaluate(() => window.game.sim.clock.minutes);
     await page.waitForTimeout(400);
-    const after = await page.evaluate(() => (window as any).game.sim.clock.minutes);
+    const after = await page.evaluate(() => window.game.sim.clock.minutes);
     expect(after).toBe(before);
-    await page.evaluate(() => (window as any).game.setSpeed(0));
+    await page.evaluate(() => window.game.setSpeed(0));
 
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt.png");
   });
@@ -208,7 +207,7 @@ test.describe("dialog chrome", () => {
     // a plain list above the build-id line (a longer release scrolls in the
     // log the skipped-versions test pins). Deterministic stub info.
     await page.evaluate(() =>
-      (window as any).game.onUpdateAvailable(async () => {}, {
+      window.game.onUpdateAvailable(async () => {}, {
         version: "1.1.1",
         sha: "abc1234",
         notes: [
@@ -220,7 +219,7 @@ test.describe("dialog chrome", () => {
     );
     await page.waitForSelector("#modal[open]");
     await expect(page.locator("#modal .whatsnew li")).toHaveCount(3);
-    await page.evaluate(() => (window as any).game.setSpeed(0));
+    await page.evaluate(() => window.game.setSpeed(0));
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-notes.png");
   });
 
@@ -230,7 +229,7 @@ test.describe("dialog chrome", () => {
     // (#1897). Four versions overflow the cap, so the baseline pins both the
     // per-version headings and the scroll well. Deterministic stub info.
     await page.evaluate(() =>
-      (window as any).game.onUpdateAvailable(async () => {}, {
+      window.game.onUpdateAvailable(async () => {}, {
         version: "1.4.0",
         sha: "abc1234",
         notes: ["Offices pay rent on time more often."],
@@ -251,7 +250,7 @@ test.describe("dialog chrome", () => {
     );
     await page.waitForSelector("#modal[open]");
     await expect(page.locator("#modal .whatsnew-ver")).toHaveCount(4);
-    await page.evaluate(() => (window as any).game.setSpeed(0));
+    await page.evaluate(() => window.game.setSpeed(0));
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-skipped-versions.png");
   });
 
@@ -267,7 +266,7 @@ test.describe("dialog chrome", () => {
       // is 700 tall, a phone showing browser chrome, as the dialog-chrome pin.
       if (viewport) await page.setViewportSize(viewport);
       await page.evaluate(
-        (notes) => (window as any).game.onUpdateAvailable(async () => {}, { version: "3.2.0", sha: "abc1234", notes }),
+        (notes) => window.game.onUpdateAvailable(async () => {}, { version: "3.2.0", sha: "abc1234", notes }),
         longReleaseNotes,
       );
       await page.waitForSelector("#modal[open]");
@@ -281,7 +280,7 @@ test.describe("dialog chrome", () => {
       expect(log.scroll).toBeGreaterThan(log.client);
       await expect(page.locator('#modal [data-act="later"]')).toBeInViewport();
       await expect(page.locator('#modal [data-act="update"]')).toBeInViewport();
-      await page.evaluate(() => (window as any).game.setSpeed(0));
+      await page.evaluate(() => window.game.setSpeed(0));
       await expect(page.locator("#modal .modal-box")).toHaveScreenshot(`update-prompt-long-release-${name}.png`);
     });
   }
@@ -291,7 +290,7 @@ test.describe("dialog chrome", () => {
     // is gone but the "↻ Update" chip stays in the speed toolbar as the way back
     // in. Snapshot that toolbar cluster (static — no live counters) so the chip's
     // placement and styling are pinned.
-    await page.evaluate(() => (window as any).game.onUpdateAvailable(async () => {}));
+    await page.evaluate(() => window.game.onUpdateAvailable(async () => {}));
     await page.waitForSelector("#modal[open]");
     await page.locator('#modal [data-act="later"]').click();
     await page.waitForFunction(() => (document.getElementById("modal") as HTMLDialogElement | null)?.open === false);
@@ -315,13 +314,13 @@ test.describe("tower scene (region-composition tripwire)", () => {
     // The Map (#343) opens by default on desktop and would cover the scene's corner.
     await hideMapBeforeLoad(page);
     await page.goto("/");
-    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.waitForFunction(() => Boolean(window.game));
     await page.evaluate(() => document.getElementById("splash")?.remove());
     const star = await page.evaluate(buildToStar, 4);
     expect(star).toBe(4);
     await expectEngineHosted(page);
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       // Freeze every nondeterministic pixel input: buildToStar already holds
       // speed 0; reduced motion pins the decorative clock (walkers, clouds,
       // crane), reset to phase zero so the frozen pose is identical across
@@ -343,11 +342,11 @@ test.describe("tower scene (region-composition tripwire)", () => {
    *  stability loop (the exact failure the first mint hit). */
   const settleAt = async (page: import("@playwright/test").Page, hour: number) => {
     await page.evaluate((h: number) => {
-      const g = (window as any).game;
+      const g = window.game;
       g.sim.clock.minutes = g.sim.clock.day * 24 * 60 + h * 60;
     }, hour);
     await page.waitForFunction((h: number) => {
-      const e = (window as any).game.engine;
+      const e = window.game.engine;
       // Queue-empty is part of the settle contract (region-design I4): the
       // hour flip marks every live region dirty and the drain trickles at
       // budget pace, so capturing before it empties would race the repaints.
@@ -362,7 +361,7 @@ test.describe("tower scene (region-composition tripwire)", () => {
   test("full tower at minimum zoom, day, matches baseline", async ({ page }) => {
     await settleAt(page, 10);
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0); // 0 clamps to MIN_ZOOM
     });
     await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-day.png", { timeout: 30_000 });
@@ -371,7 +370,7 @@ test.describe("tower scene (region-composition tripwire)", () => {
   test("full tower at minimum zoom, night, matches baseline", async ({ page }) => {
     await settleAt(page, 20);
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0); // 0 clamps to MIN_ZOOM
     });
     await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-night.png", { timeout: 30_000 });
@@ -379,13 +378,13 @@ test.describe("tower scene (region-composition tripwire)", () => {
 
   test("office floors close up, day, matches baseline", async ({ page }) => {
     await settleAt(page, 10);
-    await page.evaluate(() => (window as any).game.engine.setCamera(60, 8, 1));
+    await page.evaluate(() => window.game.engine.setCamera(60, 8, 1));
     await expect(page.locator("#view")).toHaveScreenshot("scene-detail-day.png", { timeout: 30_000 });
   });
 
   test("office floors close up, night, matches baseline", async ({ page }) => {
     await settleAt(page, 20);
-    await page.evaluate(() => (window as any).game.engine.setCamera(60, 8, 1));
+    await page.evaluate(() => window.game.engine.setCamera(60, 8, 1));
     await expect(page.locator("#view")).toHaveScreenshot("scene-detail-night.png", { timeout: 30_000 });
   });
 });
@@ -396,12 +395,10 @@ test.describe("overview map", () => {
   /** Boot with the map, grow the 3-star Classic tower and pin the camera. */
   async function classicMap(page: import("@playwright/test").Page): Promise<void> {
     await page.goto("/");
-    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.waitForFunction(() => Boolean(window.game));
     await page.evaluate(() => document.getElementById("splash")?.remove());
     expect(await page.evaluate(buildToStar, 3)).toBe(3);
-    await page.evaluate(() =>
-      (window as any).game.engine.setCamera(Math.floor((window as any).game.grid.width / 2), 6, 1),
-    );
+    await page.evaluate(() => window.game.engine.setCamera(Math.floor(window.game.grid.width / 2), 6, 1));
     await hideTransientChrome(page);
   }
 
@@ -413,12 +410,12 @@ test.describe("overview map", () => {
   async function hideTransientChrome(page: import("@playwright/test").Page): Promise<void> {
     await page.addStyleTag({ content: "#toast-wrap, #hint { visibility: hidden !important; }" });
     await page.evaluate(() => {
-      const e = (window as any).game.engine;
+      const e = window.game.engine;
       e.setReducedMotion(true);
       e.resetDecorativeClock();
     });
     await page.waitForFunction(() => {
-      const e = (window as any).game.engine;
+      const e = window.game.engine;
       return !e.hourSyncPending && e.regionDirty.size === 0;
     });
   }
@@ -433,10 +430,10 @@ test.describe("overview map", () => {
 
     test("Modern map matches baseline", async ({ page }) => {
       await page.goto("/");
-      await page.waitForFunction(() => Boolean((window as any).game));
+      await page.waitForFunction(() => Boolean(window.game));
       await page.evaluate(() => document.getElementById("splash")?.remove());
       await page.evaluate(() => {
-        const g = (window as any).game;
+        const g = window.game;
         // A small Modern tower: offices, condos and a shaft, so the map shows
         // each group's color. Self-contained for page.evaluate.
         const s = g.sim.constructor.newGame(4400, "modern");
@@ -453,11 +450,11 @@ test.describe("overview map", () => {
           const kind = f <= 5 ? "office" : "condo";
           for (let x = left + 8; x + 1 <= right;) {
             const r = s.tower.place(kind, f, x);
-            x += r.ok ? s.tower.getUnit(r.unitId).width : 1;
+            x += r.ok ? s.tower.getUnit(r.unitId)!.width : 1;
           }
         }
         // A refused build would mint a near-empty map: check every group landed.
-        const count = (kind: string) => s.tower.units.filter((u: { kind: string }) => u.kind === kind).length;
+        const count = (kind: string) => s.tower.units.filter((u) => u.kind === kind).length;
         for (const kind of ["lobby", "office", "condo"]) if (count(kind) === 0) throw new Error(`no ${kind} placed`);
         g.adoptSim(s, true);
         g.speed = 0;

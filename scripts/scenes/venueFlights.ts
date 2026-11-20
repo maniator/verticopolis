@@ -17,7 +17,7 @@ import { buildVenueFlightsTower } from "../screenshot-builders.ts";
 async function frame(page: Page, dx: number, floor: number, zoom: number): Promise<void> {
   await page.evaluate(
     ([dx, floor, zoom]) => {
-      const w = window as unknown as { game: any; __vcShotVenueFlightsAt?: { wall: number } };
+      const w = window as Window & { __vcShotVenueFlightsAt?: { wall: number } };
       const at = w.__vcShotVenueFlightsAt;
       if (!at) throw new Error("the venue flights tower was not built");
       w.game.engine.setCamera(at.wall + dx, floor, zoom);

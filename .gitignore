@@ -24,6 +24,7 @@ coverage/
 !src/public/sw-navigation-fallback.js
 !vite.config.ts
 !vite-env.d.ts
+!tooling-window.d.ts
 __pycache__/
 node_modules
 

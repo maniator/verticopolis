@@ -20,6 +20,7 @@
  */
 import { type Page } from "playwright";
 import { type Scene } from "../screenshot-env.ts";
+import type { SteppedClock } from "../screenshot-page-ops.ts";
 import { buildSecurityTower } from "../screenshot-builders.ts";
 
 /** What the engine reports about the search (`bombSearch()`), or null. */
@@ -41,7 +42,7 @@ interface SweepRead {
 
 /** In-page: the engine's clock and its read of the search. */
 function pgReadSearch(): SearchRead {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const text = g.enginePort.bombSearch?.();
   return { minutes: g.renderSim.clock.minutes, search: text === undefined ? null : JSON.parse(text) };
 }
@@ -49,7 +50,7 @@ function pgReadSearch(): SearchRead {
 /** In-page: run the engine `minutes` of game time in one step, then read
  *  the frame again so the overlay draws where the engine is now. */
 function pgRunEngine(minutes: number): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   g.enginePort.tick(minutes);
   g.reader.update();
 }
@@ -64,7 +65,8 @@ async function declineRansom(page: Page): Promise<void> {
   // One step is the usual case, which keeps the animation frame the same on
   // every run; a busy machine may need another.
   await page.evaluate(async () => {
-    const clock = (window as unknown as { game: any }).game.engine.engine.clock;
+    const clock: SteppedClock = window.game.engine.engine.clock;
+    if (!clock.step) throw new Error("the page has no stepped clock");
     const open = () => (document.getElementById("modal") as HTMLDialogElement | null)?.open === true;
     for (let i = 0; i < 20 && !open(); i++) {
       await new Promise((resolve) => setTimeout(resolve, 250));
@@ -139,7 +141,7 @@ async function searchOnBothTowers(page: Page): Promise<void> {
       // Center a little right of the lot so the towers clear the Map.
       await page.evaluate(
         ([lo, hi]) => {
-          (window as unknown as { game: any }).game.engine.setCamera(Math.round((lo + hi) / 2) + 11, 6.5, 0.9);
+          window.game.engine.setCamera(Math.round((lo + hi) / 2) + 11, 6.5, 0.9);
         },
         [towers[0]![0], towers[1]![1]] as const,
       );
@@ -191,7 +193,7 @@ export const SECURITY_SCENES: Scene[] = [
             await page.evaluate(pgRunEngine, 1);
           }
           const end = await page.evaluate(() => {
-            const g = (window as unknown as { game: any }).game;
+            const g = window.game;
             // The engine's own log says how the search ended.
             const log = JSON.stringify(JSON.parse(g.enginePort.serialize()).log ?? []);
             return {
@@ -257,7 +259,7 @@ export const SECURITY_SCENES: Scene[] = [
         frame: FRAME,
         setup: async (page) => {
           const opens = await page.evaluate(() => {
-            const g = (window as unknown as { game: any }).game;
+            const g = window.game;
             const port = g.enginePort;
             const before = port.bombSearch?.();
             if (before !== undefined) throw new Error("a search is already running before the ransom was answered");
@@ -268,10 +270,10 @@ export const SECURITY_SCENES: Scene[] = [
               throw new Error(
                 `the second Security office did not place on floor 11: ${port.lastReason() ?? "no reason given"}`,
               );
-            const office = JSON.parse(port.serialize()).units.find((u: any) => u.kind === "security" && u.floor === 11);
-            const done = office?.completeAt;
+            const units: { kind: string; floor: number; completeAt?: number }[] = JSON.parse(port.serialize()).units;
+            const done = units.find((u) => u.kind === "security" && u.floor === 11)?.completeAt;
             if (typeof done !== "number") throw new Error("the second Security office is not under construction");
-            return done as number;
+            return done;
           });
           // Ten minutes before it opens, refuse the ransom.
           const now = (await page.evaluate(pgReadSearch)).minutes;
@@ -356,20 +358,18 @@ export const SECURITY_SCENES: Scene[] = [
         frame: THIEF_FRAME,
         setup: async (page) => {
           await page.evaluate(() => {
-            const e = (window as unknown as { game: any }).game.engine;
+            const e = window.game.engine;
             // Fail loudly if the overlay renamed its thief fields, rather
             // than capture a frame with no thief in it.
             for (const field of ["thiefStart", "thiefCaught", "thiefFloor", "thiefSpan"]) {
               if (!(field in e))
                 throw new Error(`security-thief-caught: the tower overlay has no ${field} field any more`);
             }
-            const rooms = e.sim.tower.units.filter(
-              (u: any) => u.floor === 4 && u.kind !== "floor" && u.kind !== "lobby",
-            );
+            const rooms = e.sim.tower.units.filter((u) => u.floor === 4 && u.kind !== "floor" && u.kind !== "lobby");
             if (rooms.length === 0) throw new Error("security-thief-caught: floor 4 has no rooms to run");
             e.thiefSpan = {
-              left: Math.min(...rooms.map((u: any) => u.x)),
-              right: Math.max(...rooms.map((u: any) => u.x + u.width)),
+              left: Math.min(...rooms.map((u) => u.x)),
+              right: Math.max(...rooms.map((u) => u.x + u.width)),
             };
             e.thiefStart = e.d.anim;
             e.thiefCaught = true;

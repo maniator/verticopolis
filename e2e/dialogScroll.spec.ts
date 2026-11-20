@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
@@ -60,7 +59,7 @@ async function scrollers(page: Page, inner?: string) {
 
 test("About this game scrolls in one container on a short window", async ({ page }) => {
   await onGame(page);
-  await page.evaluate(() => (window as any).game.ui.showAbout());
+  await page.evaluate(() => window.game.ui.showAbout());
   await expect(page.locator("#modal .help-diagnostics")).toBeVisible();
   const s = await scrollers(page);
   expect(s.boxOverflows, "About must overflow the short window for this test to mean anything").toBe(true);
@@ -88,7 +87,7 @@ test("the update prompt's notes log is its one inner scroller", async ({ page })
         (_, i) => `A change in ${version}, number ${i + 1}, described in a full sentence.`,
       ),
     }));
-    (window as any).game.ui.showUpdatePrompt(
+    window.game.ui.showUpdatePrompt(
       () => {},
       () => {},
       { version: "9.0.3", since: "8.9.0", notes: releases[0].notes, releases },
@@ -104,7 +103,7 @@ test("the update prompt's notes log is its one inner scroller", async ({ page })
 test("the Open window's file list is its one inner scroller", async ({ page }) => {
   await onGame(page);
   await page.evaluate(async () => {
-    const g = (window as any).game;
+    const g = window.game;
     for (let i = 1; i <= 16; i++) await g.saveFile(`Tower ${i}`);
   });
   await page.evaluate(() => document.getElementById("mb-import")?.click());
@@ -127,14 +126,14 @@ test.describe("on a phone", () => {
     );
     await onGame(page, PHONE);
     await page.evaluate((text) => {
-      const g = (window as any).game;
+      const g = window.game;
       g.setSpeed(0);
       return g.saveLoad.importGame(text);
     }, tower);
     await expect(page.getByText("Tower imported.")).toBeVisible();
     await page.evaluate(() => {
-      const g = (window as any).game;
-      const shaft = g.sim.tower.transports.find((t: any) => t.kind === "elevatorStandard");
+      const g = window.game;
+      const shaft = g.sim.tower.transports.find((t) => t.kind === "elevatorStandard")!;
       g.selected = { type: "transport", id: shaft.id };
       g.engine.selectedId = shaft.id;
       g.refreshEditor();

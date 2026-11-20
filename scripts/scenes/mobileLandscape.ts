@@ -21,9 +21,7 @@ export const MOBILE_LANDSCAPE_SCENES: Scene[] = [
         // the tower's proportions on the short view.
         name: "09c-mobile-landscape",
         setup: async (page) => {
-          await page.evaluate(() =>
-            (window as any).game.engine.setCamera(Math.floor((window as any).game.grid.width / 2), 18, 0.32),
-          );
+          await page.evaluate(() => window.game.engine.setCamera(Math.floor(window.game.grid.width / 2), 18, 0.32));
           await page.click("#btn-map");
           await page.waitForSelector("#overview-map:not([hidden])");
         },

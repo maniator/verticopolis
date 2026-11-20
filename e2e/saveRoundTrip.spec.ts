@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFileSync } from "node:fs";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { test, expect, type Page } from "@playwright/test";
@@ -41,22 +40,22 @@ async function seed(page: Page, entries: Record<string, string>): Promise<void> 
 /** Load `url` and wait for the game on the Rust engine. */
 async function boot(page: Page, url: string): Promise<void> {
   await page.goto(url);
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
-  expect(await page.evaluate(() => (window as any).__vcEngineBoot.engine)).toBe("wasm");
+  expect(await page.evaluate(() => window.__vcEngineBoot!.engine)).toBe("wasm");
 }
 
 /** Play until the clock passes `after`, pause, and save; returns the saved time. */
 async function playAndSave(page: Page, after: number): Promise<number> {
   await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     g.setSpeed(3);
   });
-  await page.waitForFunction((m) => (window as any).game.reader.header.minutes > m, after, { timeout: 45_000 });
+  await page.waitForFunction((m) => window.game.reader.header.minutes > m, after, { timeout: 45_000 });
   return page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(0);
     g.saveLoad.save(true);
     return g.reader.header.minutes as number;
@@ -64,7 +63,7 @@ async function playAndSave(page: Page, after: number): Promise<number> {
 }
 
 const clockReads = (page: Page, minutes: number) =>
-  page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, minutes, { timeout: 10_000 });
+  page.waitForFunction((m) => window.game.reader.header.minutes === m, minutes, { timeout: 10_000 });
 
 test("the engine loads the autosave, plays, saves, reloads and downloads it as a binary VCTOWER2 file", async ({
   page,
@@ -72,19 +71,19 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
   await boot(page, "/");
   const first = await playAndSave(page, 0);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
   await clockReads(page, first);
   const second = await playAndSave(page, first);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
   await clockReads(page, second);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.evaluate(() => (window as any).game.saveLoad.exportGame()),
+    page.evaluate(() => window.game.saveLoad.exportGame()),
   ]);
   const file = readFileSync((await download.path())!);
   expect(file.subarray(0, 9).toString("latin1")).toBe("VCTOWER2\n");
@@ -92,16 +91,16 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
   expect(inflateRawSync(file.subarray(9)).toString().startsWith("{")).toBe(true);
   // The exported bytes load: play on, then import the file and the tower is the one that was exported.
   const exported = await page.evaluate(() => {
-    const h = (window as any).game.reader.header;
+    const h = window.game.reader.header;
     return { minutes: h.minutes as number, header: JSON.stringify(h) };
   });
   await playAndSave(page, second);
-  expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBeGreaterThan(exported.minutes);
-  await page.evaluate((bytes) => (window as any).game.saveLoad.importGame(Uint8Array.from(bytes)), Array.from(file));
+  expect(await page.evaluate(() => window.game.reader.header.minutes)).toBeGreaterThan(exported.minutes);
+  await page.evaluate((bytes) => window.game.saveLoad.importGame(Uint8Array.from(bytes)), Array.from(file));
   await expect(page.getByText("Tower imported.")).toBeVisible();
   await clockReads(page, exported.minutes);
   expect(
-    await page.evaluate(() => JSON.stringify((window as any).game.reader.header)),
+    await page.evaluate(() => JSON.stringify(window.game.reader.header)),
     "every header figure matches the exported tower",
   ).toBe(exported.header);
 });
@@ -109,18 +108,18 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
 test("the towers come back from IndexedDB after a reload, the same game", async ({ page }) => {
   await boot(page, "/");
   // A built tower, so the check covers rooms, transport and people.
-  await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), OLD_FILE);
+  await page.evaluate((text) => window.game.saveLoad.importGame(text), OLD_FILE);
   await expect(page.getByText("Tower imported.")).toBeVisible();
-  const imported = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
+  const imported = await page.evaluate(() => window.game.reader.header.minutes as number);
   // Any time played will do: the save below must hold a tower that moved on
   // from the file. Asking for a whole game hour timed out on a slow runner,
   // where every frame over 200 ms feeds the clock only 1 ms.
   await playAndSave(page, imported);
   // A My Towers file too, so the check covers more than the autosave.
-  const fileId = await page.evaluate(() => (window as any).game.saveFile("Round trip") as Promise<string>);
+  const fileId = await page.evaluate(() => window.game.saveFile("Round trip") as Promise<string>);
   // The engine's whole state, parsed so a number reads the same however it was written.
   const engine = async () =>
-    JSON.parse(await page.evaluate(() => (window as any).__vcEngine.port.serialize() as string)) as unknown;
+    JSON.parse(await page.evaluate(() => window.__vcEngine!.port.serialize() as string)) as unknown;
   const before = await engine();
   expect((before as { units: unknown[] }).units.length).toBeGreaterThan(0);
   const saves = await storedSaves(page);
@@ -135,27 +134,27 @@ test("the towers come back from IndexedDB after a reload, the same game", async 
     [[AUTO_KEY], OLD_SAVE] as const,
   );
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
-  await page.evaluate(() => (window as any).game.setSpeed(0));
+  await page.evaluate(() => window.game.setSpeed(0));
   expect(await engine(), "the autosave from IndexedDB is the same game").toEqual(before);
-  await page.evaluate((id) => (window as any).game.openFile(id), fileId);
-  await page.evaluate(() => (window as any).game.setSpeed(0));
+  await page.evaluate((id) => window.game.openFile(id), fileId);
+  await page.evaluate(() => window.game.setSpeed(0));
   expect(await engine(), "the My Towers file from IndexedDB is the same game").toEqual(before);
 });
 
 test("a tower file saved by a newer version is refused and changes nothing", async ({ page }) => {
   await boot(page, "/");
   await playAndSave(page, 0);
-  const before = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
+  const before = await page.evaluate(() => window.game.reader.header.minutes as number);
   const storedBefore = await storedSaves(page);
   const newer = JSON.parse(OLD_SAVE) as Record<string, unknown>;
   newer.version = 999;
   const file = `VCTOWER1\n${deflateRawSync(JSON.stringify(newer)).toString("base64")}\n`;
-  await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), file);
+  await page.evaluate((text) => window.game.saveLoad.importGame(text), file);
   await expect(page.getByText(/made by a newer version of Verticopolis\. Update the game to load it\./)).toBeVisible();
-  expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBe(before);
+  expect(await page.evaluate(() => window.game.reader.header.minutes)).toBe(before);
   expect(await storedSaves(page)).toEqual(storedBefore);
 });
 
@@ -167,22 +166,23 @@ test("an older version's autosave loads, a failed import changes nothing, and an
   // An old save slot too, so the import check below covers more than the autosave.
   await seed(page, { [LEGACY_AUTO_KEY]: OLD_SAVE, [SLOT_1_KEY]: OLD_SAVE });
   await boot(page, "/");
-  await page.waitForFunction((money) => (window as any).game.reader.header.money === money, old.money, {
+  await page.waitForFunction((money) => window.game.reader.header.money === money, old.money, {
     timeout: 10_000,
   });
-  await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
-  const live = () => page.evaluate(() => (window as any).__vcEngine.port.serialize() as string);
+  await page.evaluate(() => window.game.onboarding.dismissSplash());
+  const live = () => page.evaluate(() => window.__vcEngine!.port.serialize() as string);
   // Hold the 30-second autosave while the refusals run: on a slow runner the
   // loop below outlasts it, and a timer save rewrites the stored saves (and
   // stamps the camera into the live tower) whether or not an import touched
   // anything. Pause too, so the tower the checks compare stands still.
   await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(0);
-    g.__heldAutosave = g.saveLoad.autosave;
+    const w = window as Window & { __heldAutosave?: typeof g.saveLoad.autosave };
+    w.__heldAutosave = g.saveLoad.autosave;
     g.saveLoad.autosave = () => Promise.resolve();
   });
-  const before = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
+  const before = await page.evaluate(() => window.game.reader.header.minutes as number);
   const towerBefore = await live();
   const storedBefore = await storedSaves(page);
   // Two failed imports: text the front door turns away, and a container with a payload that looks like a tower
@@ -196,26 +196,26 @@ test("an older version's autosave loads, a failed import changes nothing, and an
     [`VCTOWER1\n${deflateRawSync('{"minutes":"0","units":[]}').toString("base64")}`, /Not a valid tower save file\./],
   ];
   for (const [text, message] of refusals) {
-    await page.evaluate((t) => (window as any).game.saveLoad.importGame(t), text);
+    await page.evaluate((t) => window.game.saveLoad.importGame(t), text);
     await expect(page.getByText(message)).toBeVisible();
-    expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBe(before);
+    expect(await page.evaluate(() => window.game.reader.header.minutes)).toBe(before);
     expect(await live(), "the live tower is untouched").toBe(towerBefore);
     // Every stored save is byte for byte what it was.
     expect(await storedSaves(page)).toEqual(storedBefore);
   }
   await page.evaluate(() => {
-    const g = (window as any).game;
-    g.saveLoad.autosave = g.__heldAutosave;
+    const g = window.game;
+    g.saveLoad.autosave = (window as Window & { __heldAutosave?: typeof g.saveLoad.autosave }).__heldAutosave!;
   });
   // Change the tower, so the import below has something to replace.
   await playAndSave(page, before);
-  const moved = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
+  const moved = await page.evaluate(() => window.game.reader.header.minutes as number);
   expect(moved).toBeGreaterThan(before);
   // The same older tower as a file imports through the engine and puts the clock back.
-  await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), OLD_FILE);
+  await page.evaluate((text) => window.game.saveLoad.importGame(text), OLD_FILE);
   await expect(page.getByText("Tower imported.")).toBeVisible();
-  await page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, before, { timeout: 10_000 });
-  expect(await page.evaluate(() => (window as any).game.reader.header.money)).toBe(old.money);
+  await page.waitForFunction((m) => window.game.reader.header.minutes === m, before, { timeout: 10_000 });
+  expect(await page.evaluate(() => window.game.reader.header.money)).toBe(old.money);
 });
 
 test("an unreadable autosave is kept, not overwritten, and downloads as it was stored", async ({ page }) => {

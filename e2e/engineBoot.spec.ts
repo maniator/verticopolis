@@ -18,10 +18,10 @@ interface BootState {
   failure: { stage: string; message: string } | null;
 }
 
-const bootState = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot as BootState | undefined);
+const bootState = (page: Page) => page.evaluate(() => window.__vcEngineBoot as BootState | undefined);
 
 async function hostedGame(page: Page): Promise<void> {
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, {
+  await page.waitForFunction(() => !!window.__vcEngine?.status.hosted && !!window.game, undefined, {
     timeout: 30_000,
   });
   await page.evaluate(() => document.getElementById("splash")?.remove());
@@ -30,13 +30,13 @@ async function hostedGame(page: Page): Promise<void> {
 /** Run the next frame's real step, then trap: that call and every later one
  *  on the engine throws, as a poisoned wasm-bindgen object does. */
 async function trapNextStep(page: Page): Promise<void> {
-  await page.evaluate(() => (window as any).game.setSpeed(1));
+  await page.evaluate(() => window.game.setSpeed(1));
   await page.evaluate(() => {
-    const engine = (window as any).__vcEngine.port;
+    const engine = window.__vcEngine!.port;
     const proto = Object.getPrototypeOf(engine);
     const real = engine.advance.bind(engine);
     Object.defineProperty(engine, "advance", {
-      value: (...args: unknown[]) => {
+      value: (...args: Parameters<typeof real>) => {
         real(...args);
         for (const key of Object.getOwnPropertyNames(proto)) {
           if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function")
@@ -74,15 +74,15 @@ test.describe("starts on the WASM engine", () => {
     // The two ways the old engine switch took a choice of the TypeScript engine.
     await page.addInitScript(() => localStorage.setItem("vc.engine", "ts"));
     await page.goto("/?engine=ts");
-    await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, {
+    await page.waitForFunction(() => !!window.__vcEngine?.status.hosted && !!window.game, undefined, {
       timeout: 30_000,
     });
     expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "wasm", failure: null });
     await expect(page.locator(".splash-version")).toContainText("Rust engine");
     await page.evaluate(() => document.getElementById("splash")?.remove());
-    await page.evaluate(() => (window as any).game.setSpeed(1));
-    const before = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
-    await page.waitForFunction((b) => (window as any).game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
+    await page.evaluate(() => window.game.setSpeed(1));
+    const before = await page.evaluate(() => window.game.sim.clock.minutes as number);
+    await page.waitForFunction((b) => window.game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
     expect(errors).toEqual([]);
   });
 
@@ -90,14 +90,15 @@ test.describe("starts on the WASM engine", () => {
     await page.goto("/");
     await hostedGame(page);
     const result = await page.evaluate(() => {
-      const sim = (window as any).game.sim;
-      (window as any).game.setSpeed(0);
+      const sim = window.game.sim;
+      window.game.setSpeed(0);
       // The harness's tower is a view over the Rust engine: it carries none
       // of the TypeScript step loop's passes.
       const steps: Record<string, string> = {};
-      for (const step of ["advanceStep", "onHour", "onDay", "finishConstruction"]) steps[step] = typeof sim[step];
+      for (const step of ["advanceStep", "onHour", "onDay", "finishConstruction"])
+        steps[step] = typeof Reflect.get(sim, step);
       // `game.sim.tick` runs the engine itself: it still advances.
-      const g = (window as any).game;
+      const g = window.game;
       const before = g.sim.clock.minutes;
       g.sim.tick(30);
       return { steps, advanced: g.sim.clock.minutes - before };
@@ -110,7 +111,7 @@ test.describe("starts on the WASM engine", () => {
     await page.goto("/");
     await hostedGame(page);
     const setup = await page.evaluate(async () => {
-      const g = (window as any).game;
+      const g = window.game;
       g.setSpeed(0);
       g.sim.money = 1e9;
       const built = [] as boolean[];
@@ -121,7 +122,7 @@ test.describe("starts on the WASM engine", () => {
       const id = (await g.saveFile("Replay test")) as string;
       // Read after the save: a tower file carries the camera, which the save
       // stamps into the tower first.
-      const digest = (window as any).__vcEngine.port.stateDigest() as string;
+      const digest = window.__vcEngine!.port.stateDigest() as string;
       // Copies of the same save: leaving a tower writes it into its own file,
       // so each run and the reload open a file no run has played yet.
       const again = (await g.saveFile("Replay again")) as string;
@@ -134,9 +135,9 @@ test.describe("starts on the WASM engine", () => {
     // Two runs of the same two days from the same save land on the same state.
     const run = (file: string) =>
       page.evaluate(async (id) => {
-        const g = (window as any).game;
+        const g = window.game;
         await g.openFile(id);
-        const engine = () => (window as any).__vcEngine.port;
+        const engine = () => window.__vcEngine!.port;
         const start = engine().stateDigest() as string;
         for (let i = 0; i < 96; i++) g.enginePort.tick(30);
         return { start, end: engine().stateDigest() as string, minutes: g.sim.clock.minutes as number };
@@ -152,10 +153,10 @@ test.describe("starts on the WASM engine", () => {
     await page.reload();
     await hostedGame(page);
     const reloaded = await page.evaluate(async (id) => {
-      const g = (window as any).game;
+      const g = window.game;
       g.setSpeed(0);
       await g.openFile(id);
-      return (window as any).__vcEngine.port.stateDigest() as string;
+      return window.__vcEngine!.port.stateDigest() as string;
     }, setup.reload);
     expect(reloaded).toBe(setup.digest);
   });
@@ -171,7 +172,7 @@ test.describe("never falls back to the TypeScript engine", () => {
     await expect(page.locator("#boot-fallback button:not([data-act])")).toHaveText("Reload");
     const state = await bootState(page);
     expect(state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage } });
-    expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({
+    expect(await page.evaluate(() => ({ game: !!window.game, host: !!window.__vcEngine }))).toEqual({
       game: false,
       host: false,
     });
@@ -255,7 +256,7 @@ test.describe("never falls back to the TypeScript engine", () => {
     await expect(failure).toContainText("could not start");
     expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "start" } });
     // The engine is refused before it builds a tower, so no game runs.
-    expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({
+    expect(await page.evaluate(() => ({ game: !!window.game, host: !!window.__vcEngine }))).toEqual({
       game: false,
       host: false,
     });
@@ -281,25 +282,25 @@ test.describe("never falls back to the TypeScript engine", () => {
     // The trapped engine is never called again: the view keeps the last
     // frame it read, and nothing advances it.
     const after = await page.evaluate(() => {
-      const w = window as any;
+      const vc = window.__vcEngine!;
       return {
-        hosted: !!w.__vcEngine.status.hosted,
-        lastError: w.__vcEngine.status.lastError as string,
-        speed: w.game.speed,
-        minutes: w.game.reader.header.minutes as number,
+        hosted: vc.status.hosted,
+        lastError: vc.status.lastError,
+        speed: window.game.speed,
+        minutes: window.game.reader.header.minutes,
       };
     });
     expect(after).toMatchObject({ hosted: false, speed: 0 });
     expect(after.lastError).toMatch(/failed during a tick: unreachable/);
     await page.keyboard.press("3");
     await page.waitForTimeout(500);
-    expect(await page.evaluate(() => (window as any).game.speed)).toBe(0);
-    expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBe(after.minutes);
+    expect(await page.evaluate(() => window.game.speed)).toBe(0);
+    expect(await page.evaluate(() => window.game.reader.header.minutes)).toBe(after.minutes);
     // Even a speed set directly moves nothing: the frame loop asks a stopped
     // engine nothing.
-    await page.evaluate(() => (window as any).game.setSpeed(3));
+    await page.evaluate(() => window.game.setSpeed(3));
     await page.waitForTimeout(500);
-    expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBe(after.minutes);
+    expect(await page.evaluate(() => window.game.reader.header.minutes)).toBe(after.minutes);
     // The fault is the only error the page reports: a failed stop would show
     // here.
     expect(errors.filter((e) => !/the Rust engine failed during a tick: unreachable/.test(e))).toEqual([]);
@@ -309,10 +310,10 @@ test.describe("never falls back to the TypeScript engine", () => {
     await page.goto("/");
     await hostedGame(page);
     // Run the tower a little, pause it, and save: the last good save.
-    await page.evaluate(() => (window as any).game.setSpeed(3));
-    await page.waitForFunction(() => (window as any).game.reader.header.minutes > 0, undefined, { timeout: 30_000 });
+    await page.evaluate(() => window.game.setSpeed(3));
+    await page.waitForFunction(() => window.game.reader.header.minutes > 0, undefined, { timeout: 30_000 });
     const saved = await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.setSpeed(0);
       g.saveLoad.save(true);
       return { text: localStorage.getItem("verticopolis-save"), minutes: g.reader.header.minutes as number };
@@ -322,7 +323,7 @@ test.describe("never falls back to the TypeScript engine", () => {
     // save the autosave asks for), and every later call on it throws, as a
     // poisoned wasm-bindgen object does.
     await page.evaluate(() => {
-      const engine = (window as any).__vcEngine.port;
+      const engine = window.__vcEngine!.port;
       const proto = Object.getPrototypeOf(engine);
       Object.defineProperty(engine, "saveBytes", {
         value: () => {
@@ -342,15 +343,15 @@ test.describe("never falls back to the TypeScript engine", () => {
         configurable: true,
         writable: true,
       });
-      void (window as any).game.saveLoad.autosave();
+      void window.game.saveLoad.autosave();
       // The next step hears the poisoned engine as the trap.
-      (window as any).game.setSpeed(1);
+      window.game.setSpeed(1);
     });
     await expect(page.locator("#boot-fallback-host")).toContainText("Reloading your tower", { timeout: 30_000 });
     expect(await page.evaluate(() => localStorage.getItem("verticopolis-save"))).toBe(saved.text);
     await page.waitForEvent("load", { timeout: 30_000 });
     await hostedGame(page);
-    await page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, saved.minutes, {
+    await page.waitForFunction((m) => window.game.reader.header.minutes === m, saved.minutes, {
       timeout: 10_000,
     });
     expect(await page.evaluate(() => localStorage.getItem("verticopolis-save"))).toBe(saved.text);

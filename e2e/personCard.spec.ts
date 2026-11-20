@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { buildToStar, dispatchTouch, expectEngineHosted } from "./helpers";
 
 // Every test must end with its tower still on the engine.
@@ -9,15 +9,15 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  *  hold still, and the camera on them. Answers their id. */
 async function towerWithAWalker(page: Page): Promise<number> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game?.sim && (window as any).game?.ui));
+  await page.waitForFunction(() => Boolean(window.game?.sim && window.game?.ui));
   await page.evaluate(buildToStar, 2);
   return page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     document.getElementById("splash")?.remove();
     if (!g.sim.buildTransport("elevatorStandard", 186, 1, 3).ok) throw new Error("shaft placement failed");
     // The fixture freezes the clock, so run it a minute at a time on the
     // engine until someone the render draws is out walking.
-    const walker = () => (g.reader.update(), g.engine.sim.crowd.people.find((p: any) => p.state !== "riding"));
+    const walker = () => (g.reader.update(), g.engine.sim.crowd.people.find((p) => p.state !== "riding"));
     for (let minute = 0; minute < 24 * 60 && !walker(); minute++) g.sim.tick(1);
     const p = walker();
     if (!p) throw new Error("no one walked the tower in a day");
@@ -33,8 +33,8 @@ async function figurePoint(
   id: number,
 ): Promise<{ x: number; y: number; canvas: { x: number; y: number } }> {
   return page.evaluate((who) => {
-    const e = (window as any).game.engine;
-    const rec = e.crowdActors.get(who);
+    const e = window.game.engine;
+    const rec = who === null ? undefined : e.crowdActors.get(who);
     if (!rec) throw new Error(`person ${who} is not drawn`);
     const s = e.engine.worldToScreenCoordinates(rec.actor.pos);
     const box = (document.getElementById("view") as HTMLCanvasElement).getBoundingClientRect();
@@ -56,7 +56,7 @@ test("a click with Inspect opens a walking person's card, and Follow keeps the c
   const editor = page.locator("#editor");
   await expect(editor).not.toHaveClass(/hidden/);
   // The figure under the pointer, or one overlapping it: someone the view draws.
-  const open = await page.evaluate(() => (window as any).game.personCard.openId);
+  const open = await page.evaluate(() => window.game.personCard.openId);
   expect(open).not.toBeNull();
   for (const field of ["why", "from", "to", "now", "waited", "mood"]) {
     await expect(editor.locator(`[data-field="${field}"]`)).not.toHaveText("");
@@ -65,7 +65,7 @@ test("a click with Inspect opens a walking person's card, and Follow keeps the c
   await expect(editor.locator('[data-field="now"]')).not.toHaveText("Left the tower");
 
   // Look away first, so the follow has to find them off screen.
-  await page.evaluate(() => (window as any).game.engine.setCamera(20, 20, 2));
+  await page.evaluate(() => window.game.engine.setCamera(20, 20, 2));
   const follow = editor.getByRole("button", { name: "Follow" });
   await follow.click();
   await expect(editor.getByRole("button", { name: "Stop following" })).toBeVisible();
@@ -74,8 +74,8 @@ test("a click with Inspect opens a walking person's card, and Follow keeps the c
   // still followed. (The lot's edges can keep them off center.)
   const onScreen = () =>
     page.evaluate((who) => {
-      const e = (window as any).game.engine;
-      const rec = e.crowdActors.get(who);
+      const e = window.game.engine;
+      const rec = who === null ? undefined : e.crowdActors.get(who);
       const s = rec && e.engine.worldToScreenCoordinates(rec.actor.pos);
       const box = (document.getElementById("view") as HTMLCanvasElement).getBoundingClientRect();
       const inside = !!s && s.x >= 0 && s.x <= box.width && s.y >= 0 && s.y <= box.height;
@@ -97,19 +97,19 @@ test("a click with Inspect opens a walking person's card, and Follow keeps the c
   await expect(editor.getByRole("button", { name: "Stop following" })).toBeVisible();
 
   // With the clock running and the person moving, the follow holds.
-  await page.evaluate(() => (window as any).game.setSpeed(1));
+  await page.evaluate(() => window.game.setSpeed(1));
   await page.waitForTimeout(2000);
   await expect(editor.getByRole("button", { name: "Stop following" })).toBeVisible();
-  await page.evaluate(() => (window as any).game.setSpeed(0));
+  await page.evaluate(() => window.game.setSpeed(0));
 
   // Moving the camera by any other means hands it back to the player.
-  await page.evaluate(() => (window as any).game.engine.setCamera(20, 20, 2));
+  await page.evaluate(() => window.game.engine.setCamera(20, 20, 2));
   await expect(editor.getByRole("button", { name: "Follow", exact: true })).toBeVisible();
 
   // The ✕ lets them go: the card closes and the follow ends with it.
   await editor.locator(".ed-close").click();
   await expect(editor).toHaveClass(/hidden/);
-  await expect.poll(() => page.evaluate(() => (window as any).game.personCard.openId)).toBeNull();
+  await expect.poll(() => page.evaluate(() => window.game.personCard.openId)).toBeNull();
 });
 
 test("a tap with Inspect on a phone opens the person's card (#2092)", async ({ page }) => {
@@ -117,8 +117,8 @@ test("a tap with Inspect on a phone opens the person's card (#2092)", async ({ p
   await page.click('.pal-item[data-tool="inspect"]');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate((who) => {
-    const g = (window as any).game;
-    const p = g.engine.sim.crowd.people.find((q: any) => q.id === who);
+    const g = window.game;
+    const p = g.engine.sim.crowd.people.find((q) => q.id === who)!;
     g.engine.setCamera(p.x, p.fy, 2);
   }, id);
   await page.waitForTimeout(300);
@@ -130,5 +130,5 @@ test("a tap with Inspect on a phone opens the person's card (#2092)", async ({ p
   const editor = page.locator("#editor");
   await expect(editor).not.toHaveClass(/hidden/);
   await expect(editor.locator('[data-field="why"]')).not.toHaveText("");
-  expect(await page.evaluate(() => (window as any).game.personCard.openId)).not.toBeNull();
+  expect(await page.evaluate(() => window.game.personCard.openId)).not.toBeNull();
 });

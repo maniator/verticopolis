@@ -97,10 +97,36 @@ export const SETTLE_AFTER_SETUP: ReadonlySet<string> = new Set<string>([
   "stats/stats-tenancy-classic",
 ]);
 
+/** The fields of a save {@link shotShape} reads: `game.sim.serialize()` or
+ *  the engine's own save. */
+interface ShapeSource {
+  star: number;
+  minutes: number;
+  vipVisitDay?: number;
+  builtWeddingHall: boolean;
+  events?: { pending?: unknown };
+  units?: {
+    id: number;
+    kind: string;
+    floor: number;
+    x: number;
+    state?: string;
+    occupants?: number;
+    rent?: number;
+    noRate?: boolean;
+    everOccupied?: boolean;
+    label?: string;
+  }[];
+  transports?: { id: number; kind: string; x: number; bottom: number; top: number }[];
+}
+
+/** A save in the shared shape. */
+type ShotShape = ReturnType<typeof shotShape>;
+
 /** BROWSER-INJECTED (installed as `window.__vcShotShape`): the fields of a save
  *  that a builder or a setup edits by hand, the shape every hosted check
  *  compares. Every unit and transport row has a fixed length. */
-export function shotShape(v: any): any {
+export function shotShape(v: ShapeSource) {
   return {
     star: v.star,
     // Money stays out: a money write reaches the engine as `setMoney`, and a
@@ -109,7 +135,7 @@ export function shotShape(v: any): any {
     vipVisitDay: v.vipVisitDay,
     builtWeddingHall: v.builtWeddingHall,
     pendingEvent: Boolean(v.events?.pending),
-    units: (v.units ?? []).map((u: any) => [
+    units: (v.units ?? []).map((u) => [
       u.id,
       u.kind,
       u.floor,
@@ -121,7 +147,7 @@ export function shotShape(v: any): any {
       Boolean(u.everOccupied),
       u.label ?? null,
     ]),
-    transports: (v.transports ?? []).map((t: any) => [t.id, t.kind, t.x, t.bottom, t.top]),
+    transports: (v.transports ?? []).map((t) => [t.id, t.kind, t.x, t.bottom, t.top]),
   };
 }
 
@@ -166,11 +192,11 @@ export async function settleUnlessSettled(page: Page, where: string, allowSkip: 
  *  on throws. */
 export async function beginSettleStep(page: Page, where: string): Promise<void> {
   const state = await page.evaluate(() => {
-    const w = window as unknown as { __vcEngine?: any; __vcShotSettled?: boolean };
+    const w = window as Window & { __vcShotSettled?: boolean };
     w.__vcShotSettled = false;
     const vc = w.__vcEngine;
     if (!vc) return "no engine host (did the engine package load?)";
-    const g = (window as unknown as { game?: any }).game;
+    const g = window.game;
     if (!vc.status?.hosted)
       return `the engine does not hold the tower (${vc.status?.lastError ?? "no error recorded"})`;
     if (!g || g.enginePort !== vc.port) return "the app does not run on the Rust engine";
@@ -188,7 +214,7 @@ export async function beginSettleStep(page: Page, where: string): Promise<void> 
  *  that rendered without it (the engine package never loaded). */
 async function expectHosted(page: Page, where: string): Promise<void> {
   const hosted = await page.evaluate(() => {
-    const w = window as unknown as { game?: any; __vcEngine?: any };
+    const w = window;
     if (!w.__vcEngine) return "no engine host (did the engine package load?)";
     if (!w.__vcEngine.status?.hosted) return "the engine does not hold the tower";
     return w.game?.enginePort === w.__vcEngine.port ? "hosted" : "the app does not run on the Rust engine";
@@ -234,7 +260,7 @@ export const HOSTED_FIX = {
 /** In-page: the page's tower (`game.sim`, the harnesses' tower over the engine) in the
  *  shared shape, as JSON. */
 export function pgOwnShape(): string {
-  const w = window as unknown as { game?: any; __vcShotShape?: (v: any) => any };
+  const w = window as Window & { __vcShotShape?: (v: ShapeSource) => ShotShape };
   const sim = w.game?.sim;
   if (!sim || typeof w.__vcShotShape !== "function") return "null";
   return JSON.stringify(w.__vcShotShape(sim.serialize()));
@@ -244,7 +270,7 @@ export function pgOwnShape(): string {
  *  the engine's own save, in the shared shape. Returns "hosted", or what the
  *  engine did not follow. */
 export function pgCheckHosted(before: string): string {
-  const w = window as unknown as { game?: any; __vcEngine?: any; __vcShotShape?: (v: any) => any };
+  const w = window as Window & { __vcShotShape?: (v: ShapeSource) => ShotShape };
   const g = w.game;
   const vc = w.__vcEngine;
   if (!g?.sim) return "no game";
@@ -254,17 +280,17 @@ export function pgCheckHosted(before: string): string {
   if (!vc) return "no engine host (did the engine package load?)";
   if (!vc.status?.hosted) return "the engine does not hold the tower";
   if (g.enginePort !== vc.port) return "the app does not run on the Rust engine";
-  const was = JSON.parse(before);
+  const was: ShotShape | null = JSON.parse(before);
   if (!was) return "no tower before the step";
   g.syncSim();
   const now = shapeOf(g.sim.serialize());
   const engine = shapeOf(JSON.parse(vc.port.serialize()));
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-  for (const key of ["star", "minutes", "vipVisitDay", "builtWeddingHall", "pendingEvent"]) {
+  for (const key of ["star", "minutes", "vipVisitDay", "builtWeddingHall", "pendingEvent"] as const) {
     if (!same(was[key], now[key]) && !same(now[key], engine[key]))
       return `${key} is ${JSON.stringify(now[key])} on the page, ${JSON.stringify(engine[key])} on the engine`;
   }
-  for (const key of ["units", "transports"]) {
+  for (const key of ["units", "transports"] as const) {
     const byId = (rows: unknown[][]) => new Map(rows.map((r) => [r[0], r]));
     const a = byId(was[key]);
     const b = byId(now[key]);
@@ -301,12 +327,10 @@ export function pgCheckHosted(before: string): string {
  */
 export function pgSettle(): string {
   const run = (): string => {
-    const w = window as unknown as {
-      game?: any;
-      __vcEngine?: any;
+    const w = window as Window & {
       __vcShotSettled?: boolean;
       __vcShotSettledShape?: string;
-      __vcShotShape?: (v: any) => any;
+      __vcShotShape?: (v: ShapeSource) => ShotShape;
     };
     const g = w.game;
     const vc = w.__vcEngine;

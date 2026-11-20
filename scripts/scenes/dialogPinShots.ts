@@ -47,7 +47,7 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
     setup: async (page) => {
       // About this game, the tallest Help window now that the guide is the
       // Help site: its engine diagnostics overflow the short viewport.
-      await page.evaluate(() => (window as any).game.ui.showAbout());
+      await page.evaluate(() => window.game.ui.showAbout());
       await page.waitForSelector("#modal .help-diagnostics", { timeout: 4000 });
       await page.evaluate(() => {
         const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
@@ -125,7 +125,7 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
     keepDialogs: true,
     setup: async (page) => {
       await page.evaluate(() => {
-        const ui = (window as any).game.ui;
+        const ui = window.game.ui;
         const report = (towerName: string) => ({
           towerName,
           star: 3,
@@ -178,7 +178,7 @@ export const CRASH_PIN_SHOTS: Shot[] = [
         // The scene's first shot leaves the card up; trip it again only if the
         // runner closed it, the same two-strikes path that shot stages.
         if (document.querySelector("dialog#crash-screen[open]")) return;
-        const engine = (window as any).game?.engine;
+        const engine = window.game?.engine;
         if (typeof engine?.onContextLost !== "function") throw new Error("game.engine.onContextLost is not wired");
         engine.engine?.clock?.stop?.();
         engine.onContextLost();

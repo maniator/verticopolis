@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { HELP_BAR_CHANNEL } from "../src/ui/helpBarProtocol";
 
@@ -72,6 +71,13 @@ const FRAME = `<!doctype html><script>
   parent.postMessage("ready", "*");
 </script>`;
 
+/** What the stand-in manual page below keeps on its window. */
+type ManualWindow = Window & {
+  heard: { tab: string; game: string; speed: number; heldForHelp: boolean }[];
+  ready: Promise<void>;
+  send(message: unknown): void;
+};
+
 /** The stand-in manual page: it frames the game's host and keeps what the
  *  game says. */
 const MANUAL = `<!doctype html><title>Manual</title><script>
@@ -106,22 +112,23 @@ test.afterEach(async () => {
 async function bootGame(): Promise<Page> {
   const page = await context.newPage();
   await page.goto(`${GAME}/`);
-  await page.waitForFunction(() => Boolean((window as any).game));
+  await page.waitForFunction(() => Boolean(window.game));
   await page.evaluate(() => document.getElementById("splash")?.remove());
-  await page.evaluate(() => (window as any).game.setSpeed(2));
+  await page.evaluate(() => window.game.setSpeed(2));
   return page;
 }
 
 async function openManual(help: string): Promise<Page> {
   const manual = await context.newPage();
   await manual.goto(`${help}/manual.html`);
-  await manual.evaluate(() => (window as any).ready);
-  await manual.evaluate(() => (window as any).send({ bar: "hello" }));
+  await manual.evaluate(() => (window as unknown as ManualWindow).ready);
+  await manual.evaluate(() => (window as unknown as ManualWindow).send({ bar: "hello" }));
   return manual;
 }
 
-const speedOf = (page: Page) => page.evaluate(() => (window as any).game.speed as number);
-const heardFrom = (manual: Page) => manual.evaluate(() => new Set((window as any).heard.map((s: any) => s.tab)).size);
+const speedOf = (page: Page) => page.evaluate(() => window.game.speed);
+const heardFrom = (manual: Page) =>
+  manual.evaluate(() => new Set((window as unknown as ManualWindow).heard.map((s) => s.tab)).size);
 
 test("a manual page on the help host hears the game, sees its speed, and pauses that tower alone", async () => {
   const game = await bootGame();
@@ -130,15 +137,17 @@ test("a manual page on the help host hears the game, sees its speed, and pauses 
 
   // Both game tabs answer the first hello, each with its own tab id.
   await expect.poll(() => heardFrom(manual)).toBe(2);
-  const first = await manual.evaluate(() => (window as any).heard[0]);
+  const first = await manual.evaluate(() => (window as unknown as ManualWindow).heard[0]);
   expect(first).toMatchObject({ game: "status", speed: 2, heldForHelp: false });
   expect(first.tab).toMatch(/^[0-9a-f]{16}$/);
 
   // Which tab answered first is the browser's choice; pause that one.
-  const chosen = first.tab as string;
-  await manual.evaluate((tab) => (window as any).send({ bar: "pause", tab }), chosen);
+  const chosen = first.tab;
+  await manual.evaluate((tab) => (window as unknown as ManualWindow).send({ bar: "pause", tab }), chosen);
   await expect
-    .poll(() => manual.evaluate((tab) => (window as any).heard.filter((s: any) => s.tab === tab).at(-1), chosen))
+    .poll(() =>
+      manual.evaluate((tab) => (window as unknown as ManualWindow).heard.filter((s) => s.tab === tab).at(-1), chosen),
+    )
     .toMatchObject({ speed: 0, heldForHelp: true });
   // The tab the bar named paused; the other tower still runs.
   const speeds = await Promise.all([speedOf(game), speedOf(other)]);

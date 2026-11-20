@@ -28,8 +28,7 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 /** Camera zoom derived from two world points (no absolute-zoom getter). */
 async function readZoom(page: import("@playwright/test").Page): Promise<number> {
   return page.evaluate(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const e = (window as any).game.engine;
+    const e = window.game.engine;
     return Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2)) / 34; // FLOOR px
   });
 }
@@ -41,15 +40,14 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
 
     await page.goto("/");
     await page.waitForFunction(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const canvas = document.querySelector<HTMLCanvasElement>("#view");
       return Boolean(g?.sim && g.engine && canvas && canvas.width > 0 && canvas.height > 0);
     });
     await page.evaluate(() => {
       document.getElementById("splash")?.remove();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+
+      const g = window.game;
       g.speed = 0; // freeze time; input handling is frame-driven, not sim-driven
       g.sim.money = 1e9; // placement must only depend on the gesture, never funds
       // Classic founds an empty lot now; lay the 40-tile concourse the taps
@@ -81,20 +79,19 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
     await dispatchTouch(page, "pointerup", 7002, cx + 60, cy - 30);
 
     // The survivor's drag+release must not have stranded a build ghost.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ghost = await page.evaluate(() => Boolean(((window as any).game.engine as any).preview));
+
+    const ghost = await page.evaluate(() => Boolean(window.game.engine.preview));
     expect(ghost).toBe(false);
 
     // ---- Phase 2: a single-finger tap with a build tool still places ----
     // (with the phantom contact of the old bug, this tap was misread as a
     // pinch start and swallowed: nothing placed, no message, forever).
     // Classic builds only while the clock runs (#1936), so let time run for the tap.
-    await page.evaluate(() => (window as any).game.setSpeed(1)); // eslint-disable-line @typescript-eslint/no-explicit-any
+    await page.evaluate(() => window.game.setSpeed(1));
     await page.click('.pal-item[data-kind="office"]');
-    const unitsBefore = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const unitsBefore = await page.evaluate(() => window.game.sim.tower.units.length);
     const tap = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const e = g.engine;
       // Middle of floor 2, over the ground concourse laid above: a valid office spot.
       const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
@@ -102,7 +99,7 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
     });
     await dispatchTouch(page, "pointerdown", 7003, tap.x, tap.y);
     await dispatchTouch(page, "pointerup", 7003, tap.x, tap.y);
-    const unitsAfter = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const unitsAfter = await page.evaluate(() => window.game.sim.tower.units.length);
     expect(unitsAfter).toBeGreaterThan(unitsBefore); // the tap placed a room
 
     // ---- Phase 3: pinch zoom OUT still responds (zoom is not "stuck") ----
@@ -121,12 +118,11 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
     await dispatchTouch(page, "pointerdown", 7007, cx + 40, cy);
     await dispatchTouch(page, "pointercancel", 7006, cx - 40, cy);
     await dispatchTouch(page, "pointercancel", 7007, cx + 40, cy);
-    const units2 = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const units2 = await page.evaluate(() => window.game.sim.tower.units.length);
     // Recompute the tap point: the phase-3 zoom changed the world-to-screen
     // mapping, so the phase-2 coordinates now land on different tiles.
     const tap2 = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const e = g.engine;
       const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       // Floor 3, above the office phase 2 placed on floor 2: still supported.
@@ -134,7 +130,7 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
     });
     await dispatchTouch(page, "pointerdown", 7008, tap2.x, tap2.y);
     await dispatchTouch(page, "pointerup", 7008, tap2.x, tap2.y);
-    const units3 = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const units3 = await page.evaluate(() => window.game.sim.tower.units.length);
     expect(units3).toBeGreaterThan(units2); // taps still work after cancels
 
     // The whole gesture storm produced no uncaught errors.
@@ -149,15 +145,14 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
 
     await page.goto("/");
     await page.waitForFunction(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const canvas = document.querySelector<HTMLCanvasElement>("#view");
       return Boolean(g?.sim && g.engine && canvas && canvas.width > 0 && canvas.height > 0);
     });
     await page.evaluate(() => {
       document.getElementById("splash")?.remove();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+
+      const g = window.game;
       g.speed = 0;
       g.sim.money = 1e9;
       // Classic founds an empty lot now; lay the 40-tile concourse the office
@@ -174,19 +169,18 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
     // Compare the unit count before/after so the assertion proves THIS tap placed
     // a room, not that the tower merely already had units.
     // Classic builds only while the clock runs (#1936), so let time run for the tap.
-    await page.evaluate(() => (window as any).game.setSpeed(1)); // eslint-disable-line @typescript-eslint/no-explicit-any
+    await page.evaluate(() => window.game.setSpeed(1));
     await page.click('.pal-item[data-kind="office"]');
     const spot = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const e = g.engine;
       const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       return { x: e.worldToScreenX(g.grid.width / 2), y: e.worldToScreenY(2) + zoomPx / 2 };
     });
-    const unitsBefore = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const unitsBefore = await page.evaluate(() => window.game.sim.tower.units.length);
     await dispatchTouch(page, "pointerdown", 8001, spot.x, spot.y);
     await dispatchTouch(page, "pointerup", 8001, spot.x, spot.y);
-    const unitsAfter = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const unitsAfter = await page.evaluate(() => window.game.sim.tower.units.length);
     expect(unitsAfter).toBeGreaterThan(unitsBefore);
     await page.click('.pal-item[data-tool="inspect"]');
 
@@ -198,8 +192,7 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
 
     // Re-derive the tap point (the resize changed world-to-screen), then tap.
     const spot2 = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const e = g.engine;
       const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       return { x: e.worldToScreenX(g.grid.width / 2), y: e.worldToScreenY(2) + zoomPx / 2 };
@@ -217,8 +210,7 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
 
     // Tapping empty space (well left of the office, nothing built) closes it.
     const empty = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const e = g.engine;
       const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       return { x: e.worldToScreenX(g.grid.width / 2 - 30), y: e.worldToScreenY(2) + zoomPx / 2 };
@@ -239,8 +231,7 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
  *  assertions still passed. */
 async function trueZoom(page: import("@playwright/test").Page): Promise<number> {
   return page.evaluate((floorPx) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const e = (window as any).game.engine;
+    const e = window.game.engine;
     return Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2)) / floorPx;
   }, FLOOR);
 }
@@ -263,8 +254,7 @@ test.describe("mobile pinch: zoom out frames the whole tower", () => {
 
     await page.goto("/");
     await page.waitForFunction(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const canvas = document.querySelector<HTMLCanvasElement>("#view");
       return Boolean(g?.sim && g.engine && canvas && canvas.width > 0 && canvas.height > 0);
     });
@@ -274,8 +264,7 @@ test.describe("mobile pinch: zoom out frames the whole tower", () => {
     // dynamic zoom floor only needs the tower's built floor extent, which this
     // gives us without hand-placing a whole city.
     const top = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       document.getElementById("splash")?.remove();
       g.speed = 0;
       g.sim.money = 1e9;
@@ -286,8 +275,8 @@ test.describe("mobile pinch: zoom out frames the whole tower", () => {
       ok(g.sim.build("lobby", 1, x), "ground lobby");
       for (let f = 2; f <= 82; f++) ok(g.sim.build("floor", f, x), `floor ${f}`);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).game.syncSim();
+
+      window.game.syncSim();
       return g.sim.tower.highestFloor as number;
     });
     expect(top).toBe(82);
@@ -305,8 +294,7 @@ test.describe("mobile pinch: zoom out frames the whole tower", () => {
 
     // ...and at it, the whole 82-floor tower is within the viewport.
     const visibleFloors = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const e = (window as any).game.engine;
+      const e = window.game.engine;
       const canvas = document.getElementById("view") as HTMLCanvasElement;
       return canvas.clientHeight / Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
     });

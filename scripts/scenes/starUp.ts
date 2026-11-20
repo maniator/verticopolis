@@ -27,7 +27,7 @@ async function starUp(page: Page, star: number, mode: Mode, parked = false): Pro
   if (reached < star) throw new Error(`star-up ${mode} ${star}★ only reached ${reached}★`);
   if (parked) await page.evaluate(pgParkTheOffices);
   await page.evaluate((s) => {
-    const g = (window as unknown as { game: any }).game;
+    const g = window.game;
     g.pendingStarUp = { from: s - 1, to: s };
     // The frame loop opens the box on its next UI pass (due at once); the box
     // itself stops time, and the speed stays at pause, so the tower behind it
@@ -38,7 +38,7 @@ async function starUp(page: Page, star: number, mode: Mode, parked = false): Pro
   await page.evaluate(pgStepNoDraw, 3);
   await page.waitForSelector("#modal[open] .star-up-rating", { timeout: 8000 });
   await page.evaluate(() => {
-    (window as unknown as { game: any }).game.engine.paused = true;
+    window.game.engine.paused = true;
   });
   // The parked shot stands for the plain line; a short deck would bless the red one twice.
   if (parked && (await page.$("#modal .star-up-parking.short")))
@@ -49,7 +49,7 @@ async function starUp(page: Page, star: number, mode: Mode, parked = false): Pro
  *  grown tower has every space its offices need and the parking line reads
  *  plain. In-page: it builds on the tooling handle. */
 function pgParkTheOffices(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const s = g.sim;
   const W = g.grid.width;
   for (const f of [0, -1]) {
@@ -58,10 +58,11 @@ function pgParkTheOffices(): void {
     if (!s.tower.place("parkingRamp", f, 6).ok) throw new Error(`star-up: no parking ramp on floor ${f}`);
     for (let x = 22; x + 1 <= W - 3;) {
       const r = s.tower.place("parking", f, x);
-      x += r.ok ? s.tower.getUnit(r.unitId).width : 1;
+      x += r.ok ? s.tower.getUnit(r.unitId)!.width : 1;
     }
   }
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
 }
 
 /** A still of the box, cropped to it on a desktop. */

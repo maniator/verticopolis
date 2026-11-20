@@ -34,8 +34,8 @@ export const PRICING_SCENES: Scene[] = [
         crop: "#editor",
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const office = g.sim.tower.units.find((u: any) => u.kind === "office" && u.state === "occupied");
+            const g = window.game;
+            const office = g.sim.tower.units.find((u) => u.kind === "office" && u.state === "occupied");
             if (!office) throw new Error("pricing-modern tower has no occupied office to select");
             g.selected = { type: "unit", id: office.id };
             g.engine.selectedId = office.id;
@@ -89,8 +89,8 @@ export const PRICING_SCENES: Scene[] = [
           // Select an occupied office, then open the batch dialog off its
           // editor card.
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const office = g.sim.tower.units.find((u: any) => u.kind === "office" && u.state === "occupied");
+            const g = window.game;
+            const office = g.sim.tower.units.find((u) => u.kind === "office" && u.state === "occupied");
             if (!office) throw new Error("pricing-modern tower has no occupied office to select");
             g.selected = { type: "unit", id: office.id };
             g.engine.selectedId = office.id;

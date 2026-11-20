@@ -25,7 +25,7 @@
  *  a staging accident. Body duplicated from the Classic twin (same seed 4600,
  *  same tower shape): injected page code must be self-contained. */
 export function buildEscalatorOfficeModern(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(4600, "modern");
   const s = g.sim;
@@ -45,7 +45,7 @@ export function buildEscalatorOfficeModern(): void {
   for (let x = left; x + 1 <= right;) {
     const r = s.tower.place("shop", 2, x);
     if (r.ok) {
-      const u = s.tower.getUnit(r.unitId);
+      const u = s.tower.getUnit(r.unitId)!;
       u.state = "occupied";
       u.everOccupied = true;
       u.occupants = 4;
@@ -56,7 +56,7 @@ export function buildEscalatorOfficeModern(): void {
     for (let x = left; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         u.occupants = 6;
@@ -74,7 +74,8 @@ export function buildEscalatorOfficeModern(): void {
     throw new Error("Modern escalators should reach the office floors but a flight was refused");
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 2, 1.2);
   g.speed = 0;
   g.engine.paused = true;
@@ -87,7 +88,7 @@ export function buildEscalatorOfficeModern(): void {
  *  refusal reason changed), so the pair can never quietly show two matching
  *  frames. Body duplicated: injected page code must be self-contained. */
 export function buildEscalatorOfficeClassic(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(4600, "classic");
   const s = g.sim;
@@ -104,7 +105,7 @@ export function buildEscalatorOfficeClassic(): void {
   for (let x = left; x + 1 <= right;) {
     const r = s.tower.place("shop", 2, x);
     if (r.ok) {
-      const u = s.tower.getUnit(r.unitId);
+      const u = s.tower.getUnit(r.unitId)!;
       u.state = "occupied";
       u.everOccupied = true;
       u.occupants = 4;
@@ -115,7 +116,7 @@ export function buildEscalatorOfficeClassic(): void {
     for (let x = left; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         u.occupants = 6;
@@ -137,7 +138,8 @@ export function buildEscalatorOfficeClassic(): void {
     }
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 2, 1.2);
   g.speed = 0;
   g.engine.paused = true;
@@ -149,7 +151,7 @@ export function buildEscalatorOfficeClassic(): void {
  *  always frames a real card. Body duplicated from the Classic twin (same
  *  seed, same shape): injected page code must be self-contained. */
 export function buildCinemaModern(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(4700, "modern");
   const s = g.sim;
@@ -162,7 +164,7 @@ export function buildCinemaModern(): void {
   for (let f = 2; f <= 3; f++) for (let x = cx - 20; x <= cx + 19; x++) s.tower.place("floor", f, x);
   const r = s.tower.place("cinema", 2, cx - 15);
   if (!r.ok) throw new Error(`Modern theater did not place: ${r.reason}`);
-  const u = s.tower.getUnit(r.unitId);
+  const u = s.tower.getUnit(r.unitId)!;
   u.state = "empty";
   u.filmPolicy = "blockbuster";
   u.filmDays = 4;
@@ -174,7 +176,7 @@ export function buildCinemaModern(): void {
  *  change it (a new film or a classic, at the catalog's prices). Body
  *  duplicated: injected page code must be self-contained. */
 export function buildCinemaClassic(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(4700, "classic");
   const s = g.sim;
@@ -187,7 +189,7 @@ export function buildCinemaClassic(): void {
   for (let f = 2; f <= 3; f++) for (let x = cx - 20; x <= cx + 19; x++) s.tower.place("floor", f, x);
   const r = s.tower.place("cinema", 2, cx - 15);
   if (!r.ok) throw new Error(`Classic theater did not place: ${r.reason}`);
-  const u = s.tower.getUnit(r.unitId);
+  const u = s.tower.getUnit(r.unitId)!;
   u.state = "empty";
   u.filmDays = 4;
   g.engine.setCamera(cx, 2.5, 1.6);

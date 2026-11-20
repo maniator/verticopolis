@@ -25,7 +25,7 @@
 
 /** The showcase hero: a tall, fully-populated tower at canon widths. */
 export function buildCanonTower(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(2024);
   const s = g.sim;
@@ -58,11 +58,11 @@ export function buildCanonTower(): void {
   s.tower.placeTransport("elevatorStandard", left + 14, 30, 40);
   s.tower.placeTransport("elevatorExpress", left + 20, 1, 30);
   s.tower.placeTransport("stairs", right - 12, 1, 2);
-  const fill = (f: number, kind: string, state: string) => {
+  const fill = (f: number, kind: string, state: Window["game"]["sim"]["tower"]["units"][number]["state"]) => {
     for (let x = left + 26; x + 1 <= right;) {
       const r = s.tower.place(kind, f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = state;
         u.everOccupied = true;
         if (kind === "office") u.label = "Apex Holdings";
@@ -73,7 +73,7 @@ export function buildCanonTower(): void {
   for (let x = left + 26; x + 1 <= right;) {
     const r = s.tower.place("fastFood", 2, x);
     if (r.ok) {
-      const u = s.tower.getUnit(r.unitId);
+      const u = s.tower.getUnit(r.unitId)!;
       u.state = "occupied";
       x += u.width;
     } else x += 1;
@@ -85,7 +85,7 @@ export function buildCanonTower(): void {
   fill(37, "shop", "occupied");
   fill(38, "restaurant", "occupied");
   const cine = s.tower.place("cinema", 39, left + 26);
-  if (cine.ok) s.tower.getUnit(cine.unitId).state = "occupied";
+  if (cine.ok) s.tower.getUnit(cine.unitId)!.state = "occupied";
   s.tower.place("security", 1, left + 26);
   s.tower.place("medical", 2, left);
   // Basement: a full-lot B1 concourse, a canon parking run on B2, and the 30-wide,
@@ -97,7 +97,7 @@ export function buildCanonTower(): void {
   for (let f = -1; f >= -4; f--) for (let x = 0; x < W; x++) s.tower.place("floor", f, x);
   const metro = s.tower.place("metro", -4, left + 8);
   if (!metro.ok) throw new Error(`hero metro failed: ${metro.reason}`);
-  s.tower.getUnit(metro.unitId).state = "occupied";
+  s.tower.getUnit(metro.unitId)!.state = "occupied";
   // The first elevator bank serves the metro platform (B4) up to the 15F sky
   // lobby. It needs the basement floors first (review Edge #1), and the metro
   // scene depends on it, so a failed placement fails the capture loudly.
@@ -106,14 +106,15 @@ export function buildCanonTower(): void {
   s.tower.place("parkingRamp", -1, left);
   for (let x = left + 16; x + 1 <= right;) {
     const r = s.tower.place("parking", -1, x);
-    if (r.ok) x += s.tower.getUnit(r.unitId).width;
+    if (r.ok) x += s.tower.getUnit(r.unitId)!.width;
     else x += 1;
   }
   // Recycling beside the metro: from 3 stars a shortfall drains ratings (#1970).
   const recycling = s.tower.place("recycling", -3, left + 50);
   if (!recycling.ok) throw new Error(`hero recycling failed: ${recycling.reason}`);
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 20, 0.5);
   // Keep the hero tower LIVE so commuters spawn and elevators move for the
   // people-rush shot; the per-shot pre-capture sweep clears any stray fire the
@@ -124,7 +125,7 @@ export function buildCanonTower(): void {
 
 /** A ramp-chained basement garage for the parking/recycling/garbage shots. */
 export function buildBasement(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(7);
   const s = g.sim;
@@ -143,7 +144,7 @@ export function buildBasement(): void {
     for (let x = left + 10; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.occupants = 6;
         x += u.width;
@@ -159,7 +160,7 @@ export function buildBasement(): void {
     s.tower.place("parkingRamp", f, left + 4);
     for (let x = left + 20; x + 1 <= right;) {
       const r = s.tower.place("parking", f, x);
-      if (r.ok) x += s.tower.getUnit(r.unitId).width;
+      if (r.ok) x += s.tower.getUnit(r.unitId)!.width;
       else x += 1;
     }
   }
@@ -169,7 +170,8 @@ export function buildBasement(): void {
     if (!r.ok) throw new Error(`basement recycling failed: ${r.reason}`);
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, -1, 1.6);
   // Freeze: the basement shots jump the clock hours to fill recycling / summon
   // the garbage truck, and a running sim would roll random fires into the frame.
@@ -194,7 +196,7 @@ export function buildBasement(): void {
  *     real distribution to draw.
  */
 export function buildModernPricingTower(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   // The mode is founded at newGame and permanent for the tower's life; this is
   // the one place the gallery builds a Modern sim (everything else stays on the
@@ -218,7 +220,7 @@ export function buildModernPricingTower(): void {
     for (let x = left + 8; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         u.occupants = 6;
@@ -234,7 +236,7 @@ export function buildModernPricingTower(): void {
     for (let x = left + 8; x + 1 <= right;) {
       const r = s.tower.place("condo", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         u.residents = sizes[ci % sizes.length];
@@ -249,7 +251,7 @@ export function buildModernPricingTower(): void {
   // (GameRules.coerceNoRate strips it), so an off-market split in this shot
   // would document a state the mode cannot reach; the Classic tenancy shot is
   // the one that shows the split.
-  const f5 = s.tower.units.filter((u: any) => u.kind === "office" && u.floor === 5).sort((a: any, b: any) => a.x - b.x);
+  const f5 = s.tower.units.filter((u) => u.kind === "office" && u.floor === 5).sort((a, b) => a.x - b.x);
   if (f5.length < 5)
     throw new Error(`pricing-modern tower staged only ${f5.length} floor-5 offices (need 5 for the vacancy row)`);
   for (let i = 0; i < 5; i++) {
@@ -259,7 +261,8 @@ export function buildModernPricingTower(): void {
     u.occupants = 0;
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 4, 0.9);
   // Freeze: every shot here is a DOM panel/dialog over a static backdrop, and a
   // running sim would churn the frame between regens.
@@ -279,7 +282,7 @@ export function buildModernPricingTower(): void {
  * helper; the body is duplicated per the self-containment contract).
  */
 export function buildScheduleTowerModern(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(4500, "modern");
   const s = g.sim;
@@ -294,13 +297,13 @@ export function buildScheduleTowerModern(): void {
   for (let x = left; x <= right; x++) s.tower.place("lobby", 15, x); // sky lobby
   s.tower.placeTransport("elevatorStandard", left + 4, 1, 10);
   s.tower.placeTransport("elevatorExpress", right - 8, 1, 15);
-  const std = s.tower.transports.find((t: any) => t.kind === "elevatorStandard");
+  const std = s.tower.transports.find((t) => t.kind === "elevatorStandard")!;
   s.tower.setCars(std.id, 4);
   for (let f = 2; f <= 9; f++) {
     for (let x = left + 10; x + 1 <= right - 10;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         u.occupants = 6;
@@ -340,7 +343,8 @@ export function buildScheduleTowerModern(): void {
     homeFloors: [1, 1, 8, 8],
   });
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 6, 0.7);
   // Freeze: the shots are a dialog over a static backdrop.
   g.speed = 0;
@@ -351,7 +355,7 @@ export function buildScheduleTowerModern(): void {
  *  rules) for the raw-grid variant of the dialog. Body duplicated: injected
  *  page code must be self-contained. */
 export function buildScheduleTowerClassic(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(4500, "classic");
   const s = g.sim;
@@ -366,13 +370,13 @@ export function buildScheduleTowerClassic(): void {
   for (let x = left; x <= right; x++) s.tower.place("lobby", 15, x); // sky lobby
   s.tower.placeTransport("elevatorStandard", left + 4, 1, 10);
   s.tower.placeTransport("elevatorExpress", right - 8, 1, 15);
-  const std = s.tower.transports.find((t: any) => t.kind === "elevatorStandard");
+  const std = s.tower.transports.find((t) => t.kind === "elevatorStandard")!;
   s.tower.setCars(std.id, 4);
   for (let f = 2; f <= 9; f++) {
     for (let x = left + 10; x + 1 <= right - 10;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         u.occupants = 6;
@@ -396,7 +400,8 @@ export function buildScheduleTowerClassic(): void {
     homeFloors: [1, 1, 8, 8],
   });
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 6, 0.7);
   g.speed = 0;
   g.engine.paused = true;
@@ -413,7 +418,7 @@ export function buildScheduleTowerClassic(): void {
  *    A bare rating grows a Classic tower; the star-up scenes pass `{ target, mode }`. */
 export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "modern" }): number {
   const { target, mode } = typeof arg === "number" ? { target: arg, mode: "classic" } : arg;
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(2024 + target, mode);
   const s = g.sim;
@@ -446,7 +451,7 @@ export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "
     for (let x = left; x + 1 <= right && placed < wantOffices;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         placed++;
@@ -466,13 +471,12 @@ export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "
     // a game build gives them: unpriced, the settle's load snaps them and says so over the star line.
     for (let i = 0; i < 2; i++) {
       const r = s.tower.place("hotelSuite", amenityFloor, left + 48 + i * 12);
-      if (r.ok)
-        Object.assign(s.tower.getUnit(r.unitId), {
-          state: "asleep",
-          rent: ((r: any) => (r.rungs ? r.rungs[2].value : r.default))(
-            g.getCatalog().facilities.find((f: any) => f.key === "hotelSuite").rent,
-          ),
-        });
+      if (r.ok) {
+        const rent = g.getCatalog().facilities.find((f) => f.key === "hotelSuite")!.rent!;
+        const suite = s.tower.getUnit(r.unitId)!;
+        suite.state = "asleep";
+        suite.rent = rent.shape === "ladder" ? rent.rungs[2].value : rent.default;
+      }
     }
     s.vipFavorable = true; // stands in for a favorable VIP review
     // A basement stack, laid top-down so each deck rests on the one above:
@@ -489,7 +493,7 @@ export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "
     if (target >= 5) {
       const m = s.tower.place("metro", -4, cx - 15);
       if (!m.ok) throw new Error(`milestone metro failed: ${m.reason}`);
-      s.tower.getUnit(m.unitId).state = "occupied";
+      s.tower.getUnit(m.unitId)!.state = "occupied";
     }
     // Recycling: one center per ~2,000 population so demand is comfortably met.
     const recFloor = -1;
@@ -497,12 +501,13 @@ export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "
     let rx = left;
     for (let i = 0; i < centers; i++) {
       const r = s.tower.place("recycling", recFloor, rx);
-      if (r.ok) rx += s.tower.getUnit(r.unitId).width + 1;
+      if (r.ok) rx += s.tower.getUnit(r.unitId)!.width + 1;
       else rx += 2;
     }
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, Math.max(2, Math.floor(top / 2)), Math.max(0.18, 0.95 - top / 70));
   // Freeze so the milestone shots are byte-stable across regens (nothing here needs
   // a live crowd, unlike the showcase people-rush shot); a moving sim would churn

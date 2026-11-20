@@ -37,8 +37,8 @@ import { buildScheduleTowerModern, buildScheduleTowerClassic } from "../screensh
 async function openScheduleDialog(page: import("playwright").Page, kind: string, stageUnsaved = false): Promise<void> {
   await page.evaluate(
     ({ k, stage }) => {
-      const g = (window as any).game;
-      const shaft = g.sim.tower.transports.find((t: any) => t.kind === k);
+      const g = window.game;
+      const shaft = g.sim.tower.transports.find((t) => t.kind === k);
       if (!shaft) throw new Error(`schedule tower has no ${k} to select`);
       g.selected = { type: "transport", id: shaft.id };
       g.engine.selectedId = shaft.id;
