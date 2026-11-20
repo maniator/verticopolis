@@ -45,9 +45,9 @@ sections and the cache table, is in Verticopolis/engine.
 
 | Surface | Paths |
 | --- | --- |
-| Rust engine and its build (Verticopolis/engine) | `engine-rs/src/`, `engine-rs/Cargo.toml`, `Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
+| Rust engine and its build (Verticopolis/engine) | `engine-rs/src/`, `engine-rs/Cargo.toml`, `Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh`, `scripts/layer-build.ts`, `packages/verticopolis-engine/tsconfig.build.json` |
 | WASM binding (Verticopolis/engine) | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs` |
-| The package's TypeScript layer (Verticopolis/engine) | `packages/verticopolis-engine/src/` (the binding, the host, the port, the model and the catalog reads), apart from `testing/` and `fixtures/` |
+| The package's TypeScript layer (Verticopolis/engine) | `packages/verticopolis-engine/src/` (the binding, the host, the port, the model and the catalog reads), apart from `testing/` and `fixtures/`; `src/events/` (`checkEvent`, which checks each drained event) |
 | Binding and hosts (Verticopolis/components) | `src/engineBinding/`, `src/wasmhost/`, `src/simport/` |
 | Rendering and audio (Verticopolis/components) | `src/render/`, `src/presentation/`, `src/catalog/`, `src/model/`, `src/events/`, `src/audio/` |
 | App build settings (which engine and code paths ship) | `vite.config.ts`, `src/build/` (the build modules it imports) |
