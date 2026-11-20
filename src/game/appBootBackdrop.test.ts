@@ -22,7 +22,7 @@ vi.mock("../ui/Onboarding", () => ({
  * New Tower, so the boot marks it as the backdrop and the engine hands none
  * of its events on past the swap. A real tower behind Continue is not marked.
  * The engine's half (a marked tower hands on nothing) is
- * `the_backdrop_hands_on_nothing` in `engine-rs/src/wasm_port_life_tests.rs`
+ * `the_backdrop_hands_on_nothing` in `src/wasm_port_life_tests.rs`
  * and the backdrop case in `portReads.integration.test.ts`.
  */
 

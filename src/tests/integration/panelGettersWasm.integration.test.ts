@@ -16,7 +16,7 @@ import type { WasmEngine } from "@verticopolis/engine/binding/binding";
  * cash; the coverage, the onboarding facts and the hotspot must answer their
  * full shape; every listed unit and shaft must have a card, and an id no
  * engine holds must have none. The getters' values are the Rust engine's own
- * tests (`engine-rs/src/panels/`). Without the built package the suite skips.
+ * tests (`src/panels/` in Verticopolis/engine). Without the built package the suite skips.
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");

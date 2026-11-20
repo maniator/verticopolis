@@ -29,7 +29,7 @@ import { ledger, milestoneList, statsScreenFor, type ScreenParts } from "../../t
  * the report fields its branch reads. What the engine reports (the VIP
  * review, the parking gate, the 4-star rating count, the ledger, the
  * vacancies, the star gates) is the Rust engine's, in its panel tests
- * (`engine-rs/src/panels/tests*.rs`) and `wasm_port_reports_tests.rs`.
+ * (`src/panels/tests*.rs`) and `wasm_port_reports_tests.rs`.
  */
 
 const body = (parts: ScreenParts = {}) => renderToFragment(statsTemplate(statsScreenFor(parts)));

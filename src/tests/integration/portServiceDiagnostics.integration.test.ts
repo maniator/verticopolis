@@ -26,7 +26,7 @@ type RustPort = EnginePort & { free(): void };
 /** A new fixture tower: a port kit draft on the Rust engine. */
 const start: StartTower = (seed, mode) => draftTower(seed, mode) as unknown as FixtureTower;
 
-/** The engine's census rules (`engine-rs/src/services.rs`, `demand.rs`). */
+/** The engine's census rules (`src/services.rs`, `demand.rs`). */
 const PARKING_WORKERS_PER_SPACE = 24;
 const GARBAGE_COLLECT_HOUR = 5;
 const RECYCLING_POP_PER_CENTER = 2_500;

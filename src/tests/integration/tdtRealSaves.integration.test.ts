@@ -3,7 +3,7 @@
  * their consent (r/SimTower thread, 2026-10-29). They are the first real saves
  * of that vintage the importer has met; see
  * `conformance/fixtures/tdt-reddit/README.md` and issue #1491. The Rust importer
- * reads the same files in `engine-rs/tests/tdt_real_saves.rs` and must agree.
+ * reads the same files in `tests/tdt_real_saves.rs` and must agree.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

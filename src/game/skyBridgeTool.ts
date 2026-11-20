@@ -7,7 +7,7 @@ import type { ViewReader } from "@verticopolis/engine/port/viewReader";
  * between two towers' sky lobbies lays the whole bridge, or nothing. The engine
  * finds the gap and prices it (`quoteSkyBridge`), so the ghost shows every tile
  * a click lays and its full price before the click; `buildSkyBridge` lays it.
- * The rules live in `engine-rs/src/tower/skybridge.rs`.
+ * The rules live in `src/tower/skybridge.rs`.
  */
 
 /** The undo step a bridge opens. */

@@ -18,7 +18,7 @@ const SHOP_SUBTYPES = facility("shop").subtypes;
  * original's ground truth. Each block cites its source: a section of
  * tdt-format.md (docs/tdt/ in Verticopolis/engine) where the .TDT save format
  * documents the fact, or the FAQ-derived canon (CLAUDE.md "Canon reference", PARITY.md, or
- * the sourced comment in engine-rs/src/facilities.rs) where the save format
+ * the sourced comment in src/facilities.rs) where the save format
  * doesn't carry it. If a test here fails, either the change broke canon (fix
  * the change) or canon itself was re-derived from a better source (update the
  * cited canon page first, then this table, never the other way around).

@@ -205,7 +205,7 @@ describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
 });
 
 // The color ramp itself and each congestion cell's value through it are Rust
-// tests: engine-rs/src/rule_tests/heatmap.rs and panels/tests_overlays.rs.
+// tests: src/rule_tests/heatmap.rs and panels/tests_overlays.rs.
 
 describeEngines("congestion overlay reads the engine's per-floor congestion", (leg: Leg) => {
   const loaded = loader(leg);

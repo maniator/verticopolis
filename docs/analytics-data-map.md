@@ -167,7 +167,7 @@ to 10 and 24 say what they can and cannot support.
 
 From the release that ships #2075, `import_failed` and `export_failed` also carry
 `reason`, a closed code. The engine gives it with a refusal
-(`lastRefusalCode()`, `engine-rs/src/file_refusal.rs`) and the page sends that
+(`lastRefusalCode()`, `src/file_refusal.rs` in Verticopolis/engine) and the page sends that
 word, never the refusal's sentence, which can quote the file:
 
 | `reason` | Meaning |

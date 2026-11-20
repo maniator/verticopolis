@@ -429,7 +429,7 @@ layer sitting on top, exactly like the original SimTower corridor model.
 
 A tower is founded under an immutable `GameMode` (`classic` | `modern`), chosen
 once at creation and persisted. Behavior the two modes disagree on belongs
-behind the mode's rule methods in the Rust engine (`engine-rs/src/rules/` in
+behind the mode's rule methods in the Rust engine (`src/rules/` in
 Verticopolis/engine), which the simulation calls. In this repository,
 `src/tests/modeBranch.guard.test.ts` fails a new inline test of the mode in
 the TypeScript, and `src/tests/modeBranch.ratchet.txt` lists the old ones,
@@ -627,7 +627,7 @@ release's own conformance lock.
 ### The changelog, and the update label
 
 `CHANGELOG.md` is for players, one section per app version. The engine's
-changelog is `engine-rs/CHANGELOG.md` in Verticopolis/engine, and the
+changelog is `CHANGELOG.md` at the root of Verticopolis/engine, and the
 components keep theirs in their repository. Classify a change by what a
 player would notice: an engine fix a player can feel gets a Player line in
 the note of the PR that moves the pin.

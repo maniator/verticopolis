@@ -239,7 +239,7 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
 }
 
 /** The lowest star a played tower holds only after a favorable VIP visit
- *  (`FAVORABLE_VIP_STAR` in engine-rs/src/scenario.rs). */
+ *  (`FAVORABLE_VIP_STAR` in src/scenario.rs). */
 export const FAVORABLE_VIP_STAR = 4;
 
 /** Start the Rust engine from a scenario's `start`: a new game by seed and mode, or a `.vctower`
@@ -261,7 +261,7 @@ export function startWasmHandle(start: Start): WasmEngine {
   if ("newGame" in start) {
     const founded = Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode);
     // One star is the founded game itself (the Rust runner, `start_sim` in
-    // engine-rs/src/scenario.rs, does the same).
+    // src/scenario.rs, does the same).
     if (start.newGame.star === undefined || start.newGame.star === 1)
       return checked(founded, start.newGame.mode, "new game founded");
     // The binding has no star setter: save the founded game, raise the star and

@@ -25,7 +25,7 @@ const MINUTES_PER_DAY = 1440;
 const MINUTES_PER_HOUR = 60;
 
 /** Each calendar's week: its length and the weekend days that close it
- *  (`CANON` and `REAL_WORLD` in engine-rs/src/clock.rs). */
+ *  (`CANON` and `REAL_WORLD` in src/clock.rs). */
 const WEEK: Record<CalendarKind, { days: number; weekendDays: number }> = {
   canon: { days: 3, weekendDays: 1 },
   realWorld: { days: 7, weekendDays: 2 },

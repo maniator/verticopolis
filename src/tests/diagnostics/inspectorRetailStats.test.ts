@@ -8,7 +8,7 @@ import { groupDigits } from "@verticopolis/components/windows/format";
 /**
  * The commercial venue's patronage block on the inspector card. The engine
  * decides the verdict, the bar width, the local demand and the advice (the
- * bands are held by `diagnostics::service` tests in engine-rs); the card only
+ * bands are held by `diagnostics::service` tests in the engine); the card only
  * words those facts, and these cases hold the wording: each phrase once, one
  * progress bar, the verdict's color, the plural and the optional lines.
  */

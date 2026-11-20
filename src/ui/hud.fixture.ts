@@ -16,7 +16,7 @@ const CODES = new PortCodes(mockPort());
  * a mock port's `logAfter` and `logText` answers, the way it reads the engine.
  * The log keeps the newest {@link HudTower.LOG_KEEP} lines and numbers every
  * line it was given, as the engine's ring does (`LOG_RING_CAP` in
- * `engine-rs/src/sim.rs`, pinned by the Rust test
+ * `src/sim.rs`, pinned by the Rust test
  * `the_log_ring_keeps_the_newest_lines_and_counts_them_all`).
  */
 export class HudTower {

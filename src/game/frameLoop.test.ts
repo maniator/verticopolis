@@ -19,7 +19,7 @@ import { maybeShowStarUp, noteStarUp } from "./starUpFlow";
  * The engine port is a fake whose `advance` hands back the carry it was given
  * unless a test says otherwise: how the engine cuts owed minutes into steps
  * (the pace curve, the quantum, the catch-up cap, a bad amount, a mode
- * change) is the Rust engine's, checked in `engine-rs/tests/fixed_step.rs`.
+ * change) is the Rust engine's, checked in `tests/fixed_step.rs`.
  */
 
 vi.mock("./trafficHud", () => ({ updateTraffic: vi.fn() }));
@@ -41,7 +41,7 @@ describe("the slowest speed against the render glide", () => {
   it("keeps the slowest button's longest step inside the glide, even in the lunch slowdown", () => {
     // The canon clock's slowest period runs at 30 game minutes over 400 of the
     // day's 2,600 frames (12:00 to 13:00), 0.135 of an even day
-    // (engine-rs/src/tdt/pacing.rs). A one-minute step then lasts this long.
+    // (src/tdt/pacing.rs). A one-minute step then lasts this long.
     const lunchPace = 30 / 400 / (1440 / 2600);
     const slowestStepMs = 1000 / (SPEEDS[1] * lunchPace);
     expect(slowestStepMs).toBeGreaterThan(1000);

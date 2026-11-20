@@ -20,7 +20,7 @@ export function swapDone(port: Pick<EnginePort, "lastReason">, rec: PortRecord):
   if (rec[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
 }
 
-/** The engine's refusal of a save from a newer build (engine-rs
+/** The engine's refusal of a save from a newer build (its
  *  `NEWER_SAVE_REFUSAL`; a test pins the two together). */
 export const NEWER_SAVE_REFUSAL = "This save was made by a newer version of Verticopolis. Update the game to load it.";
 

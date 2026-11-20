@@ -1,6 +1,6 @@
 /**
  * The byte layout of a `.TDT` file as the test builder writes it
- * (`docs/tdt/tdt-format.md` in Verticopolis/engine, beside the codec, `engine-rs/src/tdt/format.rs`).
+ * (`docs/tdt/tdt-format.md` in Verticopolis/engine, beside the codec, `src/tdt/format.rs`).
  * The builder and the tests that cut or pad a buffer share these sizes.
  */
 

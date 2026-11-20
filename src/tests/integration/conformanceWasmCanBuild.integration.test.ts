@@ -19,7 +19,7 @@ import type { WasmEngine } from "@verticopolis/engine/binding/binding";
  * bridging on and off where the mode allows it, and with money flush, short,
  * and exactly at a price. Until #1875 this suite compared each answer with the
  * TypeScript engine's; the engine's own placement rules are pinned by the Rust
- * tests in `engine-rs/src/tower_scans_tests.rs` and the conformance scenarios.
+ * tests in `src/tower_scans_tests.rs` and the conformance scenarios.
  */
 
 type Quote = { ok: boolean; reason?: string; cost: number };

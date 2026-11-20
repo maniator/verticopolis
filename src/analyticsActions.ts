@@ -26,7 +26,7 @@ export function trackAppAction(action: AppActionName, detail?: string): void {
   trackEvent("app_action", detail === undefined ? { action } : { action, detail });
 }
 
-/** The words the engine's `lastRefusalCode()` answers (`engine-rs/src/file_refusal.rs`). */
+/** The words the engine's `lastRefusalCode()` answers (`src/file_refusal.rs`). */
 const ENGINE_REFUSAL_CODES = [
   "too_large",
   "not_tower",

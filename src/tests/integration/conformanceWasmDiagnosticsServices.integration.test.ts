@@ -220,7 +220,7 @@ function wasmWithReads(handle: WasmEngine, reads: Read[]): ScenarioEngine {
 const CARD_UTILIZATION = viewLayout.records.shaftCard.indexOf("utilization");
 const CARD_NEAR_CAPACITY = viewLayout.records.shaftCard.indexOf("nearCapacity");
 /** A set flag slot holds 1 (the Rust port's `flag` in
- *  `engine-rs/src/wasm_port_panels.rs`, read the same way by `Cards` in
+ *  `src/wasm_port_panels.rs`, read the same way by `Cards` in
  *  `src/simport/cards.ts`). */
 const FLAG_SET = 1;
 const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] === FLAG_SET;

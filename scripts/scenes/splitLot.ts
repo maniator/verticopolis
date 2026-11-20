@@ -3,7 +3,7 @@
  * (`buildSplitLotTower`): the still the Help site's "How people get around"
  * section shows (help-site/src/content/docs/tower/people.mdx), with the
  * office staff of the left tower out on the street on their way to lunch in
- * the right one (`engine-rs/src/crowd/street.rs`). The setup runs the engine
+ * the right one (`src/crowd/street.rs`). The setup runs the engine
  * itself a minute at a time from noon until someone is out on the open
  * ground, and fails the scene (keeping the committed image) when nobody is.
  * The engine is deterministic, so every run stops at the same minute. Keep

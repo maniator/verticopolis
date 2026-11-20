@@ -267,16 +267,16 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **The Rust engine is the only engine the shipped game runs** (since app
   2.66.0 and engine crate 1.0.0; every build is the Rust-only
   build). A simulation change
-  lands in `engine-rs/` in Verticopolis/engine. The TypeScript reference engine
+  lands in Verticopolis/engine. The TypeScript reference engine
   was deleted (#1875); every rule and its tests live in the engine now, so
   never add a TypeScript copy of a rule.
-- **The Rust engine (`engine-rs/` in Verticopolis/engine) is the source of truth for gameplay rules,
-  caps and tuning.** Per-tower build caps live in `engine-rs/src/facilities.rs`
+- **The Rust engine (Verticopolis/engine) is the source of truth for gameplay rules,
+  caps and tuning.** Per-tower build caps live in the engine's `src/facilities.rs`
   (`build_cap`, `POOLED_CAPS`, `Kind::max_cars`, `Kind::max_span`) and are
-  enforced in one place, `Tower::cap_reason` (`engine-rs/src/tower.rs`). Mirror
+  enforced in one place, `Tower::cap_reason` (`src/tower.rs`). Mirror
   the 1994 original there, checking each value against it. The engine
   publishes them, with every price, size and mode rule a frontend shows,
-  through the catalog (`engine-rs/src/catalog.rs`); the web UI reads that
+  through the catalog (`src/catalog.rs`); the web UI reads that
   catalog and no TypeScript table (the mode-name choices the UI still makes
   are tracked on #1621). `conformance/catalog-digests.json` is written from
   the Rust catalog alone, so a changed cap moves that digest in the PR that

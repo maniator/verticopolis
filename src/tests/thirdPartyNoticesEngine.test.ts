@@ -30,7 +30,7 @@ const std = {
   hasLicenseFile: true,
   kind: "crate",
 };
-// The engine ports fflate's deflate (engine-rs/src/fflate.rs), so its record carries fflate's notice (#1356).
+// The engine ports fflate's deflate (src/fflate.rs), so its record carries fflate's notice (#1356).
 const port = {
   name: "fflate",
   version: "0.8.3",

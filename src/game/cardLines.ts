@@ -17,7 +17,7 @@ import type { FacilityKind } from "@verticopolis/engine/model/types";
  * access" row would just repeat the diagnostics line (drop it) or is the only
  * connectivity signal for a zero-population service kind (keep it). The Rust
  * card applies the same gate to the same catalog values
- * (`has_access_diagnostic` in `engine-rs/src/diagnostics/tenant.rs`, over the
+ * (`has_access_diagnostic` in `src/diagnostics/tenant.rs`, over the
  * `population` and `dailyIncome` the catalog is built from, which
  * `the_access_line_gate_matches_the_catalog_values` pins), so the editor and
  * the card's access line follow the same kinds.

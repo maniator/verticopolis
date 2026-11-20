@@ -23,7 +23,7 @@ const viewOf = (sim: Draft | null): SerializedView | undefined => sim?.serialize
  * See _bmad-output/implementation-artifacts/story-view-state-save-parity.md.
  * How a loaded view is checked (kept as written, dropped when malformed,
  * clamped onto the lot) is pinned by the engine's own tests in
- * engine-rs/src/load/coerce.rs.
+ * src/load/coerce.rs.
  */
 
 /** Decode a binary `.vctower` (`VCTOWER2`, a newline, the raw deflate bytes)

@@ -10,7 +10,7 @@ import {
   stepCursor,
 } from "./placement";
 
-/** The lot's geometry, from the Rust engine's catalog (`engine-rs/src/catalog.rs` world). */
+/** The lot's geometry, from the Rust engine's catalog (`src/catalog.rs` world). */
 const CAT = catalogFor("classic");
 const WORLD = CAT.world;
 const GRID = { width: WORLD.lotWidth, minFloor: WORLD.minFloor, maxFloor: WORLD.maxFloor };

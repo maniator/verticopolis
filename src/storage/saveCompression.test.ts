@@ -154,7 +154,7 @@ describe("the save writers refuse a save past the cap", () => {
   });
 });
 
-/** The engine's compressor (engine-rs/src/fflate.rs) is a port of exactly
+/** The engine's compressor (src/fflate.rs) is a port of exactly
  *  this fflate, so the two write the same bits; a different fflate would
  *  break that, and only the WASM suite would notice. Move both together. */
 it("installs fflate 0.8.3, the version the engine's compressor ports", () => {

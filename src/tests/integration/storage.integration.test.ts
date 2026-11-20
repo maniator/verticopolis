@@ -36,7 +36,7 @@ describe.skipIf(noEngine)("SaveGame", () => {
 
   // What a load does with a tampered save (forged fields, ids, geometry,
   // overlaps, the unit cap) is a Rust test since #1875:
-  // engine-rs/src/rule_tests/save_hardening.rs.
+  // src/rule_tests/save_hardening.rs.
 
   it("a storage-layer quota throw propagates out of saveSlot (the manual-save catch depends on it)", () => {
     // Pins the OTHER half of the #537 AC at the localStorage layer: appModals
@@ -629,7 +629,7 @@ describe.skipIf(noEngine)("SaveGame", () => {
   });
 
   // The round trip, the version ladder, unknown kinds and the founder mark
-  // are Rust tests since #1875: engine-rs/src/rule_tests/save_versions.rs.
+  // are Rust tests since #1875: src/rule_tests/save_versions.rs.
 
   describe.skipIf(noEngine)("Ground-floor recognition through the real file-load path", () => {
     // Build a genuine .vctower container (magic + base64 of the async-deflated

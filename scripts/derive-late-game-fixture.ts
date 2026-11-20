@@ -155,10 +155,10 @@ try {
   engine.setMoney(start.money);
   const save = read(engine);
   // A run `{ id, x, run: n }` stands for n floor tiles, at x and the next
-  // n - 1 places, with the next ids (`engine-rs/src/save_floor_runs.rs`).
+  // n - 1 places, with the next ids (`src/save_floor_runs.rs`).
   // With no run left, the save is stamped as the engine stamps a save with
   // no floor run, no tall lobby and no schedule (`stamped_save_version` in
-  // `engine-rs/src/sim.rs`).
+  // `src/sim.rs`).
   save.units = save.units.flatMap(({ run, ...u }) =>
     run ? Array.from({ length: run }, (_, k) => ({ ...u, id: u.id + k, x: u.x + k })) : [u],
   );
