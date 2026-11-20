@@ -11,6 +11,7 @@ it is. Counts that change often (shards, jobs) are left to those files.
 flowchart TD
     PR["Push to a pull request"] --> Test["Test CI (test.yml)"]
     PR --> Drift["Screenshot drift check (pr-drift-check.yml)"]
+    PR --> CodeQL["CodeQL (codeql.yml)<br/>Analyze (actions) · Analyze (javascript-typescript)"]
     PR --> Other["Windows smoke · Help site<br/>PR template · Milestone"]
 
     Test --> Lane{"changes job:<br/>which lane?"}
@@ -84,6 +85,13 @@ commits the regenerated gallery to the branch. See
 - **Help site**: builds the player's manual when its sources change. The
   engine docs site (docs.verticopolis.com) and the engine bench run in
   Verticopolis/engine.
+- **CodeQL** (`codeql.yml`): code scanning for the workflows (`Analyze
+  (actions)`) and the TypeScript and JavaScript (`Analyze
+  (javascript-typescript)`), with the default query suite and no build. Both
+  jobs run on every pull request so their checks always report; when every
+  changed file is Markdown, a Scope step skips the analysis and the job
+  finishes green in seconds. A push to `main` and a weekly run always
+  analyze. Alerts are under the repository's Security tab.
 - **PR template** checks the description keeps every heading of
   `.github/PULL_REQUEST_TEMPLATE.md`; **Milestone** sets the pull request's
   milestone.
@@ -95,6 +103,8 @@ commits the regenerated gallery to the branch. See
 - `update-visual-baselines.yml`, `update-perf-baseline.yml`: mint baselines in
   the pinned image when a commit message asks.
 - `analytics-report.yml`: the PostHog report.
+- `codeql.yml`: a weekly CodeQL run on `main` (Mondays), so new queries
+  reach code that has not changed.
 - `screenshot-approval-reaper.yml`: cancels drift-check runs parked on a closed
   pull request.
 
