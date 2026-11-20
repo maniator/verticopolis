@@ -1,0 +1,6 @@
+# Commits that only change layout. git blame skips them when run with
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# and GitHub's blame view reads this file on its own.
+
+# Format the code with Prettier
+2297361cc3cfe0e49ea589c17b39510368094001
