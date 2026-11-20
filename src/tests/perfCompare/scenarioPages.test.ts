@@ -35,8 +35,8 @@ describe("the perf:compare runner", () => {
     // The timed and frames loops are the helper's, so no bare loop over the scenarios is left (the memory pass and the saved-tower starts loop over opts.scenarios, each in its own fresh page or context).
     expect(source).not.toMatch(/for \(const sc of scenarios\)/);
     // Each use opens a fresh page for the scenario.
-    expect(source).toMatch(/eachScenarioFresh\(scenarios, \(sc\) => freshPage\(page, engine, `\$\{sc\.name\} timed passes boot`\)/);
-    expect(source).toMatch(/eachScenarioFresh\(scenarios, \(sc\) => freshPage\(page, engine, `\$\{sc\.name\} frames \(audio \$\{block\}\) boot`\)/);
+    expect(source).toMatch(/eachScenarioFresh\(\s*scenarios,\s*\(sc\) => freshPage\(page, engine, `\$\{sc\.name\} timed passes boot`\)/);
+    expect(source).toMatch(/eachScenarioFresh\(\s*scenarios,\s*\(sc\) => freshPage\(page, engine, `\$\{sc\.name\} frames \(audio \$\{block\}\) boot`\)/);
     // One page boot for all scenarios is the pattern that biased the second tower.
     expect(source).not.toMatch(/"timed passes boot"/);
   });
@@ -49,7 +49,7 @@ describe("the perf:compare runner", () => {
 
   it("gives each saved-tower start a fresh context, seeded at creation and closed whatever happens (#1254)", () => {
     const body = source.slice(source.indexOf("async function savedStarts("), source.indexOf("async function firstVisit("));
-    expect(body).toMatch(/for \(const sc of opts\.scenarios\) \{[\s\S]*ctx = await newContext\(browser, opts\.config, "block", \(line\) => row\.contextLost\.push\(line\), autosaveState\(server\.url, seed\)\);/);
+    expect(body).toMatch(/for \(const sc of opts\.scenarios\) \{[\s\S]*ctx = await newContext\(\s*browser,\s*opts\.config,\s*"block",\s*\(line\) => row\.contextLost\.push\(line\),\s*autosaveState\(server\.url, seed\),?\s*\);/);
     expect(body).toMatch(/\} finally \{\n\s*await ctx\?\.close\(\)/);
     // It runs after the first visit, outside the repetition's try, so it cannot fail the repetition.
     expect(source.indexOf("run.coldSaved = await savedStarts(")).toBeGreaterThan(source.indexOf("run.firstVisitWithServiceWorker = await firstVisit("));

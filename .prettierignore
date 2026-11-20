@@ -1,0 +1,14 @@
+# Prose, data and the page keep their own layout: Markdown is house-style
+# prose, JSON is mostly generated (lockfiles, fixtures, goldens), and the HTML
+# shell's whitespace is part of what it renders. Prettier already skips
+# node_modules and everything .gitignore lists.
+*.md
+*.json
+*.jsonc
+*.html
+# BMAD's files: its installer rewrites the skills and the engine on every
+# update, and the planning output is prose and copies.
+_bmad/
+_bmad-output/
+.agents/
+.claude/

@@ -186,8 +186,15 @@ describe("--network on the command line", () => {
  * the context-loss check.
  */
 describe("the runner's use of the limit", () => {
-  const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "runner.ts"), "utf8");
-  const at = (text: string): number => {
+  // Read with the layout flattened, so Prettier's line breaks never move a match.
+  const flat = (text: string) =>
+    text
+      .replace(/\s+/g, " ")
+      .replace(/([([{]) /g, "$1")
+      .replace(/,? ([)\]}])/g, "$1");
+  const source = flat(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "runner.ts"), "utf8"));
+  const at = (raw: string): number => {
+    const text = flat(raw);
     const i = source.indexOf(text);
     expect(i, text).toBeGreaterThan(-1);
     expect(source.indexOf(text, i + 1), `${text} appears once`).toBe(-1);

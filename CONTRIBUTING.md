@@ -58,6 +58,7 @@ skipped lane.
 ```bash
 npm run typecheck   # tsc --noEmit, then the api/ project, then scripts/ and tools/, then e2e/ and the Vite and Playwright configs
 npm run lint        # eslint src api
+npm run format:check  # Prettier; `npm run format` rewrites the files
 npm test            # vitest run (Tier-1 unit tests)
 npm run build       # production build must succeed
 ```
@@ -775,9 +776,12 @@ alone.
   [`docs/analytics-data-map.md`](./docs/analytics-data-map.md) and the
   dashboard tiles that read them.
 - **500 lines per file.** `src/tests/fileSize.guard.test.ts` caps TypeScript
-  files (`.ts`, `.tsx`) in `src/` and `scripts/` at 500 lines. Files
-  already over it sit on a shrink-only ratchet
-  (`src/tests/fileSize.ratchet.txt`): split them, never add to them.
+  files (`.ts`, `.tsx`) in `src/` and `scripts/` at 500 lines, counted as
+  Prettier lays them out. Test files (`*.test.ts`) are exempt (owner,
+  2026-11-20). Files already over it sit on a shrink-only ratchet
+  (`src/tests/fileSize.ratchet.txt`): split them, never add to them. The
+  files Prettier's first pass pushed over were added once, by the owner's
+  choice, when Prettier was set up.
 - **Show visual/gameplay changes with real screenshots** in the PR's
   *Screenshots / recordings* section: committed images, not prose descriptions.
   See [docs/screenshots.md](./docs/screenshots.md) for how to capture, commit,

@@ -58,9 +58,13 @@ function lineCount(absPath: string): number {
   return n;
 }
 
+/** Test files are exempt from the ceiling (owner, 2026-11-20). */
+const isTestFile = (rel: string) => /\.test\.tsx?$/.test(rel);
+
 function scanFiles(): { rel: string; lines: number }[] {
   return SCANNED_DIRS.flatMap(({ dir, exts }) => sourceFiles(dir, exts))
     .map((p) => ({ rel: repoRel(p), lines: lineCount(p) }))
+    .filter((f) => !isTestFile(f.rel))
     .sort((a, b) => a.rel.localeCompare(b.rel));
 }
 
