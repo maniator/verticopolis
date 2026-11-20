@@ -5,5 +5,5 @@
     "types": ["node", "vitest/globals"],
     "noEmit": true
   },
-  "include": ["**/*.ts", "../tools/**/*.ts", "../src/vite-env.d.ts", "../*.d.ts"]
+  "include": ["**/*.ts", "*.mjs", "../tools/**/*.ts", "../src/vite-env.d.ts", "../*.d.ts"]
 }
