@@ -164,11 +164,10 @@ Verticopolis has **two test tiers**:
     **The suites on the WASM engine.** `npm run test:wasm` runs the suites
     that start the Rust engine themselves (the save suites, the card-text
     golden, perf comparison) with the
-    engine package required. CI runs it
-    once per PR in three shards, reported as the required
-    `test-engine (host)` check; the
-    `test-engine (unit)` leg runs the unit tests with the package
-    required, so the package's own tests run instead of skipping. The Rust
+    engine package required. CI runs them in the four `test` shards with
+    every other suite: `npm ci` installs the engine package there, and a
+    step fails the shard when it is missing, so the engine suites never
+    skip quietly. The Rust
     workflow uses its own `on.push.paths` list to select PR engine jobs, so
     there is no second independent list or YAML snapshot test.
 
@@ -376,7 +375,7 @@ Also excluded are non-product tooling entry points that are build/dev plumbing,
 not game logic: the gallery/preview pages (`src/gallery.ts`,
 `src/preview.ts`), the PWA bootstrap (`src/pwa.ts`), the harnesses' tower
 (`src/game/toolingTower.ts` and `toolingSim.ts`, which drive the Rust engine
-package the coverage run does not build; their tests run on the `test-engine (unit)` leg,
+package; their tests run in the `test` shards,
 and the e2e specs and the screenshot gallery drive them),
 plus the usual non-code (`*.d.ts`, `*.config.*`), fixtures (`*.fixture.ts`)
 and the tests themselves.

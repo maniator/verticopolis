@@ -233,7 +233,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The engine's suites skip without the engine package, so a broken
+      # install would pass them quietly. Fail instead. (Its files are the
+      # ones src/tests/conformance/wasmEngine.ts checks.)
+      - name: The engine package is installed
+        run: |
+          root=$(node -p "require('node:path').dirname(require.resolve('@verticopolis/engine/package.json'))")
+          for f in verticopolis_engine.js verticopolis_engine_bg.wasm package.json; do
+            if [ ! -f "$root/tooling/node/$f" ]; then
+              echo "::error::the engine package has no tooling/node/$f; npm ci did not install it, so the engine suites would skip"
+              exit 1
+            fi
+          done
+
+      # VC_LOG_TEST_STARTS prints each test as it starts, so a run cut off by
+      # its time limit inside a WASM call still names the test (#1152).
       - name: Run tests
+        env:
+          VC_LOG_TEST_STARTS: "1"
         run: >-
           npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob
           --coverage.reporter=text-summary
@@ -310,118 +327,6 @@ jobs:
       - name: Unit tests (docs or notes only, no coverage)
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane == 'prose' }}
         run: npx vitest run --project unit
-
-  # The suites that need the engine package, which npm ci installs. The unit
-  # leg runs the unit tests, which include the engine package's own
-  # (they skip in the plain unit job); the port-kit leg runs the port-kit
-  # suites, and the host suites run in the engine-host job below, in three
-  # shards.
-  test-engine:
-    name: test-engine (${{ matrix.leg }})
-    needs: changes
-    # A matrix job that is skipped as a whole reports under its unexpanded
-    # name, and the required checks are named per leg. So the legs always
-    # run on a prose-only change and skip their steps, which keeps every
-    # name reporting.
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        leg: [unit, port-kit]
-    steps:
-      - name: No code changed, nothing to run
-        if: ${{ needs.changes.outputs.code == 'false' }}
-        run: echo "Only prose changed; the WASM engine suites are skipped."
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: ${{ needs.changes.outputs.code != 'false' }}
-        with:
-          persist-credentials: false
-
-      - name: Use Node.js (from .nvmrc)
-        if: ${{ needs.changes.outputs.code != 'false' }}
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-
-      - name: Install dependencies
-        if: ${{ needs.changes.outputs.code != 'false' }}
-        run: npm ci
-
-      - name: Unit tests with the engine package required
-        if: ${{ needs.changes.outputs.code != 'false' && matrix.leg == 'unit' }}
-        env:
-          VC_LOG_TEST_STARTS: "1"
-        run: npx vitest run --project unit
-
-      # The port-kit suites run on their own port-kit leg.
-      - name: Port-kit suites
-        if: ${{ needs.changes.outputs.code != 'false' && matrix.leg == 'port-kit' }}
-        run: npm run test:port
-
-  # The suites that start the Rust engine themselves (saves, the
-  # card-text golden, perf comparison), run once per PR; the test:wasm script's
-  # test:port half runs on the port-kit leg. Vitest splits the files across three shards, so a slow
-  # runner no longer pushes the whole set past its timeout, and the
-  # engine-host-result job reports them as the one required
-  # test-engine (host) check. Like the other legs, the shards always run
-  # and skip their steps on a prose-only change.
-  engine-host:
-    name: test-engine (host, shard ${{ matrix.shard }} of 3)
-    needs: changes
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    steps:
-      - name: No code changed, nothing to run
-        if: ${{ needs.changes.outputs.code == 'false' }}
-        run: echo "Only prose changed; the WASM engine suites are skipped."
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: ${{ needs.changes.outputs.code != 'false' }}
-        with:
-          persist-credentials: false
-
-      - name: Use Node.js (from .nvmrc)
-        if: ${{ needs.changes.outputs.code != 'false' }}
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-
-      - name: Install dependencies
-        if: ${{ needs.changes.outputs.code != 'false' }}
-        run: npm ci
-
-      # Logs each test start (#1152), so a step that hits its timeout names
-      # the test it was in.
-      - name: Host suites on the WASM engine
-        if: ${{ needs.changes.outputs.code != 'false' }}
-        timeout-minutes: 15
-        env:
-          VC_LOG_TEST_STARTS: "1"
-        run: npm run test:wasm:host -- --shard=${{ matrix.shard }}/3
-
-  engine-host-result:
-    name: test-engine (host)
-    needs: engine-host
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Every shard passed
-        env:
-          SHARDS: ${{ needs.engine-host.result }}
-        run: |
-          echo "host suite shards: $SHARDS"
-          test "$SHARDS" = success
 
   # Tier-2 end-to-end smoke: drive the BUILT app in a real browser and prove the
   # TOWER win surfaces (the congratulations modal), plus the visual.spec.ts pixel
