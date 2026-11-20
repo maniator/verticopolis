@@ -11,3 +11,4 @@ src/tests/integration/traffic.integration.test.ts
 src/tests/integration/heatmap.integration.test.ts
 src/tests/integration/venueOccupancy.integration.test.ts
 src/tests/integration/towerCallItems.integration.test.ts
+src/tests/portKit/portSim.integration.test.ts

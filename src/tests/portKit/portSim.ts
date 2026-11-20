@@ -1,6 +1,6 @@
 import { afterEach, describe } from "vitest";
 import type { Person } from "@verticopolis/engine/model/engineTypes";
-import type { FacilityKind, UnitState, VacateReason, WeatherKind } from "@verticopolis/engine/model/types";
+import type { FacilityKind, UnitState } from "@verticopolis/engine/model/types";
 import type { HeatCell, HeatmapMode } from "@verticopolis/engine/model/engineTypes";
 import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import type { StatsReport } from "@verticopolis/engine/port/panels";
@@ -268,7 +268,7 @@ export class PortSim {
     }
     if (this.unsavedWrite)
       throw new Error(
-        "PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn or setWeather; call setup first",
+        "PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn; call setup first",
       );
     const draft = draftFromSave(this.leaf.port.serialize());
     const out = edit(draft);
@@ -407,13 +407,6 @@ export class PortSim {
     this.changed();
   }
 
-  /** Put the clock at `minutes` (a literal 0 is the founding 07:00), forward
-   *  or back, running nothing: how a test pins an hour once the crowd exists. */
-  setClock(minutes: number): void {
-    if (!this.leaf.setClock(minutes)) throw new Error(`PortSim.setClock: the engine refused ${minutes}`);
-    this.changed();
-  }
-
   /** Set a unit's state, and its occupants when given, mid-run. */
   setUnitState(id: number, state: UnitState, occupants?: number): void {
     if (!this.leaf.setUnitState(id, state, occupants))
@@ -433,36 +426,6 @@ export class PortSim {
     if (!this.leaf.setCustomersIn(id, count))
       throw new Error(`PortSim.setCustomersIn: the engine refused unit ${id} customers ${count}`);
     this.unsavedWrite = true;
-    this.changed();
-  }
-
-  /** Set today's weather mid-run, which no save carries: the next day's roll
-   *  replaces it, and so does a load, so call it after {@link setup}. The
-   *  `state` snapshot is a save, so its `weather` is the day's computed one. */
-  setWeather(weather: WeatherKind): void {
-    if (!this.leaf.setWeather(weather)) throw new Error(`PortSim.setWeather: the engine refused ${weather}`);
-    this.unsavedWrite = true;
-    this.changed();
-  }
-
-  /** A tenant leaves unit `id` for `reason` mid-run (a sold condo is bought back). */
-  vacateUnit(id: number, reason: VacateReason): void {
-    if (!this.leaf.vacateUnit(id, reason))
-      throw new Error(`PortSim.vacateUnit: the engine refused unit ${id} ${reason}`);
-    this.changed();
-  }
-
-  /** Write unit `id`'s price mid-run as given (no ladder snap), or clear it with null. */
-  setUnitRent(id: number, rent: number | null): void {
-    if (!this.leaf.setUnitRent(id, rent))
-      throw new Error(`PortSim.setUnitRent: the engine refused unit ${id} rent ${rent}`);
-    this.changed();
-  }
-
-  /** Clear every unit's patronage and profit tallies (today and yesterday),
-   *  the render-only fields no economy path reads. */
-  clearRetailTallies(): void {
-    this.leaf.clearRetailTallies();
     this.changed();
   }
 
