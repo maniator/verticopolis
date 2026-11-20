@@ -40,7 +40,11 @@ function buildOne(sim: Draft, kind: FacilityKind, x: number): number {
 /** Whether any unit holds one of the four retail tallies. */
 function anyTally(sim: PortSim): boolean {
   return sim.state.tower.units.some(
-    (u) => u.patronageToday !== undefined || u.patronageYest !== undefined || u.profitToday !== undefined || u.profitYest !== undefined,
+    (u) =>
+      u.patronageToday !== undefined ||
+      u.patronageYest !== undefined ||
+      u.profitToday !== undefined ||
+      u.profitYest !== undefined,
   );
 }
 
@@ -89,7 +93,10 @@ describeEngines("Commercial-venue inspector: patronage/profit accumulation, roll
     expect(withAccum.earned, "the tower earned money over the week").toBeGreaterThan(0);
     expect(withAccum.shopPatronageYest, "the shop tallied a day's patronage").toBeGreaterThan(0);
     expect(cleared.clearLeftATally, "every hourly clear left no tally behind").toBe(false);
-    expect(withAccum.clearAfterWeekLeftATally, "a clear after a full week, yesterday's tallies included, left none").toBe(false);
+    expect(
+      withAccum.clearAfterWeekLeftATally,
+      "a clear after a full week, yesterday's tallies included, left none",
+    ).toBe(false);
     expect(cleared.money).toBe(withAccum.money);
     expect(cleared.pending).toEqual(withAccum.pending);
   });

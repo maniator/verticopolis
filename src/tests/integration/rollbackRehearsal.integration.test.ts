@@ -14,9 +14,12 @@ import { hasWasmPackage } from "../conformance/wasmEngine";
  * `_bmad-output/planning-artifacts/release-3.0-rollback-rehearsal.md`.
  */
 
-const last = <T,>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
+const last = <T>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 const HOURS = 2;
-const FIXTURE_DIRS = ["node_modules/@verticopolis/engine/conformance/fixtures", "node_modules/@verticopolis/engine/conformance/fixtures/tdt-reddit"].map((d) => join(REPO_ROOT, d));
+const FIXTURE_DIRS = [
+  "node_modules/@verticopolis/engine/conformance/fixtures",
+  "node_modules/@verticopolis/engine/conformance/fixtures/tdt-reddit",
+].map((d) => join(REPO_ROOT, d));
 const ONLY = ["towerone-vip-pending.vctower", "split-tower.vctower", "TOWER5.TDT", "TOWER8.TDT"];
 
 describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () => {
@@ -40,7 +43,10 @@ describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () =
     const keeps1994 = (w: Written) => (w.transports ?? []).some((t) => typeof t.tdtSchedule === "string");
     for (const s of saves) expect(JSON.parse(s.text), s.name).toMatchObject({ units: expect.any(Array) });
     const versions = written.map((w) => w.version);
-    expect(written.every((w) => (keeps1994(w) ? w.version === 13 : w.version === 7 || w.version === 11)), versions.join()).toBe(true);
+    expect(
+      written.every((w) => (keeps1994(w) ? w.version === 13 : w.version === 7 || w.version === 11)),
+      versions.join(),
+    ).toBe(true);
     expect(versions).toContain(11);
   });
 
@@ -72,14 +78,20 @@ describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () =
     const tower = saves.find((s) => s.name === "split-tower.vctower")!;
     const result = rehearseCase(tower.name, tower.text, loses, candidate, { hours: HOURS, allowed: [] });
     expect(result.ok).toBe(false);
-    const dropped = result.steps.find((s) => s.step === "previous-read")?.judgement?.unexplained.map((e) => `${e.kind} ${e.path}`) ?? [];
+    const dropped =
+      result.steps.find((s) => s.step === "previous-read")?.judgement?.unexplained.map((e) => `${e.kind} ${e.path}`) ??
+      [];
     expect(dropped).toContain("dropped money");
   });
 
   it("refuses a newer save instead of quietly dropping what it does not know (#1603)", () => {
     const tower = saves.find((s) => s.name === "split-tower.vctower")!;
     // Far past any version this engine writes, so the case stays newer as saves move on.
-    const newer = { ...(JSON.parse(tower.text) as Record<string, unknown>), version: 99, aFieldFromTheFuture: { keep: true } };
+    const newer = {
+      ...(JSON.parse(tower.text) as Record<string, unknown>),
+      version: 99,
+      aFieldFromTheFuture: { keep: true },
+    };
     let engine: ReturnType<typeof candidate.fromSave> | undefined;
     let refusal: unknown;
     try {

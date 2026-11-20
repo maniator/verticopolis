@@ -67,7 +67,8 @@ export function quotedTiles(q: SkyBridgeQuote): number {
  *  rather than laying a new one: the `detail` of the `sky_bridge` action. */
 export function finishesHalfBridge(reader: Pick<ViewReader, "tower">, floor: number, q: SkyBridgeQuote): boolean {
   const t = reader.tower;
-  const bridgeAt = (x: number) => t.structureKindAt(floor, x) === "lobby" && t.structureKindAt(floor - 1, x) === undefined;
+  const bridgeAt = (x: number) =>
+    t.structureKindAt(floor, x) === "lobby" && t.structureKindAt(floor - 1, x) === undefined;
   return bridgeAt(q.from - 1) || bridgeAt(q.to);
 }
 

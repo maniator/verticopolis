@@ -17,7 +17,12 @@ export type SidebarEntry =
 export const sidebar: SidebarEntry[];
 export function isSponsorLink(href: string): boolean;
 export function sponsorTapListener(track: () => void): (e: MouseEvent) => void;
-export function landingAction(pathname: string, referrer: string, origin: string, base?: string): "page_help" | "page_changelog" | null;
+export function landingAction(
+  pathname: string,
+  referrer: string,
+  origin: string,
+  base?: string,
+): "page_help" | "page_changelog" | null;
 /** The page a help page view reports: "rooms/hotels", "home" or "other". */
 export function helpPageDetail(pathname: string, base?: string): string;
 export function gameLinkDetail(inFrontPage: boolean, fromGame: boolean): string;
@@ -29,7 +34,12 @@ export const HELP_SCHEME_KEY: string;
 export const HELP_SCHEME_COOKIE: string;
 export function schemeBootScript(readCookie?: boolean): string;
 /** A help page's schema.org structured data (breadcrumbs plus a WebSite or Article). */
-export function pageJsonLd(page: { slug: string; title: string; description: string; hasIndex?: string[] }): Record<string, unknown>;
+export function pageJsonLd(page: {
+  slug: string;
+  title: string;
+  description: string;
+  hasIndex?: string[];
+}): Record<string, unknown>;
 /** A page's share card file name in help-site/public/cards/. */
 export function cardFile(slug: string): string;
 /** The full URL of a page's share card. */

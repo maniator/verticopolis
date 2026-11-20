@@ -69,7 +69,11 @@ describe("the Previous Versions window", () => {
     };
     const ways: [string, (box: HTMLElement, dialog: HTMLDialogElement) => void][] = [
       ["Cancel", (box) => box.querySelector<HTMLButtonElement>(".pv-buttons .btn:not(.primary)")!.click()],
-      ["Esc or the ✕", (_box, dialog) => expect(cancel(dialog).defaultPrevented, "the dialog stays open for the window it goes back to").toBe(true)],
+      [
+        "Esc or the ✕",
+        (_box, dialog) =>
+          expect(cancel(dialog).defaultPrevented, "the dialog stays open for the window it goes back to").toBe(true),
+      ],
       ["a click beside it", (_box, dialog) => dialog.dispatchEvent(new MouseEvent("click", { bubbles: true }))],
     ];
     for (const [how, close] of ways) {

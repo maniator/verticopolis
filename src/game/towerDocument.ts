@@ -7,7 +7,13 @@ import { saveStore } from "../storage/saveStore";
 import { toTowerFile } from "../storage/towerFileCodec";
 import { autosaveIfLive } from "./autosaveSchedule";
 import { mirrorAutosave, vctowerFileOf, writeLinkedTower } from "./autosaveMirror";
-import { currentFileId, currentLinkedFile, onCurrentFileChange, setCurrentFile, setCurrentLinkedFile } from "./currentFile";
+import {
+  currentFileId,
+  currentLinkedFile,
+  onCurrentFileChange,
+  setCurrentFile,
+  setCurrentLinkedFile,
+} from "./currentFile";
 import { isSplashUp } from "./interactionState";
 
 /**
@@ -181,24 +187,39 @@ function writeFailed(app: DocApp, err: unknown): void {
   trackAppActionOnce("autosave_failed", "file");
   if (fileFailSaid) return;
   fileFailSaid = true;
-  app.ui.sayVisibly(`Couldn't save your tower in My Towers: ${err instanceof Error ? err.message : String(err)} The game keeps trying.`);
+  app.ui.sayVisibly(
+    `Couldn't save your tower in My Towers: ${err instanceof Error ? err.message : String(err)} The game keeps trying.`,
+  );
 }
 let fileFailSaid = false;
 
 /** Give the live tower (generation `generation`) a new My Towers file;
  *  answers it once it is the live tower's. */
-async function found(app: DocApp, generation: number, bytes: Uint8Array, modified: number, why: "founded" | "forked"): Promise<TowerFileEntry | null> {
+async function found(
+  app: DocApp,
+  generation: number,
+  bytes: Uint8Array,
+  modified: number,
+  why: "founded" | "forked",
+): Promise<TowerFileEntry | null> {
   const entry = await fileSpace.add(fileName(app.enginePort.towerName()), "tower", bytes, modified);
   // Another tower arrived, or an open named the file, while it was written:
   // the file stays (it holds this tower), but it is not the live tower's.
-  if (app.enginePort.generation() !== generation || currentFileId() !== null || currentLinkedFile() !== null) return null;
+  if (app.enginePort.generation() !== generation || currentFileId() !== null || currentLinkedFile() !== null)
+    return null;
   setCurrentFile(entry.id);
   trackAppAction("tower_file", why);
   return entry;
 }
 
 /** Write the live tower's file with an autosave's bytes. */
-async function writeFile(app: DocApp, generation: number, savedAt: number, packed: Uint8Array, now: number): Promise<void> {
+async function writeFile(
+  app: DocApp,
+  generation: number,
+  savedAt: number,
+  packed: Uint8Array,
+  now: number,
+): Promise<void> {
   if (app.enginePort.generation() !== generation) return;
   const bytes = vctowerFileOf(packed);
   if (currentLinkedFile() !== null) {
@@ -217,9 +238,18 @@ async function writeFile(app: DocApp, generation: number, savedAt: number, packe
         if (!(err instanceof FileGoneError || err instanceof FileConflictError)) throw err;
         const was = fileSpace.get(id)?.name;
         if (currentFileId() === id) setCurrentFile(null);
-        const entry = await found(app, generation, bytes, savedAt, err instanceof FileConflictError ? "forked" : "founded");
+        const entry = await found(
+          app,
+          generation,
+          bytes,
+          savedAt,
+          err instanceof FileConflictError ? "forked" : "founded",
+        );
         if (entry && err instanceof FileConflictError)
-          app.ui.toast(`Another window saved "${was ?? entry.name}" too, so this window's tower is now "${entry.name}".`, "info");
+          app.ui.toast(
+            `Another window saved "${was ?? entry.name}" too, so this window's tower is now "${entry.name}".`,
+            "info",
+          );
       }
     } else if (claims === 0) {
       await found(app, generation, bytes, savedAt, "founded");
@@ -236,7 +266,12 @@ async function writeFile(app: DocApp, generation: number, savedAt: number, packe
  * (`SaveLoadDeps.crashCopy`). Remembers its file beside it and, for an
  * autosave (`packed`), writes the tower's own file with the same bytes.
  */
-export function crashCopyWritten(generation: number, savedAt: number, packed: Uint8Array | null, now = Date.now()): void {
+export function crashCopyWritten(
+  generation: number,
+  savedAt: number,
+  packed: Uint8Array | null,
+  now = Date.now(),
+): void {
   crash = { generation, savedAt };
   remember();
   const app = live;

@@ -48,7 +48,9 @@ export class HudTower {
   /** `logAfter(seq)`: each kept line past `seq` as a (number, kind code,
    *  minute) triple; every line here is stamped 07:00. */
   logAfter(after: number): Float64Array {
-    return Float64Array.from(this.lines.filter((l) => l.seq > after).flatMap((l) => [l.seq, CODES.code("logKinds", l.kind), 420]));
+    return Float64Array.from(
+      this.lines.filter((l) => l.seq > after).flatMap((l) => [l.seq, CODES.code("logKinds", l.kind), 420]),
+    );
   }
 
   logText(seq: number): string | undefined {
@@ -68,7 +70,16 @@ function sourceOf(tower: HudTower): HudSource {
       logText: (seq: number) => tower.logText(seq),
       undoDepths: () => Float64Array.of(0, 0),
     });
-    const header = { minutes: 420, day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2 };
+    const header = {
+      minutes: 420,
+      day: 0,
+      dayOfWeek: 0,
+      isWeekend: false,
+      quarter: 0,
+      year: 0,
+      weekDays: 7,
+      weekendDays: 2,
+    };
     const reader = {
       get header() {
         return { ...header, money: tower.money, star: tower.star, mode: tower.mode, logSeq: tower.logSeq };

@@ -43,11 +43,20 @@ function snapshot(v: SimView) {
     header: { ...h, fx: JSON.parse(JSON.stringify(h.fx)) as unknown, camera: h.camera && { ...h.camera } },
     rooms: v.rooms.map((u) => ({ ...u })),
     structure: v.structure.map((r) => ({ kind: r.kind, floor: r.floor, x: r.x, width: r.width, count: r.count })),
-    transports: v.tower.transports.map((t) => ({ ...t, carPositions: [...t.carPositions], carLoad: [...(t.carLoad ?? [])], carDir: [...t.carDir] })),
+    transports: v.tower.transports.map((t) => ({
+      ...t,
+      carPositions: [...t.carPositions],
+      carLoad: [...(t.carLoad ?? [])],
+      carDir: [...t.carDir],
+    })),
     people: v.crowd.people.map((p) => ({ ...p })),
     bounds: [v.tower.highestFloor, v.tower.lowestFloor, v.tower.revision, v.tower.towerName],
     lookups: [170, 175, 190, 200, 230, 260, 290].flatMap((x) =>
-      [1, 2, 3, 4].map((fl) => [v.tower.unitAt(fl, x)?.kind, v.tower.hasStructure(fl, x), v.tower.structureKindAt(fl, x)]),
+      [1, 2, 3, 4].map((fl) => [
+        v.tower.unitAt(fl, x)?.kind,
+        v.tower.hasStructure(fl, x),
+        v.tower.structureKindAt(fl, x),
+      ]),
     ),
   };
 }
@@ -62,7 +71,16 @@ function truth(engine: EnginePort) {
   return {
     rooms: save.units
       .filter((u) => u.kind !== "floor" && u.kind !== "lobby")
-      .map((u) => ({ id: u.id, kind: u.kind, floor: u.floor, x: u.x, width: u.width, state: u.state ?? "empty", label: u.label ?? catalogFacility(cat, u.kind as FacilityKind).name, subtype: u.subtype })),
+      .map((u) => ({
+        id: u.id,
+        kind: u.kind,
+        floor: u.floor,
+        x: u.x,
+        width: u.width,
+        state: u.state ?? "empty",
+        label: u.label ?? catalogFacility(cat, u.kind as FacilityKind).name,
+        subtype: u.subtype,
+      })),
     money: save.money,
     population: new PortCodes(engine).slot(engine.statsStrip(), "statsStrip", "population"),
   };
@@ -70,7 +88,18 @@ function truth(engine: EnginePort) {
 
 const plain = (rooms: object[]) => rooms.map((r) => JSON.parse(JSON.stringify(r)) as unknown);
 const pick = (rooms: SimView["rooms"]) =>
-  plain(rooms.map((u) => ({ id: u.id, kind: u.kind, floor: u.floor, x: u.x, width: u.width, state: u.state, label: u.label, subtype: u.subtype })));
+  plain(
+    rooms.map((u) => ({
+      id: u.id,
+      kind: u.kind,
+      floor: u.floor,
+      x: u.x,
+      width: u.width,
+      state: u.state,
+      label: u.label,
+      subtype: u.subtype,
+    })),
+  );
 
 /** Check the kept reader against the engine. `fresh` also decodes one full
  *  frame with a new reader and compares the two; that frame makes the kept
@@ -80,9 +109,12 @@ function check(reader: ViewReader, engine: EnginePort, fresh = true): void {
   // The saved camera is read on a new tower only, so a kept reader keeps the
   // one it read then; the new reader's camera is checked where it is set.
   const frame = (v: SimView) => ({ ...snapshot(v), header: { ...snapshot(v).header, camera: undefined } });
-  if (fresh) expect(frame(reader), "the kept reader decodes what one full frame says").toEqual(frame(newViewReader(engine)));
+  if (fresh)
+    expect(frame(reader), "the kept reader decodes what one full frame says").toEqual(frame(newViewReader(engine)));
   const t = truth(engine);
-  expect(pick(reader.rooms).sort((x, y) => (x as { id: number }).id - (y as { id: number }).id)).toEqual(plain(t.rooms).sort((x, y) => (x as { id: number }).id - (y as { id: number }).id));
+  expect(pick(reader.rooms).sort((x, y) => (x as { id: number }).id - (y as { id: number }).id)).toEqual(
+    plain(t.rooms).sort((x, y) => (x as { id: number }).id - (y as { id: number }).id),
+  );
   expect([reader.header.money, reader.header.population]).toEqual([t.money, t.population]);
 }
 
@@ -106,7 +138,11 @@ describe.skipIf(noEngine)("ViewReader over the Rust engine", () => {
     expect(rust.buildAt(codes.code("kinds", "office"), 2, 255)[0]).toBe(1);
     expect(rust.paintTiles(codes.code("kinds", "floor"), 4, Float64Array.of(160, 161, 162))[0]).toBe(1);
     rust.setCamera(200, 2, 1.5);
-    expect(newViewReader(rust).header.camera, "a new tower's reader reads the saved camera").toEqual({ tile: 200, floor: 2, zoom: 1.5 });
+    expect(newViewReader(rust).header.camera, "a new tower's reader reads the saved camera").toEqual({
+      tile: 200,
+      floor: 2,
+      zoom: 1.5,
+    });
     check(r, rust);
     expect(r.rooms).not.toBe(kept);
     expect(r.tower.getUnit(office)).toBe(kept.find((u) => u.id === office));

@@ -1,7 +1,12 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { isTenanted } from "@verticopolis/components/shared/unitState";
 import { isCommercialKind, isElevatorKind } from "@verticopolis/components/presentation/viewKinds";
-import { catalogFacility, catalogOpenAt, catalogResidents, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import {
+  catalogFacility,
+  catalogOpenAt,
+  catalogResidents,
+  type Catalog,
+} from "@verticopolis/components/catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "@verticopolis/components/port/panels";
 import { floorTag } from "@verticopolis/components/windows/format";
 import { occupantsText } from "../../game/cardLines";
@@ -44,7 +49,12 @@ function statusTextFor(u: Pick<UnitDetail, "state" | "vacateReason">): string {
   }
 }
 
-export function unitInspectorTemplate(u: UnitDetail, catalog: Catalog, hour: number, diagnostics: TemplateResult[]): TemplateResult {
+export function unitInspectorTemplate(
+  u: UnitDetail,
+  catalog: Catalog,
+  hour: number,
+  diagnostics: TemplateResult[],
+): TemplateResult {
   const f = catalogFacility(catalog, u.kind);
   const statusText = statusTextFor(u);
   // Canon retail variant (§7): a shop / fastFood / restaurant with a subtype
@@ -66,13 +76,18 @@ export function unitInspectorTemplate(u: UnitDetail, catalog: Catalog, hour: num
   let peopleLine: TemplateResult | typeof nothing = nothing;
   if ((isCommercialKind(u.kind) && f.population > 0) || f.attendance !== null)
     peopleLine = html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`;
-  else if (f.population) peopleLine = html`<div>Occupants: ${occupantsText(u.occupants, catalogResidents(f, u.residents), u.workersComing)}</div>`;
+  else if (f.population)
+    peopleLine = html`<div>Occupants: ${occupantsText(u.occupants, catalogResidents(f, u.residents), u.workersComing)}</div>`;
   return html`<h4 class="win-title">${title}</h4><div>${labelIsExtra ? html`${u.label}<br />` : nothing}${
     u.floor >= 1 ? `Floor ${u.floor}` : `B${1 - u.floor}`
   }</div><div>Status: ${statusText}</div>${peopleLine}${diagnostics}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
 }
 
-export function transportInspectorTemplate(t: TransportDetail, catalog: Catalog, diagnostics: TemplateResult[]): TemplateResult {
+export function transportInspectorTemplate(
+  t: TransportDetail,
+  catalog: Catalog,
+  diagnostics: TemplateResult[],
+): TemplateResult {
   const f = catalogFacility(catalog, t.kind);
   // Passenger elevators report how full their cars run on average (staff-only
   // service elevators carry no passenger load, so they show none). Shared

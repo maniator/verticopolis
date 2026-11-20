@@ -42,10 +42,29 @@ export function parseColor(c: string): [number, number, number, number] {
 export function rasterCtx(w: number, h: number): Raster {
   const data = new Float64Array(w * h * 4);
   interface State {
-    fill: string; stroke: string; align: string; alpha: number; lineWidth: number;
-    sx: number; sy: number; tx: number; ty: number; clip: [number, number, number, number];
+    fill: string;
+    stroke: string;
+    align: string;
+    alpha: number;
+    lineWidth: number;
+    sx: number;
+    sy: number;
+    tx: number;
+    ty: number;
+    clip: [number, number, number, number];
   }
-  let st: State = { fill: "#000000", stroke: "#000000", align: "left", alpha: 1, lineWidth: 1, sx: 1, sy: 1, tx: 0, ty: 0, clip: [0, 0, w, h] };
+  let st: State = {
+    fill: "#000000",
+    stroke: "#000000",
+    align: "left",
+    alpha: 1,
+    lineWidth: 1,
+    sx: 1,
+    sy: 1,
+    tx: 0,
+    ty: 0,
+    clip: [0, 0, w, h],
+  };
   const stack: State[] = [];
   let path: [number, number, number, number] | null = null;
   // Line segments of the current path, in device pixels, for `stroke`.
@@ -171,7 +190,8 @@ export function rasterCtx(w: number, h: number): Raster {
       else if (prop === "textAlign") st.align = String(value);
       else if (prop === "globalAlpha") st.alpha = Number(value);
       else if (prop === "lineWidth") st.lineWidth = Number(value);
-      else if (prop !== "imageSmoothingEnabled" && prop !== "font") throw new Error(`rasterCtx: unsupported set ${String(prop)}`);
+      else if (prop !== "imageSmoothingEnabled" && prop !== "font")
+        throw new Error(`rasterCtx: unsupported set ${String(prop)}`);
       return true;
     },
   });
@@ -192,8 +212,15 @@ export function crop(r: Raster, ox: number, oy: number, w: number, h: number): n
 
 export function unitOf(kind: FacilityKind, over: Partial<Unit> = {}): Unit {
   return {
-    id: 9, kind, floor: 12, x: 31, width: kindFacts(kind).width, state: "occupied",
-    satisfaction: 1, occupants: kindFacts(kind).population, ...over,
+    id: 9,
+    kind,
+    floor: 12,
+    x: 31,
+    width: kindFacts(kind).width,
+    state: "occupied",
+    satisfaction: 1,
+    occupants: kindFacts(kind).population,
+    ...over,
   } as Unit;
 }
 
@@ -201,7 +228,15 @@ export function unitOf(kind: FacilityKind, over: Partial<Unit> = {}): Unit {
  *  that leaves the same margin on every side, cropped back to the room.
  *  `extra` sets the scene inputs a `DrawCtx` may carry (parking use,
  *  recycling fill, staffing, animation time). */
-export function paintAt(u: Unit, ox: number, oy: number, lit: boolean, hour = 20, dead = false, extra: Partial<DrawCtx> = {}): number[] {
+export function paintAt(
+  u: Unit,
+  ox: number,
+  oy: number,
+  lit: boolean,
+  hour = 20,
+  dead = false,
+  extra: Partial<DrawCtx> = {},
+): number[] {
   const w = u.width * TILE;
   const h = kindFacts(u.kind).floors * FLOOR;
   const r = rasterCtx(w + 2 * ox, h + 2 * oy);
@@ -213,7 +248,14 @@ export function paintAt(u: Unit, ox: number, oy: number, lit: boolean, hour = 20
 /** The game's region paint of `u` with the room's left and top edges at
  *  (-dx, -dy), as in the second region of a room that straddles a seam: the
  *  canvas holds only the part past the seam, cropped from (0, 0). */
-export function paintPastSeam(u: Unit, dx: number, dy: number, lit: boolean, hour = 20, extra: Partial<DrawCtx> = {}): number[] {
+export function paintPastSeam(
+  u: Unit,
+  dx: number,
+  dy: number,
+  lit: boolean,
+  hour = 20,
+  extra: Partial<DrawCtx> = {},
+): number[] {
   const w = u.width * TILE;
   const h = kindFacts(u.kind).floors * FLOOR;
   const r = rasterCtx(w - dx, h - dy);

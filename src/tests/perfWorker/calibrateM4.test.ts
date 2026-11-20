@@ -6,9 +6,11 @@ import { main } from "../perfCompare/calibrateMain";
 import { blockingDifference, calibrateM4, isWorkerResults, m4Markdown } from "./calibrateM4";
 import { RTX, SWIFT, workerPass, type WorkerSpec } from "./calibrateM4Fixture";
 
-const many = (n: number, over: (i: number) => WorkerSpec = () => ({})) => Array.from({ length: n }, (_, i) => workerPass(i, over(i)));
+const many = (n: number, over: (i: number) => WorkerSpec = () => ({})) =>
+  Array.from({ length: n }, (_, i) => workerPass(i, over(i)));
 /** Five passes per engine guarantee 1/6, so most tests state a 20% limit; the default 5% limit is tested on its own. */
-const calibrate = (folders: ReturnType<typeof many>, options: Parameters<typeof calibrateM4>[1] = {}) => calibrateM4(folders, { exceedanceLimit: 0.2, ...options });
+const calibrate = (folders: ReturnType<typeof many>, options: Parameters<typeof calibrateM4>[1] = {}) =>
+  calibrateM4(folders, { exceedanceLimit: 0.2, ...options });
 
 describe("calibrateM4", () => {
   it("adopts a round candidate when enough passes agree", () => {
@@ -106,7 +108,13 @@ describe("calibrateM4", () => {
   });
 
   it("reads the context-loss record of every process run, not the first or any one", () => {
-    const run = () => ({ ok: true, page: { webgl: { renderer: RTX } }, rendererEnd: RTX, rendererEndCold: RTX, contextLost: [] as string[] | undefined });
+    const run = () => ({
+      ok: true,
+      page: { webgl: { renderer: RTX } },
+      rendererEnd: RTX,
+      rendererEndCold: RTX,
+      contextLost: [] as string[] | undefined,
+    });
     const triple = (i: number, edit: (runs: ReturnType<typeof run>[]) => void) => {
       const f = workerPass(i);
       const runs = [run(), run(), run()];
@@ -114,7 +122,12 @@ describe("calibrateM4", () => {
       (f.results as unknown as { runs: unknown[] }).runs = runs;
       return f;
     };
-    const c = calibrate([...many(10), triple(20, (r) => (r[1].contextLost = undefined)), triple(21, (r) => (r[2].contextLost = ["webglcontextlost at 7 ms"])), triple(22, () => {})]);
+    const c = calibrate([
+      ...many(10),
+      triple(20, (r) => (r[1].contextLost = undefined)),
+      triple(21, (r) => (r[2].contextLost = ["webglcontextlost at 7 ms"])),
+      triple(22, () => {}),
+    ]);
     const reason = (name: string) => c.excluded.find((e) => e.folder === name)?.reason;
     expect(reason("aa-worker-20")).toMatch(/^a process run has no WebGL context-loss record/);
     expect(reason("aa-worker-21")).toMatch(/lost its WebGL context/);
@@ -122,7 +135,9 @@ describe("calibrateM4", () => {
   });
 
   it("refuses to pool passes that differ, and counts a copy once", () => {
-    const c = calibrate(many(10, (i) => ({ cpu: i === 4 ? "cpu-b" : "cpu-a", commit: i === 5 ? "fff0000" : "abc1234def" })));
+    const c = calibrate(
+      many(10, (i) => ({ cpu: i === 4 ? "cpu-b" : "cpu-a", commit: i === 5 ? "fff0000" : "abc1234def" })),
+    );
     expect(c.problems.join("\n")).toMatch(/differ in machine or runtime: cpuModel/);
     expect(c.problems.join("\n")).toMatch(/more than one commit/);
     expect(c.adoptable).toBe(false);

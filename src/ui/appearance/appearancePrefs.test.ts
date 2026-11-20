@@ -1,5 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
-import { DEFAULT_SCHEME, SCHEME_ATTRIBUTE, SCHEME_COOKIE, applyScheme, loadScheme, saveScheme, schemeCookie, shareScheme } from "./appearancePrefs";
+import {
+  DEFAULT_SCHEME,
+  SCHEME_ATTRIBUTE,
+  SCHEME_COOKIE,
+  applyScheme,
+  loadScheme,
+  saveScheme,
+  schemeCookie,
+  shareScheme,
+} from "./appearancePrefs";
 
 const store = (raw: string | null) => ({ getItem: vi.fn(() => raw) });
 
@@ -22,7 +31,11 @@ describe("appearance prefs", () => {
   });
 
   it("fall back to Standard on blocked or missing storage", () => {
-    const throwing = { getItem: vi.fn(() => { throw new Error("blocked"); }) };
+    const throwing = {
+      getItem: vi.fn(() => {
+        throw new Error("blocked");
+      }),
+    };
     expect(loadScheme(throwing)).toBe("standard");
     expect(loadScheme(null)).toBe("standard");
   });
@@ -31,7 +44,11 @@ describe("appearance prefs", () => {
     const s = { setItem: vi.fn() };
     saveScheme("skyline", s);
     expect(s.setItem).toHaveBeenCalledWith("vc.appearance", "skyline");
-    const full = { setItem: vi.fn(() => { throw new Error("quota"); }) };
+    const full = {
+      setItem: vi.fn(() => {
+        throw new Error("quota");
+      }),
+    };
     expect(() => saveScheme("standard", full)).not.toThrow();
   });
 

@@ -21,7 +21,10 @@ const SPOT_PATTERN = /^(\d{1,5}),(\d{1,5})$/;
 
 /** The stored spot for a layout class, or null when there is none (or
  *  storage cannot be read, or holds something else). */
-export function storedMapSpot(storage: Pick<Storage, "getItem"> | null | undefined, layout: MapLayoutClass): Spot | null {
+export function storedMapSpot(
+  storage: Pick<Storage, "getItem"> | null | undefined,
+  layout: MapLayoutClass,
+): Spot | null {
   let raw: string | null = null;
   try {
     raw = storage ? storage.getItem(MAP_SPOT_STORAGE_KEY[layout]) : null;

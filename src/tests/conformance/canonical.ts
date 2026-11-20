@@ -37,7 +37,8 @@ export function canonicalJson(value: unknown, path = "$"): string {
   if (Array.isArray(value)) {
     const parts: string[] = [];
     for (let i = 0; i < value.length; i++) {
-      if (!(i in value) || value[i] === undefined) throw new Error(`canonicalJson: missing array element at ${path}[${i}]`);
+      if (!(i in value) || value[i] === undefined)
+        throw new Error(`canonicalJson: missing array element at ${path}[${i}]`);
       parts.push(canonicalJson(value[i], `${path}[${i}]`));
     }
     return `[${parts.join(",")}]`;

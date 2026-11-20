@@ -115,7 +115,8 @@ describe("cookieless error tracking", () => {
     const ext = (i: number) => {
       const e = new Error(`Failed to connect to MetaMask ${i}`);
       e.name = "i";
-      e.stack = "i: Failed to connect to MetaMask\n    at Object.connect (chrome-extension://abc/scripts/inpage.js:7:84292)";
+      e.stack =
+        "i: Failed to connect to MetaMask\n    at Object.connect (chrome-extension://abc/scripts/inpage.js:7:84292)";
       return e;
     };
     // Distinct messages, so dedup cannot hide a cap slot being spent.
@@ -128,8 +129,15 @@ describe("cookieless error tracking", () => {
 
   it("keeps an error whose only game frame sits past the stack bound", () => {
     const e = new Error("through an extension");
-    const extFrames = Array.from({ length: 40 }, (_, i) => `    at f${i} (chrome-extension://abc/scripts/inpage.js:${i}:1)`);
-    e.stack = ["Error: through an extension", ...extFrames, "    at boot (https://game.example/assets/main.js:1:2)"].join("\n");
+    const extFrames = Array.from(
+      { length: 40 },
+      (_, i) => `    at f${i} (chrome-extension://abc/scripts/inpage.js:${i}:1)`,
+    );
+    e.stack = [
+      "Error: through an extension",
+      ...extFrames,
+      "    at boot (https://game.example/assets/main.js:1:2)",
+    ].join("\n");
     expect(e.stack.length).toBeGreaterThan(2_000); // MAX_STACK_LEN
     fireRejection(e);
     expect(sendException).toHaveBeenCalledTimes(1);
@@ -225,7 +233,13 @@ describe("cookieless error tracking", () => {
 
   describe("reportCrashException (WebGL crash to Error Tracking)", () => {
     it("emits a synthetic $exception for a WebGL context loss with crash flags", () => {
-      reportCrashException({ kind: "webgl-context-lost", repeat: false, recoveryFailed: true, saveFlushed: true, behindSplash: false });
+      reportCrashException({
+        kind: "webgl-context-lost",
+        repeat: false,
+        recoveryFailed: true,
+        saveFlushed: true,
+        behindSplash: false,
+      });
       expect(sendException).toHaveBeenCalledTimes(1);
       const props = sentProps();
       expect(sentException()).toMatchObject({

@@ -146,7 +146,7 @@ export function renderCoverageMarkdown({ coverage, traps, lives }, meta) {
     `| Sessions with engine rows | ${seen(coverage.engineSessions)} |`,
     `| Of those, sessions with no \`session_end\` row in the window | ${seen(coverage.engineNoEnd)} |`,
     "",
-    "> A page life that began before the window and one that ended after it sit on one side of a check only, so the two sides of a pair differ a little by construction. \"Sessions that ended\" and \"sessions with engine rows\" use different counting rules (`session_end` re-fires on every tab hide), so their difference is not lost sessions.",
+    '> A page life that began before the window and one that ended after it sit on one side of a check only, so the two sides of a pair differ a little by construction. "Sessions that ended" and "sessions with engine rows" use different counting rules (`session_end` re-fires on every tab hide), so their difference is not lost sessions.',
     "",
   ];
   if (traps.trapped === 0) {
@@ -169,13 +169,22 @@ export function renderCoverageMarkdown({ coverage, traps, lives }, meta) {
 
 /** Run the three queries and render; a failed query says so rather than printing zeros. */
 export async function coverageSection(hours, windowLabel, lives) {
-  const [cov, trapCount, outcomes] = [await runQuery(buildCoverageQuery(hours)), await runQuery(buildTrapCountQuery(hours)), await runQuery(buildTrapOutcomeQuery(hours))];
+  const [cov, trapCount, outcomes] = [
+    await runQuery(buildCoverageQuery(hours)),
+    await runQuery(buildTrapCountQuery(hours)),
+    await runQuery(buildTrapOutcomeQuery(hours)),
+  ];
   for (const res of [cov, trapCount, outcomes]) {
-    if (!res.ok) return `## Telemetry coverage and trap recovery\n\n> **Unavailable:** the query failed (${res.hint}). Nothing here is a zero.`;
-    if (!Array.isArray(res.json?.results) || !Array.isArray(res.json?.columns)) return "## Telemetry coverage and trap recovery\n\n> **Unavailable:** the query returned no results table.";
+    if (!res.ok)
+      return `## Telemetry coverage and trap recovery\n\n> **Unavailable:** the query failed (${res.hint}). Nothing here is a zero.`;
+    if (!Array.isArray(res.json?.results) || !Array.isArray(res.json?.columns))
+      return "## Telemetry coverage and trap recovery\n\n> **Unavailable:** the query returned no results table.";
   }
   const outcomeRows = rowsToObjects(outcomes.json);
   const truncated = outcomeRows.length >= ROW_LIMIT || outcomes.json.hasMore === true;
   const trapped = rowsToObjects(trapCount.json)[0]?.trap_sessions;
-  return renderCoverageMarkdown({ coverage: coverageFromRows(rowsToObjects(cov.json)), traps: summarizeTraps(trapped, outcomeRows), lives }, { windowLabel, truncated });
+  return renderCoverageMarkdown(
+    { coverage: coverageFromRows(rowsToObjects(cov.json)), traps: summarizeTraps(trapped, outcomeRows), lives },
+    { windowLabel, truncated },
+  );
 }

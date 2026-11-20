@@ -24,7 +24,10 @@ export function showSaveWarning(rail: HTMLElement, text: string, onExport: () =>
     body.className = "save-warning-text";
     const actions = document.createElement("div");
     actions.className = "save-warning-actions";
-    actions.append(button("Save As…", "export", onExport), button("Dismiss", "dismiss", () => clearSaveWarning(rail)));
+    actions.append(
+      button("Save As…", "export", onExport),
+      button("Dismiss", "dismiss", () => clearSaveWarning(rail)),
+    );
     box.append(title, body, actions);
     // First on the rail, so the toasts that come and go stack under it.
     rail.prepend(box);

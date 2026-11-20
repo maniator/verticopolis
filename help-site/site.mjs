@@ -65,11 +65,22 @@ export const sidebar = [
   { label: "How to Play", link: "/" },
   {
     label: "Getting started",
-    items: [{ slug: "first-tower" }, { slug: "classic-vs-modern" }, { slug: "differences" }, { slug: "controls" }, { slug: "desktop" }],
+    items: [
+      { slug: "first-tower" },
+      { slug: "classic-vs-modern" },
+      { slug: "differences" },
+      { slug: "controls" },
+      { slug: "desktop" },
+    ],
   },
   {
     label: "Your towers",
-    items: [{ slug: "your-towers/saving" }, { slug: "your-towers/importing-exporting" }, { slug: "your-towers/installing" }, { slug: "your-towers/settings" }],
+    items: [
+      { slug: "your-towers/saving" },
+      { slug: "your-towers/importing-exporting" },
+      { slug: "your-towers/installing" },
+      { slug: "your-towers/settings" },
+    ],
   },
   {
     label: "Rooms",
@@ -326,7 +337,15 @@ export function pageJsonLd({ slug, title, description, hasIndex = ["rooms"] }) {
   };
   const game = { "@type": "VideoGame", name: "Verticopolis", url: `${SITE_ORIGIN}/` };
   const page = slug
-    ? { "@type": "Article", headline: title, description, url: url(slug), inLanguage: "en-US", about: game, isPartOf: { "@type": "WebSite", name: "Verticopolis Help", url: url("") } }
+    ? {
+        "@type": "Article",
+        headline: title,
+        description,
+        url: url(slug),
+        inLanguage: "en-US",
+        about: game,
+        isPartOf: { "@type": "WebSite", name: "Verticopolis Help", url: url("") },
+      }
     : { "@type": "WebSite", name: "Verticopolis Help", description, url: url(""), inLanguage: "en-US", about: game };
   return { "@context": "https://schema.org", "@graph": [page, breadcrumb] };
 }

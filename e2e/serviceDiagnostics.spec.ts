@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import {
-  serviceDiagnosticsFixture, retailServiceFixture, underServedRetailFixture, withHotelState, type FixtureBuilder,
+  serviceDiagnosticsFixture,
+  retailServiceFixture,
+  underServedRetailFixture,
+  withHotelState,
+  type FixtureBuilder,
 } from "../src/tests/fixtures/serviceDiagnostics.fixture";
 import type { SerializedGame } from "@verticopolis/components/shared/types";
 import { buildInPage, expectEngineHosted } from "./helpers";
@@ -14,10 +18,14 @@ import { buildInPage, expectEngineHosted } from "./helpers";
 test.describe("Rust service diagnostics in the real browser", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.waitForFunction(() => {
-      const w = window as any;
-      return Boolean(w.__vcEngine?.status?.hosted && w.game);
-    }, undefined, { timeout: 30_000 });
+    await page.waitForFunction(
+      () => {
+        const w = window as any;
+        return Boolean(w.__vcEngine?.status?.hosted && w.game);
+      },
+      undefined,
+      { timeout: 30_000 },
+    );
     await page.evaluate(() => {
       document.getElementById("splash")?.remove();
       (window as any).game.setSpeed(0);
@@ -73,56 +81,67 @@ test.describe("Rust service diagnostics in the real browser", () => {
     return { sim, shaftId: shaft.transportId };
   };
 
-  test("desktop inspector and the mobile editor show the real Rust passenger-elevator load warning", async ({ page }) => {
+  test("desktop inspector and the mobile editor show the real Rust passenger-elevator load warning", async ({
+    page,
+  }) => {
     const built = await buildInPage(page, utilizedPassengerLift, "classic");
     const fixture = { save: built.save, id: built.shaftId, kind: "elevatorStandard" };
     await loadFixture(page, fixture.save);
-    const readout = await page.evaluate(({ id }) => {
-      const g = (window as any).game;
-      const slots = JSON.parse(g.enginePort.viewLayout()).records.shaftCard;
-      const index = slots.indexOf("utilization");
-      if (index < 0) {
-        throw new Error(`Rust shaft-card layout missing 'utilization' slot: ${JSON.stringify(slots)}`);
-      }
-      const shaft = g.sim.tower.getTransport(id);
-      if (!shaft) throw new Error("fixture did not restore the passenger shaft");
-      let util = Number.NaN;
-      let peak = Number.NEGATIVE_INFINITY;
-      let crossedAtHour = -1;
-      for (let hour = 1; hour <= 120; hour++) {
-        g.enginePort.tick(60);
-        g.reader.update();
-        // The port contract returns a Float64Array. Read only the named slot,
-        // without copying the (potentially large) shaft-card record.
-        const card = g.enginePort.shaftCard(id) as Float64Array | undefined;
-        if (!card || index >= card.length || !Number.isFinite(card[index])) {
-          throw new Error(
-            `Rust shaft-card payload has invalid utilization for shaft ${id}: index=${index}, length=${card?.length ?? "missing"}`,
-          );
+    const readout = await page.evaluate(
+      ({ id }) => {
+        const g = (window as any).game;
+        const slots = JSON.parse(g.enginePort.viewLayout()).records.shaftCard;
+        const index = slots.indexOf("utilization");
+        if (index < 0) {
+          throw new Error(`Rust shaft-card layout missing 'utilization' slot: ${JSON.stringify(slots)}`);
         }
-        util = card[index];
-        if (Number.isFinite(util)) peak = Math.max(peak, util);
-        if (Number.isFinite(util) && util > 0.85) {
-          crossedAtHour = hour;
-          break;
+        const shaft = g.sim.tower.getTransport(id);
+        if (!shaft) throw new Error("fixture did not restore the passenger shaft");
+        let util = Number.NaN;
+        let peak = Number.NEGATIVE_INFINITY;
+        let crossedAtHour = -1;
+        for (let hour = 1; hour <= 120; hour++) {
+          g.enginePort.tick(60);
+          g.reader.update();
+          // The port contract returns a Float64Array. Read only the named slot,
+          // without copying the (potentially large) shaft-card record.
+          const card = g.enginePort.shaftCard(id) as Float64Array | undefined;
+          if (!card || index >= card.length || !Number.isFinite(card[index])) {
+            throw new Error(
+              `Rust shaft-card payload has invalid utilization for shaft ${id}: index=${index}, length=${card?.length ?? "missing"}`,
+            );
+          }
+          util = card[index];
+          if (Number.isFinite(util)) peak = Math.max(peak, util);
+          if (Number.isFinite(util) && util > 0.85) {
+            crossedAtHour = hour;
+            break;
+          }
         }
-      }
-      if (crossedAtHour < 0) throw new Error(`Rust runtime never crossed 85% utilization (peak=${peak})`);
-      return { util, pct: Number.isFinite(util) ? Math.round(util * 100) : NaN, crossedAtHour };
-    }, { id: fixture.id });
+        if (crossedAtHour < 0) throw new Error(`Rust runtime never crossed 85% utilization (peak=${peak})`);
+        return { util, pct: Number.isFinite(util) ? Math.round(util * 100) : NaN, crossedAtHour };
+      },
+      { id: fixture.id },
+    );
     expect(readout.util).toBeGreaterThan(0.85);
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.inspector.inspectPicked({ type: "transport", id, kind });
-    }, { id: fixture.id, kind: fixture.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.inspector.inspectPicked({ type: "transport", id, kind });
+      },
+      { id: fixture.id, kind: fixture.kind },
+    );
     await expect(page.locator("#inspector")).toContainText(`Avg load: ${readout.pct}% full`);
     // A Classic tower names the problem without the fix (#549).
     await expect(page.locator("#inspector")).toContainText("Near capacity.");
     await expect(page.locator("#inspector")).not.toContainText("consider more cars");
 
     await page.setViewportSize({ width: 390, height: 700 });
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.selectPicked({ type: "transport", id, kind });
-    }, { id: fixture.id, kind: fixture.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.selectPicked({ type: "transport", id, kind });
+      },
+      { id: fixture.id, kind: fixture.kind },
+    );
     await expect(page.locator("#editor .ed-diagnostics")).toContainText(`Avg load: ${readout.pct}% full`);
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Near capacity.");
     await expect(page.locator("#editor .ed-diagnostics")).not.toContainText("consider more cars");
@@ -136,21 +155,30 @@ test.describe("Rust service diagnostics in the real browser", () => {
     const dirty = withHotelState(JSON.parse(f.save) as SerializedGame, f.hotel.id, "dirty");
     await loadFixture(page, JSON.stringify(dirty));
 
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
-    }, { id: f.hotel.id, kind: f.hotel.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+      },
+      { id: f.hotel.id, kind: f.hotel.kind },
+    );
     await expect(page.locator("#inspector")).toContainText("Counts toward stars: no");
     await expect(page.locator("#inspector")).toContainText("Left dirty for 3 days");
 
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
-    }, { id: f.connectedParking.id, kind: f.connectedParking.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+      },
+      { id: f.connectedParking.id, kind: f.connectedParking.kind },
+    );
     await expect(page.locator("#inspector")).toContainText("Ramp access: connected");
     await expect(page.locator("#inspector")).toContainText("Parking demand:");
 
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
-    }, { id: f.disconnectedParking.id, kind: f.disconnectedParking.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+      },
+      { id: f.disconnectedParking.id, kind: f.disconnectedParking.kind },
+    );
     await expect(page.locator("#inspector")).toContainText("Ramp access: none");
     await expect(page.locator("#inspector")).not.toContainText("Parking demand:");
   });
@@ -158,18 +186,24 @@ test.describe("Rust service diagnostics in the real browser", () => {
   test("real Rust retail copy appears on desktop and the mobile editor", async ({ page }) => {
     const f = await buildInPage(page, retailServiceFixture, "modern");
     await loadFixture(page, f.save);
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
-    }, { id: f.shop.id, kind: f.shop.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+      },
+      { id: f.shop.id, kind: f.shop.kind },
+    );
     await expect(page.locator("#inspector")).toContainText("Today's patronage: 40 customers");
     await expect(page.locator("#inspector")).toContainText("Very few customers.");
     await expect(page.locator("#inspector")).toContainText("Yesterday's profit: $200.");
     await expect(page.locator("#inspector")).toContainText("more retail than its shoppers fill");
 
     await page.setViewportSize({ width: 390, height: 700 });
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.selectPicked({ type: "unit", id, kind });
-    }, { id: f.restaurant.id, kind: f.restaurant.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.selectPicked({ type: "unit", id, kind });
+      },
+      { id: f.restaurant.id, kind: f.restaurant.kind },
+    );
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Business is booming.");
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Yesterday's profit: $4,800.");
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Local demand:");
@@ -178,16 +212,22 @@ test.describe("Rust service diagnostics in the real browser", () => {
   test("real Rust under-served retail advice appears on desktop and the mobile editor", async ({ page }) => {
     const f = await buildInPage(page, underServedRetailFixture, "modern");
     await loadFixture(page, f.save);
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
-    }, { id: f.shop.id, kind: f.shop.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+      },
+      { id: f.shop.id, kind: f.shop.kind },
+    );
     await expect(page.locator("#inspector")).toContainText("another venue would still sell");
     await expect(page.locator("#inspector")).not.toContainText("more retail than its shoppers fill");
 
     await page.setViewportSize({ width: 390, height: 700 });
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.selectPicked({ type: "unit", id, kind });
-    }, { id: f.shop.id, kind: f.shop.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.selectPicked({ type: "unit", id, kind });
+      },
+      { id: f.shop.id, kind: f.shop.kind },
+    );
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("another venue would still sell");
   });
 
@@ -195,17 +235,23 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await page.setViewportSize({ width: 390, height: 700 });
     const f = await buildInPage(page, serviceDiagnosticsFixture, "modern");
     await loadFixture(page, f.save);
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.selectPicked({ type: "unit", id, kind });
-    }, { id: f.housekeeping.id, kind: f.housekeeping.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.selectPicked({ type: "unit", id, kind });
+      },
+      { id: f.housekeeping.id, kind: f.housekeeping.kind },
+    );
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Fields 6 maids");
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("hotel room(s)");
 
     const infested = withHotelState(JSON.parse(f.save) as SerializedGame, f.hotel.id, "infested");
     await loadFixture(page, JSON.stringify(infested));
-    await page.evaluate(({ id, kind }) => {
-      (window as any).game.selectPicked({ type: "unit", id, kind });
-    }, { id: f.hotel.id, kind: f.hotel.kind });
+    await page.evaluate(
+      ({ id, kind }) => {
+        (window as any).game.selectPicked({ type: "unit", id, kind });
+      },
+      { id: f.hotel.id, kind: f.hotel.kind },
+    );
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Cockroach infested");
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Call an exterminator");
   });

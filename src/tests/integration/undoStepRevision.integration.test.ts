@@ -45,12 +45,22 @@ describe.skipIf(!hasWasmPackage())("the Rust engine's undo and redo steps", () =
     }
     const undo = (): PortRecord => s.port.undo();
     const redo = (): PortRecord => s.port.redo();
-    for (const [name, step] of [["undo", undo], ["undo", undo], ["redo", redo], ["undo", undo], ["redo", redo], ["redo", redo]] as const) {
+    for (const [name, step] of [
+      ["undo", undo],
+      ["undo", undo],
+      ["redo", redo],
+      ["undo", undo],
+      ["redo", redo],
+      ["redo", redo],
+    ] as const) {
       const highest = Math.max(...seen);
       expect(done(step()), name).toBe(true);
       expect(read(), `${name} after revisions ${seen.slice(0, -1).join(", ")}`).toBeGreaterThan(highest);
     }
     const offices = s.reader.tower.units.filter((u) => u.kind === "office");
-    expect(offices.map((u) => u.floor).sort((a, b) => a - b), "both offices are back").toEqual([2, 3]);
+    expect(
+      offices.map((u) => u.floor).sort((a, b) => a - b),
+      "both offices are back",
+    ).toEqual([2, 3]);
   });
 });

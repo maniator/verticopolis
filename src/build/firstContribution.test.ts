@@ -25,19 +25,11 @@ const event = (over: Partial<ContributionEvent> = {}): ContributionEvent => ({
   ...over,
 });
 
-function port(
-  answers: { numbers?: number[]; comments?: string[]; template?: string } = {},
-) {
+function port(answers: { numbers?: number[]; comments?: string[]; template?: string } = {}) {
   return {
-    listAuthorNumbers: vi.fn<WelcomePort["listAuthorNumbers"]>(
-      () => answers.numbers ?? [2017],
-    ),
-    readMessage: vi.fn<WelcomePort["readMessage"]>(
-      () => answers.template ?? TEMPLATE,
-    ),
-    listCommentBodies: vi.fn<WelcomePort["listCommentBodies"]>(
-      () => answers.comments ?? [],
-    ),
+    listAuthorNumbers: vi.fn<WelcomePort["listAuthorNumbers"]>(() => answers.numbers ?? [2017]),
+    readMessage: vi.fn<WelcomePort["readMessage"]>(() => answers.template ?? TEMPLATE),
+    listCommentBodies: vi.fn<WelcomePort["listCommentBodies"]>(() => answers.comments ?? []),
     postComment: vi.fn<WelcomePort["postComment"]>(),
   };
 }
@@ -47,10 +39,7 @@ describe("welcomeFirstContribution", () => {
     const p = port();
     const outcome = welcomeFirstContribution(event(), p);
     expect(outcome.posted).toBe(true);
-    expect(p.listAuthorNumbers).toHaveBeenCalledWith(
-      "pull request",
-      "newcomer",
-    );
+    expect(p.listAuthorNumbers).toHaveBeenCalledWith("pull request", "newcomer");
     expect(p.readMessage).toHaveBeenCalledWith(".github/welcome/first-pr.md");
     expect(p.listCommentBodies).toHaveBeenCalledWith(2017);
     expect(p.postComment).toHaveBeenCalledWith(
@@ -61,17 +50,10 @@ describe("welcomeFirstContribution", () => {
 
   it("uses the issue message and counts only issues for an issue", () => {
     const p = port({ numbers: [40] });
-    expect(
-      welcomeFirstContribution(event({ kind: "issue", number: 40 }), p).posted,
-    ).toBe(true);
+    expect(welcomeFirstContribution(event({ kind: "issue", number: 40 }), p).posted).toBe(true);
     expect(p.listAuthorNumbers).toHaveBeenCalledWith("issue", "newcomer");
-    expect(p.readMessage).toHaveBeenCalledWith(
-      ".github/welcome/first-issue.md",
-    );
-    expect(p.postComment).toHaveBeenCalledWith(
-      40,
-      expect.stringContaining("@newcomer"),
-    );
+    expect(p.readMessage).toHaveBeenCalledWith(".github/welcome/first-issue.md");
+    expect(p.postComment).toHaveBeenCalledWith(40, expect.stringContaining("@newcomer"));
   });
 
   it.each(["OWNER", "MEMBER", "COLLABORATOR"])(
@@ -89,32 +71,18 @@ describe("welcomeFirstContribution", () => {
   );
 
   it("never welcomes a bot, by user type or by the [bot] suffix", () => {
-    for (const bot of [
-      event({ authorType: "Bot", author: "copilot" }),
-      event({ author: "dependabot[bot]" }),
-    ]) {
+    for (const bot of [event({ authorType: "Bot", author: "copilot" }), event({ author: "dependabot[bot]" })]) {
       const p = port();
-      expect(welcomeFirstContribution(bot, p).reason).toBe(
-        `${bot.author} is a bot`,
-      );
+      expect(welcomeFirstContribution(bot, p).reason).toBe(`${bot.author} is a bot`);
       expect(p.listAuthorNumbers).not.toHaveBeenCalled();
       expect(p.postComment).not.toHaveBeenCalled();
     }
   });
 
   it("refuses a login GitHub could not have issued before it reaches a query", () => {
-    for (const author of [
-      "a&state=open",
-      "-lead",
-      "trail-",
-      "dou--ble",
-      "x".repeat(40),
-    ]) {
+    for (const author of ["a&state=open", "-lead", "trail-", "dou--ble", "x".repeat(40)]) {
       const p = port();
-      expect(
-        welcomeFirstContribution(event({ author }), p).posted,
-        author,
-      ).toBe(false);
+      expect(welcomeFirstContribution(event({ author }), p).posted, author).toBe(false);
       expect(p.listAuthorNumbers, author).not.toHaveBeenCalled();
     }
   });
@@ -131,13 +99,9 @@ describe("welcomeFirstContribution", () => {
 
   it("still welcomes the first of two opened at once, and only that one", () => {
     const first = port({ numbers: [2017, 2018] });
-    expect(
-      welcomeFirstContribution(event({ number: 2017 }), first).posted,
-    ).toBe(true);
+    expect(welcomeFirstContribution(event({ number: 2017 }), first).posted).toBe(true);
     const second = port({ numbers: [2017, 2018] });
-    expect(
-      welcomeFirstContribution(event({ number: 2018 }), second).posted,
-    ).toBe(false);
+    expect(welcomeFirstContribution(event({ number: 2018 }), second).posted).toBe(false);
     expect(second.postComment).not.toHaveBeenCalled();
   });
 
@@ -166,82 +130,58 @@ describe("welcomeFirstContribution", () => {
 
   it("refuses a message file that lost its marker, so it cannot post twice", () => {
     const p = port({ template: "Thanks @{login}!" });
-    expect(() => welcomeFirstContribution(event(), p)).toThrow(
-      /must start with/,
-    );
+    expect(() => welcomeFirstContribution(event(), p)).toThrow(/must start with/);
     expect(p.postComment).not.toHaveBeenCalled();
   });
 });
 
 describe("renderWelcome", () => {
   it("fills every placeholder and leaves other text alone", () => {
-    expect(renderWelcome("{login} {login} {repo} {other}", "a-b", "o/r")).toBe(
-      "a-b a-b o/r {other}",
-    );
+    expect(renderWelcome("{login} {login} {repo} {other}", "a-b", "o/r")).toBe("a-b a-b o/r {other}");
   });
 });
 
 /** The labels `.github/labels.yml` defines. */
 const labels = new Set(
-  [
-    ...readFileSync(resolve(root, ".github/labels.yml"), "utf8").matchAll(
-      /^\s*- name:\s*"?([^"\n]+?)"?\s*$/gm,
-    ),
-  ].map((m) => m[1]),
+  [...readFileSync(resolve(root, ".github/labels.yml"), "utf8").matchAll(/^\s*- name:\s*"?([^"\n]+?)"?\s*$/gm)].map(
+    (m) => m[1],
+  ),
 );
 
-describe.each(Object.entries(WELCOME_MESSAGES))(
-  "the %s welcome as posted",
-  (kind, path) => {
-    const posted = renderWelcome(
-      readFileSync(resolve(root, path), "utf8"),
-      "newcomer",
-      "Verticopolis/web",
-    );
-    const links = [...posted.matchAll(/\]\((https:\/\/[^)]+)\)/g)].map(
-      (m) => m[1],
-    );
+describe.each(Object.entries(WELCOME_MESSAGES))("the %s welcome as posted", (kind, path) => {
+  const posted = renderWelcome(readFileSync(resolve(root, path), "utf8"), "newcomer", "Verticopolis/web");
+  const links = [...posted.matchAll(/\]\((https:\/\/[^)]+)\)/g)].map((m) => m[1]);
 
-    it("starts with the marker and greets the author", () => {
-      expect(posted.split("\n")[0]).toBe(WELCOME_MARKER);
-      expect(posted).toContain("@newcomer");
-      expect(posted).not.toMatch(/\{(login|repo)\}/);
-    });
+  it("starts with the marker and greets the author", () => {
+    expect(posted.split("\n")[0]).toBe(WELCOME_MARKER);
+    expect(posted).toContain("@newcomer");
+    expect(posted).not.toMatch(/\{(login|repo)\}/);
+  });
 
-    it("links CONTRIBUTING.md and the good first issue and help wanted lists", () => {
-      expect(links).toContain(
-        "https://github.com/Verticopolis/web/blob/main/CONTRIBUTING.md",
-      );
-      const linked = links.flatMap((link) => {
-        const m = /label%3A%22(.+?)%22/.exec(link);
-        return m ? [decodeURIComponent(m[1].split("+").join(" "))] : [];
-      });
-      expect(linked).toEqual(["good first issue", "help wanted"]);
+  it("links CONTRIBUTING.md and the good first issue and help wanted lists", () => {
+    expect(links).toContain("https://github.com/Verticopolis/web/blob/main/CONTRIBUTING.md");
+    const linked = links.flatMap((link) => {
+      const m = /label%3A%22(.+?)%22/.exec(link);
+      return m ? [decodeURIComponent(m[1].split("+").join(" "))] : [];
     });
+    expect(linked).toEqual(["good first issue", "help wanted"]);
+  });
 
-    it("links only files and labels that exist", () => {
-      for (const link of links) {
-        expect(
-          link.startsWith("https://github.com/Verticopolis/web/"),
-          link,
-        ).toBe(true);
-        const blob = /\/blob\/main\/(.+)$/.exec(link);
-        if (blob) expect(existsSync(resolve(root, blob[1])), link).toBe(true);
-        const label = /label%3A%22(.+?)%22/.exec(link);
-        if (label)
-          expect(
-            labels.has(decodeURIComponent(label[1].split("+").join(" "))),
-            link,
-          ).toBe(true);
-        expect(blob || label, `${kind}: ${link}`).toBeTruthy();
-      }
-    });
+  it("links only files and labels that exist", () => {
+    for (const link of links) {
+      expect(link.startsWith("https://github.com/Verticopolis/web/"), link).toBe(true);
+      const blob = /\/blob\/main\/(.+)$/.exec(link);
+      if (blob) expect(existsSync(resolve(root, blob[1])), link).toBe(true);
+      const label = /label%3A%22(.+?)%22/.exec(link);
+      if (label) expect(labels.has(decodeURIComponent(label[1].split("+").join(" "))), link).toBe(true);
+      expect(blob || label, `${kind}: ${link}`).toBeTruthy();
+    }
+  });
 
-    it("uses no em-dash", () => {
-      expect(posted).not.toContain("—");
-    });
-  },
-);
+  it("uses no em-dash", () => {
+    expect(posted).not.toContain("—");
+  });
+});
 
 describe("contributionKind", () => {
   it("maps the two events the workflow sends", () => {
@@ -250,9 +190,7 @@ describe("contributionKind", () => {
   });
 
   it("throws on any other event instead of guessing", () => {
-    expect(() => contributionKind("pull_request_target")).toThrow(
-      "unexpected event 'pull_request_target'",
-    );
+    expect(() => contributionKind("pull_request_target")).toThrow("unexpected event 'pull_request_target'");
   });
 });
 

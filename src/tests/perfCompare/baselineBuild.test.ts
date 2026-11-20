@@ -3,7 +3,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { BASELINE_DIST, BASELINE_STAMP, BASELINE_TREE, TS_BASELINE, buildBaseline, type BaselineSteps } from "./baseline";
+import {
+  BASELINE_DIST,
+  BASELINE_STAMP,
+  BASELINE_TREE,
+  TS_BASELINE,
+  buildBaseline,
+  type BaselineSteps,
+} from "./baseline";
 import { BASELINE_LOCK } from "./baselineLock";
 
 const made: string[] = [];
@@ -76,7 +83,10 @@ describe("buildBaseline", () => {
     const w = setup();
     w.run();
     expect(w.calls).toEqual(["cat-file", "worktree add", "install", "build"]);
-    expect(JSON.parse(readFileSync(join(w.dist, BASELINE_STAMP), "utf8"))).toEqual({ commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion });
+    expect(JSON.parse(readFileSync(join(w.dist, BASELINE_STAMP), "utf8"))).toEqual({
+      commit: TS_BASELINE.commit,
+      appVersion: TS_BASELINE.appVersion,
+    });
     expect(w.log.join("\n")).toContain("checking out the TypeScript baseline");
   });
 
@@ -84,14 +94,29 @@ describe("buildBaseline", () => {
     const w = setup({ head: TS_BASELINE.commit });
     existingTree(w.tree);
     w.run();
-    expect(w.calls).toEqual(["cat-file", "rev-parse (in tree)", "reset (in tree)", "clean (in tree)", "install", "build"]);
+    expect(w.calls).toEqual([
+      "cat-file",
+      "rev-parse (in tree)",
+      "reset (in tree)",
+      "clean (in tree)",
+      "install",
+      "build",
+    ]);
   });
 
   it("replaces a checkout at another commit", () => {
     const w = setup({ head: "0".repeat(40) });
     existingTree(w.tree);
     w.run();
-    expect(w.calls).toEqual(["cat-file", "rev-parse (in tree)", "worktree remove", "worktree prune", "worktree add", "install", "build"]);
+    expect(w.calls).toEqual([
+      "cat-file",
+      "rev-parse (in tree)",
+      "worktree remove",
+      "worktree prune",
+      "worktree add",
+      "install",
+      "build",
+    ]);
   });
 
   it("removes a leftover folder git does not know as a worktree, and does not ask git about it", () => {

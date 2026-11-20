@@ -154,7 +154,8 @@ function loneTile(engine: Engine): { floor: number; x: number; cost: number } {
   type Check = { ok: boolean; cost: number };
   const checks: (Check & { floor: number; x: number })[] = [];
   for (let floor = 2; floor <= TOP_FLOOR; floor++) {
-    for (let x = 0; x < LOT_WIDTH; x++) checks.push({ floor, x, ...(JSON.parse(engine.canBuild("floor", floor, x)) as Check) });
+    for (let x = 0; x < LOT_WIDTH; x++)
+      checks.push({ floor, x, ...(JSON.parse(engine.canBuild("floor", floor, x)) as Check) });
   }
   const single = checks.reduce((low, c) => (c.cost > 0 && c.cost < low ? c.cost : low), Infinity);
   const spot = checks.find((c) => c.ok && c.cost === single);
@@ -222,7 +223,15 @@ function child(pkgPath: string, savePath: string, step: Step): void {
     const saveStart = performance.now();
     engine.serialize();
     const buildSaveMs = performance.now() - saveStart;
-    sample = { afterLoad, afterSearch, afterBuild, buildMs, buildSaveMs, afterBuildThenSave: memory.buffer.byteLength, built: `${tile.floor}, ${tile.x}` };
+    sample = {
+      afterLoad,
+      afterSearch,
+      afterBuild,
+      buildMs,
+      buildSaveMs,
+      afterBuildThenSave: memory.buffer.byteLength,
+      built: `${tile.floor}, ${tile.x}`,
+    };
   } else if (step === "vctower" || step === "tdt") {
     for (let i = 0; i < 30; i++) engine.tick(2);
     const afterPlay = memory.buffer.byteLength;
@@ -231,11 +240,22 @@ function child(pkgPath: string, savePath: string, step: Step): void {
       if (!engine.exportVctower) throw new Error(`${pkgPath} has no exportVctower`);
       const file = engine.exportVctower("3.0.0", 1.7e12);
       if (!file?.startsWith("VCTOWER1")) throw new Error("the .vctower export wrote no file");
-      sample = { afterLoad, afterPlay, afterVctower: memory.buffer.byteLength, vctowerMs: performance.now() - exportStart };
+      sample = {
+        afterLoad,
+        afterPlay,
+        afterVctower: memory.buffer.byteLength,
+        vctowerMs: performance.now() - exportStart,
+      };
     } else {
       if (!engine.tdtExport) throw new Error(`${pkgPath} has no tdtExport`);
       const record = engine.tdtExport();
-      sample = { afterLoad, afterPlay, afterTdt: memory.buffer.byteLength, tdtMs: performance.now() - exportStart, tdtStatus: record[0] };
+      sample = {
+        afterLoad,
+        afterPlay,
+        afterTdt: memory.buffer.byteLength,
+        tdtMs: performance.now() - exportStart,
+        tdtStatus: record[0],
+      };
     }
   } else {
     for (let i = 0; i < 30; i++) engine.tick(2);
@@ -277,7 +297,28 @@ function child(pkgPath: string, savePath: string, step: Step): void {
     engine.serialize();
     const thirdSaveAfterBuildMs = performance.now() - thirdStart;
     const afterThird = memory.buffer.byteLength;
-    sample = { before, afterLoad, afterPlay, afterSerialize, loadMs, serializeMs, secondSerializeMs, reloadMs, reloadSerializeMs, afterReload, afterReloadSearch, laterBuildMs, afterLaterBuild, saveAfterBuildMs, afterBuildSave, thirdLoadMs, thirdBuildMs, thirdSaveAfterBuildMs, afterThird, heapDelta };
+    sample = {
+      before,
+      afterLoad,
+      afterPlay,
+      afterSerialize,
+      loadMs,
+      serializeMs,
+      secondSerializeMs,
+      reloadMs,
+      reloadSerializeMs,
+      afterReload,
+      afterReloadSearch,
+      laterBuildMs,
+      afterLaterBuild,
+      saveAfterBuildMs,
+      afterBuildSave,
+      thirdLoadMs,
+      thirdBuildMs,
+      thirdSaveAfterBuildMs,
+      afterThird,
+      heapDelta,
+    };
   }
   process.stdout.write(`${JSON.stringify(sample)}\n`);
   engine.free();
@@ -300,7 +341,8 @@ const median = (xs: number[]): number => {
 const mib = (bytes: number): string => (bytes / MIB).toFixed(2);
 
 /** A time's median, with its range over the repetitions. */
-const spread = (ms: number[]): string => `${median(ms).toFixed(1)} (${Math.min(...ms).toFixed(1)} to ${Math.max(...ms).toFixed(1)})`;
+const spread = (ms: number[]): string =>
+  `${median(ms).toFixed(1)} (${Math.min(...ms).toFixed(1)} to ${Math.max(...ms).toFixed(1)})`;
 
 /** The same figure from every repetition, or each one when they differ. */
 function steady(xs: number[]): string {
@@ -309,10 +351,14 @@ function steady(xs: number[]): string {
 
 /** One child's run on the save at `path`: the last line it printed. */
 function runChild(name: string, pkgPath: string, path: string, step: Step): Partial<Sample> {
-  const run = spawnSync(process.execPath, [...process.execArgv, "--expose-gc", SCRIPT, "--child", pkgPath, path, step], {
-    encoding: "utf8",
-    timeout: CHILD_TIMEOUT_MS,
-  });
+  const run = spawnSync(
+    process.execPath,
+    [...process.execArgv, "--expose-gc", SCRIPT, "--child", pkgPath, path, step],
+    {
+      encoding: "utf8",
+      timeout: CHILD_TIMEOUT_MS,
+    },
+  );
   if (run.error) throw new Error(`${name}: the child did not finish: ${run.error.message}`);
   if (run.status !== 0) throw new Error(`${name}: the child failed (${run.status}): ${run.stderr}`);
   const line = run.stdout.trim().split("\n").pop();
@@ -340,11 +386,15 @@ async function main(args: string[]): Promise<void> {
   const jsonOut = option(args, "--json");
   const engineRoot = resolve(option(args, "--engine") ?? REPO);
   const pkgDir = PACKAGE_DIRS.map((d) => resolve(engineRoot, d)).find((d) => existsSync(join(d, BINARY)));
-  if (!pkgDir) throw new Error(`${engineRoot} has no Node engine package (${PACKAGE_DIRS.join(" or ")}); run npm ci there`);
+  if (!pkgDir)
+    throw new Error(`${engineRoot} has no Node engine package (${PACKAGE_DIRS.join(" or ")}); run npm ci there`);
   const pkgPath = join(pkgDir, GLUE);
   const wasmPath = join(pkgDir, BINARY);
   const stamp = parseBuildMetadata(customSectionsOf(readFileSync(wasmPath), BUILD_SECTION));
-  if (stamp.state !== "ok") throw new Error(`${wasmPath} carries no readable ${BUILD_SECTION} stamp (${stamp.state === "malformed" ? stamp.why : "missing"}); run npm ci there`);
+  if (stamp.state !== "ok")
+    throw new Error(
+      `${wasmPath} carries no readable ${BUILD_SECTION} stamp (${stamp.state === "malformed" ? stamp.why : "missing"}); run npm ci there`,
+    );
   const sources = stamp.sourceHash;
   const { buildScenarios, unknownScenarios } = await import("../src/tests/perfCompare/scenarios");
   if (only && unknownScenarios([only]).length > 0) throw new Error(`no scenario named ${only}`);
@@ -363,7 +413,8 @@ async function main(args: string[]): Promise<void> {
         const tdt = runChild(s.name, pkgPath, path, "tdt");
         // The processes load the same build and save, so they must agree.
         for (const other of [built, vctower, tdt]) {
-          if (other.afterLoad !== played.afterLoad) throw new Error(`${s.name}: the two loads left ${played.afterLoad} and ${other.afterLoad} bytes`);
+          if (other.afterLoad !== played.afterLoad)
+            throw new Error(`${s.name}: the two loads left ${played.afterLoad} and ${other.afterLoad} bytes`);
         }
         samples.push({
           ...played,
@@ -395,8 +446,22 @@ async function main(args: string[]): Promise<void> {
   ];
   const each = (r: (typeof results)[string], key: keyof Sample) => r.samples.map((x) => x[key] as number);
   for (const [name, r] of Object.entries(results)) {
-    const memory = (["before", "afterLoad", "afterPlay", "afterSerialize", "afterReload", "afterReloadSearch", "afterLaterBuild", "afterBuildSave", "afterThird"] as const).map((k) => steady(each(r, k)));
-    lines.push(`| ${name} | ${r.units} | ${mib(r.saveBytes)} | ${memory.join(" | ")} | ${mib(median(each(r, "heapDelta")))} |`);
+    const memory = (
+      [
+        "before",
+        "afterLoad",
+        "afterPlay",
+        "afterSerialize",
+        "afterReload",
+        "afterReloadSearch",
+        "afterLaterBuild",
+        "afterBuildSave",
+        "afterThird",
+      ] as const
+    ).map((k) => steady(each(r, k)));
+    lines.push(
+      `| ${name} | ${r.units} | ${mib(r.saveBytes)} | ${memory.join(" | ")} | ${mib(median(each(r, "heapDelta")))} |`,
+    );
   }
   lines.push(
     "",
@@ -406,7 +471,20 @@ async function main(args: string[]): Promise<void> {
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   );
   for (const [name, r] of Object.entries(results)) {
-    const times = (["loadMs", "serializeMs", "secondSerializeMs", "reloadMs", "reloadSerializeMs", "laterBuildMs", "saveAfterBuildMs", "thirdLoadMs", "thirdBuildMs", "thirdSaveAfterBuildMs"] as const).map((k) => spread(each(r, k)));
+    const times = (
+      [
+        "loadMs",
+        "serializeMs",
+        "secondSerializeMs",
+        "reloadMs",
+        "reloadSerializeMs",
+        "laterBuildMs",
+        "saveAfterBuildMs",
+        "thirdLoadMs",
+        "thirdBuildMs",
+        "thirdSaveAfterBuildMs",
+      ] as const
+    ).map((k) => spread(each(r, k)));
     lines.push(`| ${name} | ${times.join(" | ")} |`);
   }
   lines.push(
@@ -417,8 +495,12 @@ async function main(args: string[]): Promise<void> {
     "| --- | --- | --- | --- | --- | --- | --- | --- |",
   );
   for (const [name, r] of Object.entries(results)) {
-    const memory = (["afterLoad", "afterSearch", "afterBuild", "afterBuildThenSave"] as const).map((k) => steady(each(r, k)));
-    lines.push(`| ${name} | ${memory.join(" | ")} | ${spread(each(r, "buildMs"))} | ${spread(each(r, "buildSaveMs"))} | ${[...new Set(r.samples.map((x) => x.built))].join("; ")} |`);
+    const memory = (["afterLoad", "afterSearch", "afterBuild", "afterBuildThenSave"] as const).map((k) =>
+      steady(each(r, k)),
+    );
+    lines.push(
+      `| ${name} | ${memory.join(" | ")} | ${spread(each(r, "buildMs"))} | ${spread(each(r, "buildSaveMs"))} | ${[...new Set(r.samples.map((x) => x.built))].join("; ")} |`,
+    );
   }
   lines.push(
     "",
@@ -429,7 +511,9 @@ async function main(args: string[]): Promise<void> {
   );
   for (const [name, r] of Object.entries(results)) {
     const memory = (["afterLoad", "afterPlay", "afterVctower"] as const).map((k) => steady(each(r, k)));
-    lines.push(`| ${name} | ${memory.join(" | ")} | ${spread(each(r, "vctowerMs"))} | ${steady(each(r, "afterTdt"))} | ${spread(each(r, "tdtMs"))} | ${[...new Set(each(r, "tdtStatus"))].join("; ")} |`);
+    lines.push(
+      `| ${name} | ${memory.join(" | ")} | ${spread(each(r, "vctowerMs"))} | ${steady(each(r, "afterTdt"))} | ${spread(each(r, "tdtMs"))} | ${[...new Set(each(r, "tdtStatus"))].join("; ")} |`,
+    );
   }
   process.stdout.write(`${lines.join("\n")}\n`);
   if (jsonOut) {

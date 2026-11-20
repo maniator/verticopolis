@@ -55,7 +55,11 @@ describe("app_action telemetry", () => {
     trackAppActionOnce("volume");
     trackAppActionOnce("volume");
     trackAppActionOnce("volume");
-    const volumeCalls = vi.mocked(sendToRelay).mock.calls.filter(([name, props]) => name === "app_action" && (props as { action?: string }).action === "volume");
+    const volumeCalls = vi
+      .mocked(sendToRelay)
+      .mock.calls.filter(
+        ([name, props]) => name === "app_action" && (props as { action?: string }).action === "volume",
+      );
     expect(volumeCalls).toHaveLength(1);
   });
 
@@ -73,7 +77,11 @@ describe("app_action telemetry", () => {
     gameplaySession.reset();
     window.location.href = prod; // reset does not touch the host
     trackAppActionOnce("volume");
-    const volumeCalls = vi.mocked(sendToRelay).mock.calls.filter(([name, props]) => name === "app_action" && (props as { action?: string }).action === "volume");
+    const volumeCalls = vi
+      .mocked(sendToRelay)
+      .mock.calls.filter(
+        ([name, props]) => name === "app_action" && (props as { action?: string }).action === "volume",
+      );
     expect(volumeCalls).toHaveLength(2); // once before reset, once after
   });
 });

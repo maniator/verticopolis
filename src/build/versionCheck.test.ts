@@ -56,8 +56,24 @@ describe("a feature PR", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatch(/src\/a\.ts.*no \.changes note/);
     // Dependabot cannot write one; its version lines still hold.
-    expect(checkFeature(tree(main()), tree(main({ "src/a.ts": "b" })), [{ status: "M", path: "src/a.ts" }], new Set(["src/a.ts"]), true)).toEqual([]);
-    expect(checkFeature(tree(main()), tree(main({ "package.json": pkg("2.90.0") })), [{ status: "M", path: "package.json" }], new Set(["package.json"]), true)).toHaveLength(1);
+    expect(
+      checkFeature(
+        tree(main()),
+        tree(main({ "src/a.ts": "b" })),
+        [{ status: "M", path: "src/a.ts" }],
+        new Set(["src/a.ts"]),
+        true,
+      ),
+    ).toEqual([]);
+    expect(
+      checkFeature(
+        tree(main()),
+        tree(main({ "package.json": pkg("2.90.0") })),
+        [{ status: "M", path: "package.json" }],
+        new Set(["package.json"]),
+        true,
+      ),
+    ).toHaveLength(1);
   });
 
   it("refuses every hand bump", () => {
@@ -91,26 +107,45 @@ describe("a feature PR", () => {
 
   it("needs at least a patch note to move the engine or components pin", () => {
     const pinned = (engine: string, components = "0.2.1") =>
-      JSON.stringify({ name: "x", version: "2.89.1", dependencies: { "@verticopolis/engine": engine, "@verticopolis/components": components } });
+      JSON.stringify({
+        name: "x",
+        version: "2.89.1",
+        dependencies: { "@verticopolis/engine": engine, "@verticopolis/components": components },
+      });
     const base = main({ "package.json": pinned("1.57.1") });
     const none = feature(base, { ...base, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") });
     expect(none).toHaveLength(1);
     expect(none[0]).toMatch(/@verticopolis\/engine pin .* at least app: patch/);
-    expect(feature(base, { ...base, "package.json": pinned("1.57.1", "0.2.2"), ".changes/topic.md": note("none") })[0]).toMatch(/@verticopolis\/components pin/);
-    expect(feature(base, { ...base, "package.json": pinned("1.57.2"), ".changes/topic.md": note("patch") })).toEqual([]);
+    expect(
+      feature(base, { ...base, "package.json": pinned("1.57.1", "0.2.2"), ".changes/topic.md": note("none") })[0],
+    ).toMatch(/@verticopolis\/components pin/);
+    expect(feature(base, { ...base, "package.json": pinned("1.57.2"), ".changes/topic.md": note("patch") })).toEqual(
+      [],
+    );
     // A pending note from main does not count for this PR.
     const pending = { ...base, ".changes/other.md": note("minor") };
-    expect(feature(pending, { ...pending, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") })).toHaveLength(1);
+    expect(
+      feature(pending, { ...pending, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") }),
+    ).toHaveLength(1);
     // Adding the first pin, where main had none, is not a raise.
     const unpinned = main({ "package.json": JSON.stringify({ name: "x", version: "2.89.1", dependencies: {} }) });
-    expect(feature(unpinned, { ...unpinned, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") })).toEqual([]);
+    expect(
+      feature(unpinned, { ...unpinned, "package.json": pinned("1.57.2"), ".changes/topic.md": note("none") }),
+    ).toEqual([]);
     // Other dependencies move with any note.
-    const other = JSON.stringify({ name: "x", version: "2.89.1", dependencies: { "@verticopolis/engine": "1.57.1", "@verticopolis/components": "0.2.1", fflate: "^0.8.4" } });
+    const other = JSON.stringify({
+      name: "x",
+      version: "2.89.1",
+      dependencies: { "@verticopolis/engine": "1.57.1", "@verticopolis/components": "0.2.1", fflate: "^0.8.4" },
+    });
     expect(feature(base, { ...base, "package.json": other, ".changes/topic.md": note("none") })).toEqual([]);
   });
 
   it("refuses a note that still declares an engine change", () => {
-    const errors = feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": "---\napp: none\ncrate: patch\n---\n" }));
+    const errors = feature(
+      main(),
+      main({ "src/a.ts": "b", ".changes/topic.md": "---\napp: none\ncrate: patch\n---\n" }),
+    );
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatch(/Verticopolis\/engine/);
   });
@@ -143,7 +178,9 @@ describe("a release PR", () => {
       'package-lock.json version is "2.89.1" and should be "2.90.0".',
       'package-lock.json root package version is "2.89.1" and should be "2.90.0".',
     ]);
-    expect(release(pending, cut("2.90.0", { "CHANGELOG.md": main()["CHANGELOG.md"] }))).toEqual(["CHANGELOG.md has no 2.90.0 section at the top."]);
+    expect(release(pending, cut("2.90.0", { "CHANGELOG.md": main()["CHANGELOG.md"] }))).toEqual([
+      "CHANGELOG.md has no 2.90.0 section at the top.",
+    ]);
     expect(release(pending, cut("2.90.0", { "src/a.ts": "b" }))).toEqual([
       "src/a.ts changed: a release PR changes only the version, the changelog and the notes it consumes.",
     ]);
@@ -157,7 +194,11 @@ describe("a release PR", () => {
     expect(beyond("package.json", (t) => JSON.stringify({ ...JSON.parse(t), scripts: { x: "y" } }))).toEqual([
       "package.json changed beyond its version: a release PR changes only the version there.",
     ]);
-    expect(beyond("package-lock.json", (t) => JSON.stringify({ ...JSON.parse(t), packages: { "": { name: "x", version: "2.90.0" }, "node_modules/a": {} } }))).toHaveLength(1);
+    expect(
+      beyond("package-lock.json", (t) =>
+        JSON.stringify({ ...JSON.parse(t), packages: { "": { name: "x", version: "2.90.0" }, "node_modules/a": {} } }),
+      ),
+    ).toHaveLength(1);
     // The changelog is the driver's to curate.
     expect(beyond("CHANGELOG.md", (t) => t.replace("- New.", "- Curated."))).toEqual([]);
   });

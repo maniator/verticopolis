@@ -50,7 +50,8 @@ function reloadedBuilds(raw: string | null): string[] | null {
   if (raw === null) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    const ok = Array.isArray(parsed) && parsed.length < MAX_REMEMBERED_BUILDS && parsed.every((b) => typeof b === "string");
+    const ok =
+      Array.isArray(parsed) && parsed.length < MAX_REMEMBERED_BUILDS && parsed.every((b) => typeof b === "string");
     return ok ? (parsed as string[]) : null;
   } catch {
     return null;

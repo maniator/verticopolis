@@ -22,7 +22,8 @@ const runs = () => Array.from({ length: 10 }, (_, rep) => [processRun(rep, "ts")
 describe("the engine-loaded split and the saved-tower rows (#1254)", () => {
   it("splits each start where the engine loaded and keeps both engine-specific spans out of the verdicts", () => {
     const rows = aggregate(runs(), ["small"], [1, 4], null);
-    const get = (metric: string, engine: EngineName, throttle = "1") => rows.find((r) => r.metric === metric && r.engine === engine && r.throttle === throttle)!;
+    const get = (metric: string, engine: EngineName, throttle = "1") =>
+      rows.find((r) => r.metric === metric && r.engine === engine && r.throttle === throttle)!;
     // The fixture: ready at 300 ms, loaded at 150 (WASM) and 40 (TypeScript).
     expect(get("cold loaded to ready", "wasm").values[0]).toBe(150);
     expect(get("cold loaded to ready", "ts").values[0]).toBe(260);
@@ -49,14 +50,25 @@ describe("the engine-loaded split and the saved-tower rows (#1254)", () => {
   it("reports the cold start with each scenario's save, at 1x, per scenario, from checked samples only", () => {
     const rows = aggregate(runs(), ["small"], [1, 4], null);
     const saved = rows.filter((r) => r.metric === SAVED_READY);
-    expect(saved.map((r) => [r.scenario, r.throttle, r.engine])).toEqual([["small", "1", "ts"], ["small", "1", "wasm"]]);
+    expect(saved.map((r) => [r.scenario, r.throttle, r.engine])).toEqual([
+      ["small", "1", "ts"],
+      ["small", "1", "wasm"],
+    ]);
     expect(saved[0].values).toEqual(Array(10).fill(600));
     expect(rows.find((r) => r.metric === SAVED_SPLIT && r.engine === "wasm")!.values[0]).toBe(450);
     // A start whose checks failed has no sample and adds nothing.
-    const failed = runs().map((r) => (r.rep === 0 ? { ...r, coldSaved: { small: { ...r.coldSaved!.small, sample: null, error: "x" } } } : r));
-    expect(aggregate(failed, ["small"], [1], null).find((r) => r.metric === SAVED_READY)?.reps).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const failed = runs().map((r) =>
+      r.rep === 0 ? { ...r, coldSaved: { small: { ...r.coldSaved!.small, sample: null, error: "x" } } } : r,
+    );
+    expect(aggregate(failed, ["small"], [1], null).find((r) => r.metric === SAVED_READY)?.reps).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9,
+    ]);
     // A run from before the rows existed leaves them empty instead of failing.
-    const old = runs().map((r) => ({ ...r, coldSaved: undefined, cold: r.cold && { ...r.cold, engineLoadedMs: undefined } }));
+    const old = runs().map((r) => ({
+      ...r,
+      coldSaved: undefined,
+      cold: r.cold && { ...r.cold, engineLoadedMs: undefined },
+    }));
     const oldRows = aggregate(old, ["small"], [1], null);
     expect(oldRows.find((r) => r.metric === SAVED_READY)?.values).toEqual([]);
     expect(oldRows.find((r) => r.metric === "cold loaded to ready")?.values).toEqual([]);
@@ -71,7 +83,12 @@ describe("the engine-loaded split and the saved-tower rows (#1254)", () => {
   it("prints the reported rows with M5's statistic, apart from M5's own lines", () => {
     const metrics = [
       row("ts", "warm game ready", "-", Array(10).fill(70)),
-      row("wasm", "warm game ready", "-", Array.from({ length: 10 }, (_, i) => 80 + i)),
+      row(
+        "wasm",
+        "warm game ready",
+        "-",
+        Array.from({ length: 10 }, (_, i) => 80 + i),
+      ),
       row("ts", SAVED_READY, "medium", Array(10).fill(460)),
       row("wasm", SAVED_READY, "medium", Array(10).fill(690)),
       row("ts", "cold game ready", "-", Array(10).fill(400)),
@@ -83,7 +100,9 @@ describe("the engine-loaded split and the saved-tower rows (#1254)", () => {
     expect(text).toContain("Reported, not gates (#1254)");
     expect(text).toContain("| warm game ready | - | 1x | 14.50 ms | 11.00 ms to 18.00 ms | 10 |");
     expect(text).toContain("| cold game ready (saved tower) | medium | 1x | 230 ms | 230 ms to 230 ms | 10 |");
-    expect(text).toContain("| cold engine loaded | - | 1x | 110 ms | no interval | 3 (below the gate's minimum of 10) |");
+    expect(text).toContain(
+      "| cold engine loaded | - | 1x | 110 ms | no interval | 3 (below the gate's minimum of 10) |",
+    );
     // M5's own row stays in M5's lines only, and M5 never reads a saved-tower row.
     expect(text).not.toMatch(/\| cold game ready \|/);
     const m5 = coldStartDifferenceLines(metrics, null).join("\n");

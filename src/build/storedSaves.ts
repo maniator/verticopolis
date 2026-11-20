@@ -37,7 +37,8 @@ export async function storedSavesInPage(): Promise<Record<string, string>> {
       if (typeof row?.text === "string") saves[`idb:${String(key)}`] = row.text;
       else if (row?.packed instanceof Uint8Array) {
         let bin = "";
-        for (let j = 0; j < row.packed.length; j += 0x8000) bin += String.fromCharCode(...row.packed.subarray(j, j + 0x8000));
+        for (let j = 0; j < row.packed.length; j += 0x8000)
+          bin += String.fromCharCode(...row.packed.subarray(j, j + 0x8000));
         saves[`idb:${String(key)}`] = `VCZ1:${btoa(bin)}`;
       }
     });

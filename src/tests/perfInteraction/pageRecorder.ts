@@ -81,7 +81,8 @@ export function adoptForInteraction(save: string): { population: number; minuteO
   const stamped = JSON.stringify({ ...parsed, appVersion: parsed.appVersion ?? "2.0.0" });
   if (g.enginePort.loadSave(stamped)[0] !== 1) throw new Error("the engine refused the scenario's save");
   g.followSwap();
-  g.ui.showEventChoice = (_m: string, _c: string, onResolve: (opt: "accept" | "decline") => void) => onResolve("decline");
+  g.ui.showEventChoice = (_m: string, _c: string, onResolve: (opt: "accept" | "decline") => void) =>
+    onResolve("decline");
   g.shownWin = true;
   g.shownChoice = false;
   g.shownUpdate = false;
@@ -167,11 +168,24 @@ export function installRecorder(speed: number): { loafSupported: boolean } {
     rec.observers.push([o, push]);
   };
   observe("longtask", (e) => rec.longTasks.push([e.startTime, e.duration]));
-  if (loafSupported) observe("long-animation-frame", (e) => rec.loafs.push([e.startTime, e.duration, e.blockingDuration ?? 0]));
+  if (loafSupported)
+    observe("long-animation-frame", (e) => rec.loafs.push([e.startTime, e.duration, e.blockingDuration ?? 0]));
   // One click is several entries (pointerdown, mousedown, pointerup, mouseup,
   // click) sharing an interaction id; `collectRecord` keeps one per id.
   // Entries with no interaction id (hovers, moves) are not interactions.
-  observe("event", (e) => rec.events.push([e.startTime, e.name, e.duration, e.processingStart - e.startTime, e.processingEnd - e.processingStart, e.interactionId ?? 0]), { durationThreshold: 16 });
+  observe(
+    "event",
+    (e) =>
+      rec.events.push([
+        e.startTime,
+        e.name,
+        e.duration,
+        e.processingStart - e.startTime,
+        e.processingEnd - e.processingStart,
+        e.interactionId ?? 0,
+      ]),
+    { durationThreshold: 16 },
+  );
   const time = (obj: any, key: string, label: string): (() => unknown) | null => {
     const f = obj?.[key];
     if (typeof f !== "function") return null;
@@ -216,7 +230,14 @@ export function setPhase(arg: { name: string | null; autosaveAtMs?: number }): v
     rec.open = null;
   }
   if (arg.name === null) return;
-  rec.open = { name: arg.name, start: now, end: Infinity, simMinutesStart: header.minutes, simMinutesEnd: header.minutes, minuteOfDayStart: header.minuteOfDay };
+  rec.open = {
+    name: arg.name,
+    start: now,
+    end: Infinity,
+    simMinutesStart: header.minutes,
+    simMinutesEnd: header.minutes,
+    minuteOfDayStart: header.minuteOfDay,
+  };
   if (arg.autosaveAtMs !== undefined && rec.autosave) {
     rec.autosaveTimer = setTimeout(() => {
       rec.autosaveTimer = null;
@@ -237,7 +258,17 @@ export function collectRecord(): PageRecord {
     return null;
   };
   for (const win of rec.windows) {
-    phases[win.name] = { frames: [], longTasks: [], loafs: [], events: [], inputToFrame: [], parts: {}, simMinutes: win.simMinutesEnd - win.simMinutesStart, windowMs: win.end - win.start, minuteOfDayStart: win.minuteOfDayStart };
+    phases[win.name] = {
+      frames: [],
+      longTasks: [],
+      loafs: [],
+      events: [],
+      inputToFrame: [],
+      parts: {},
+      simMinutes: win.simMinutesEnd - win.simMinutesStart,
+      windowMs: win.end - win.start,
+      minuteOfDayStart: win.minuteOfDayStart,
+    };
   }
   for (const [t, dt] of rec.frames) windowAt(t)?.frames.push(dt);
   for (const [t, d] of rec.longTasks) windowAt(t)?.longTasks.push(d);
@@ -256,7 +287,8 @@ export function collectRecord(): PageRecord {
     seen.delay = Math.max(delay, seen.delay);
     if (dur > seen.dur) Object.assign(seen, { name, dur, proc });
   }
-  for (const e of byInteraction.values()) windowAt(e.t)?.events.push({ name: e.name, dur: e.dur, delay: e.delay, proc: e.proc });
+  for (const e of byInteraction.values())
+    windowAt(e.t)?.events.push({ name: e.name, dur: e.dur, delay: e.delay, proc: e.proc });
   for (const [t, lat] of rec.inputs) windowAt(t)?.inputToFrame.push(lat);
   for (const [t, label, d] of rec.calls) {
     const p = windowAt(t);
@@ -323,7 +355,8 @@ export function restoreCamera(): void {
 export async function officeSpots(arg: { max: number }): Promise<{ x: number; y: number }[]> {
   const g = (window as any).game;
   const code = g.portCodes.kind("office");
-  const fits = (floor: number, tile: number): boolean => g.portCodes.slot(g.enginePort.quoteBuild(code, floor, tile), "quoteBuild", "ok") === 1;
+  const fits = (floor: number, tile: number): boolean =>
+    g.portCodes.slot(g.enginePort.quoteBuild(code, floor, tile), "quoteBuild", "ok") === 1;
   // The renderer maps canvas coordinates; the mouse moves in page ones. Each
   // floor's row center (floor f spans world y from -f to -(f - 1) floors),
   // so a click lands inside the row the quote asked about.

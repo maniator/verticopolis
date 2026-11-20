@@ -30,7 +30,11 @@ export class PackerLostError extends Error {
   }
 }
 
-type Waiter = { resolve: (packed: PackedSave) => void; reject: (err: unknown) => void; timer: ReturnType<typeof setTimeout> };
+type Waiter = {
+  resolve: (packed: PackedSave) => void;
+  reject: (err: unknown) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
 
 /** How long a request waits for the worker before the page takes the save
  *  back: a worker that hangs must not hold every later autosave behind it. A

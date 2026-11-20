@@ -377,7 +377,11 @@ class GameplaySession {
     // both the numerator and the denominator, so the RATE stays unbiased.
     if (isFinal && this.played && !this.emergReported) {
       this.emergReported = true;
-      trackEvent("session_emergencies", { fires: this.emerg.fires, firesGutRooms: this.emerg.gutRooms, bombs: this.emerg.bombs });
+      trackEvent("session_emergencies", {
+        fires: this.emerg.fires,
+        firesGutRooms: this.emerg.gutRooms,
+        bombs: this.emerg.bombs,
+      });
     }
     // How many crash screens this page life showed, which the `crash` event's cap
     // and dedup cannot say (#841). Final only, for the reason given above, and

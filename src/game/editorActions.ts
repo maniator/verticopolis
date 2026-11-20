@@ -1,5 +1,11 @@
 import { isElevatorKind, isHotelKind } from "@verticopolis/components/presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, filmPolicyEditAction } from "@verticopolis/components/catalog/catalogTypes";
+import {
+  catalogFacility,
+  catalogFilmRebook,
+  catalogTicketPrice,
+  filmEditAction,
+  filmPolicyEditAction,
+} from "@verticopolis/components/catalog/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind } from "@verticopolis/components/shared/types";
 import type { BatchRentResult } from "@verticopolis/components/shared/engineTypes";
@@ -18,7 +24,6 @@ import { sayHeldRefusal, type HeldRefusal } from "./dragRefusal";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 import { rememberPlayerText } from "../analyticsPlayerText";
 import { trackAppAction } from "../analytics";
-
 
 /**
  * The editor-card actions: everything the selected facility's buttons can do
@@ -52,7 +57,10 @@ export interface EditorActionsDeps {
   build: {
     // Both read only the facility's id, so a card serves as the argument.
     tryRemoveUnit(u: { id: number }, verb: "sell" | "bulldoze"): ReturnType<BuildActions["tryRemoveUnit"]>;
-    removeTransportWithRefund(t: { id: number }, verb: "sell" | "bulldoze"): ReturnType<BuildActions["removeTransportWithRefund"]>;
+    removeTransportWithRefund(
+      t: { id: number },
+      verb: "sell" | "bulldoze",
+    ): ReturnType<BuildActions["removeTransportWithRefund"]>;
   };
   /** Current selection (id-based; the entity may have been removed). */
   selected(): { type: "unit" | "transport"; id: number } | null;
@@ -75,7 +83,8 @@ export class EditorActions {
    *  each step's record, so a pointer move asks the port for no card. A
    *  step the engine stopped short or refused holds its reason, which the
    *  release says once (#1847). */
-  private extendDrag: ({ id: number; generation: number; gesture: number; bottom: number; top: number } & HeldRefusal) | null = null;
+  private extendDrag:
+    ({ id: number; generation: number; gesture: number; bottom: number; top: number } & HeldRefusal) | null = null;
 
   constructor(private readonly deps: EditorActionsDeps) {}
 
@@ -130,7 +139,10 @@ export class EditorActions {
       // The engine decides each refusal (an endpoint always stops, an express
       // serves only the floors its rule allows); a refused or no-op toggle leaves the tower
       // as it was, so its commit records no undo step.
-      setServe: (floor: number, serve: boolean) => (stopsCommand((e) => e.markStop(id, floor, serve), false), Promise.resolve()),
+      setServe: (floor: number, serve: boolean) => (
+        stopsCommand((e) => e.markStop(id, floor, serve), false),
+        Promise.resolve()
+      ),
       expressStops: () => (stopsCommand((e) => e.expressStops(id), true), Promise.resolve()),
       allStops: () => (stopsCommand((e) => e.dropStops(id), true), Promise.resolve()),
     };
@@ -148,7 +160,10 @@ export class EditorActions {
         top: t.top,
         stops,
         origins: t.origins
-          ? { weekday: t.origins.weekday.map((ring) => new Map(ring)), weekend: t.origins.weekend.map((ring) => new Map(ring)) }
+          ? {
+              weekday: t.origins.weekday.map((ring) => new Map(ring)),
+              weekend: t.origins.weekend.map((ring) => new Map(ring)),
+            }
           : undefined,
         // The engine owns the warm-up gate and the tuning (#1550): ask it live,
         // so undo/redo and stop edits made while the dialog is open are read.
@@ -176,7 +191,8 @@ export class EditorActions {
           const res = outcome(engine, engine.scheduleShaft(id, scheduleSlots(schedule)));
           this.deps.commitUndo();
           if (!res.ok) return Promise.resolve(this.refuse(res.reason ?? "That schedule could not be saved."));
-          if (!!schedule.autoTune !== !!opened?.autoTune) trackAppAction("elevator_auto_tune", schedule.autoTune ? "on" : "off");
+          if (!!schedule.autoTune !== !!opened?.autoTune)
+            trackAppAction("elevator_auto_tune", schedule.autoTune ? "on" : "off");
           this.deps.audio.sfx("build");
           this.deps.announce("Elevator schedule saved.");
           this.deps.refreshEditor();
@@ -258,7 +274,9 @@ export class EditorActions {
             this.refuse(res.reason ?? "Those prices could not be set.");
             return Promise.resolve(null);
           }
-          const batch = Object.fromEntries(BATCH_COUNTERS.map((name) => [name, codes.slot(rec, "rentBatch", name)])) as unknown as BatchRentResult;
+          const batch = Object.fromEntries(
+            BATCH_COUNTERS.map((name) => [name, codes.slot(rec, "rentBatch", name)]),
+          ) as unknown as BatchRentResult;
           return Promise.resolve(batch);
         },
         onApplied: (summary) => {

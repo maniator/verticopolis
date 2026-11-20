@@ -20,7 +20,14 @@ vi.mock("../ui/screenSaver/saverTriggers", () => ({
   },
 }));
 
-import { SCREEN_SAVER_ITEM_ID, marqueeLines, shownBucket, towerSnapshot, windowColor, wireScreenSaver } from "./screenSaverWiring";
+import {
+  SCREEN_SAVER_ITEM_ID,
+  marqueeLines,
+  shownBucket,
+  towerSnapshot,
+  windowColor,
+  wireScreenSaver,
+} from "./screenSaverWiring";
 
 function view() {
   return {
@@ -84,10 +91,21 @@ describe("what the savers read from the tower", () => {
     expect(lines[0]).toBe("Maple Heights is rated 3 stars.");
     expect(lines[1]).toBe("12,345 people live, work or play here.");
     expect(lines[2]).toBe("Funds on hand: $2,500,000.");
-    const tower = { ...view(), header: { ...view().header, star: 6, population: 1, money: -5000 }, tower: { ...view().tower, towerName: "  " } };
-    expect(marqueeLines(tower as never).slice(0, 3)).toEqual(["Your tower has the TOWER rating.", "1 person lives, works or plays here.", "Funds on hand: -$5,000."]);
+    const tower = {
+      ...view(),
+      header: { ...view().header, star: 6, population: 1, money: -5000 },
+      tower: { ...view().tower, towerName: "  " },
+    };
+    expect(marqueeLines(tower as never).slice(0, 3)).toEqual([
+      "Your tower has the TOWER rating.",
+      "1 person lives, works or plays here.",
+      "Funds on hand: -$5,000.",
+    ]);
     const empty = { ...view(), header: { ...view().header, star: 1, population: 0 } };
-    expect(marqueeLines(empty as never).slice(0, 2)).toEqual(["Maple Heights is rated 1 star.", "Nobody lives, works or plays here yet."]);
+    expect(marqueeLines(empty as never).slice(0, 2)).toEqual([
+      "Maple Heights is rated 1 star.",
+      "Nobody lives, works or plays here yet.",
+    ]);
   });
 
   it("buckets how long a saver was up", () => {
@@ -164,7 +182,11 @@ describe("wireScreenSaver", () => {
     const app = appDouble();
     const ports = dialogPorts(app);
     ports.save({ saver: "marquee", waitMinutes: 10, onReturn: false });
-    expect(JSON.parse(localStorage.getItem("vc.screensaver")!)).toEqual({ saver: "marquee", waitMinutes: 10, onReturn: false });
+    expect(JSON.parse(localStorage.getItem("vc.screensaver")!)).toEqual({
+      saver: "marquee",
+      waitMinutes: 10,
+      onReturn: false,
+    });
     expect(track).toHaveBeenCalledWith("screensaver_set", "marquee");
     const triggers = watch.mock.calls[0][0] as SaverTriggerPorts;
     expect(triggers.prefs().saver).toBe("marquee");

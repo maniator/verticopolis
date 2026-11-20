@@ -29,9 +29,7 @@ function srgbToLinear(c: number): number {
 function luminance(hex: string): number {
   const n = parseInt(hex.replace("#", ""), 16);
   return (
-    0.2126 * srgbToLinear((n >> 16) & 255) +
-    0.7152 * srgbToLinear((n >> 8) & 255) +
-    0.0722 * srgbToLinear(n & 255)
+    0.2126 * srgbToLinear((n >> 16) & 255) + 0.7152 * srgbToLinear((n >> 8) & 255) + 0.0722 * srgbToLinear(n & 255)
   );
 }
 function contrast(a: string, b: string): number {

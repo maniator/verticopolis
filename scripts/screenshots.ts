@@ -50,13 +50,55 @@
 import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { DIRS, DESKTOP, EXECUTABLE, PORT, BASE, assertReady, captureCrop, isPhoneViewport, mapForShot, restoreMapAfterShot, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
-import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFlushFrames, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetMapView, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
-import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
+import {
+  DIRS,
+  DESKTOP,
+  EXECUTABLE,
+  PORT,
+  BASE,
+  assertReady,
+  captureCrop,
+  isPhoneViewport,
+  mapForShot,
+  restoreMapAfterShot,
+  type OutDir,
+  type Scene,
+  type Shot,
+} from "./screenshot-env.ts";
+import {
+  pgAdoptTestClock,
+  pgClearTransients,
+  pgDismissSplash,
+  pgFlushFrames,
+  pgFrame,
+  pgMaskVersion,
+  pgRefreshUi,
+  pgSetClock,
+  pgSetMapView,
+  pgStep,
+  pgStepNoDraw,
+} from "./screenshot-builders.ts";
+import {
+  armPhaseWatch,
+  judgeAndPromote,
+  markPhaseTarget,
+  phaseCapturePath,
+  stopPhaseWatch,
+} from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
 import { pgNoStarUpBox } from "./scenes/starUp.ts";
 import { DETERMINISTIC_RASTER_ARGS } from "./chromium-raster-flags.ts";
-import { SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, installShotHelpers, settleUnlessSettled } from "./screenshot-engine.ts";
+import {
+  SETTLE_AFTER_SETUP,
+  assertEnginePackage,
+  HOSTED_FIX,
+  beginSettleStep,
+  checkHosted,
+  checkSettleList,
+  hostedSnapshot,
+  installShotHelpers,
+  settleUnlessSettled,
+} from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 import { runSceneShots } from "../src/tests/screenshotChain.ts";
 import { distPublishesHandle } from "../src/build/toolingHandle.ts";
@@ -217,7 +259,12 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
   // coarse)` / mobile-only chrome never applies and the "mobile" shot renders the
   // desktop UI. isMobile/hasTouch are Chromium-only (we always launch Chromium).
   const mobile = isPhoneViewport(vp);
-  const page = await browser.newPage({ viewport: vp, deviceScaleFactor: scene.outDir === "screenshots" ? 1 : 2, isMobile: mobile, hasTouch: mobile });
+  const page = await browser.newPage({
+    viewport: vp,
+    deviceScaleFactor: scene.outDir === "screenshots" ? 1 : 2,
+    isMobile: mobile,
+    hasTouch: mobile,
+  });
   page.on("pageerror", (e) => console.error("  PAGE ERROR:", e.message));
   try {
     if (scene.route) {
@@ -273,10 +320,14 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       // commit a blank/half-drawn PNG over a good one. Record the failure and SKIP the
       // scene's shots entirely, leaving the existing committed images untouched.
       try {
-        await page.waitForFunction(() => {
-          const w = window as any;
-          return w.galleryReady === true || w.previewReady === true || w.notFoundReady === true;
-        }, null, { timeout: READY_TIMEOUT_MS });
+        await page.waitForFunction(
+          () => {
+            const w = window as any;
+            return w.galleryReady === true || w.previewReady === true || w.notFoundReady === true;
+          },
+          null,
+          { timeout: READY_TIMEOUT_MS },
+        );
       } catch {
         for (const shot of scene.shots) {
           failures.push(`${scene.id}/${shot.name}: route never signaled ready, skipped (no new image written)`);
@@ -352,10 +403,15 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       if (scene.assertUnits) await assertReady(page, scene.assertUnits);
       await settleUnlessSettled(page, "after the scene build", true);
     }
-    await runSceneShots(scene.shots, !!scene.chained, (shot) => takeShot(page, scene, shot), (shot, msg) => {
-      failures.push(`${scene.id}/${shot.name}: ${msg}`);
-      console.error(`  ✗ ${shot.name}: ${msg}`);
-    });
+    await runSceneShots(
+      scene.shots,
+      !!scene.chained,
+      (shot) => takeShot(page, scene, shot),
+      (shot, msg) => {
+        failures.push(`${scene.id}/${shot.name}: ${msg}`);
+        console.error(`  ✗ ${shot.name}: ${msg}`);
+      },
+    );
   } finally {
     // page.close() is cleanup: never let it throw past the finally (that would fail
     // a scene whose shots all captured) and never let it skip the timing row. Log a
@@ -375,7 +431,6 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
     console.log(`◀ scene: ${scene.id} (${(sceneMs / 1000).toFixed(1)}s)`);
   }
 }
-
 
 // ---- main -------------------------------------------------------------------
 

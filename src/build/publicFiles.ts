@@ -32,8 +32,16 @@ const ICONS = "drawn in code by scripts/gen-pwa-icons.mjs";
 export const PUBLIC_FILES: readonly PublicFile[] = [
   { path: ".well-known/assetlinks.json", license: "MIT", source: "written for the project (Android app link)" },
   { path: "apple-touch-icon.png", license: "CC-BY-4.0", source: ICONS },
-  { path: "audio/voice-laughs.mp3", license: "CC-BY-4.0", source: "recorded by the project owner and family (ASSETS-LICENSE.md)" },
-  { path: "audio/voice-talk.mp3", license: "CC-BY-4.0", source: "recorded by the project owner and family (ASSETS-LICENSE.md)" },
+  {
+    path: "audio/voice-laughs.mp3",
+    license: "CC-BY-4.0",
+    source: "recorded by the project owner and family (ASSETS-LICENSE.md)",
+  },
+  {
+    path: "audio/voice-talk.mp3",
+    license: "CC-BY-4.0",
+    source: "recorded by the project owner and family (ASSETS-LICENSE.md)",
+  },
   { path: "favicon.png", license: "CC-BY-4.0", source: ICONS },
   { path: "icon-1024x1024.png", license: "CC-BY-4.0", source: ICONS },
   { path: "og-image.png", license: "CC-BY-4.0", source: "drawn in code by scripts/gen-og-image.mjs" },
@@ -42,8 +50,16 @@ export const PUBLIC_FILES: readonly PublicFile[] = [
   { path: "pwa-maskable-512x512.png", license: "CC-BY-4.0", source: ICONS },
   { path: "robots.txt", license: "MIT", source: "written for the project" },
   { path: "sitemap.xml", license: "MIT", source: "written for the project" },
-  { path: "splash-skyline.svg", license: "CC-BY-4.0", source: "the title screen's skyline, drawn for the project (src/ui/splashTemplate.ts)" },
-  { path: "sw-navigation-fallback.js", license: "MIT", source: "written for the project (service worker helper, #1345)" },
+  {
+    path: "splash-skyline.svg",
+    license: "CC-BY-4.0",
+    source: "the title screen's skyline, drawn for the project (src/ui/splashTemplate.ts)",
+  },
+  {
+    path: "sw-navigation-fallback.js",
+    license: "MIT",
+    source: "written for the project (service worker helper, #1345)",
+  },
 ];
 
 /**
@@ -73,13 +89,18 @@ export function isExcludedPublicPath(path: string): boolean {
  * file that is gone or did not ship, a listed path twice and a listed path in
  * an excluded folder are each a problem.
  */
-export function publicFileProblems(listed: readonly PublicFile[], inPublic: readonly string[], inDist: (path: string) => boolean): string[] {
+export function publicFileProblems(
+  listed: readonly PublicFile[],
+  inPublic: readonly string[],
+  inDist: (path: string) => boolean,
+): string[] {
   const problems: string[] = [];
   const names = new Set<string>();
   for (const f of listed) {
     if (names.has(f.path)) problems.push(`${f.path} is listed twice`);
     names.add(f.path);
-    if (isExcludedPublicPath(f.path)) problems.push(`${f.path} is in a folder attributed elsewhere and must not be listed`);
+    if (isExcludedPublicPath(f.path))
+      problems.push(`${f.path} is in a folder attributed elsewhere and must not be listed`);
     else if (!inPublic.includes(f.path)) problems.push(`${f.path} is listed but not in src/public`);
     else if (!inDist(f.path)) problems.push(`${f.path} is listed but did not ship in dist`);
   }
@@ -87,7 +108,9 @@ export function publicFileProblems(listed: readonly PublicFile[], inPublic: read
     if (OS_FILE_NAMES.includes(path.slice(path.lastIndexOf("/") + 1))) {
       problems.push(`src/public/${path} is a file the operating system wrote; delete it, or it ships in dist`);
     } else if (!names.has(path) && !isExcludedPublicPath(path)) {
-      problems.push(`src/public/${path} ships with no entry in src/build/publicFiles.ts; list its source and license, or move third-party content into the module graph`);
+      problems.push(
+        `src/public/${path} ships with no entry in src/build/publicFiles.ts; list its source and license, or move third-party content into the module graph`,
+      );
     }
   }
   return problems;

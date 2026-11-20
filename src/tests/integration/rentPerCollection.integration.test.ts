@@ -31,7 +31,11 @@ const saveOf = (engine: EnginePort): Save => JSON.parse(engine.serialize()) as S
 
 /** A tower of `mode` on `calendar` with one room of `kind` on floor 2 that
  *  already has its tenant, served by a standard elevator from the lobby. */
-function towerWithTenant(mode: "classic" | "modern", calendar: CalendarKind, kind: "office" | "rentalStudio" = "office"): { engine: ClockedEngine; id: number } {
+function towerWithTenant(
+  mode: "classic" | "modern",
+  calendar: CalendarKind,
+  kind: "office" | "rentalStudio" = "office",
+): { engine: ClockedEngine; id: number } {
   // The seed is one whose run across the quarter draws no fire in the office
   // (seed 7 does, and a burning office pays nothing).
   const draft = newSeededDraft(42, mode, calendar);
@@ -55,14 +59,21 @@ function towerWithTenant(mode: "classic" | "modern", calendar: CalendarKind, kin
 
 /** Run the clock across the next end of a `periodDays` period and return the
  *  amount and count of the one log line `line` matches. */
-function nextCollection(engine: ClockedEngine, periodDays: number, line: RegExp = RENT_LINE): { amount: number; count: number } {
+function nextCollection(
+  engine: ClockedEngine,
+  periodDays: number,
+  line: RegExp = RENT_LINE,
+): { amount: number; count: number } {
   const minutes = saveOf(engine).minutes;
   let day = (Math.floor(minutes / MINUTES_PER_DAY / periodDays) + 1) * periodDays;
   while (day * MINUTES_PER_DAY - MINUTES_PER_HOUR <= minutes) day += periodDays;
   engine.advanceClock(day * MINUTES_PER_DAY - MINUTES_PER_HOUR - minutes);
   const seen = saveOf(engine).log.length;
   for (let h = 0; h < 3; h++) engine.tick(MINUTES_PER_HOUR);
-  const lines = saveOf(engine).log.slice(seen).map((e) => line.exec(e.text)).filter((m) => m !== null);
+  const lines = saveOf(engine)
+    .log.slice(seen)
+    .map((e) => line.exec(e.text))
+    .filter((m) => m !== null);
   expect(lines, "one rent line at the period's end").toHaveLength(1);
   return { amount: Number(lines[0][1].replace(/,/g, "")), count: Number(lines[0][2]) };
 }

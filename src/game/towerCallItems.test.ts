@@ -18,7 +18,11 @@ function fakeApp(o: { fires?: number; choice?: boolean; flying?: boolean } = {})
   const codes = { slot: vi.fn(() => o.fires ?? 0) };
   const helicopter = o.flying ? { called: 0, arrive: 30, sprayEnd: 50, leave: 65 } : null;
   const reader = { header: { pendingChoice: o.choice ? { kind: "fireRescue" } : null, fireResponse: { helicopter } } };
-  return { port, codes, app: { enginePort: port, portCodes: codes, reader } as unknown as Parameters<typeof towerCalls>[0] };
+  return {
+    port,
+    codes,
+    app: { enginePort: port, portCodes: codes, reader } as unknown as Parameters<typeof towerCalls>[0],
+  };
 }
 
 /** The stats sheet's answer as `statsReport` decodes it. */

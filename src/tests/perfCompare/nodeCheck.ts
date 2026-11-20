@@ -40,7 +40,9 @@ export function glueFileUrl(dir: string, windows: boolean = process.platform ===
  *  plays a scenario with player ops alone, so it takes either flavor (#1057):
  *  the served player package or a tooling build's `dist-perf/engine/`. */
 export async function loadWebPackage(dir: string): Promise<WasmModule> {
-  const glue = (await import(/* @vite-ignore */ glueFileUrl(dir))) as { initSync(arg: { module: BufferSource }): unknown };
+  const glue = (await import(/* @vite-ignore */ glueFileUrl(dir))) as {
+    initSync(arg: { module: BufferSource }): unknown;
+  };
   glue.initSync({ module: readFileSync(resolve(dir, "verticopolis_engine_bg.wasm")) });
   return checkBinding(glue, { tooling: false });
 }

@@ -69,7 +69,8 @@ export function batchPriceText(ctx: BatchPricingCtx, target: BatchTarget): strin
 export function batchPreviewMessage(ctx: BatchPricingCtx, target: BatchTarget, r: BatchRentResult): string {
   let msg = `Set ${r.changed} of ${r.matched} ${ctx.noun} to ${batchPriceText(ctx, target)}.`;
   if (r.skippedCustom) msg += ` ${r.skippedCustom} custom-priced left as-is.`;
-  if (r.customOverwritten) msg += ` ${r.customOverwritten} custom price${r.customOverwritten === 1 ? "" : "s"} will be overwritten.`;
+  if (r.customOverwritten)
+    msg += ` ${r.customOverwritten} custom price${r.customOverwritten === 1 ? "" : "s"} will be overwritten.`;
   if (r.skippedSold) msg += ` ${r.skippedSold} sold skipped.`;
   if (r.clampedHigh) msg += ` Clamped to the ${money(ctx.band.max)} max.`;
   if (r.clampedLow) msg += ` Clamped to the ${money(ctx.band.min)} min.`;
@@ -120,11 +121,7 @@ export function batchRungPreviewMessage(ctx: BatchRungCtx, choice: RungChoice, r
   return msg;
 }
 
-export function batchRungTemplate(
-  ctx: BatchRungCtx,
-  state: BatchRungState,
-  h: BatchRungHandlers,
-): TemplateResult {
+export function batchRungTemplate(ctx: BatchRungCtx, state: BatchRungState, h: BatchRungHandlers): TemplateResult {
   return html`
       <h2>Set all ${ctx.noun}</h2>
       <p class="bp-rung-lead">Set every ${ctx.single} to</p>

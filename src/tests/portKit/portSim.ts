@@ -11,7 +11,16 @@ import type { WasmEngine } from "@verticopolis/components/binding/binding";
 import { rustTooling, type ToolingSetters } from "./tooling";
 import { Snapshot, draftFromSave, releaseDrafts, type Draft, type Leg } from "./drafts";
 
-export { Snapshot, draftFromSave, draftTower, type Draft, type Leg, type PendingChoiceRecord, type SnapshotSource, type UnitRecord } from "./drafts";
+export {
+  Snapshot,
+  draftFromSave,
+  draftTower,
+  type Draft,
+  type Leg,
+  type PendingChoiceRecord,
+  type SnapshotSource,
+  type UnitRecord,
+} from "./drafts";
 
 /**
  * The test kit for suites that run on the engine port (#878, #1421; PR 7 of
@@ -32,7 +41,6 @@ export { Snapshot, draftFromSave, draftTower, type Draft, type Leg, type Pending
  * engine's first tick after a load; once a crowd exists a test needs a
  * tooling-only member instead, and `setup` says so.
  */
-
 
 interface Leaf extends ToolingSetters {
   readonly port: EnginePort;
@@ -58,7 +66,10 @@ function makeLeaf(save: string): Leaf {
     setMoney: (amount) => engine.setMoney(amount),
     ...rustTooling(engine),
     crowdView: () => JSON.parse(engine.crowdView()) as { people: Person[] },
-    elevatorUtilization: (id) => (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(([shaft]) => shaft === id)?.[1],
+    elevatorUtilization: (id) =>
+      (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(
+        ([shaft]) => shaft === id,
+      )?.[1],
     free: () => engine.free(),
   };
 }
@@ -152,7 +163,11 @@ export class PortSim {
 
   /** The analytics-only emergency tallies (#611). */
   emergencyCounts(): { fires: number; firesGutRooms: number; bombs: number } {
-    return { fires: this.frameSlot("firesStarted"), firesGutRooms: this.frameSlot("firesGutRooms"), bombs: this.frameSlot("bombsDetonated") };
+    return {
+      fires: this.frameSlot("firesStarted"),
+      firesGutRooms: this.frameSlot("firesGutRooms"),
+      bombs: this.frameSlot("bombsDetonated"),
+    };
   }
 
   /** The stats screen as the engine answers it (`statsSheet`): the HUD strip,
@@ -179,7 +194,11 @@ export class PortSim {
   /** The overlay cells for `mode`, decoded from the port's `heatCells`
    *  record by the `heatCell` slot names of the port's own layout. */
   heatCells(mode: HeatmapMode): HeatCell[] {
-    const layout = JSON.parse(this.leaf.port.viewLayout()) as { heatModes: HeatmapMode[]; heatTints: string[]; records: Record<string, string[]> };
+    const layout = JSON.parse(this.leaf.port.viewLayout()) as {
+      heatModes: HeatmapMode[];
+      heatTints: string[];
+      records: Record<string, string[]>;
+    };
     const modeIndex = layout.heatModes.indexOf(mode);
     if (modeIndex < 0) throw new Error(`PortSim.heatCells: the engine's layout has no heat mode "${mode}"`);
     const slots = layout.records.heatCell ?? [];
@@ -190,12 +209,14 @@ export class PortSim {
     };
     const [floor, minX, maxX, severity, tint] = ["floor", "minX", "maxX", "severity", "tint"].map(slot);
     const r = this.leaf.port.heatCells(modeIndex);
-    if (r.length % slots.length !== 0) throw new Error(`PortSim.heatCells: ${r.length} values is not a whole number of ${slots.length}-slot cells`);
+    if (r.length % slots.length !== 0)
+      throw new Error(`PortSim.heatCells: ${r.length} values is not a whole number of ${slots.length}-slot cells`);
     const cells: HeatCell[] = [];
     for (let i = 0; i < r.length; i += slots.length) {
       const cell: HeatCell = { floor: r[i + floor], minX: r[i + minX], maxX: r[i + maxX], severity: r[i + severity] };
       const code = r[i + tint];
-      if (!Number.isInteger(code) || code < 0 || code >= layout.heatTints.length) throw new Error(`PortSim.heatCells: tint code ${code} is not in the layout's heatTints`);
+      if (!Number.isInteger(code) || code < 0 || code >= layout.heatTints.length)
+        throw new Error(`PortSim.heatCells: tint code ${code} is not in the layout's heatTints`);
       if (code > 0) cell.tint = layout.heatTints[code] as HeatCell["tint"];
       cells.push(cell);
     }
@@ -241,13 +262,21 @@ export class PortSim {
    *  are not the engine's. */
   setup<T = void>(edit: (draft: Draft) => T): T {
     if (this.ticked) {
-      throw new Error("PortSim.setup runs before the engine's first tick; a mid-run write needs a tooling-only member on the engine");
+      throw new Error(
+        "PortSim.setup runs before the engine's first tick; a mid-run write needs a tooling-only member on the engine",
+      );
     }
-    if (this.unsavedWrite) throw new Error("PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn or setWeather; call setup first");
+    if (this.unsavedWrite)
+      throw new Error(
+        "PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn or setWeather; call setup first",
+      );
     const draft = draftFromSave(this.leaf.port.serialize());
     const out = edit(draft);
     const answer = this.leaf.port.loadSave(draft.saveText());
-    if (answer[0] !== 1) throw new Error(`PortSim.setup: the engine refused the edited save: ${this.leaf.port.lastReason() ?? "no reason"}`);
+    if (answer[0] !== 1)
+      throw new Error(
+        `PortSim.setup: the engine refused the edited save: ${this.leaf.port.lastReason() ?? "no reason"}`,
+      );
     this.changed();
     return out;
   }
@@ -315,15 +344,27 @@ export class PortSim {
 
   /** Apply a price target to every unit of `kind`; null when the engine
    *  refused (an unpriced kind, or No Rate in Modern). */
-  rentBatch(kind: FacilityKind, target: BatchTarget, options: { onlyDefaultPriced?: boolean } = {}): BatchResult | null {
+  rentBatch(
+    kind: FacilityKind,
+    target: BatchTarget,
+    options: { onlyDefaultPriced?: boolean } = {},
+  ): BatchResult | null {
     const rec = this.leaf.port.rentBatch(this.codes.kind(kind), batchCode(target), options.onlyDefaultPriced === true);
     this.changed();
     return rec[0] === 1 ? batchResult(this.codes.fields("rentBatch"), rec) : null;
   }
 
   /** What {@link rentBatch} would do, with nothing written; null when refused. */
-  quoteRentBatch(kind: FacilityKind, target: BatchTarget, options: { onlyDefaultPriced?: boolean } = {}): BatchResult | null {
-    const rec = this.leaf.port.quoteRentBatch(this.codes.kind(kind), batchCode(target), options.onlyDefaultPriced === true);
+  quoteRentBatch(
+    kind: FacilityKind,
+    target: BatchTarget,
+    options: { onlyDefaultPriced?: boolean } = {},
+  ): BatchResult | null {
+    const rec = this.leaf.port.quoteRentBatch(
+      this.codes.kind(kind),
+      batchCode(target),
+      options.onlyDefaultPriced === true,
+    );
     return rec[0] === 1 ? batchResult(this.codes.fields("quoteRentBatch"), rec) : null;
   }
 
@@ -375,7 +416,10 @@ export class PortSim {
 
   /** Set a unit's state, and its occupants when given, mid-run. */
   setUnitState(id: number, state: UnitState, occupants?: number): void {
-    if (!this.leaf.setUnitState(id, state, occupants)) throw new Error(`PortSim.setUnitState: the engine refused unit ${id} ${state}${occupants === undefined ? "" : ` x${occupants}`}`);
+    if (!this.leaf.setUnitState(id, state, occupants))
+      throw new Error(
+        `PortSim.setUnitState: the engine refused unit ${id} ${state}${occupants === undefined ? "" : ` x${occupants}`}`,
+      );
     this.changed();
   }
 
@@ -386,7 +430,8 @@ export class PortSim {
    *  venue's occupants follow the tally. A later `setup` throws, since its
    *  reload would drop the stamp. */
   setCustomersIn(id: number, count: number): void {
-    if (!this.leaf.setCustomersIn(id, count)) throw new Error(`PortSim.setCustomersIn: the engine refused unit ${id} customers ${count}`);
+    if (!this.leaf.setCustomersIn(id, count))
+      throw new Error(`PortSim.setCustomersIn: the engine refused unit ${id} customers ${count}`);
     this.unsavedWrite = true;
     this.changed();
   }
@@ -402,13 +447,15 @@ export class PortSim {
 
   /** A tenant leaves unit `id` for `reason` mid-run (a sold condo is bought back). */
   vacateUnit(id: number, reason: VacateReason): void {
-    if (!this.leaf.vacateUnit(id, reason)) throw new Error(`PortSim.vacateUnit: the engine refused unit ${id} ${reason}`);
+    if (!this.leaf.vacateUnit(id, reason))
+      throw new Error(`PortSim.vacateUnit: the engine refused unit ${id} ${reason}`);
     this.changed();
   }
 
   /** Write unit `id`'s price mid-run as given (no ladder snap), or clear it with null. */
   setUnitRent(id: number, rent: number | null): void {
-    if (!this.leaf.setUnitRent(id, rent)) throw new Error(`PortSim.setUnitRent: the engine refused unit ${id} rent ${rent}`);
+    if (!this.leaf.setUnitRent(id, rent))
+      throw new Error(`PortSim.setUnitRent: the engine refused unit ${id} rent ${rent}`);
     this.changed();
   }
 

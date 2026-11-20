@@ -17,18 +17,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  listedFiles,
-  measuredSeconds,
-  planShards,
-} from "../src/tests/ci/e2eShards.ts";
+import { listedFiles, measuredSeconds, planShards } from "../src/tests/ci/e2eShards.ts";
 
 const [command, ...args] = process.argv.slice(2);
 
 function usage(): never {
-  console.error(
-    "usage: node scripts/e2e-shards.ts plan <list.json> <shard> <total> <test-list>",
-  );
+  console.error("usage: node scripts/e2e-shards.ts plan <list.json> <shard> <total> <test-list>");
   console.error("       node scripts/e2e-shards.ts measure <log>...");
   process.exit(2);
 }
@@ -39,19 +33,11 @@ if (command === "plan") {
   const shard = Number(shardArg);
   const total = Number(totalArg);
   if (!Number.isInteger(shard) || shard < 1 || shard > total) {
-    console.error(
-      `the shard must be a whole number from 1 to ${totalArg}, not ${shardArg}`,
-    );
+    console.error(`the shard must be a whole number from 1 to ${totalArg}, not ${shardArg}`);
     process.exit(2);
   }
-  const secondsFile = join(
-    dirname(fileURLToPath(import.meta.url)),
-    "../src/tests/ci/e2eShardSeconds.json",
-  );
-  const measured = JSON.parse(readFileSync(secondsFile, "utf8")) as Record<
-    string,
-    number
-  >;
+  const secondsFile = join(dirname(fileURLToPath(import.meta.url)), "../src/tests/ci/e2eShardSeconds.json");
+  const measured = JSON.parse(readFileSync(secondsFile, "utf8")) as Record<string, number>;
   const files = listedFiles(JSON.parse(readFileSync(listFile, "utf8")));
   const shards = planShards(files, total, measured);
   shards.forEach((planned, index) => {
@@ -60,20 +46,14 @@ if (command === "plan") {
       `shard ${index + 1} of ${total}${marker}: about ${Math.round(planned.seconds)} s, ${planned.files.join(" ")}`,
     );
   });
-  const unmeasured = files
-    .filter(({ file }) => !(file in measured))
-    .map(({ file }) => file);
+  const unmeasured = files.filter(({ file }) => !(file in measured)).map(({ file }) => file);
   if (unmeasured.length > 0) {
-    console.log(
-      `::notice::no measured time for ${unmeasured.join(", ")}; refresh src/tests/ci/e2eShardSeconds.json`,
-    );
+    console.log(`::notice::no measured time for ${unmeasured.join(", ")}; refresh src/tests/ci/e2eShardSeconds.json`);
   }
   writeFileSync(outFile, `${shards[shard - 1].files.join("\n")}\n`);
 } else if (command === "measure") {
   if (args.length === 0) usage();
-  const seconds = measuredSeconds(
-    args.map((file) => readFileSync(file, "utf8")),
-  );
+  const seconds = measuredSeconds(args.map((file) => readFileSync(file, "utf8")));
   const rounded = Object.fromEntries(
     Object.entries(seconds)
       .sort(([a], [b]) => a.localeCompare(b))

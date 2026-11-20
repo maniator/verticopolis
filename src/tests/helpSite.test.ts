@@ -1,11 +1,37 @@
 import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { HELP_BASE, OLD_ANCHORS, SPONSOR_URL, siteHref, cardAlt, cardFile, cardUrl, gameLinkDetail, helpPageDetail, isSponsorLink, landingAction, sponsorTapListener, oldAnchorRedirects, pageJsonLd, sharedHead, sidebar, type SidebarEntry } from "../../help-site/site.mjs";
+import {
+  HELP_BASE,
+  OLD_ANCHORS,
+  SPONSOR_URL,
+  siteHref,
+  cardAlt,
+  cardFile,
+  cardUrl,
+  gameLinkDetail,
+  helpPageDetail,
+  isSponsorLink,
+  landingAction,
+  sponsorTapListener,
+  oldAnchorRedirects,
+  pageJsonLd,
+  sharedHead,
+  sidebar,
+  type SidebarEntry,
+} from "../../help-site/site.mjs";
 import { catalogFor } from "./catalogFixture";
 import { SPONSOR_URL as GAME_SPONSOR_URL } from "../ui/splashTemplate";
 import { HELP_PAGES_DIR } from "../build/helpMarkdown";
-import { CARD_MANIFEST, REGENERATE, cardManifest, helpPages, staleCards, type CardManifest, type HelpCardPage } from "../../scripts/help-card-pages.mjs";
+import {
+  CARD_MANIFEST,
+  REGENERATE,
+  cardManifest,
+  helpPages,
+  staleCards,
+  type CardManifest,
+  type HelpCardPage,
+} from "../../scripts/help-card-pages.mjs";
 
 const pagesDir = resolve(__dirname, "../..", HELP_PAGES_DIR);
 
@@ -42,7 +68,8 @@ describe("the side menu", () => {
   it("names only pages that exist", () => {
     const slugs = flatten(sidebar).flatMap((entry) => ("slug" in entry ? [entry.slug] : []));
     expect(slugs.length).toBeGreaterThan(0);
-    const exists = (slug: string) => [`${slug}.md`, `${slug}.mdx`, `${slug}/index.mdx`].some((f) => existsSync(resolve(pagesDir, f)));
+    const exists = (slug: string) =>
+      [`${slug}.md`, `${slug}.mdx`, `${slug}/index.mdx`].some((f) => existsSync(resolve(pagesDir, f)));
     for (const slug of slugs) expect(exists(slug), slug).toBe(true);
   });
 
@@ -53,7 +80,12 @@ describe("the side menu", () => {
     const pages = readdirSync(pagesDir, { recursive: true, encoding: "utf8" })
       .filter((f) => /\.mdx?$/.test(f) && f !== "index.md")
       // Windows lists nested files with backslashes; slugs use slashes.
-      .map((f) => f.replace(/\\/g, "/").replace(/\.mdx?$/, "").replace(/\/index$/, ""));
+      .map((f) =>
+        f
+          .replace(/\\/g, "/")
+          .replace(/\.mdx?$/, "")
+          .replace(/\/index$/, ""),
+      );
     for (const page of pages) expect(slugs.has(page), page).toBe(true);
   });
 
@@ -70,7 +102,9 @@ describe("the side menu", () => {
     const entries = flatten(sidebar);
     const byLabel = (label: string) => entries.find((e) => "label" in e && e.label === label);
     expect(byLabel("Release notes")).toMatchObject({ link: "/changelog/" });
-    expect(byLabel("Report a problem")).toMatchObject({ link: expect.stringContaining("github.com/Verticopolis/web/issues") });
+    expect(byLabel("Report a problem")).toMatchObject({
+      link: expect.stringContaining("github.com/Verticopolis/web/issues"),
+    });
     expect(entries.some((e) => "slug" in e && e.slug === "privacy")).toBe(true);
   });
 
@@ -88,7 +122,8 @@ describe("the pages' old anchors", () => {
   // "going-further" and "about" stay on the front page, which links on.
   it("send every old section that has a page of its own to a page that exists", () => {
     expect(Object.keys(OLD_ANCHORS).sort()).toEqual(["basics", "classic-vs-modern", "keyboard", "privacy", "touch"]);
-    const exists = (slug: string) => [`${slug}.md`, `${slug}.mdx`, `${slug}/index.mdx`].some((f) => existsSync(resolve(pagesDir, f)));
+    const exists = (slug: string) =>
+      [`${slug}.md`, `${slug}.mdx`, `${slug}/index.mdx`].some((f) => existsSync(resolve(pagesDir, f)));
     for (const [id, slug] of Object.entries(OLD_ANCHORS)) expect(exists(slug), `${id} → ${slug}`).toBe(true);
   });
 });
@@ -109,9 +144,13 @@ describe("the manual's own words, checked against the engine", () => {
     for (const mode of ["classic", "modern"] as const) {
       const catalog = catalogFor(mode);
       const hall = catalog.facilities.find((f) => f.key === "weddingHall")!;
-      expect(page("rooms/wedding-hall.mdx"), mode).toContain(`It is ${hall.width} tiles wide and ${words[hall.floors]} floors tall`);
+      expect(page("rooms/wedding-hall.mdx"), mode).toContain(
+        `It is ${hall.width} tiles wide and ${words[hall.floors]} floors tall`,
+      );
       expect(page("rooms/wedding-hall.mdx"), mode).toContain(`Nothing else may reach floor ${catalog.world.maxFloor}`);
-      expect(page("building/floors-and-lobbies.mdx"), mode).toContain(`You can build up to **floor ${catalog.world.maxFloor}**`);
+      expect(page("building/floors-and-lobbies.mdx"), mode).toContain(
+        `You can build up to **floor ${catalog.world.maxFloor}**`,
+      );
     }
   });
 });
@@ -169,7 +208,10 @@ describe("search and sharing", () => {
     ];
     const cardsDir = resolve(__dirname, "../../help-site/public/cards");
     const cards = new Set(readdirSync(cardsDir));
-    for (const slug of slugs) expect(cards.has(cardFile(slug)), `no card for ${slug || "the front page"}: run scripts/gen-help-cards.mjs`).toBe(true);
+    for (const slug of slugs)
+      expect(cards.has(cardFile(slug)), `no card for ${slug || "the front page"}: run scripts/gen-help-cards.mjs`).toBe(
+        true,
+      );
     expect([...cards].sort()).toEqual(slugs.map(cardFile).sort());
   });
 
@@ -179,7 +221,9 @@ describe("search and sharing", () => {
 
     it("matches the record of what every card was drawn from", async () => {
       const stale = staleCards(await helpPages(), recorded());
-      expect(stale, `stale share cards; redraw them with ${REGENERATE} <slug> in the pinned Playwright image`).toEqual([]);
+      expect(stale, `stale share cards; redraw them with ${REGENERATE} <slug> in the pinned Playwright image`).toEqual(
+        [],
+      );
     });
 
     it("records exactly the cards on disk, the front page, a section's index page and the release notes included", async () => {
@@ -214,14 +258,23 @@ describe("search and sharing", () => {
       const added = [...pages, { slug: "rooms/casino", title: "Casino", description: "d" }];
       expect(staleCards(added, manifest)).toEqual([expect.stringMatching(/^rooms-casino\.png: no record/)]);
       const removed = pages.filter((p) => p.slug !== "rooms/hotels");
-      expect(staleCards(removed, manifest)).toEqual([expect.stringMatching(/^rooms-hotels\.png: recorded, but no page has this card/)]);
+      expect(staleCards(removed, manifest)).toEqual([
+        expect.stringMatching(/^rooms-hotels\.png: recorded, but no page has this card/),
+      ]);
     });
 
     it("updates only the cards drawn, keeps the rest and drops pages that are gone", () => {
       const a = { slug: "a", title: "A", description: "a" };
       const b = { slug: "b/c", title: "B", description: "b" };
-      const previous = { "a.png": { title: "old A", description: "old a" }, "b-c.png": { title: "B", description: "b" }, "gone.png": { title: "G", description: "g" } };
-      expect(cardManifest([a, b], [a], previous)).toEqual({ "a.png": { title: "A", description: "a" }, "b-c.png": { title: "B", description: "b" } });
+      const previous = {
+        "a.png": { title: "old A", description: "old a" },
+        "b-c.png": { title: "B", description: "b" },
+        "gone.png": { title: "G", description: "g" },
+      };
+      expect(cardManifest([a, b], [a], previous)).toEqual({
+        "a.png": { title: "A", description: "a" },
+        "b-c.png": { title: "B", description: "b" },
+      });
       expect(Object.keys(cardManifest([b, a], [b, a]))).toEqual(["a.png", "b-c.png"]);
     });
   });
@@ -235,14 +288,20 @@ describe("search and sharing", () => {
   });
 
   it("marks the front page as the site and a room page as an article inside Rooms", () => {
-    const home = pageJsonLd({ slug: "", title: "How to Play", description: "d" }) as { "@graph": Record<string, unknown>[] };
+    const home = pageJsonLd({ slug: "", title: "How to Play", description: "d" }) as {
+      "@graph": Record<string, unknown>[];
+    };
     expect(home["@graph"][0]["@type"]).toBe("WebSite");
     expect(home["@graph"][0].url).toBe("https://verticopolis.com/help/");
 
     const hotels = pageJsonLd({ slug: "rooms/hotels", title: "Hotels", description: "d" }) as {
       "@graph": [Record<string, unknown>, { itemListElement: Record<string, unknown>[] }];
     };
-    expect(hotels["@graph"][0]).toMatchObject({ "@type": "Article", headline: "Hotels", url: "https://verticopolis.com/help/rooms/hotels/" });
+    expect(hotels["@graph"][0]).toMatchObject({
+      "@type": "Article",
+      headline: "Hotels",
+      url: "https://verticopolis.com/help/rooms/hotels/",
+    });
     expect(hotels["@graph"][1].itemListElement).toEqual([
       { "@type": "ListItem", position: 1, name: "Help", item: "https://verticopolis.com/help/" },
       { "@type": "ListItem", position: 2, name: "Rooms", item: "https://verticopolis.com/help/rooms/" },
@@ -303,7 +362,13 @@ describe("a help page's links in each build", () => {
   });
 
   it("never touches a link to another site, a section or a relative path", () => {
-    for (const href of ["https://github.com/Verticopolis/web", "//cdn.example/x.js", "#spa", "hotels/", "mailto:a@b.c"]) {
+    for (const href of [
+      "https://github.com/Verticopolis/web",
+      "//cdn.example/x.js",
+      "#spa",
+      "hotels/",
+      "mailto:a@b.c",
+    ]) {
       expect(siteHref(href, "", "https://verticopolis.com")).toBe(href);
     }
   });
@@ -359,9 +424,15 @@ describe("the link check", () => {
     expect(servedPath("index.html")).toBe("/help/");
     const pages = new Map([
       ["/help/", '<a href="/help/rooms/#spa">ok</a><a href="/help/rooms/#nope">x</a><a href="/help/gone/">x</a>'],
-      ["/help/rooms/", '<h2 id="spa">Spa</h2><a href="/help/">home</a><a href="/help/catalog.json">data</a><a href="https://example.com/">out</a>'],
+      [
+        "/help/rooms/",
+        '<h2 id="spa">Spa</h2><a href="/help/">home</a><a href="/help/catalog.json">data</a><a href="https://example.com/">out</a>',
+      ],
     ]);
-    expect(brokenLinks(pages)).toEqual(["/help/ → /help/rooms/#nope (no such section)", "/help/ → /help/gone/ (no such page)"]);
+    expect(brokenLinks(pages)).toEqual([
+      "/help/ → /help/rooms/#nope (no such section)",
+      "/help/ → /help/gone/ (no such page)",
+    ]);
   });
 
   it("checks a build for the manual's own host, where the pages sit at the root", async () => {
@@ -369,7 +440,10 @@ describe("the link check", () => {
     expect(servedPath("rooms/venues/index.html", "")).toBe("/rooms/venues/");
     expect(servedPath("index.html", "")).toBe("/");
     const pages = new Map([
-      ["/", '<a href="/rooms/#spa">ok</a><a href="/gone/">x</a><a href="/_astro/x.css">asset</a><a href="https://verticopolis.com/">game</a>'],
+      [
+        "/",
+        '<a href="/rooms/#spa">ok</a><a href="/gone/">x</a><a href="/_astro/x.css">asset</a><a href="https://verticopolis.com/">game</a>',
+      ],
       ["/rooms/", '<h2 id="spa">Spa</h2><a href="/">home</a>'],
     ]);
     expect(brokenLinks(pages, "")).toEqual(["/ → /gone/ (no such page)"]);

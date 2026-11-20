@@ -30,7 +30,16 @@ describe("the game's player text sources (#607)", () => {
     wirePlayerTextSources(app);
 
     expect(knownPlayerText().sort()).toEqual(
-      ["Harbor", "Harbor Point", "Harbor Point.TDT", "Harmony Tower", "Lighthouse", "Lighthouse.vctower", "Old Mill", "Spire"].sort(),
+      [
+        "Harbor",
+        "Harbor Point",
+        "Harbor Point.TDT",
+        "Harmony Tower",
+        "Lighthouse",
+        "Lighthouse.vctower",
+        "Old Mill",
+        "Spire",
+      ].sort(),
     );
     // A My Towers file id is not text the player wrote.
     expect(knownPlayerText()).not.toContain("f1");

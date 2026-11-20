@@ -141,7 +141,11 @@ describe("a CompressionStream-written tower reads back through fflate", () => {
     if (!forward.ok) return;
     // The engine's load of that text is saveRepair.integration.test.ts's.
     const imported = JSON.parse(await SaveGame.importText(forward.text)) as Record<string, unknown>;
-    expect(imported).toEqual({ ...(JSON.parse(SMALL_TOWER_SAVE) as object), savedAt: imported.savedAt, appVersion: __APP_VERSION__ });
+    expect(imported).toEqual({
+      ...(JSON.parse(SMALL_TOWER_SAVE) as object),
+      savedAt: imported.savedAt,
+      appVersion: __APP_VERSION__,
+    });
   });
 });
 
@@ -164,7 +168,7 @@ describe("PR review findings: the reverse path validates by doing, not pattern-m
     // player autosave. Same bar as the forward direction now.
     const { deflateSync } = await import("fflate");
     const { toBase64 } = await import("./saveCompression");
-    for (const junk of ["42", "null", "[]", "{}", "\"hi\"", "{\"minutes\":1}"]) {
+    for (const junk of ["42", "null", "[]", "{}", '"hi"', '{"minutes":1}']) {
       const payload = toBase64(deflateSync(new TextEncoder().encode(junk), { level: 1 }));
       expect(fromTowerFile("VCTOWER1\n" + payload + "\n"), junk).toEqual({ ok: false, reason: "unreadable" });
     }

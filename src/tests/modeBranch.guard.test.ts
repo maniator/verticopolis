@@ -26,7 +26,13 @@ import { repoRel, sourceFiles } from "./guardFiles";
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** TypeScript paths that are tests, fixtures or generated declarations. */
-const TS_SKIPPED: readonly RegExp[] = [/^src\/tests\//, /\.test\.tsx?$/, /\.spec\.tsx?$/, /\.fixture\.ts$/, /^src\/engineBinding\/engine\.d\.ts$/];
+const TS_SKIPPED: readonly RegExp[] = [
+  /^src\/tests\//,
+  /\.test\.tsx?$/,
+  /\.spec\.tsx?$/,
+  /\.fixture\.ts$/,
+  /^src\/engineBinding\/engine\.d\.ts$/,
+];
 
 const TS_CHECKS: readonly RegExp[] = [
   /[!=]==?\s*["'](?:classic|modern)["']/g,

@@ -1,7 +1,12 @@
 import type { GameApp } from "../main";
 import type { FacilityKind } from "@verticopolis/components/shared/types";
 import type { Picked } from "@verticopolis/components/render/excalibur/TowerEngine";
-import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import {
+  catalogBuildKind,
+  catalogFacility,
+  catalogTileCost,
+  type Catalog,
+} from "@verticopolis/components/catalog/catalogTypes";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";
 import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
@@ -135,7 +140,10 @@ function touchesTower(app: GameApp, groundFloor: number, floor: number, x: numbe
   const t = app.reader.tower;
   if (t.structureKindAt(floor, x) !== undefined) return true;
   if (t.structureKindAt(floor, x - 1) !== undefined || t.structureKindAt(floor, x + 1) !== undefined) return true;
-  return floor <= groundFloor && (t.structureKindAt(floor - 1, x) !== undefined || t.structureKindAt(floor + 1, x) !== undefined);
+  return (
+    floor <= groundFloor &&
+    (t.structureKindAt(floor - 1, x) !== undefined || t.structureKindAt(floor + 1, x) !== undefined)
+  );
 }
 
 /** What a quote of the tile at `at` lays besides that tile: `extra`, the price
@@ -155,7 +163,13 @@ function quotedBridge(
 ): { at: number; extra: number; from: number; to: number } {
   // A tall lobby (#308) pays the lobby price once per story it rises.
   const tall = (rise - 1) * catalogTileCost(catalog, kind, "a floor tile");
-  const own = tall + catalogTileCost(catalog, kind, app.reader.tower.structureKindAt(floor, at) === undefined ? "no floor yet" : "a floor tile");
+  const own =
+    tall +
+    catalogTileCost(
+      catalog,
+      kind,
+      app.reader.tower.structureKindAt(floor, at) === undefined ? "no floor yet" : "a floor tile",
+    );
   // A refusal for money still carries the full price, bridge and all.
   const priced = quote.ok || quote.reason === NOT_ENOUGH_MONEY;
   const extra = priced ? quote.cost - own : 0;
@@ -189,7 +203,8 @@ const lastPreview = new WeakMap<GameApp, { tile: number; floor: number; showReas
  *  lobby height changed (#308) and the pointer did not move. */
 export function refreshBuildPreview(app: GameApp): void {
   const last = lastPreview.get(app);
-  if (last && app.engine.preview && (app.tool.type === "build" || app.tool.type === "skyBridge")) updateBuildPreview(app, last.tile, last.floor, last.showReasonCard);
+  if (last && app.engine.preview && (app.tool.type === "build" || app.tool.type === "skyBridge"))
+    updateBuildPreview(app, last.tile, last.floor, last.showReasonCard);
 }
 
 /** The Sky Bridge tool's ghost (Modern): every tile one click lays across the
@@ -202,7 +217,15 @@ function updateSkyBridgePreview(app: GameApp, tile: number, floor: number, showR
     // A finished bridge: a click dresses it in the picked look, free.
     const look = catalogOf(app).rules.skyBridge?.looks[pickedSkyBridgeLook()];
     const label = bridge.look === pickedSkyBridgeLook() ? "Already this look" : `${look ?? "New look"}, free`;
-    app.engine.preview = { kind: "lobby", floor, x: bridge.from, span: bridge.to - bridge.from, valid: true, stories: 1, label };
+    app.engine.preview = {
+      kind: "lobby",
+      floor,
+      x: bridge.from,
+      span: bridge.to - bridge.from,
+      valid: true,
+      stories: 1,
+      label,
+    };
     app.engine.transportPreview = null;
     clearBuildRefusal(app);
     return;
@@ -211,7 +234,16 @@ function updateSkyBridgePreview(app: GameApp, tile: number, floor: number, showR
   const tiles = quotedTiles(q);
   const x = tiles > 0 ? q.from : tile;
   const label = skyBridgeLabel(q, groupDigits);
-  app.engine.preview = { kind: "lobby", floor, x, span: Math.max(1, tiles), valid: q.ok, reason: q.reason, stories: 1, label };
+  app.engine.preview = {
+    kind: "lobby",
+    floor,
+    x,
+    span: Math.max(1, tiles),
+    valid: q.ok,
+    reason: q.reason,
+    stories: 1,
+    label,
+  };
   app.engine.transportPreview = null;
   if (showReasonCard) updateBuildRefusal(app, q.reason, floor, x + Math.floor(Math.max(1, tiles) / 2));
   else clearBuildRefusal(app);
@@ -326,12 +358,22 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // and nothing built back to the quoted tile: its quote scans everything
     // the quoted tile's would and its own right side, so it is quoted alone.
     const nothingBuiltBackToQuoted = (builtBeforeLast ?? -Infinity) < quoted;
-    if (lastBuilt !== undefined && lastBuiltLaid && lastRunStart === undefined && lastBuilt > quoted && nothingBuiltBackToQuoted) {
+    if (
+      lastBuilt !== undefined &&
+      lastBuiltLaid &&
+      lastRunStart === undefined &&
+      lastBuilt > quoted &&
+      nothingBuiltBackToQuoted
+    ) {
       quoted = lastBuilt;
     }
     const laidTiles = [...brush].filter((tx) => {
       const built = builtAt(tx);
-      return !brushSkips(kind, built) && !roomBlocks(app, kind, built, floor, tx) && heldUp(app, groundFloor, floor, tx, tallLobbies);
+      return (
+        !brushSkips(kind, built) &&
+        !roomBlocks(app, kind, built, floor, tx) &&
+        heldUp(app, groundFloor, floor, tx, tallLobbies)
+      );
     });
     const laid = laidTiles.length;
     // In Modern a run of laid tiles rises with the hall its first laid tile
@@ -359,9 +401,16 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // stands between it and the quoted tile (else it is the quoted tile), and
     // its scan left stops there.
     let rightEnd: number | undefined;
-    if (lastBuilt !== undefined && quoted < lastBuilt) rightEnd = lastRunStart ?? (lastBuiltLaid ? lastBuilt : undefined);
-    const farLeft = leftEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, leftEnd, quote(leftEnd), riseAt(leftEnd));
-    const farRight = rightEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, rightEnd, quote(rightEnd), riseAt(rightEnd));
+    if (lastBuilt !== undefined && quoted < lastBuilt)
+      rightEnd = lastRunStart ?? (lastBuiltLaid ? lastBuilt : undefined);
+    const farLeft =
+      leftEnd === undefined
+        ? undefined
+        : quotedBridge(app, catalog, ghostKind, floor, leftEnd, quote(leftEnd), riseAt(leftEnd));
+    const farRight =
+      rightEnd === undefined
+        ? undefined
+        : quotedBridge(app, catalog, ghostKind, floor, rightEnd, quote(rightEnd), riseAt(rightEnd));
     // A tall lobby pays the lobby price once per story.
     const floorTile = catalogTileCost(catalog, ghostKind, "a floor tile");
     const bareTile = catalogTileCost(catalog, ghostKind, "no floor yet");
@@ -377,7 +426,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // would take a lobby (plain floor on the ground floor, from an old save).
     const valid = laid > 0 && can.ok && affordsStrip;
     let reason: string | undefined;
-    if (!valid && catalog.rules.previewNamesRefusal && (!can.ok || laid > 0)) reason = can.ok ? NOT_ENOUGH_MONEY : can.reason;
+    if (!valid && catalog.rules.previewNamesRefusal && (!can.ok || laid > 0))
+      reason = can.ok ? NOT_ENOUGH_MONEY : can.reason;
     // A gold ghost stops at the brush's last tile that is built or laid, so
     // near the tower's edge it ends flush with the floor below instead of
     // hanging over open air the click leaves alone (#637); a red one keeps
@@ -405,7 +455,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const reason = !can.ok && catalog.rules.previewNamesRefusal ? can.reason : undefined;
     app.engine.preview = { kind, floor, x, valid: can.ok, reason };
     app.engine.transportPreview = null;
-    if (showReasonCard) updateBuildRefusal(app, reason, floor, x + Math.floor(catalogFacility(catalog, kind).width / 2));
+    if (showReasonCard)
+      updateBuildRefusal(app, reason, floor, x + Math.floor(catalogFacility(catalog, kind).width / 2));
     else clearBuildRefusal(app);
   }
 }

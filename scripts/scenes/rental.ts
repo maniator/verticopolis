@@ -28,7 +28,7 @@ function buildRentalTower(): void {
   for (let f = 2; f <= 4; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
   s.tower.placeTransport("elevatorStandard", left + 3, 1, 4);
   // Floor 2: a strip of Studios (single occupants), all leased.
-  for (let x = left + 6; x + 1 <= right; ) {
+  for (let x = left + 6; x + 1 <= right;) {
     const r = s.tower.place("rentalStudio", 2, x);
     if (r.ok) {
       const u = s.tower.getUnit(r.unitId);
@@ -43,7 +43,7 @@ function buildRentalTower(): void {
   const sizes = [3, 2, 4, 5, 3, 2];
   const placed: any[] = [];
   let ci = 0;
-  for (let x = left + 6; x + 1 <= right; ) {
+  for (let x = left + 6; x + 1 <= right;) {
     const r = s.tower.place("rentalApartment", 3, x);
     if (r.ok) {
       const u = s.tower.getUnit(r.unitId);

@@ -80,7 +80,9 @@ async function lightAndAnswer(page: Page, act: "accept" | "decline", where: stri
   const read = await page.evaluate(pgReadFire);
   if (!read.fire) throw new Error(`${where}: the fire started no response`);
   if ((read.fire.helicopter !== null) !== (act === "accept")) {
-    throw new Error(`${where}: ${act === "accept" ? "paying called no helicopter" : "declining still called the helicopter"}`);
+    throw new Error(
+      `${where}: ${act === "accept" ? "paying called no helicopter" : "declining still called the helicopter"}`,
+    );
   }
 }
 
@@ -113,7 +115,9 @@ export const FIRE_RESPONSE_SCENES: Scene[] = [
           const climbing = guards.filter((g) => read.minutes < g.arrive).length;
           const there = guards.length - climbing;
           if (climbing === 0 || there === 0) {
-            throw new Error(`fire-guards: wanted guards both climbing and at the fire, got ${climbing} climbing and ${there} there at minute ${read.minutes}`);
+            throw new Error(
+              `fire-guards: wanted guards both climbing and at the fire, got ${climbing} climbing and ${there} there at minute ${read.minutes}`,
+            );
           }
         },
         wait: 400,
@@ -139,7 +143,8 @@ export const FIRE_RESPONSE_SCENES: Scene[] = [
           await page.evaluate(pgRunEngine, 15);
           const read = await page.evaluate(pgReadFire);
           const h = read.fire?.helicopter;
-          if (!h || read.minutes >= h.arrive) throw new Error(`fire-helicopter-arriving: no helicopter in flight at minute ${read.minutes}`);
+          if (!h || read.minutes >= h.arrive)
+            throw new Error(`fire-helicopter-arriving: no helicopter in flight at minute ${read.minutes}`);
         },
         wait: 400,
       },
@@ -155,7 +160,8 @@ export const FIRE_RESPONSE_SCENES: Scene[] = [
           if (!h || read.minutes < h.arrive || read.minutes >= h.sprayEnd) {
             throw new Error(`fire-helicopter-spraying: the helicopter is not spraying at minute ${read.minutes}`);
           }
-          if (!read.fire?.out) throw new Error("fire-helicopter-spraying: the fire still burns after the helicopter landed");
+          if (!read.fire?.out)
+            throw new Error("fire-helicopter-spraying: the fire still burns after the helicopter landed");
         },
         wait: 400,
       },

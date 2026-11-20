@@ -79,7 +79,17 @@ export const APPEARANCE_SCENES: Scene[] = [
     desk: true,
     build: buildCanonTower,
     assertUnits: 200,
-    shots: [{ name: "appearance-dialog", clock: 11, keepDialogs: true, setup: async (page) => { await deskFrame(page); await openDialog(page); } }],
+    shots: [
+      {
+        name: "appearance-dialog",
+        clock: 11,
+        keepDialogs: true,
+        setup: async (page) => {
+          await deskFrame(page);
+          await openDialog(page);
+        },
+      },
+    ],
   },
   {
     id: "appearance-skyline",
@@ -91,8 +101,23 @@ export const APPEARANCE_SCENES: Scene[] = [
     shots: [
       { name: "appearance-skyline-day", clock: 11, setup: deskFrame },
       { name: "appearance-skyline-night", clock: 22, setup: deskFrame },
-      { name: "appearance-skyline-start-menu", clock: 11, setup: async (page) => { await press(page, ".desk-start"); await park(page); } },
-      { name: "appearance-skyline-dialog", clock: 11, keepDialogs: true, setup: async (page) => { await page.keyboard.press("Escape"); await openDialog(page); } },
+      {
+        name: "appearance-skyline-start-menu",
+        clock: 11,
+        setup: async (page) => {
+          await press(page, ".desk-start");
+          await park(page);
+        },
+      },
+      {
+        name: "appearance-skyline-dialog",
+        clock: 11,
+        keepDialogs: true,
+        setup: async (page) => {
+          await page.keyboard.press("Escape");
+          await openDialog(page);
+        },
+      },
     ],
   },
   {
@@ -105,11 +130,31 @@ export const APPEARANCE_SCENES: Scene[] = [
     shots: [
       { name: "appearance-high-contrast-day", clock: 11, setup: deskFrame },
       // The Tower menu with no fire: Call Fire Rescue… greyed out.
-      { name: "appearance-high-contrast-tower-menu", clock: 11, setup: async (page) => { await press(page, "#mb-tower"); await park(page); } },
-      { name: "appearance-high-contrast-dialog", clock: 11, keepDialogs: true, setup: async (page) => { await page.keyboard.press("Escape"); await openDialog(page); } },
+      {
+        name: "appearance-high-contrast-tower-menu",
+        clock: 11,
+        setup: async (page) => {
+          await press(page, "#mb-tower");
+          await park(page);
+        },
+      },
+      {
+        name: "appearance-high-contrast-dialog",
+        clock: 11,
+        keepDialogs: true,
+        setup: async (page) => {
+          await page.keyboard.press("Escape");
+          await openDialog(page);
+        },
+      },
       // The update prompt with more than three notes: its "What's new" log is a
       // well, which High Contrast once drew white text on white.
-      { name: "appearance-high-contrast-update-notes", clock: 11, crop: "#modal .modal-box", setup: highContrastUpdateNotes },
+      {
+        name: "appearance-high-contrast-update-notes",
+        clock: 11,
+        crop: "#modal .modal-box",
+        setup: highContrastUpdateNotes,
+      },
     ],
   },
   {

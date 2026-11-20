@@ -89,7 +89,9 @@ for (const u of save.units) {
 }
 save.star = 3;
 save.view = { tile: 15, floor: 20 }; // frame floors ~14..27 (both offices + the transfer floors)
-console.log(`mode=${mixed ? "MIXED" : emptyAll ? "EMPTY" : "seeded"}; camera at tile ${save.view.tile}, floor ${save.view.floor}.`);
+console.log(
+  `mode=${mixed ? "MIXED" : emptyAll ? "EMPTY" : "seeded"}; camera at tile ${save.view.tile}, floor ${save.view.floor}.`,
+);
 
 const built = buildTDT(save);
 mkdirSync(SAVES, { recursive: true });

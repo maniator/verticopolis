@@ -26,7 +26,9 @@ export interface SeededSave {
  * autosave, the one play rewrites, and the slots both carry both kinds.
  */
 export function readSeeds(savesDir: string): SeededSave[] {
-  const all = readdirSync(savesDir).filter((f) => f.endsWith(".json")).sort();
+  const all = readdirSync(savesDir)
+    .filter((f) => f.endsWith(".json"))
+    .sort();
   const vctowers = all.filter((f) => f.endsWith(".vctower.json"));
   const others = all.filter((f) => !f.endsWith(".vctower.json"));
   const files: string[] = [];
@@ -36,8 +38,15 @@ export function readSeeds(savesDir: string): SeededSave[] {
     if (a !== undefined) files.push(a);
     if (b !== undefined) files.push(b);
   }
-  const places = [{ key: AUTO_KEY, label: "Auto-save" }, ...SLOT_KEYS.map((key, i) => ({ key, label: `Slot ${i + 1}` }))];
-  return files.slice(0, places.length).map((name, i) => ({ name, ...places[i]!, save: JSON.parse(readFileSync(join(savesDir, name), "utf8")) as Record<string, unknown> }));
+  const places = [
+    { key: AUTO_KEY, label: "Auto-save" },
+    ...SLOT_KEYS.map((key, i) => ({ key, label: `Slot ${i + 1}` })),
+  ];
+  return files.slice(0, places.length).map((name, i) => ({
+    name,
+    ...places[i]!,
+    save: JSON.parse(readFileSync(join(savesDir, name), "utf8")) as Record<string, unknown>,
+  }));
 }
 
 /** A save as the game stores it: stamped like `saveStamp.ts` does, deflated, base64. */
@@ -50,9 +59,13 @@ export function storedForm(save: Record<string, unknown>, appVersion: string, sa
 export function decodeStored(raw: string | null): Record<string, unknown> | undefined {
   if (raw === null) return undefined;
   try {
-    const json = raw.startsWith(STORE_MAGIC) ? inflateRawSync(Buffer.from(raw.slice(STORE_MAGIC.length), "base64")).toString("utf8") : raw;
+    const json = raw.startsWith(STORE_MAGIC)
+      ? inflateRawSync(Buffer.from(raw.slice(STORE_MAGIC.length), "base64")).toString("utf8")
+      : raw;
     const parsed: unknown = JSON.parse(json);
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
   } catch {
     return undefined;
   }

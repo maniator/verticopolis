@@ -63,7 +63,8 @@ export async function judgeAndPromote(page: Page, capturePath: string, path: str
   const watch = await page.evaluate(pgStopModalPhaseWatch);
   let verdict: string | null = null;
   if (!watch) {
-    verdict = "the dialog phase watch was armed but is gone at capture time (did the page reload?), so it checked nothing";
+    verdict =
+      "the dialog phase watch was armed but is gone at capture time (did the page reload?), so it checked nothing";
   } else if (watch.error) {
     verdict = `the dialog phase watch failed while sampling (${watch.error}), so it checked nothing reliable`;
   } else if (watch.target === "closed") {

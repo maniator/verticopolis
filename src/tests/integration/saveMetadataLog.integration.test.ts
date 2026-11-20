@@ -154,10 +154,7 @@ describe.skipIf(noEngine)("bulletin-log persistence through the storage paths", 
     ];
     const tower = { serialize: () => ({ ...draftTower().serialize(), log }) };
     SaveGame.saveSlot(2, saveOf(tower));
-    expect(readSlot(2)!.log!.map((e) => e.text)).toEqual([
-      "Metro line opened.",
-      "Recycling is overdue.",
-    ]);
+    expect(readSlot(2)!.log!.map((e) => e.text)).toEqual(["Metro line opened.", "Recycling is overdue."]);
     const file = await SaveGame.export(saveOf(tower));
     const imported = await readImport(file);
     expect(imported.log!.map((e) => `${e.kind}:${e.text}`)).toEqual([

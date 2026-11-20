@@ -15,9 +15,7 @@ export interface Label {
 
 const unquote = (value: string): string => {
   const v = value.trim();
-  return v.length >= 2 && v.startsWith('"') && v.endsWith('"')
-    ? v.slice(1, -1)
-    : v;
+  return v.length >= 2 && v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v;
 };
 
 /** Every label in the list, in file order. */
@@ -28,9 +26,7 @@ export function parseLabelList(text: string): Label[] {
     if (!/^\s*-/.test(lines[i])) continue;
     const name = /^ {2}- name: *(\S.*)$/.exec(lines[i])?.[1];
     if (name === undefined)
-      throw new Error(
-        `labels.yml: line ${i + 1} starts an entry that is not "  - name: <label>"`,
-      );
+      throw new Error(`labels.yml: line ${i + 1} starts an entry that is not "  - name: <label>"`);
     const color = /^ {4}color: (.+)$/.exec(lines[i + 1] ?? "")?.[1];
     const description = /^ {4}description: (.+)$/.exec(lines[i + 2] ?? "")?.[1];
     const label = {

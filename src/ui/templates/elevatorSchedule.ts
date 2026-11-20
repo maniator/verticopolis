@@ -237,8 +237,11 @@ function stripTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Temp
       <div class="es-strip">
         <div class="es-strip-inner">
           <div class="es-strip-bars" role="group" aria-label="Cars on shift by hour, ${state.day}">
-            ${Array.from({ length: Math.max(0, ctx.cars - 1) }, (_, i) => html`<span
-              class="es-gridline" style="bottom:${((i + 1) / ctx.cars) * 100}%"></span>`)}
+            ${Array.from(
+              { length: Math.max(0, ctx.cars - 1) },
+              (_, i) => html`<span
+              class="es-gridline" style="bottom:${((i + 1) / ctx.cars) * 100}%"></span>`,
+            )}
             ${r.map((v, hr) => {
               const d = demandAt(hr);
               const fillPct = ctx.cars > 0 ? (v / ctx.cars) * 100 : 0;
@@ -257,12 +260,16 @@ function stripTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Temp
                   }
                 }}>
                 <span class="es-bar-fill" style="height:${fillPct}%"></span>
-                ${demandPct !== undefined && fillPct > demandPct
-                  ? html`<span class="es-bar-over" style="bottom:${demandPct}%;height:${fillPct - demandPct}%"></span>`
-                  : nothing}
-                ${demandPct !== undefined
-                  ? html`<span class="es-bar-demand" style="bottom:${demandPct}%"></span>`
-                  : nothing}
+                ${
+                  demandPct !== undefined && fillPct > demandPct
+                    ? html`<span class="es-bar-over" style="bottom:${demandPct}%;height:${fillPct - demandPct}%"></span>`
+                    : nothing
+                }
+                ${
+                  demandPct !== undefined
+                    ? html`<span class="es-bar-demand" style="bottom:${demandPct}%"></span>`
+                    : nothing
+                }
                 <span class="es-bar-n">${v}</span>
               </button>`;
             })}
@@ -272,9 +279,11 @@ function stripTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Temp
           </div>
         </div>
       </div>
-      ${ctx.hourly
-        ? html`<p class="es-hint es-legend">Dashes mark measured demand; the pale bar top is spare capacity.</p>`
-        : nothing}
+      ${
+        ctx.hourly
+          ? html`<p class="es-hint es-legend">Dashes mark measured demand; the pale bar top is spare capacity.</p>`
+          : nothing
+      }
       <p class="es-hint es-touch-hint">Tap an hour, then set its cars with − and +. A second tap spans hours.</p>
       <div class="es-row es-strip-step">
         <span>${spanLabel}</span>
@@ -305,7 +314,8 @@ function steppersTemplate(state: SchedState, h: SchedHandlers): TemplateResult {
  *  offering the toggle only when a basement row has one. A Classic express
  *  states the original's rule instead. */
 function expressCaption(ctx: SchedCtx, floors: readonly FloorRow[]): string {
-  if (ctx.classicExpress) return "Stops at the ground floor, every 15th floor and every basement; any of those stops can be turned off";
+  if (ctx.classicExpress)
+    return "Stops at the ground floor, every 15th floor and every basement; any of those stops can be turned off";
   if (!floors.some((f) => isBasementFloor(f.floor))) return "Serves all lobbies and sky lobbies";
   return floors.some((f) => isBasementFloor(f.floor) && f.toggles)
     ? "Stops at every lobby and basement floor; a basement stop can be turned off"
@@ -342,16 +352,19 @@ function serveCellTemplate(ctx: SchedCtx, f: FloorRow, h: SchedHandlers): Templa
  *  reads as a fact, a grayed control reads as a bug). */
 function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
   const homes = state.schedule.homeFloors;
-  const baseLabel = state.base === 1 ? "Home all cars at the lobby" : `Home all cars at Floor ${floorLabel(state.base)}`;
+  const baseLabel =
+    state.base === 1 ? "Home all cars at the lobby" : `Home all cars at Floor ${floorLabel(state.base)}`;
   return html`
     <div class="es-floors">
       <div class="es-row es-heading-row"><span class="es-heading">Serviced floors and home cars</span></div>
       ${ctx.isExpress ? html`<p class="es-hint">${expressCaption(ctx, state.floors)}</p>` : nothing}
       <div class="es-row es-quick">
-        ${ctx.isExpress
-          ? nothing
-          : html`<button type="button" class="btn" @click=${h.onExpressStops}>Express (lobbies)</button>
-              <button type="button" class="btn" @click=${h.onAllStops}>All stops</button>`}
+        ${
+          ctx.isExpress
+            ? nothing
+            : html`<button type="button" class="btn" @click=${h.onExpressStops}>Express (lobbies)</button>
+              <button type="button" class="btn" @click=${h.onAllStops}>All stops</button>`
+        }
         <button type="button" class="btn" @click=${h.onHomeAllBase}>${baseLabel}</button>
         <button type="button" class="btn" @click=${h.onStageUpTower}>Stage upper half up-tower</button>
       </div>
@@ -369,14 +382,16 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
             <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${floorLabel(f.floor)}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}${state.originFloors.includes(f.floor) ? html`<span class="es-origin" role="img" aria-label="Demand hotspot: many riders board here at the busiest ${state.day} hour" title="Demand hotspot: many riders board here at the busiest ${state.day} hour">▲</span>` : nothing}</span>
             ${serveCell}
             <span class="es-cell-cars">
-              ${f.served
-                ? Array.from({ length: ctx.cars }, (_, car) => {
-                    const here = homes[car] === f.floor;
-                    return html`<button type="button" class="es-chip${here ? " on" : ""}"
+              ${
+                f.served
+                  ? Array.from({ length: ctx.cars }, (_, car) => {
+                      const here = homes[car] === f.floor;
+                      return html`<button type="button" class="es-chip${here ? " on" : ""}"
                       aria-label="Home car ${car + 1} at floor ${floorLabel(f.floor)}" aria-pressed=${here}
                       @click=${() => h.onHomeSet(car, f.floor)}>${car + 1}</button>`;
-                  })
-                : nothing}
+                    })
+                  : nothing
+              }
             </span>
           </div>`;
         })}
@@ -395,7 +410,8 @@ function tuneHint(ctx: SchedCtx, state: SchedState): string {
       : "Auto starts once this shaft has measured a day of traffic.";
   }
   if (ctx.tuneStatus === "insufficient-data") return "Auto-tune needs a day or two of measured traffic first.";
-  if (ctx.canTune && !ctx.hasMeasured) return `No measured ${state.day} traffic yet; Auto-tune adjusts only measured days.`;
+  if (ctx.canTune && !ctx.hasMeasured)
+    return `No measured ${state.day} traffic yet; Auto-tune adjusts only measured days.`;
   return "";
 }
 
@@ -407,16 +423,22 @@ function presetsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Te
   const hint = tuneHint(ctx, state);
   return html`
     <div class="es-row es-presets">
-      ${(["rush", "balanced", "feeder"] as AssistedPreset[]).map((p) => html`
+      ${(["rush", "balanced", "feeder"] as AssistedPreset[]).map(
+        (p) => html`
         <button type="button" class="btn${p === ctx.recommended ? " es-rec" : ""}" ?disabled=${locked} @click=${() => h.onPreset(p)}
-          title=${p === ctx.recommended ? "Recommended for this shaft" : ""}>${PRESET_LABEL[p]}</button>`)}
-      ${ctx.ux.autoTune && !locked
-        ? html`<button type="button" class="btn es-autotune" ?disabled=${!ctx.canTune} @click=${h.onAutoTune}>Auto-tune</button>`
-        : nothing}
-      ${ctx.ux.autoTune
-        ? html`<label class="es-auto" title="Re-tune the car counts every morning from measured traffic"><input type="checkbox"
+          title=${p === ctx.recommended ? "Recommended for this shaft" : ""}>${PRESET_LABEL[p]}</button>`,
+      )}
+      ${
+        ctx.ux.autoTune && !locked
+          ? html`<button type="button" class="btn es-autotune" ?disabled=${!ctx.canTune} @click=${h.onAutoTune}>Auto-tune</button>`
+          : nothing
+      }
+      ${
+        ctx.ux.autoTune
+          ? html`<label class="es-auto" title="Re-tune the car counts every morning from measured traffic"><input type="checkbox"
             .checked=${live(state.schedule.autoTune)} @change=${h.onAutoToggle} /> Auto</label>`
-        : nothing}
+          : nothing
+      }
     </div>
     ${hint ? html`<p class="es-hint">${hint}</p>` : nothing}`;
 }
@@ -446,22 +468,31 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
         ${steppersTemplate(state, h)}
 
         <!-- The count grid: primary in Classic (rawGridDefault), behind Advanced in Modern. -->
-        ${ctx.ux.rawGridDefault
-          ? strip
-          : html`<details class="es-adv" ?open=${state.advancedOpen}>
-              <summary @click=${(e: Event) => { e.preventDefault(); h.onToggleAdvanced(); }}>Cars on shift by hour (Advanced)</summary>
+        ${
+          ctx.ux.rawGridDefault
+            ? strip
+            : html`<details class="es-adv" ?open=${state.advancedOpen}>
+              <summary @click=${(e: Event) => {
+                e.preventDefault();
+                h.onToggleAdvanced();
+              }}>Cars on shift by hour (Advanced)</summary>
               ${state.advancedOpen ? strip : nothing}
-            </details>`}
+            </details>`
+        }
 
         ${ctx.ux.advice && state.adviceMsg ? html`<p class="es-advice" aria-live="polite">${state.adviceMsg}</p>` : nothing}
         <div class="es-sim" aria-live="polite">${state.simMsg}</div>
       </div>
       <div class="modal-actions modal-footer">
-        ${state.dirty
-          ? html`<span class="modal-warn" role=${state.cancelArmed ? "alert" : "status"}>${state.cancelArmed
-              ? "You have unsaved changes. Press again to discard them."
-              : "You have unsaved changes."}</span>`
-          : nothing}
+        ${
+          state.dirty
+            ? html`<span class="modal-warn" role=${state.cancelArmed ? "alert" : "status"}>${
+                state.cancelArmed
+                  ? "You have unsaved changes. Press again to discard them."
+                  : "You have unsaved changes."
+              }</span>`
+            : nothing
+        }
         <button class="btn primary" data-act="apply" @click=${h.onOk}>OK</button>
         <button class="btn" data-act="close" @click=${h.onCancel}>${state.cancelArmed ? "Discard changes?" : "Cancel"}</button>
       </div>`;

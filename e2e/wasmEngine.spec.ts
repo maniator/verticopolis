@@ -13,12 +13,18 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 test("the game runs on the WASM engine on boot", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
   await page.goto("/");
-  await page.waitForFunction(() => {
-    const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: { sim: unknown } };
-    return !!w.__vcEngine?.status.hosted && !!w.game;
-  }, undefined, { timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: { sim: unknown } };
+      return !!w.__vcEngine?.status.hosted && !!w.game;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
   // The title screen names the engine next to the version, so a tester can
   // tell which engine runs without the console.
   await expect(page.locator(".splash-version")).toContainText("Rust engine");
@@ -36,8 +42,16 @@ test("the game runs on the WASM engine on boot", async ({ page }) => {
     g.sim.money = 1e9;
     const ok = g.sim.build("lobby", 1, 160).ok;
     g.syncSim();
-    const unitInEngine = JSON.parse(host.port.serialize()).units.some((u: { kind: string; x: number }) => u.kind === "lobby" && u.x === 160);
-    return { ok, hosted: host.status.hosted, lastError: host.status.lastError, onEngine: g.enginePort === host.port, unitInEngine };
+    const unitInEngine = JSON.parse(host.port.serialize()).units.some(
+      (u: { kind: string; x: number }) => u.kind === "lobby" && u.x === 160,
+    );
+    return {
+      ok,
+      hosted: host.status.hosted,
+      lastError: host.status.lastError,
+      onEngine: g.enginePort === host.port,
+      unitInEngine,
+    };
   });
   expect(result).toEqual({ ok: true, hosted: true, lastError: null, onEngine: true, unitInEngine: true });
   expect(errors).toEqual([]);
@@ -50,10 +64,14 @@ test("the game runs on the WASM engine on boot", async ({ page }) => {
  */
 test("the car, extend and removal commands charge inside the WASM engine", async ({ page }) => {
   await page.goto("/");
-  await page.waitForFunction(() => {
-    const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: unknown };
-    return !!w.__vcEngine?.status.hosted && !!w.game;
-  }, undefined, { timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: unknown };
+      return !!w.__vcEngine?.status.hosted && !!w.game;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
   await page.evaluate(() => document.getElementById("splash")?.remove());
   const result = await page.evaluate(() => {
     const g = (window as any).game;
@@ -89,7 +107,8 @@ test("the car, extend and removal commands charge inside the WASM engine", async
     }
     const save = JSON.parse(engine.serialize()) as { units: { kind: string }[]; transports: { x: number }[] };
     return {
-      setupOk, steps,
+      setupOk,
+      steps,
       shaftGone: !save.transports.some((t) => t.x === 168),
       officeGone: !save.units.some((u) => u.kind === "office"),
     };
@@ -97,7 +116,8 @@ test("the car, extend and removal commands charge inside the WASM engine", async
   expect(result.setupOk, "the setup tower built").toBe(true);
   expect(result.shaftGone).toBe(true);
   expect(result.officeGone).toBe(true);
-  for (const s of result.steps) expect(s.engineMoved, `${s.step}: the engine moved by the reported change`).toBe(s.delta);
+  for (const s of result.steps)
+    expect(s.engineMoved, `${s.step}: the engine moved by the reported change`).toBe(s.delta);
   const by = Object.fromEntries(result.steps.map((s) => [s.step, s]));
   expect(by["add car"]).toMatchObject({ ok: true, delta: -40_000 });
   expect(by["remove car"]).toMatchObject({ ok: true, delta: 20_000 });

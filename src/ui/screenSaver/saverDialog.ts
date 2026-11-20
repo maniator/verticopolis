@@ -2,7 +2,15 @@ import { html, type TemplateResult } from "lit-html";
 import type { UI } from "../UI";
 import { runScene } from "./screenSaver";
 import type { SaverScene } from "./saverScene";
-import { NO_SAVER, SAVERS, SAVER_NAMES, WAIT_MINUTES, type SaverChoice, type SaverId, type SaverPrefs } from "./saverPrefs";
+import {
+  NO_SAVER,
+  SAVERS,
+  SAVER_NAMES,
+  WAIT_MINUTES,
+  type SaverChoice,
+  type SaverId,
+  type SaverPrefs,
+} from "./saverPrefs";
 
 /**
  * Options > Screen Saver…: the period Screen Saver dialog. A small monitor

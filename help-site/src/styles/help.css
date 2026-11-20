@@ -88,7 +88,9 @@ html.vc-help-bar-showing body {
   min-width: 1.1em;
   padding: 0 5px;
   margin: 0 1px;
-  font: 600 0.85em "Courier New", monospace;
+  font:
+    600 0.85em "Courier New",
+    monospace;
   text-align: center;
   color: var(--r-ink);
   background: #f4f4f4;

@@ -5,7 +5,9 @@ import { copyText } from "./ui/copyText";
  *  opened (#963). The report is built from the page's own state, so it works
  *  when the engine never loaded. */
 export function copyEngineDiagnostics(e: Event): void {
-  const status = (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-copy-status");
+  const status = (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(
+    ".engine-failure-copy-status",
+  );
   const host = document.getElementById("boot-fallback-host") ?? document.body;
   const { text } = gameDiagnostics();
   void copyText(text, navigator, document, host).then((ok) => {
@@ -19,7 +21,8 @@ export function copyEngineDiagnostics(e: Event): void {
       area.readOnly = true;
       area.rows = 12;
       area.setAttribute("aria-label", "Engine diagnostics");
-      area.style.cssText = "width:min(48em,100%);box-sizing:border-box;font:12px/1.4 ui-monospace,monospace;text-align:left";
+      area.style.cssText =
+        "width:min(48em,100%);box-sizing:border-box;font:12px/1.4 ui-monospace,monospace;text-align:left";
       status?.closest("p")?.insertAdjacentElement("afterend", area);
     }
     area.value = text;

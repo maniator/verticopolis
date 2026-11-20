@@ -44,7 +44,10 @@ let form: IssueForm | undefined;
 if (formName) {
   form = read(formName);
 } else {
-  const labels = (labelArg ?? "").split(",").map((l) => l.trim()).filter(Boolean);
+  const labels = (labelArg ?? "")
+    .split(",")
+    .map((l) => l.trim())
+    .filter(Boolean);
   form = formForLabels(labels, FORM_ORDER.map(read));
   if (!form) {
     console.log(`No issue form matches the labels [${labels.join(", ")}]; nothing to check.`);

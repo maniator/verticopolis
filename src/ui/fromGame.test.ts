@@ -34,7 +34,9 @@ describe("fromGameHref and openedFromGame", () => {
   it("marks a path with the game and the place it opened from, keeping its fragment and any query", () => {
     expect(fromGameHref("/help", "game_menu")).toBe("/help?from=game&via=game_menu");
     expect(fromGameHref("/help#classic-vs-modern", "compare")).toBe("/help?from=game&via=compare#classic-vs-modern");
-    expect(fromGameHref("https://help.verticopolis.com/changelog?x=1", "update_prompt")).toBe("https://help.verticopolis.com/changelog?x=1&from=game&via=update_prompt");
+    expect(fromGameHref("https://help.verticopolis.com/changelog?x=1", "update_prompt")).toBe(
+      "https://help.verticopolis.com/changelog?x=1&from=game&via=update_prompt",
+    );
   });
 
   it("names the appearance scheme the game wears, and nothing for Standard", () => {
@@ -49,8 +51,12 @@ describe("fromGameHref and openedFromGame", () => {
   });
 
   it("re-marks a game link with the scheme worn now, and leaves other links alone", () => {
-    expect(withScheme("/help/rooms?from=game&via=stats#x", "skyline")).toBe("/help/rooms?from=game&via=stats&scheme=skyline#x");
-    expect(withScheme("https://help.verticopolis.com/?from=game&via=about&scheme=skyline", null)).toBe("https://help.verticopolis.com/?from=game&via=about");
+    expect(withScheme("/help/rooms?from=game&via=stats#x", "skyline")).toBe(
+      "/help/rooms?from=game&via=stats&scheme=skyline#x",
+    );
+    expect(withScheme("https://help.verticopolis.com/?from=game&via=about&scheme=skyline", null)).toBe(
+      "https://help.verticopolis.com/?from=game&via=about",
+    );
     expect(withScheme("https://help.verticopolis.com/?from=game&via=about&scheme=skyline", "high_contrast")).toBe(
       "https://help.verticopolis.com/?from=game&via=about&scheme=high_contrast",
     );
@@ -78,7 +84,12 @@ describe("backToOpenGame", () => {
     vi.useFakeTimers();
     try {
       mountFromGame();
-      const win = { close: vi.fn(), closed: false, setTimeout: window.setTimeout.bind(window), document } as unknown as Window;
+      const win = {
+        close: vi.fn(),
+        closed: false,
+        setTimeout: window.setTimeout.bind(window),
+        document,
+      } as unknown as Window;
       const e = new MouseEvent("click", { cancelable: true });
       backToOpenGame(e, win, browserTab);
       const note = document.getElementById("back-note")!;
@@ -96,7 +107,12 @@ describe("backToOpenGame", () => {
     vi.useFakeTimers();
     try {
       mountFromGame();
-      const win = { close: vi.fn(), closed: true, setTimeout: window.setTimeout.bind(window), document } as unknown as Window;
+      const win = {
+        close: vi.fn(),
+        closed: true,
+        setTimeout: window.setTimeout.bind(window),
+        document,
+      } as unknown as Window;
       backToOpenGame(new MouseEvent("click", { cancelable: true }), win, browserTab);
       vi.advanceTimersByTime(300);
       expect(document.getElementById("back-note")!.hidden).toBe(true);
@@ -107,22 +123,39 @@ describe("backToOpenGame", () => {
 
   it("never asks after the game from a browser tab", () => {
     const stillOpen = vi.fn(() => Promise.resolve(false));
-    const win = { close: vi.fn(), closed: true, setTimeout: vi.fn(), document, location: { replace: vi.fn() } } as unknown as Window;
+    const win = {
+      close: vi.fn(),
+      closed: true,
+      setTimeout: vi.fn(),
+      document,
+      location: { replace: vi.fn() },
+    } as unknown as Window;
     backToOpenGame(new MouseEvent("click", { cancelable: true }), win, { installed: () => false, stillOpen });
     expect(stillOpen).not.toHaveBeenCalled();
     expect(win.close).toHaveBeenCalledTimes(1);
   });
 
   /** Click the shell's Back to game link in an installed app whose game does or doesn't answer. */
-  async function clickInstalled(gameAnswers: boolean, pageAt: string = location.href): Promise<{ win: Window; e: MouseEvent; stillOpen: ReturnType<typeof vi.fn> }> {
+  async function clickInstalled(
+    gameAnswers: boolean,
+    pageAt: string = location.href,
+  ): Promise<{ win: Window; e: MouseEvent; stillOpen: ReturnType<typeof vi.fn> }> {
     mountFromGame();
     const replace = vi.fn();
     const page = new URL(pageAt);
-    const win = { close: vi.fn(), closed: true, setTimeout: vi.fn(), document, location: { replace, href: page.href, origin: page.origin } } as unknown as Window;
+    const win = {
+      close: vi.fn(),
+      closed: true,
+      setTimeout: vi.fn(),
+      document,
+      location: { replace, href: page.href, origin: page.origin },
+    } as unknown as Window;
     const stillOpen = vi.fn(() => Promise.resolve(gameAnswers));
     const link = document.querySelector<HTMLAnchorElement>("a[data-act=back-to-game]")!;
     const e = new MouseEvent("click", { cancelable: true });
-    link.addEventListener("click", (ev) => backToOpenGame(ev, win, { installed: () => true, stillOpen }), { once: true });
+    link.addEventListener("click", (ev) => backToOpenGame(ev, win, { installed: () => true, stillOpen }), {
+      once: true,
+    });
     link.dispatchEvent(e);
     await Promise.resolve();
     await Promise.resolve();
@@ -154,7 +187,11 @@ describe("backToOpenGame", () => {
 });
 
 /** A stand-in channel that records what it sends and lets a test deliver a message. */
-function fakeChannel(): PresenceChannel & { postMessage: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>; deliver: (data: unknown) => void } {
+function fakeChannel(): PresenceChannel & {
+  postMessage: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+  deliver: (data: unknown) => void;
+} {
   const channel = {
     onmessage: null as ((ev: MessageEvent) => void) | null,
     postMessage: vi.fn(),
@@ -177,7 +214,10 @@ describe("game presence", () => {
   it("a page hears the game answer before the wait runs out", async () => {
     const channel = fakeChannel();
     const timers: Array<() => void> = [];
-    const answer = gameStillOpen(() => channel, (fn) => timers.push(fn));
+    const answer = gameStillOpen(
+      () => channel,
+      (fn) => timers.push(fn),
+    );
     expect(channel.postMessage).toHaveBeenCalledWith(PRESENCE_ASK);
     channel.deliver(PRESENCE_HERE);
     timers.forEach((fn) => fn());
@@ -231,7 +271,11 @@ describe("takeFromGameFlag", () => {
 
   it("takes the appearance scheme out with it", () => {
     const hist = { replaceState: vi.fn() };
-    takeFromGameFlag({ pathname: "/help/", search: "?from=game&via=stats&scheme=skyline", hash: "" }, hist, memoryStorage);
+    takeFromGameFlag(
+      { pathname: "/help/", search: "?from=game&via=stats&scheme=skyline", hash: "" },
+      hist,
+      memoryStorage,
+    );
     expect(hist.replaceState).toHaveBeenCalledWith(null, "", "/help/");
   });
 
@@ -252,7 +296,9 @@ describe("takeFromGameFlag", () => {
   it("still knows a tab the earlier release notes build marked under its old key", () => {
     const store = memoryStorage();
     store.setItem(LEGACY_FROM_GAME_STORAGE_KEY, "game");
-    expect(takeFromGameFlag({ pathname: "/help/changelog", search: "", hash: "" }, { replaceState: vi.fn() }, () => store)).toBe(true);
+    expect(
+      takeFromGameFlag({ pathname: "/help/changelog", search: "", hash: "" }, { replaceState: vi.fn() }, () => store),
+    ).toBe(true);
   });
 
   it("is a plain visit with no marker and nothing stored", () => {
@@ -328,9 +374,10 @@ describe("helpVisitSource", () => {
 });
 
 describe("repeatsEarlierLoad", () => {
-  const withType = (type: string | undefined) => ({
-    getEntriesByType: vi.fn(() => (type === undefined ? [] : [{ type }])),
-  }) as unknown as Pick<Performance, "getEntriesByType">;
+  const withType = (type: string | undefined) =>
+    ({
+      getEntriesByType: vi.fn(() => (type === undefined ? [] : [{ type }])),
+    }) as unknown as Pick<Performance, "getEntriesByType">;
 
   it("is true for a reload or a step back or forward, and reads the navigation entry", () => {
     const reload = withType("reload");

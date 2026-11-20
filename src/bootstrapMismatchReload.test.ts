@@ -36,8 +36,20 @@ function stubWebGL(): void {
   });
 }
 
-const detail = { file: "wasm", expected: "111111111111", found: "222222222222", expectedPackage: "aaaaaaaaaaaa", servedPackage: "bbbbbbbbbbbb", controlled: false } as const;
-const refused = (kind: PackageFailure["kind"], controlled = false) => new EngineBootError("package-mismatch", "the engine binary is not the one this build expects", { ...detail, kind, controlled });
+const detail = {
+  file: "wasm",
+  expected: "111111111111",
+  found: "222222222222",
+  expectedPackage: "aaaaaaaaaaaa",
+  servedPackage: "bbbbbbbbbbbb",
+  controlled: false,
+} as const;
+const refused = (kind: PackageFailure["kind"], controlled = false) =>
+  new EngineBootError("package-mismatch", "the engine binary is not the one this build expects", {
+    ...detail,
+    kind,
+    controlled,
+  });
 
 /** Every event the relay saw, by name. */
 const sent = (name: string): Record<string, unknown>[] =>
@@ -79,10 +91,15 @@ describe("bootGame with engine files from another build", () => {
     await expect(run).resolves.toBeUndefined();
     expect(reloadForMatchingFiles).toHaveBeenCalledOnce();
     expect(create).not.toHaveBeenCalled();
-    expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot, "only the page that stays publishes its boot state").toBeUndefined();
+    expect(
+      (globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot,
+      "only the page that stays publishes its boot state",
+    ).toBeUndefined();
     expect(document.getElementById("boot-fallback-host")!.textContent).toContain(MISMATCH_RELOAD_LINE);
     expect(sent("app_action")).toEqual([expect.objectContaining({ action: "engine_reload", detail: "mismatch" })]);
-    expect(sent("engine_status").filter((r) => r.trigger === "settle")).toEqual([expect.objectContaining({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "load" })]);
+    expect(sent("engine_status").filter((r) => r.trigger === "settle")).toEqual([
+      expect.objectContaining({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "load" }),
+    ]);
     expect(JSON.parse(sessionStorage.getItem(MISMATCH_RELOAD_KEY)!)).toEqual([__APP_SHA__]);
   });
 
@@ -94,7 +111,9 @@ describe("bootGame with engine files from another build", () => {
     sessionStorage.setItem(MISMATCH_RELOAD_KEY, JSON.stringify([__APP_SHA__]));
     await expect(boot().run).rejects.toThrow(/did not start \(load\): package-mismatch, mismatch/);
     expect(reloadForMatchingFiles).not.toHaveBeenCalled();
-    expect((globalThis as { __vcEngineBoot?: { failure?: unknown } }).__vcEngineBoot?.failure).toMatchObject({ reason: "package-mismatch" });
+    expect((globalThis as { __vcEngineBoot?: { failure?: unknown } }).__vcEngineBoot?.failure).toMatchObject({
+      reason: "package-mismatch",
+    });
     expect(sent("app_action").filter((r) => r.action === "engine_reload")).toEqual([]);
     expect(document.getElementById("boot-fallback-host")!.textContent).toMatch(/do not match this version of the game/);
   });

@@ -9,7 +9,14 @@ import { draftTower, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
 import type { Picked, TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
-import { kitOf, portOf, unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
+import {
+  kitOf,
+  portOf,
+  unitEditor,
+  transportEditor,
+  editorPortDeps,
+  inspectorPortDeps,
+} from "../../game/cardKit.fixture";
 import { announceForPlacement, snapX, type PlaceOutcome } from "../../ui/placement";
 import { BuildActions } from "../../game/buildActions";
 import { EditorActions } from "../../game/editorActions";
@@ -154,7 +161,9 @@ describe.skipIf(noEngine)("BuildActions (the money boundary)", () => {
     const before = sim.money;
     expect(await build.tryRemoveUnit(office, "sell")).toBe(false);
     expect(sim.money).toBe(before);
-    expect(f.toasts).toEqual([{ text: "You can't sell a burning unit. Call fire rescue or let it burn out.", kind: "bad" }]);
+    expect(f.toasts).toEqual([
+      { text: "You can't sell a burning unit. Call fire rescue or let it burn out.", kind: "bad" },
+    ]);
     expect(f.sfx).toEqual(["error"]);
     expect(unitsOf(sim).find((u) => u.id === office.id)?.state).toBe("fire");
   });
@@ -356,18 +365,20 @@ describe.skipIf(noEngine)("SaveLoad (tower-swap contracts)", () => {
     sim = draftTower();
     f = fakes();
     adopted = [];
-    saveLoad = new SaveLoad(withPorts({
-      getSim: () => sim,
-      getView: () => null,
-      adoptSim: (s) => {
-        adopted.push(s);
-      },
-      ui: f.ui,
-      showCrashScreen: () => {},
-      showRecoveryWait: () => () => {},
-      attemptGraphicsRecovery: () => {},
-      armOnboarding: () => {},
-    }));
+    saveLoad = new SaveLoad(
+      withPorts({
+        getSim: () => sim,
+        getView: () => null,
+        adoptSim: (s) => {
+          adopted.push(s);
+        },
+        ui: f.ui,
+        showCrashScreen: () => {},
+        showRecoveryWait: () => () => {},
+        attemptGraphicsRecovery: () => {},
+        armOnboarding: () => {},
+      }),
+    );
   });
 
   it("newGame adopts a fresh tower (the dep's shape forbids preserving the undo trail)", () => {
@@ -430,18 +441,20 @@ describe.skipIf(noEngine)("SaveLoad (tower-swap contracts)", () => {
     // engine; the manual path's no-escaped-throw contract covers the stamp
     // too, while the silent path still propagates it to its own callers.
     const f2 = fakes();
-    const throwing = new SaveLoad(withPorts({
-      getSim: () => sim,
-      getView: () => {
-        throw new Error("context lost");
-      },
-      adoptSim: () => {},
-      ui: f2.ui,
-      showCrashScreen: () => {},
-      showRecoveryWait: () => () => {},
-      attemptGraphicsRecovery: () => {},
-      armOnboarding: () => {},
-    }));
+    const throwing = new SaveLoad(
+      withPorts({
+        getSim: () => sim,
+        getView: () => {
+          throw new Error("context lost");
+        },
+        adoptSim: () => {},
+        ui: f2.ui,
+        showCrashScreen: () => {},
+        showRecoveryWait: () => () => {},
+        attemptGraphicsRecovery: () => {},
+        armOnboarding: () => {},
+      }),
+    );
     expect(() => throwing.save()).not.toThrow();
     expect(f2.toasts).toEqual([{ text: "Save failed: context lost", kind: "bad" }]);
     expect(() => throwing.save(true)).toThrow(/context lost/);
@@ -574,7 +587,8 @@ describe.skipIf(noEngine)("KeyboardPlay (commit announcements)", () => {
     const pickedAt = (floor: number, tile: number): Picked | null => {
       sim.settle();
       const u = sim.tower.unitAt(floor, tile);
-      if (u && u.kind !== "floor" && u.kind !== "lobby") return { type: "unit", id: u.id, kind: u.kind as FacilityKind };
+      if (u && u.kind !== "floor" && u.kind !== "lobby")
+        return { type: "unit", id: u.id, kind: u.kind as FacilityKind };
       const t = (sim.tower.transports as unknown as Transport[]).find(
         (tr) => tile >= tr.x && tile < tr.x + tr.width && floor >= tr.bottom && floor <= tr.top,
       );
@@ -626,7 +640,9 @@ describe.skipIf(noEngine)("KeyboardPlay (commit announcements)", () => {
     tool = { type: "build", kind: "floor" };
     await keyboard.commitCursor(); // paints on floor 3 support? no: floor 2 already built…
     // …so the honest line is the "already built here" reason, verbatim.
-    expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: false, reason: "Floor already built here" }, CAT, "floor", 2));
+    expect(last(announced)).toBe(
+      announceForPlacement({ what: "paint", ok: false, reason: "Floor already built here" }, CAT, "floor", 2),
+    );
     keyboard.moveCursor(0, 1); // floor 3: fresh tiles above the strip
     await keyboard.commitCursor();
     expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: true }, CAT, "floor", 3));

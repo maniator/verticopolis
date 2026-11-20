@@ -82,7 +82,9 @@ export function starUpTemplate(screen: StarUpScreen, onOk: () => void): Template
       : nothing;
   // Inside the Statistics dialog's grid, as there: a bare `.win-title` child of
   // the box would take the box's sticky title-bar rule and cover the text above.
-  const next = h?.next ? html`<div class="stats-grid star-up-next">${nextStarSection(h.next, screen.topFloor)}</div>` : nothing;
+  const next = h?.next
+    ? html`<div class="stats-grid star-up-next">${nextStarSection(h.next, screen.topFloor)}</div>`
+    : nothing;
   return html`<h2>${iconTemplate("milestone", { size: 20 })}Star Rating</h2>
     <p class="star-up-rating" aria-label=${`${screen.star} stars`}>${stars(screen.star)}</p>
     <p>Congratulations! Your tower is now rated <b>${screen.star} stars</b>.</p>

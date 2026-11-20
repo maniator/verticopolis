@@ -24,8 +24,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // VC_PUBLIC_SRC and VC_PUBLIC_DIST point the check at fixture trees; its test
 // uses them (publicFiles.test.ts). Honored only under vitest, so a stray
 // variable in a real build cannot check another tree.
-const PUBLIC = process.env.VITEST && process.env.VC_PUBLIC_SRC ? resolve(process.env.VC_PUBLIC_SRC) : join(ROOT, "src", "public");
-const DIST = process.env.VITEST && process.env.VC_PUBLIC_DIST ? resolve(process.env.VC_PUBLIC_DIST) : join(ROOT, "dist");
+const PUBLIC =
+  process.env.VITEST && process.env.VC_PUBLIC_SRC ? resolve(process.env.VC_PUBLIC_SRC) : join(ROOT, "src", "public");
+const DIST =
+  process.env.VITEST && process.env.VC_PUBLIC_DIST ? resolve(process.env.VC_PUBLIC_DIST) : join(ROOT, "dist");
 
 function fail(msg: string): never {
   process.stderr.write(`verify-public-files: ${msg}\n`);
@@ -45,7 +47,8 @@ function filesUnder(dir: string, base: string, ancestors: readonly string[] = []
   } catch {
     fail(`src/public/${relative(base, dir).replace(/\\/g, "/") || "."} cannot be read`);
   }
-  if (ancestors.includes(real)) fail(`src/public/${relative(base, dir).replace(/\\/g, "/") || "."} links back to a folder above it`);
+  if (ancestors.includes(real))
+    fail(`src/public/${relative(base, dir).replace(/\\/g, "/") || "."} links back to a folder above it`);
   const chain = [...ancestors, real];
   for (const entry of entries) {
     const p = join(dir, entry.name);

@@ -62,7 +62,8 @@ const isRunner = (rel: string): boolean => ENGINE_RUNNERS.includes(rel);
 const isUnitTest = (rel: string): boolean => /\.test\.tsx?$/.test(rel) && !/\.integration\.test\.tsx?$/.test(rel);
 /** Test-support code a unit test's reach is followed through: production
  *  modules are the code under test, which a unit test mocks at its boundary. */
-const isTestSupport = (rel: string): boolean => (rel.startsWith("src/tests/") && !isTestFile(rel)) || /\.fixture\.tsx?$/.test(rel);
+const isTestSupport = (rel: string): boolean =>
+  (rel.startsWith("src/tests/") && !isTestFile(rel)) || /\.fixture\.tsx?$/.test(rel);
 
 /** The names a file imports at runtime from `spec`, or null when it imports
  *  the module whole (a namespace, a default, a side effect, a dynamic import). */
@@ -70,16 +71,28 @@ function namedImports(source: ts.SourceFile, spec: string): string[] | null {
   const names: string[] = [];
   let whole = false;
   source.forEachChild((node) => {
-    if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === spec && !node.isTypeOnly) {
+    if (
+      ts.isExportDeclaration(node) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      node.moduleSpecifier.text === spec &&
+      !node.isTypeOnly
+    ) {
       // A fixture that re-exports a runner hands it on: count what it passes.
       if (!node.exportClause || !ts.isNamedExports(node.exportClause)) return void (whole = true);
       for (const e of node.exportClause.elements) if (!e.isTypeOnly) names.push((e.propertyName ?? e.name).text);
       return;
     }
-    if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier) || node.moduleSpecifier.text !== spec) return;
+    if (
+      !ts.isImportDeclaration(node) ||
+      !ts.isStringLiteral(node.moduleSpecifier) ||
+      node.moduleSpecifier.text !== spec
+    )
+      return;
     const clause = node.importClause;
     if (clause?.isTypeOnly) return;
-    if (!clause || clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) return void (whole = true);
+    if (!clause || clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings))
+      return void (whole = true);
     for (const e of clause.namedBindings.elements) if (!e.isTypeOnly) names.push((e.propertyName ?? e.name).text);
   });
   return whole ? null : names;
@@ -101,7 +114,8 @@ function wholeLoads(source: ts.SourceFile): Array<{ spec: string; kind: "dynamic
 }
 
 /** The source file an extensionless module path names, if one exists. */
-const sourceOf = (base: string, has: (rel: string) => boolean): string | undefined => [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`].find(has);
+const sourceOf = (base: string, has: (rel: string) => boolean): string | undefined =>
+  [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`].find(has);
 
 /** One module a file loads: the specifier as written, the repo-relative path
  *  it resolves to (none for a package), and for a runner, the names a static
@@ -120,13 +134,15 @@ function loadsOf(rel: string, read: (rel: string) => string): Load[] {
   if (cached) return cached;
   const text = read(rel);
   const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true);
-  const loads = [...scanRuntimeImports(rel, text, source).imports, ...wholeLoads(source)].map(({ spec, kind }): Load => {
-    const target = resolveRelative(rel, spec);
-    // A dynamic import hands back the whole module, so only static named
-    // imports of the probes pass.
-    const names = target && isRunner(target) && kind === "static" ? namedImports(source, spec) : null;
-    return { raw: target ?? spec, target, names };
-  });
+  const loads = [...scanRuntimeImports(rel, text, source).imports, ...wholeLoads(source)].map(
+    ({ spec, kind }): Load => {
+      const target = resolveRelative(rel, spec);
+      // A dynamic import hands back the whole module, so only static named
+      // imports of the probes pass.
+      const names = target && isRunner(target) && kind === "static" ? namedImports(source, spec) : null;
+      return { raw: target ?? spec, target, names };
+    },
+  );
   byFile.set(rel, loads);
   return loads;
 }
@@ -175,7 +191,10 @@ function callRoot(call: ts.CallExpression): string | null {
  *  function only runs when something calls it by name. */
 function passedToCall(fn: ts.Node): boolean {
   const parent = fn.parent;
-  return (ts.isCallExpression(parent) || ts.isNewExpression(parent)) && (parent.arguments?.some((arg) => arg === fn) ?? false);
+  return (
+    (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+    (parent.arguments?.some((arg) => arg === fn) ?? false)
+  );
 }
 
 /** True when `node` makes a call that `asserts` accepts. Comments and strings
@@ -212,7 +231,8 @@ function registersTest(callee: ts.Expression): boolean {
 /** The scope a declaration lives in: the nearest block, module or file. */
 function scopeOf(node: ts.Node): ts.Node {
   let n = node.parent;
-  while (!ts.isBlock(n) && !ts.isSourceFile(n) && !ts.isModuleBlock(n) && !ts.isCaseClause(n) && !ts.isDefaultClause(n)) n = n.parent;
+  while (!ts.isBlock(n) && !ts.isSourceFile(n) && !ts.isModuleBlock(n) && !ts.isCaseClause(n) && !ts.isDefaultClause(n))
+    n = n.parent;
   return n;
 }
 
@@ -232,7 +252,12 @@ export function assertionFreeTests(rel: string, text: string): string[] {
   };
   const collect = (node: ts.Node): void => {
     if (ts.isFunctionDeclaration(node) && node.name && node.body) declare(node, node.name.text, node.body);
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
       declare(node, node.name.text, node.initializer.body);
     }
     node.forEachChild(collect);
@@ -256,7 +281,7 @@ export function assertionFreeTests(rel: string, text: string): string[] {
     return root !== null && assertsThrough(root, call);
   };
   const helpers = [...scopes.values()].flatMap((m) => [...m.values()]);
-  for (let grew = true; grew; ) {
+  for (let grew = true; grew;) {
     grew = false;
     for (const body of helpers) {
       if (!asserting.has(body) && callsAny(body, isAssertCall)) {
@@ -269,10 +294,13 @@ export function assertionFreeTests(rel: string, text: string): string[] {
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
       if (registersTest(node.expression)) {
-        const body = node.arguments.slice(1).find((a) => ts.isArrowFunction(a) || ts.isFunctionExpression(a) || ts.isIdentifier(a));
+        const body = node.arguments
+          .slice(1)
+          .find((a) => ts.isArrowFunction(a) || ts.isFunctionExpression(a) || ts.isIdentifier(a));
         // A callback passed by name asserts only when it is a same-file helper that does.
         const named = body && ts.isIdentifier(body) ? resolveName(body.text, body) : undefined;
-        const asserts = body && (ts.isIdentifier(body) ? named !== undefined && asserting.has(named) : callsAny(body, isAssertCall));
+        const asserts =
+          body && (ts.isIdentifier(body) ? named !== undefined && asserting.has(named) : callsAny(body, isAssertCall));
         if (body && !asserts) out.push(`${rel} > ${node.arguments[0]?.getText(source) ?? ""}`);
       }
     }
@@ -298,8 +326,12 @@ function parseAllow(text: string): Map<string, string> {
 const read = (rel: string): string => readFileSync(resolve(repoRoot, rel), "utf8");
 const exists = (rel: string): boolean => existsSync(resolve(repoRoot, rel));
 const allow = parseAllow(read("src/tests/testHonesty.allow.txt"));
-const srcTests = sourceFiles("src", [".ts", ".tsx"]).map(repoRel).filter((rel) => !rel.endsWith(".d.ts"));
-const e2eSpecs = sourceFiles("e2e", [".ts"]).map(repoRel).filter((rel) => rel.endsWith(".spec.ts"));
+const srcTests = sourceFiles("src", [".ts", ".tsx"])
+  .map(repoRel)
+  .filter((rel) => !rel.endsWith(".d.ts"));
+const e2eSpecs = sourceFiles("e2e", [".ts"])
+  .map(repoRel)
+  .filter((rel) => rel.endsWith(".spec.ts"));
 const unitTests = srcTests.filter(isUnitTest);
 /** Compile-time suites: their checks are type errors, so a body need not call expect. */
 const isTypeSuite = (rel: string): boolean => rel.endsWith(".types.test.ts");
@@ -323,9 +355,15 @@ describe("unit tests mock the engine; integration tests run it", () => {
       "src/game/f.test.ts": 'import { start } from "./f.fixture";',
       "src/game/f.fixture.ts": 'export { wasm as start } from "../tests/conformance/wasmEngine";',
       "src/game/g.test.ts": 'const { wasm } = await import("../tests/conformance/wasmEngine");',
-      "src/game/h.test.ts": 'const real = await vi.importActual<typeof import("../tests/conformance/wasmEngine")>("../tests/conformance/wasmEngine");',
+      "src/game/h.test.ts":
+        'const real = await vi.importActual<typeof import("../tests/conformance/wasmEngine")>("../tests/conformance/wasmEngine");',
     };
-    const reach = (rel: string) => engineReach(rel, (r) => files[r] ?? "", (r) => r in files);
+    const reach = (rel: string) =>
+      engineReach(
+        rel,
+        (r) => files[r] ?? "",
+        (r) => r in files,
+      );
     expect(reach("src/game/a.test.ts")).toBe("src/game/a.test.ts -> src/tests/conformance/wasmEngine");
     expect(reach("src/game/b.test.ts")).toBeNull();
     expect(reach("src/game/c.test.ts")).toBe("src/game/c.test.ts -> src/game/c.fixture.ts -> src/tests/portKit/drafts");
@@ -333,11 +371,15 @@ describe("unit tests mock the engine; integration tests run it", () => {
     expect(reach("src/game/e.test.ts")).toContain("@verticopolis/engine/tooling/");
     expect(reach("src/game/g.test.ts")).toBe("src/game/g.test.ts -> src/tests/conformance/wasmEngine");
     expect(reach("src/game/h.test.ts")).toBe("src/game/h.test.ts -> src/tests/conformance/wasmEngine");
-    expect(reach("src/game/f.test.ts")).toBe("src/game/f.test.ts -> src/game/f.fixture.ts -> src/tests/conformance/wasmEngine");
+    expect(reach("src/game/f.test.ts")).toBe(
+      "src/game/f.test.ts -> src/game/f.fixture.ts -> src/tests/conformance/wasmEngine",
+    );
   });
 
   it("no unit test reaches a real engine beyond the allowlist", () => {
-    const found = unitTests.map((rel) => [rel, engineReach(rel, read, exists)] as const).filter(([rel, chain]) => chain !== null && !allow.has(rel));
+    const found = unitTests
+      .map((rel) => [rel, engineReach(rel, read, exists)] as const)
+      .filter(([rel, chain]) => chain !== null && !allow.has(rel));
     expect(
       found.map(([, chain]) => chain),
       "A unit test mocks the engine port with vi.fn spies and canned JSON answers. Move a test that needs the real engine to a *.integration.test.ts file (and add it to test:wasm:host when it needs the package), or rewrite it against a mock.",
@@ -347,19 +389,25 @@ describe("unit tests mock the engine; integration tests run it", () => {
 
 describe("no recorded engine answers", () => {
   it("has no recordings directory and no record script", () => {
-    const scanned = ["src", "e2e", "scripts"].flatMap((dir) => sourceFiles(dir, [".ts", ".tsx", ".json", ".mjs"]).map(repoRel));
-    expect(scanned.some((rel) => rel.startsWith("src/") && rel.endsWith(".json"))).toBe(true);
-    const dirs = scanned.filter((rel) =>
-      rel.split("/").includes("recordings"),
+    const scanned = ["src", "e2e", "scripts"].flatMap((dir) =>
+      sourceFiles(dir, [".ts", ".tsx", ".json", ".mjs"]).map(repoRel),
     );
-    expect(dirs, "Recorded engine answers replayed as a stand-in engine test nothing about the code under test (PR #1923).").toEqual([]);
+    expect(scanned.some((rel) => rel.startsWith("src/") && rel.endsWith(".json"))).toBe(true);
+    const dirs = scanned.filter((rel) => rel.split("/").includes("recordings"));
+    expect(
+      dirs,
+      "Recorded engine answers replayed as a stand-in engine test nothing about the code under test (PR #1923).",
+    ).toEqual([]);
     const scripts = Object.keys((JSON.parse(read("package.json")) as { scripts: Record<string, string> }).scripts);
     expect(scripts.filter((s) => /:record$/.test(s))).toEqual([]);
   });
 
   it("names no module for recordings beyond the allowlist", () => {
     const named = srcTests.filter((rel) => /recording/i.test(rel.split("/").pop()!) && !allow.has(rel));
-    expect(named, "A spy records the calls the code makes; a recording of engine answers is not a test. Allowlist a spy with its reason.").toEqual([]);
+    expect(
+      named,
+      "A spy records the calls the code makes; a recording of engine answers is not a test. Allowlist a spy with its reason.",
+    ).toEqual([]);
   });
 });
 
@@ -404,7 +452,10 @@ describe("every test asserts", () => {
 
   it("no test outside the allowlist asserts nothing", () => {
     const empty = assertingTiers.flatMap((rel) => assertionFreeTests(rel, read(rel))).filter((at) => !allow.has(at));
-    expect(empty, "Each test asserts what its name promises: the calls a mock saw, the state the code left, the value it returned.").toEqual([]);
+    expect(
+      empty,
+      "Each test asserts what its name promises: the calls a mock saw, the state the code left, the value it returned.",
+    ).toEqual([]);
   });
 
   it("keeps every allowlist entry live", () => {

@@ -16,19 +16,38 @@ import { unfoldFloorRuns } from "@verticopolis/components/shared/floorRuns";
 type Slots = Record<string, number>;
 interface Layout {
   version: number;
-  header: Slots; headerWidth: number;
-  person: Slots; personWidth: number;
-  unit: Slots; unitWidth: number;
-  transport: Slots; transportFixed: number;
-  car: Slots; carWidth: number;
-  structure: Slots; structureWidth: number;
-  room: Slots; roomWidth: number;
-  run: Slots; runWidth: number;
-  shaft: Slots; shaftFixed: number;
-  kinds: string[]; names: string[]; unitStates: string[]; personStates: string[]; weather: string[];
-  modes: string[]; calendars: string[]; metaRecord: string[];
+  header: Slots;
+  headerWidth: number;
+  person: Slots;
+  personWidth: number;
+  unit: Slots;
+  unitWidth: number;
+  transport: Slots;
+  transportFixed: number;
+  car: Slots;
+  carWidth: number;
+  structure: Slots;
+  structureWidth: number;
+  room: Slots;
+  roomWidth: number;
+  run: Slots;
+  runWidth: number;
+  shaft: Slots;
+  shaftFixed: number;
+  kinds: string[];
+  names: string[];
+  unitStates: string[];
+  personStates: string[];
+  weather: string[];
+  modes: string[];
+  calendars: string[];
+  metaRecord: string[];
 }
-interface Meta { revision: number; full: boolean; units: (number | string | null)[][] }
+interface Meta {
+  revision: number;
+  full: boolean;
+  units: (number | string | null)[][];
+}
 type Engine = {
   viewLayout(): string;
   viewStructure(): Float64Array;
@@ -97,9 +116,15 @@ describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)"
     const l = layout();
     expect(l.version).toBe(34);
     const tables: [Slots, number][] = [
-      [l.header, l.headerWidth], [l.person, l.personWidth], [l.unit, l.unitWidth],
-      [l.transport, l.transportFixed], [l.car, l.carWidth], [l.structure, l.structureWidth],
-      [l.room, l.roomWidth], [l.run, l.runWidth], [l.shaft, l.shaftFixed],
+      [l.header, l.headerWidth],
+      [l.person, l.personWidth],
+      [l.unit, l.unitWidth],
+      [l.transport, l.transportFixed],
+      [l.car, l.carWidth],
+      [l.structure, l.structureWidth],
+      [l.room, l.roomWidth],
+      [l.run, l.runWidth],
+      [l.shaft, l.shaftFixed],
     ];
     for (const [slots, width] of tables) {
       expect(Object.values(slots).sort((a, b) => a - b)).toEqual([...Array(width).keys()]);
@@ -121,7 +146,13 @@ describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)"
     let at = l.structureWidth;
     for (const u of rooms) {
       const r = (name: string) => v[at + l.room[name]];
-      expect([r("id"), l.kinds[r("kind")], r("floor"), r("x"), r("width")]).toEqual([u.id, u.kind, u.floor, u.x, widths.get(u.kind)]);
+      expect([r("id"), l.kinds[r("kind")], r("floor"), r("x"), r("width")]).toEqual([
+        u.id,
+        u.kind,
+        u.floor,
+        u.x,
+        widths.get(u.kind),
+      ]);
       at += l.roomWidth;
     }
     // Every floor and lobby tile in exactly one run.
@@ -130,15 +161,26 @@ describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)"
     expect(h("runs")).toBe(3);
     for (let k = 0; k < h("runs"); k++) {
       const r = (name: string) => v[at + l.run[name]];
-      for (let i = 0; i < r("count"); i++) tiles.push(`${l.kinds[r("kind")]}@${r("floor")},${r("x") + i * r("width")}x${r("width")}`);
+      for (let i = 0; i < r("count"); i++)
+        tiles.push(`${l.kinds[r("kind")]}@${r("floor")},${r("x") + i * r("width")}x${r("width")}`);
       at += l.runWidth;
     }
-    const want = save.units.filter((u) => STRUCTURAL.has(u.kind)).map((u) => `${u.kind}@${u.floor},${u.x}x${widths.get(u.kind)}`);
+    const want = save.units
+      .filter((u) => STRUCTURAL.has(u.kind))
+      .map((u) => `${u.kind}@${u.floor},${u.x}x${widths.get(u.kind)}`);
     expect(tiles.sort()).toEqual(want.sort());
     expect(h("shafts")).toBe(save.transports.length);
     for (const t of save.transports) {
       const s = (name: string) => v[at + l.shaft[name]];
-      expect([s("id"), l.kinds[s("kind")], s("x"), s("width"), s("bottom"), s("top"), s("cars")]).toEqual([t.id, t.kind, t.x, widths.get(t.kind), t.bottom, t.top, t.cars]);
+      expect([s("id"), l.kinds[s("kind")], s("x"), s("width"), s("bottom"), s("top"), s("cars")]).toEqual([
+        t.id,
+        t.kind,
+        t.x,
+        widths.get(t.kind),
+        t.bottom,
+        t.top,
+        t.cars,
+      ]);
       at += l.shaftFixed + s("skips");
     }
     expect(at).toBe(v.length);

@@ -25,7 +25,9 @@ function buildFullModernPalette(): void {
   for (let f = 2; f <= 4; f++) for (let x = cx - 20; x <= cx + 20; x++) s.tower.place("floor", f, x);
   const lift = s.tower.placeTransport("elevatorStandard", cx - 16, 1, 4);
   if (!lift.ok) throw new Error("palette-fit: the elevator did not place");
-  const floors = (s.tower.units as { kind: string; floor: number }[]).filter((u) => u.kind === "floor" && u.floor === 4);
+  const floors = (s.tower.units as { kind: string; floor: number }[]).filter(
+    (u) => u.kind === "floor" && u.floor === 4,
+  );
   if (floors.length === 0) throw new Error("palette-fit: floor 4 did not place");
   if (s.star !== 5) throw new Error("palette-fit: the tower is not at five stars");
 }
@@ -53,7 +55,8 @@ export const PALETTE_FIT_SCENES: Scene[] = [
         crop: "#palette",
         frame: { floor: 3, zoom: 1.0 },
         setup: async (page) => {
-          for (const group of ["Living", "Leisure", "Services"]) await page.click(`.pal-group[data-group="${group}"] > .pal-group-title[role="button"]`);
+          for (const group of ["Living", "Leisure", "Services"])
+            await page.click(`.pal-group[data-group="${group}"] > .pal-group-title[role="button"]`);
           await page.waitForSelector('#palette:not(.pal-fit-columns) .pal-group.pal-folded[data-group="Services"]');
           // The list moved up under the pointer: park it on the top bar so no
           // row shows its hover.
@@ -73,7 +76,9 @@ export const PALETTE_FIT_SCENES: Scene[] = [
           // Park the pointer on the top bar, off the strip and the tower, and
           // let the canvas take its new size before the settle.
           await page.mouse.move(640, 10);
-          await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+          await page.evaluate(
+            () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+          );
         },
       },
     ],

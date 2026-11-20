@@ -1,4 +1,11 @@
-import { cleanFileName, copyName, FileNameTakenError, freeName, type TowerFileEntry, type TowerFileKind } from "./fileSpace";
+import {
+  cleanFileName,
+  copyName,
+  FileNameTakenError,
+  freeName,
+  type TowerFileEntry,
+  type TowerFileKind,
+} from "./fileSpace";
 
 /**
  * A folder on the player's own computer, linked to the Open and Save As
@@ -90,7 +97,9 @@ function changed(): void {
  *  page, in the top window (pickers are refused in a frame). */
 export function canLinkFolder(win: Window = window): boolean {
   try {
-    return typeof (win as PickerWindow).showDirectoryPicker === "function" && win.isSecureContext && win.top === win.self;
+    return (
+      typeof (win as PickerWindow).showDirectoryPicker === "function" && win.isSecureContext && win.top === win.self
+    );
   } catch {
     return false;
   }
@@ -142,7 +151,8 @@ async function scan(entry: Linked): Promise<void> {
     const kind = item.kind === "file" ? linkedFileKind(item.name) : null;
     if (!kind) continue;
     const file = await readEntry(entry.handle, item.name);
-    if (file) entries.push({ id: item.name, name: shownName(item.name), kind, size: file.size, modified: file.lastModified });
+    if (file)
+      entries.push({ id: item.name, name: shownName(item.name), kind, size: file.size, modified: file.lastModified });
   }
   entry.entries = entries;
 }
@@ -375,7 +385,9 @@ export const linkedFolder = {
       // The name as the folder spells it first: a file named in a way this game
       // would not write (two spaces, a long name) is still the same file.
       const towers = folder.entries.filter((e) => e.kind === "tower");
-      const same = towers.find((e) => e.name === name) ?? towers.find((e) => e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
+      const same =
+        towers.find((e) => e.name === name) ??
+        towers.find((e) => e.name.toLocaleLowerCase() === clean.toLocaleLowerCase());
       if (same && !replace && !(await emptyOnDisk(folder, same.id))) throw new FileNameTakenError(clean);
       if (same) return writeFile(folder, same.id, bytes);
       return writeFresh(folder, clean, towers, bytes);
@@ -388,7 +400,14 @@ export const linkedFolder = {
     const folder = need();
     const clean = cleanFileName(name);
     if (!clean) throw new Error("Type a name for the tower.");
-    return oneSaveAtATime(() => writeFresh(folder, clean, folder.entries.filter((e) => e.kind === "tower"), bytes));
+    return oneSaveAtATime(() =>
+      writeFresh(
+        folder,
+        clean,
+        folder.entries.filter((e) => e.kind === "tower"),
+        bytes,
+      ),
+    );
   },
 
   /** Write `bytes` over the file `id` itself, by its name on disk, for File >
@@ -404,7 +423,10 @@ export const linkedFolder = {
     const bytes = source ? await linkedFolder.read(id) : null;
     if (!source || !bytes) throw new Error("That tower is gone from the folder.");
     const ext = id.slice(id.lastIndexOf("."));
-    const name = copyName(source.name, folder.entries.filter((e) => e.kind === source.kind));
+    const name = copyName(
+      source.name,
+      folder.entries.filter((e) => e.kind === source.kind),
+    );
     if (await exists(folder, `${name}${ext}`)) throw new FileNameTakenError(name);
     return writeFile(folder, `${name}${ext}`, bytes);
   },
@@ -413,7 +435,12 @@ export const linkedFolder = {
 /** Write a new file `clean.vctower`, or the first "clean (2)" and up that
  *  neither `towers` nor the disk has: a file another program wrote since the
  *  list was read is never replaced without asking. */
-async function writeFresh(folder: Linked, clean: string, towers: readonly TowerFileEntry[], bytes: Uint8Array): Promise<TowerFileEntry> {
+async function writeFresh(
+  folder: Linked,
+  clean: string,
+  towers: readonly TowerFileEntry[],
+  bytes: Uint8Array,
+): Promise<TowerFileEntry> {
   // An empty file is free to take: it is what a failed new-name save leaves.
   const taken = towers.filter((e) => e.size > 0);
   let pick = freeName(clean, taken);
@@ -472,7 +499,15 @@ async function writeFile(folder: Linked, filename: string, bytes: Uint8Array): P
   // its old list rather than calling the save a failure.
   await scan(folder).catch(() => {});
   changed();
-  return folder.entries.find((e) => e.id === filename) ?? { id: filename, name: shownName(filename), kind: linkedFileKind(filename) ?? "tower", size: bytes.byteLength, modified: Date.now() };
+  return (
+    folder.entries.find((e) => e.id === filename) ?? {
+      id: filename,
+      name: shownName(filename),
+      kind: linkedFileKind(filename) ?? "tower",
+      size: bytes.byteLength,
+      modified: Date.now(),
+    }
+  );
 }
 
 /** Forget everything this page knew, as a reload does, for tests; `factory`

@@ -46,7 +46,9 @@ describe.skipIf(noEngine)("the port's reads on the conformance saves", () => {
 
   it("answers every story of a taller room as the tower's own index does", () => {
     // split-tower-4 holds cinemas and party halls (2 floors) and a metro (3).
-    const e = engineFromSave(JSON.stringify(decodeVctower(readFileSync(resolve(CONFORMANCE_ROOT, "fixtures/split-tower-4.vctower"), "utf8"))));
+    const e = engineFromSave(
+      JSON.stringify(decodeVctower(readFileSync(resolve(CONFORMANCE_ROOT, "fixtures/split-tower-4.vctower"), "utf8"))),
+    );
     const r = newViewReader(e);
     const floorsOf = floorsOfPort(e);
     const own = look(e).tower;

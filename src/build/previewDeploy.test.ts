@@ -1,5 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
-import { applyHelpHostWorker, applyPreviewWorker, HELP_HOST_SERVICE_WORKER, helpHostWorkerProblem, isPreviewDeploy, PRECACHE_CALL, productionWorkerProblem, RETIRING_SERVICE_WORKER, RETIRING_WORKER_MARKER } from "./previewDeploy";
+import {
+  applyHelpHostWorker,
+  applyPreviewWorker,
+  HELP_HOST_SERVICE_WORKER,
+  helpHostWorkerProblem,
+  isPreviewDeploy,
+  PRECACHE_CALL,
+  productionWorkerProblem,
+  RETIRING_SERVICE_WORKER,
+  RETIRING_WORKER_MARKER,
+} from "./previewDeploy";
 
 describe("isPreviewDeploy", () => {
   it("is true only for a Vercel preview build", () => {
@@ -109,7 +119,10 @@ describe("applyPreviewWorker (scripts/preview-service-worker.ts)", () => {
 
   it("replaces the built worker with the retiring one on a preview", () => {
     const io = files(true);
-    expect(applyPreviewWorker({ VERCEL_ENV: "preview" }, SW, io)).toEqual({ code: 0, message: expect.stringContaining("now unregisters itself") });
+    expect(applyPreviewWorker({ VERCEL_ENV: "preview" }, SW, io)).toEqual({
+      code: 0,
+      message: expect.stringContaining("now unregisters itself"),
+    });
     expect(io.exists).toHaveBeenCalledWith(SW);
     expect(io.write).toHaveBeenCalledExactlyOnceWith(SW, RETIRING_SERVICE_WORKER);
   });
@@ -117,7 +130,10 @@ describe("applyPreviewWorker (scripts/preview-service-worker.ts)", () => {
   it("leaves the production worker alone in production and outside Vercel, without looking at the file", () => {
     for (const env of [{ VERCEL_ENV: "production" }, {}]) {
       const io = files(true);
-      expect(applyPreviewWorker(env, SW, io)).toEqual({ code: 0, message: expect.stringContaining("stays the production worker") });
+      expect(applyPreviewWorker(env, SW, io)).toEqual({
+        code: 0,
+        message: expect.stringContaining("stays the production worker"),
+      });
       expect(io.exists).not.toHaveBeenCalled();
       expect(io.write).not.toHaveBeenCalled();
     }
@@ -125,7 +141,10 @@ describe("applyPreviewWorker (scripts/preview-service-worker.ts)", () => {
 
   it("fails on a preview whose build wrote no worker, and writes nothing", () => {
     const io = files(false);
-    expect(applyPreviewWorker({ VERCEL_ENV: "preview" }, SW, io)).toEqual({ code: 1, message: `preview-service-worker: ${SW} does not exist; did the build output move?` });
+    expect(applyPreviewWorker({ VERCEL_ENV: "preview" }, SW, io)).toEqual({
+      code: 1,
+      message: `preview-service-worker: ${SW} does not exist; did the build output move?`,
+    });
     expect(io.write).not.toHaveBeenCalled();
   });
 });
@@ -144,7 +163,10 @@ describe("applyHelpHostWorker (scripts/preview-service-worker.ts)", () => {
 
   it("fails when the help site was not built, and writes nothing", () => {
     const io = files(false);
-    expect(applyHelpHostWorker(HELP, SW, io)).toEqual({ code: 1, message: expect.stringContaining("build the help site first") });
+    expect(applyHelpHostWorker(HELP, SW, io)).toEqual({
+      code: 1,
+      message: expect.stringContaining("build the help site first"),
+    });
     expect(io.write).not.toHaveBeenCalled();
   });
 

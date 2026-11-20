@@ -5,7 +5,14 @@ import { browserStorage } from "../ui/overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../ui/paletteCollapse";
 import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";
 import { trackAppAction } from "../analytics";
-import { menuItemCodeOf, menuNameOf, trackMenuDismiss, trackMenuOpen, trackMenuPick, type MenuScreen } from "../analyticsMenus";
+import {
+  menuItemCodeOf,
+  menuNameOf,
+  trackMenuDismiss,
+  trackMenuOpen,
+  trackMenuPick,
+  type MenuScreen,
+} from "../analyticsMenus";
 import { isEngineStopped, isSplashUp } from "./interactionState";
 import { closeTower } from "./titleScreen";
 import { wireFileShortcuts, type FileCommands } from "./fileShortcuts";
@@ -162,7 +169,9 @@ export function wireMenus(app: GameApp): MenuBar | null {
 
   // Tower Info and Bulletin. A phone starts both closed.
   const onPhone = app.mobileMq?.matches ?? false;
-  const floating = (Object.entries(MENU_WINDOW) as [keyof typeof MENU_WINDOW, (typeof MENU_WINDOW)[keyof typeof MENU_WINDOW]][]).map(([name, w]) => {
+  const floating = (
+    Object.entries(MENU_WINDOW) as [keyof typeof MENU_WINDOW, (typeof MENU_WINDOW)[keyof typeof MENU_WINDOW]][]
+  ).map(([name, w]) => {
     const win = document.getElementById(w.id);
     if (win) {
       // On the 1994 desk the desk counts the move (desk_window <window>_move).
@@ -196,7 +205,11 @@ export function wireMenus(app: GameApp): MenuBar | null {
   // File: Open…, Save and Save As… also answer to their keys. Open and Save
   // As show My Towers (fileSpaceCommands.ts).
   // The analytics tell a menu pick from its Ctrl+O key.
-  const file = { open: () => showOpenDialog(app, "key"), save: () => ui.cb.onSave(), saveAs: () => showSaveAsDialog(app) };
+  const file = {
+    open: () => showOpenDialog(app, "key"),
+    save: () => ui.cb.onSave(),
+    saveAs: () => showSaveAsDialog(app),
+  };
   on("mb-quick-save", file.save);
   on("mb-close", () => closeTower(app));
   on("mb-import", () => showOpenDialog(app, "menu"));
@@ -240,7 +253,11 @@ export function wireMenus(app: GameApp): MenuBar | null {
   // attribute writes, on a body child or class change only.
   fitToScreen(titleScreenUp());
   if (typeof MutationObserver === "function") {
-    new MutationObserver(() => fitToScreen(titleScreenUp())).observe(document.body, { childList: true, attributes: true, attributeFilter: ["class"] });
+    new MutationObserver(() => fitToScreen(titleScreenUp())).observe(document.body, {
+      childList: true,
+      attributes: true,
+      attributeFilter: ["class"],
+    });
   }
   // Capture runs before an item's own handlers: a grayed item does nothing,
   // and on the title screen a routed item presses the title screen's button.

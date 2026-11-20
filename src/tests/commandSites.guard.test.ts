@@ -80,11 +80,19 @@ const LIFECYCLE: ReadonlyMap<string, number> = new Map();
 const RECEIVER = /^(?:[A-Za-z_$]*[Ss]im[A-Za-z_$0-9]*|tower)$/;
 
 /** `=` and every compound assignment (`+=`, `??=`, `|=`, `**=` …). */
-const isAssignment = (kind: ts.SyntaxKind): boolean => kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+const isAssignment = (kind: ts.SyntaxKind): boolean =>
+  kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
 
 /** `x!`, `(x)`, `x as T`, `<T>x` and `x satisfies T` read as `x`. */
 function bare(node: ts.Expression): ts.Expression {
-  while (ts.isNonNullExpression(node) || ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isSatisfiesExpression(node)) node = node.expression;
+  while (
+    ts.isNonNullExpression(node) ||
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isTypeAssertionExpression(node) ||
+    ts.isSatisfiesExpression(node)
+  )
+    node = node.expression;
   return node;
 }
 
@@ -92,7 +100,10 @@ function bare(node: ts.Expression): ts.Expression {
  *  a destructuring pattern (`[sim.view] = [v]`, `({ a: sim.money } = o)`). */
 function targets(node: ts.Expression): ts.Expression[] {
   node = bare(node);
-  if (ts.isArrayLiteralExpression(node)) return node.elements.flatMap((e) => (ts.isOmittedExpression(e) ? [] : targets(ts.isSpreadElement(e) ? e.expression : e)));
+  if (ts.isArrayLiteralExpression(node))
+    return node.elements.flatMap((e) =>
+      ts.isOmittedExpression(e) ? [] : targets(ts.isSpreadElement(e) ? e.expression : e),
+    );
   if (ts.isObjectLiteralExpression(node)) {
     return node.properties.flatMap((p) => {
       if (ts.isPropertyAssignment(p)) return targets(p.initializer);
@@ -109,7 +120,8 @@ function targets(node: ts.Expression): ts.Expression[] {
 function member(node: ts.Expression): { object: ts.Expression; name: string } | undefined {
   node = bare(node);
   if (ts.isPropertyAccessExpression(node)) return { object: node.expression, name: node.name.text };
-  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) return { object: node.expression, name: node.argumentExpression.text };
+  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression))
+    return { object: node.expression, name: node.argumentExpression.text };
   return undefined;
 }
 
@@ -128,7 +140,13 @@ function isReceiver(node: ts.Expression, aliases: ReadonlySet<string>): boolean 
 function aliasesIn(file: ts.SourceFile): Set<string> {
   const aliases = new Set<string>();
   const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && isReceiver(node.initializer, aliases)) aliases.add(node.name.text);
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      isReceiver(node.initializer, aliases)
+    )
+      aliases.add(node.name.text);
     ts.forEachChild(node, visit);
   };
   visit(file);
@@ -150,11 +168,15 @@ function scanText(rel: string, text: string): Map<string, number> {
     if (ts.isCallExpression(node)) {
       let callee = member(node.expression);
       // `sim.build.call(sim, …)` and `.apply` / `.bind` call the method too.
-      if (callee && (callee.name === "call" || callee.name === "apply" || callee.name === "bind")) callee = member(callee.object) ?? callee;
+      if (callee && (callee.name === "call" || callee.name === "apply" || callee.name === "bind"))
+        callee = member(callee.object) ?? callee;
       if (callee && METHODS.has(callee.name) && isReceiver(callee.object, aliases)) bump(`${rel} ${callee.name}`);
     } else if (ts.isBinaryExpression(node) && isAssignment(node.operatorToken.kind)) {
       for (const target of targets(node.left)) write(target);
-    } else if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)) {
+    } else if (
+      (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+      (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+    ) {
       write(node.operand);
     } else if (ts.isDeleteExpression(node)) {
       write(node.expression);
@@ -179,7 +201,9 @@ describe("command sites", () => {
   it("sends every player command through the port, apart from slice 5's lifecycle writes", () => {
     const found = scan();
     const extra = [...found].filter(([key, n]) => n > (LIFECYCLE.get(key) ?? 0)).map(([key, n]) => `${key} (${n})`);
-    expect(extra, "a frontend file calls a command on the simulation or tower; send it through port.command()").toEqual([]);
+    expect(extra, "a frontend file calls a command on the simulation or tower; send it through port.command()").toEqual(
+      [],
+    );
   });
 
   it("names no lifecycle write that is gone", () => {

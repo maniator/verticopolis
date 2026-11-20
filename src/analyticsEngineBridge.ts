@@ -5,7 +5,13 @@ import type { GameplayEventSource } from "@verticopolis/components/port/portEven
 import { RateLimiter } from "./analyticsRateLimit";
 import { gameplaySession } from "./analyticsSession";
 import { nextAnalyticsTower } from "./analyticsTower";
-import { trackBombOutcome, trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice, trackFireOutcome } from "./analyticsActions";
+import {
+  trackBombOutcome,
+  trackEconomyAction,
+  trackEconomyActionOnce,
+  trackEmergencyChoice,
+  trackFireOutcome,
+} from "./analyticsActions";
 
 /**
  * The analytics engine bridge (#873 phase 2): the one place the game's gameplay
@@ -76,7 +82,14 @@ export interface EngineBridgeStats {
   engineDropped: number;
 }
 
-const freshStats = (): EngineBridgeStats => ({ rejected: 0, rateLimited: 0, drainFailures: 0, foldFailures: 0, discarded: 0, engineDropped: 0 });
+const freshStats = (): EngineBridgeStats => ({
+  rejected: 0,
+  rateLimited: 0,
+  drainFailures: 0,
+  foldFailures: 0,
+  discarded: 0,
+  engineDropped: 0,
+});
 /** Each kind of drop warns on the console once per page life, so a stream that
  *  goes dark (an engine that started adding a field every event now fails)
  *  shows up in a console without flooding it. */
@@ -150,7 +163,11 @@ function fold(event: GameplayEvent, now: number): void {
       if (event.payload.source === "player" && allowSend("emergency_choice", now)) {
         trackEmergencyChoice(event.payload.kind, event.payload.decision);
       }
-      if (event.payload.kind === "bombThreat" && event.payload.decision === "accept" && allowSend("bomb_outcome", now)) {
+      if (
+        event.payload.kind === "bombThreat" &&
+        event.payload.decision === "accept" &&
+        allowSend("bomb_outcome", now)
+      ) {
         trackBombOutcome("paid");
       }
       return;
@@ -227,7 +244,11 @@ function drain(source: GameplayEventSource, release = false): unknown[] | null {
 /** Drain `source` and fold its batch. A title backdrop's events are drained
  *  and dropped; a drain that fails folds nothing and is counted. Never
  *  throws: the frame loop calls it every frame. */
-export function drainEngineEvents(source: GameplayEventSource | undefined, now = monotonicNow(), release = false): void {
+export function drainEngineEvents(
+  source: GameplayEventSource | undefined,
+  now = monotonicNow(),
+  release = false,
+): void {
   if (!source) return;
   const batch = drain(source, release);
   if (!batch) return;

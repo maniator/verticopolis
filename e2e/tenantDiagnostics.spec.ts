@@ -16,7 +16,10 @@ import { buildInPage, expectEngineHosted } from "./helpers";
  * tests. A second, built tower covers the No Rate, shoppers-too-far and
  * notice lines.
  */
-const TOWER = readFileSync(new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower-4.vctower", import.meta.url), "utf8");
+const TOWER = readFileSync(
+  new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower-4.vctower", import.meta.url),
+  "utf8",
+);
 const PHONE = { width: 390, height: 844 };
 
 // A 75-floor tower on a software-rendered page draws slowly.
@@ -37,11 +40,13 @@ async function roomsWithSections(page: Page): Promise<Room[]> {
     const g = (window as any).game;
     const slots: string[] = JSON.parse(g.enginePort.viewLayout()).records.unitFacts;
     const sections = ["gripe", "wontLease", "notice"] as const;
-    const at = Object.fromEntries(sections.map((s) => {
-      const i = slots.indexOf(s);
-      if (i < 0) throw new Error(`the unitFacts layout has no "${s}" slot`);
-      return [s, i];
-    }));
+    const at = Object.fromEntries(
+      sections.map((s) => {
+        const i = slots.indexOf(s);
+        if (i < 0) throw new Error(`the unitFacts layout has no "${s}" slot`);
+        return [s, i];
+      }),
+    );
     const isSet = (facts: Float64Array, s: string): boolean => facts[at[s]] === 1;
     const rooms = new Map<number, { id: number; kind: string; sections: string[] }>();
     const taken = new Set<string>();
@@ -65,11 +70,14 @@ const COPY: Record<Section, string> = { gripe: "Main gripe:", wontLease: "Won't 
 /** Open `room` on the desktop inspector or, on a phone, in the editor, and
  *  return the block its diagnostics print in. */
 async function open(page: Page, room: { id: number; kind: string }, phone: boolean) {
-  await page.evaluate(({ id, kind, phone }) => {
-    const g = (window as any).game;
-    if (phone) g.selectPicked({ type: "unit", id, kind });
-    else g.inspector.inspectPicked({ type: "unit", id, kind });
-  }, { id: room.id, kind: room.kind, phone });
+  await page.evaluate(
+    ({ id, kind, phone }) => {
+      const g = (window as any).game;
+      if (phone) g.selectPicked({ type: "unit", id, kind });
+      else g.inspector.inspectPicked({ type: "unit", id, kind });
+    },
+    { id: room.id, kind: room.kind, phone },
+  );
   const surface = page.locator(phone ? "#editor .ed-diagnostics" : "#inspector");
   await expect(surface).toBeVisible();
   return surface;
@@ -82,9 +90,15 @@ async function expectOnce(surface: ReturnType<Page["locator"]>, copy: string, wh
   expect(count, `${what}: "${copy}" printed more than once`).toBe(1);
 }
 
-test("an imported tower's unhappy tenants explain themselves on the desktop card and the phone editor", async ({ page }) => {
+test("an imported tower's unhappy tenants explain themselves on the desktop card and the phone editor", async ({
+  page,
+}) => {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game), undefined, { timeout: 30_000 });
+  await page.waitForFunction(
+    () => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game),
+    undefined,
+    { timeout: 30_000 },
+  );
   await page.evaluate((text) => {
     const g = (window as any).game;
     g.onboarding.dismissSplash();
@@ -103,10 +117,12 @@ test("an imported tower's unhappy tenants explain themselves on the desktop card
   // no fresh tenant stays for: a room the move-in gate holds.
   const held = await page.evaluate(() => {
     const g = (window as any).game;
-    const office = g.sim.tower.units.find((u: any) =>
-      u.kind === "office" && u.state === "occupied" && !u.noRate && g.sim.tower.isFloorServed(u.floor));
+    const office = g.sim.tower.units.find(
+      (u: any) => u.kind === "office" && u.state === "occupied" && !u.noRate && g.sim.tower.isFloorServed(u.floor),
+    );
     if (!office) throw new Error("split-tower-4 has no occupied office on a served floor");
-    if (!g.enginePort.vacateUnit(office.id, "rent")) throw new Error(`the engine refused to vacate office ${office.id}`);
+    if (!g.enginePort.vacateUnit(office.id, "rent"))
+      throw new Error(`the engine refused to vacate office ${office.id}`);
     // A Modern price clamps to the band, so this asks for its top.
     g.enginePort.setRent(office.id, Number.MAX_SAFE_INTEGER);
     g.syncSim();
@@ -117,7 +133,9 @@ test("an imported tower's unhappy tenants explain themselves on the desktop card
   const present = rooms.flatMap((r) => r.sections);
   test.info().annotations.push({ type: "sections", description: present.join(", ") });
   expect(present, "the overpriced empty office must be a room that won't lease").toContain("wontLease");
-  expect(rooms.find((r) => r.sections.includes("wontLease"))?.id, "the held room is the office the test priced").toBe(held);
+  expect(rooms.find((r) => r.sections.includes("wontLease"))?.id, "the held room is the office the test priced").toBe(
+    held,
+  );
 
   for (const phone of [false, true]) {
     if (phone) await page.setViewportSize(PHONE);
@@ -146,13 +164,18 @@ async function loadSave(page: Page, save: string): Promise<void> {
 test("No Rate, shoppers too far, a notice and the editor's access row show on the Rust engine", async ({ page }) => {
   // Classic: Modern never holds the No Rate state, and both engines drop it on load there.
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game), undefined, { timeout: 30_000 });
+  await page.waitForFunction(
+    () => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game),
+    undefined,
+    { timeout: 30_000 },
+  );
   await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
   // Built on the page's own engine; the edit is self-contained, as it runs there too.
   const f = await buildInPage(page, lobbyDistanceFixture, "classic", ({ sim, office }) => {
     const room = (kind: string, floor: number, x: number): Unit => {
       const r = sim.tower.place(kind, floor, x);
-      if (!r.ok || r.unitId === undefined) throw new Error(`place ${kind} at ${floor},${x}: ${r.reason ?? "no reason"}`);
+      if (!r.ok || r.unitId === undefined)
+        throw new Error(`place ${kind} at ${floor},${x}: ${r.reason ?? "no reason"}`);
       return sim.tower.getUnit(r.unitId) as Unit;
     };
     office.noRate = true;
@@ -193,10 +216,18 @@ test("No Rate, shoppers too far, a notice and the editor's access row show on th
   // The phone editor (still at 390px): the access row for each security office,
   // and none for the office, whose diagnostics carry the access line instead.
   for (const [i, guard] of guards.entries()) {
-    await page.evaluate(({ id, kind }) => (window as any).game.selectPicked({ type: "unit", id, kind }), { id: guard.id, kind: guard.kind });
-    await expect(page.locator('#editor [data-field="served"]'), `security on floor ${guard.floor}`).toHaveText(access[i]);
+    await page.evaluate(({ id, kind }) => (window as any).game.selectPicked({ type: "unit", id, kind }), {
+      id: guard.id,
+      kind: guard.kind,
+    });
+    await expect(page.locator('#editor [data-field="served"]'), `security on floor ${guard.floor}`).toHaveText(
+      access[i],
+    );
   }
-  await page.evaluate(({ id, kind }) => (window as any).game.selectPicked({ type: "unit", id, kind }), { id: f.office.id, kind: f.office.kind });
+  await page.evaluate(({ id, kind }) => (window as any).game.selectPicked({ type: "unit", id, kind }), {
+    id: f.office.id,
+    kind: f.office.kind,
+  });
   await expect(page.locator("#editor .ed-diagnostics")).toContainText("No Rate: the tenant stays");
   await expect(page.locator("#editor .ed-diagnostics")).toContainText("Access:");
   await expect(page.locator('#editor [data-field="served"]')).toHaveCount(0);

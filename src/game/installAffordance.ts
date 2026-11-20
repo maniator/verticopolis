@@ -1,5 +1,12 @@
 import type { GameApp } from "../main";
-import { initPwaInstall, installAvailability, promptInstall, isStandalone, isIos, canPromptInstall } from "../pwaInstall";
+import {
+  initPwaInstall,
+  installAvailability,
+  promptInstall,
+  isStandalone,
+  isIos,
+  canPromptInstall,
+} from "../pwaInstall";
 import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { showInstallHelp } from "../ui/uiDialogs";
 import { isSplashUp } from "./interactionState";

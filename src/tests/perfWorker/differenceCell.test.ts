@@ -20,7 +20,10 @@ describe("differenceCell", () => {
   it("prints the median of wasm minus ts with the 95% interval of the median", () => {
     // Differences 0 to 9: median 4.5, interval x(2) to x(9) = 1 to 8.
     const ts = metric("ts", Array(10).fill(100));
-    const wasm = metric("wasm", Array.from({ length: 10 }, (_, i) => 100 + i));
+    const wasm = metric(
+      "wasm",
+      Array.from({ length: 10 }, (_, i) => 100 + i),
+    );
     expect(differenceCell(wasm, ts)).toBe("4.50 [1.00, 8.00], 10 pairs (wasm minus ts)");
     expect(differenceCell(wasm, ts, true)).toContain("(slot wasm minus slot ts)");
   });
@@ -35,7 +38,9 @@ describe("differenceCell", () => {
     const ts = metric("ts", [10, 20, 30], [0, 1, 2]);
     const wasm = metric("wasm", [31, 11, 99], [2, 0, 7]);
     expect(pairedDifferences(wasm, ts)).toEqual([1, 1]);
-    expect(differenceCell(wasm, ts)).toBe("1.00 (no interval), 2 pairs (wasm minus ts), below the gate's minimum of 10 pairs");
+    expect(differenceCell(wasm, ts)).toBe(
+      "1.00 (no interval), 2 pairs (wasm minus ts), below the gate's minimum of 10 pairs",
+    );
   });
 
   it("says n/a when a side is missing or nothing pairs", () => {

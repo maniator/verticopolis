@@ -32,7 +32,8 @@ const tick = (): void => {
   autoBox()!.click();
 };
 const hints = (): string[] => Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent ?? "");
-const presetButtons = (): HTMLButtonElement[] => Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn"));
+const presetButtons = (): HTMLButtonElement[] =>
+  Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn"));
 const AUTO_HINT = "Auto re-tunes the car counts every morning from measured traffic. Uncheck Auto to set them by hand.";
 
 describe("the Auto box", () => {
@@ -57,7 +58,9 @@ describe("the Auto box", () => {
     expect(q<HTMLButtonElement>(".es-allcars")?.disabled).toBe(true);
     expect(hints()).toContain(AUTO_HINT);
     press(".es-adv summary");
-    expect(Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-strip-step .es-sq")).every((b) => b.disabled)).toBe(true);
+    expect(
+      Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-strip-step .es-sq")).every((b) => b.disabled),
+    ).toBe(true);
     expect(q(".es-bar")?.getAttribute("aria-readonly")).toBe("true");
     ok();
     expect(saved(apply).autoTune).toBe(true);
@@ -79,7 +82,10 @@ describe("the Auto box", () => {
   });
 
   it("ticking it seeds the staging floors when the player has set none, as the Auto-tune button does", () => {
-    const { apply } = open({ current: { activeCars: { weekday: row(CARS), weekend: row(1) }, homeFloors: [] }, autoTune: TUNE_WEEKDAY });
+    const { apply } = open({
+      current: { activeCars: { weekday: row(CARS), weekend: row(1) }, homeFloors: [] },
+      autoTune: TUNE_WEEKDAY,
+    });
     tick();
     ok();
     const s = saved(apply);

@@ -12,7 +12,16 @@
  *
  * Node only, and ERASABLE (see scripts/screenshot-env.ts); never imported by the app.
  */
-import { CHANGES_DIR, bumpVersion, changelogVersions, highestLevel, isNoteFile, isSemverIncrease, parseNote, type ChangeNote } from "./changeNotes.ts";
+import {
+  CHANGES_DIR,
+  bumpVersion,
+  changelogVersions,
+  highestLevel,
+  isNoteFile,
+  isSemverIncrease,
+  parseNote,
+  type ChangeNote,
+} from "./changeNotes.ts";
 
 /** One commit's files, read by repository path. */
 export interface Tree {
@@ -51,7 +60,10 @@ function need(tree: Tree, path: string): string {
 
 export function versionsOf(tree: Tree): Versions {
   const pkg = JSON.parse(need(tree, "package.json")) as { version: string };
-  const lock = JSON.parse(need(tree, "package-lock.json")) as { version?: string; packages?: Record<string, { version?: string }> };
+  const lock = JSON.parse(need(tree, "package-lock.json")) as {
+    version?: string;
+    packages?: Record<string, { version?: string }>;
+  };
   return {
     app: pkg.version,
     "package-lock.json version": lock.version ?? "(none)",
@@ -75,7 +87,9 @@ export function notesOf(tree: Tree): { notes: ChangeNote[]; errors: string[] } {
 }
 
 const isNotePath = (path: string): boolean =>
-  path.startsWith(`${CHANGES_DIR}/`) && !path.slice(CHANGES_DIR.length + 1).includes("/") && isNoteFile(path.slice(CHANGES_DIR.length + 1));
+  path.startsWith(`${CHANGES_DIR}/`) &&
+  !path.slice(CHANGES_DIR.length + 1).includes("/") &&
+  isNoteFile(path.slice(CHANGES_DIR.length + 1));
 
 /** The packages whose pinned version is the game players run: raising one
  *  changes what players get, so the PR's own notes must ask for at least a
@@ -87,13 +101,20 @@ function dependencyOf(tree: Tree, name: string): string | null {
   return pkg.dependencies?.[name] ?? null;
 }
 
-const RELEASE_HOW = "versions move only in a release PR (`npm run release` on a release/ branch); add a .changes note with the tier instead (CONTRIBUTING.md \"Versioning\")";
+const RELEASE_HOW =
+  'versions move only in a release PR (`npm run release` on a release/ branch); add a .changes note with the tier instead (CONTRIBUTING.md "Versioning")';
 
 /**
  * What a feature PR got wrong. `deployed` is every changed path that can reach
  * the deployed app (`vercel-ignore-build.sh --classify` says "build").
  */
-export function checkFeature(base: Tree, head: Tree, changes: readonly Change[], deployed: ReadonlySet<string>, noteOptional = false): string[] {
+export function checkFeature(
+  base: Tree,
+  head: Tree,
+  changes: readonly Change[],
+  deployed: ReadonlySet<string>,
+  noteOptional = false,
+): string[] {
   const errors: string[] = [];
   const was = versionsOf(base);
   const now = versionsOf(head);
@@ -106,7 +127,9 @@ export function checkFeature(base: Tree, head: Tree, changes: readonly Change[],
     // PR's pending note under its own name; editing it would rewrite what the
     // merged PR declared.
     if (c.status !== "D" && isNotePath(c.path) && base.read(c.path) !== null) {
-      errors.push(`${c.path} is a pending note main already has, from a merged PR: leave it to the release and add .changes/<branch-slug>-2.md for this PR.`);
+      errors.push(
+        `${c.path} is a pending note main already has, from a merged PR: leave it to the release and add .changes/<branch-slug>-2.md for this PR.`,
+      );
     }
   }
   errors.push(...notesOf(head).errors);
@@ -114,7 +137,9 @@ export function checkFeature(base: Tree, head: Tree, changes: readonly Change[],
   const shipped = changes.map((c) => c.path).filter((p) => deployed.has(p) && !p.startsWith(`${CHANGES_DIR}/`));
   if (shipped.length > 0 && touched.length === 0 && !noteOptional) {
     const sample = shipped.slice(0, 3).join(", ") + (shipped.length > 3 ? `, and ${shipped.length - 3} more` : "");
-    errors.push(`this PR changes deployed paths (${sample}) and adds no .changes note: add .changes/<branch-slug>.md, with app: none when no player would notice.`);
+    errors.push(
+      `this PR changes deployed paths (${sample}) and adds no .changes note: add .changes/<branch-slug>.md, with app: none when no player would notice.`,
+    );
   }
   // A pin that main already had and this PR moves. The first pin, which
   // replaced the in-repository engine and components, is not a raise.
@@ -132,19 +157,31 @@ export function checkFeature(base: Tree, head: Tree, changes: readonly Change[],
       }
     }
     if (highestLevel(own.map((n) => n.app)) === "none") {
-      errors.push(`this PR changes the ${moved.join(" and ")} pin in package.json, which changes the game players run: its .changes note needs at least app: patch, with a Player line.`);
+      errors.push(
+        `this PR changes the ${moved.join(" and ")} pin in package.json, which changes the game players run: its .changes note needs at least app: patch, with a Player line.`,
+      );
     }
   }
   return errors;
 }
 
 /** Checks one version against the level its notes ask for. */
-function checkBump(errors: string[], what: string, from: string, to: string, notes: readonly ChangeNote[], pick: (n: ChangeNote) => ChangeNote["app"], allowLater: boolean): void {
+function checkBump(
+  errors: string[],
+  what: string,
+  from: string,
+  to: string,
+  notes: readonly ChangeNote[],
+  pick: (n: ChangeNote) => ChangeNote["app"],
+  allowLater: boolean,
+): void {
   const level = highestLevel(notes.map(pick));
   const expected = bumpVersion(from, level);
   if (to === expected) return;
   if (allowLater && level !== "none" && isSemverIncrease(expected, to)) return;
-  errors.push(`${what} is ${to}, but main's ${from} raised by the highest pending ${what} level (${level}) is ${expected}.`);
+  errors.push(
+    `${what} is ${to}, but main's ${from} raised by the highest pending ${what} level (${level}) is ${expected}.`,
+  );
 }
 
 /** A version line blanked, so two copies compare equal when only it differs. */
@@ -166,9 +203,13 @@ export function checkRelease(base: Tree, head: Tree, changes: readonly Change[])
   const errors: string[] = [];
   const { notes, errors: unreadable } = notesOf(base);
   errors.push(...unreadable);
-  if (notes.length === 0 && unreadable.length === 0) errors.push("main has no pending notes, so there is nothing to release.");
+  if (notes.length === 0 && unreadable.length === 0)
+    errors.push("main has no pending notes, so there is nothing to release.");
   const left = head.notes();
-  if (left.length > 0) errors.push(`a release consumes every pending note, and ${left.join(", ")} remain: merge main in and run \`npm run release\` again.`);
+  if (left.length > 0)
+    errors.push(
+      `a release consumes every pending note, and ${left.join(", ")} remain: merge main in and run \`npm run release\` again.`,
+    );
   const was = versionsOf(base);
   const now = versionsOf(head);
   checkBump(errors, "app", was.app, now.app, notes, (n) => n.app, true);
@@ -177,7 +218,8 @@ export function checkRelease(base: Tree, head: Tree, changes: readonly Change[])
   };
   same("package-lock.json version", now.app);
   same("package-lock.json root package version", now.app);
-  if (now.app !== was.app && now["CHANGELOG.md sections"].split(", ")[0] !== now.app) errors.push(`CHANGELOG.md has no ${now.app} section at the top.`);
+  if (now.app !== was.app && now["CHANGELOG.md sections"].split(", ")[0] !== now.app)
+    errors.push(`CHANGELOG.md has no ${now.app} section at the top.`);
   const release = new Set<string>(RELEASE_FILES);
   for (const c of changes) {
     if (c.status === "D" && isNotePath(c.path)) continue;

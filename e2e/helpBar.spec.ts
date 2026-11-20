@@ -41,7 +41,14 @@ async function partitionedBrowser(): Promise<Browser> {
   const probe = await chromium.launchServer({ executablePath, channel });
   const defaults = probe.process().spawnargs.find((a) => a.startsWith("--disable-features="));
   await probe.close();
-  const disabled = defaults ? [defaults.split(",").filter((f) => f !== "ThirdPartyStoragePartitioning").join(",")] : [];
+  const disabled = defaults
+    ? [
+        defaults
+          .split(",")
+          .filter((f) => f !== "ThirdPartyStoragePartitioning")
+          .join(","),
+      ]
+    : [];
   return chromium.launch({
     executablePath,
     channel,

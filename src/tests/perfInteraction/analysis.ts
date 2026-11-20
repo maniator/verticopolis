@@ -66,7 +66,11 @@ const max = (xs: readonly number[]): number => xs.reduce((a, b) => Math.max(a, b
 
 /** One phase's metrics. Throws when the phase recorded no frames, which means
  *  the page stopped drawing and the run is not usable. */
-export function phaseMetrics(p: PhaseRecord, loafSupported: boolean, acts: PhaseActions = { actions: 0, effective: null }): PhaseMetrics {
+export function phaseMetrics(
+  p: PhaseRecord,
+  loafSupported: boolean,
+  acts: PhaseActions = { actions: 0, effective: null },
+): PhaseMetrics {
   const f = frameStats(p.frames);
   const durs = p.events.map((e) => e.dur);
   const blocking = p.loafs.map((l) => l.blocking);
@@ -113,7 +117,16 @@ export interface ArmRun {
 
 /** The metrics compared as ratios (B over A) and as differences (B minus A). */
 export const RATIO_METRICS = ["frameP95Ms", "frameP99Ms", "onePercentLowFps"] as const;
-export const DIFFERENCE_METRICS = ["longTaskMsPerSecond", "longTaskMaxMs", "loafBlockingMsPerSecond", "inputToFrameP95Ms", "inputToFrameP99Ms", "slowInteractionsPerMinute", "eventP98Ms", "eventMaxDelayMs"] as const;
+export const DIFFERENCE_METRICS = [
+  "longTaskMsPerSecond",
+  "longTaskMaxMs",
+  "loafBlockingMsPerSecond",
+  "inputToFrameP95Ms",
+  "inputToFrameP99Ms",
+  "slowInteractionsPerMinute",
+  "eventP98Ms",
+  "eventMaxDelayMs",
+] as const;
 type RatioMetric = (typeof RATIO_METRICS)[number];
 type DifferenceMetric = (typeof DIFFERENCE_METRICS)[number];
 
@@ -135,7 +148,13 @@ function median(xs: readonly number[]): number | null {
   return xs.length ? quantile(xs, 0.5) : null;
 }
 
-function valuesOf(runs: readonly ArmRun[], arm: Arm, throttle: number, phase: string, metric: keyof PhaseMetrics): { reps: number[]; values: number[] } {
+function valuesOf(
+  runs: readonly ArmRun[],
+  arm: Arm,
+  throttle: number,
+  phase: string,
+  metric: keyof PhaseMetrics,
+): { reps: number[]; values: number[] } {
   const reps: number[] = [];
   const values: number[] = [];
   for (const r of runs) {
@@ -163,13 +182,35 @@ export function compareArms(runs: readonly ArmRun[], phases: readonly string[]):
           if (j >= 0 && a.values[i] > 0) pairs.push([b.values[j], a.values[i]]);
         });
         const r = pairs.length ? pairedRatio(pairs) : null;
-        out.push({ throttle, phase, metric, kind: "ratio", medianA: median(a.values), medianB: median(b.values), value: r?.ratio ?? null, ciLow: r?.ciLow ?? null, ciHigh: r?.ciHigh ?? null, pairs: pairs.length });
+        out.push({
+          throttle,
+          phase,
+          metric,
+          kind: "ratio",
+          medianA: median(a.values),
+          medianB: median(b.values),
+          value: r?.ratio ?? null,
+          ciLow: r?.ciLow ?? null,
+          ciHigh: r?.ciHigh ?? null,
+          pairs: pairs.length,
+        });
       }
       for (const metric of DIFFERENCE_METRICS) {
         const a = valuesOf(runs, "A", throttle, phase, metric);
         const b = valuesOf(runs, "B", throttle, phase, metric);
         const d = pairedDifference(b, a);
-        out.push({ throttle, phase, metric, kind: "difference", medianA: median(a.values), medianB: median(b.values), value: d?.median ?? null, ciLow: d?.ciLow ?? null, ciHigh: d?.ciHigh ?? null, pairs: d?.n ?? 0 });
+        out.push({
+          throttle,
+          phase,
+          metric,
+          kind: "difference",
+          medianA: median(a.values),
+          medianB: median(b.values),
+          value: d?.median ?? null,
+          ciLow: d?.ciLow ?? null,
+          ciHigh: d?.ciHigh ?? null,
+          pairs: d?.n ?? 0,
+        });
       }
     }
   }
@@ -194,13 +235,22 @@ const num = (v: number | null, digits = 1): string => (v === null ? "n/a" : v.to
 
 /** The report table: one row per throttle, phase and metric. */
 export function comparisonTable(rows: readonly Comparison[]): string {
-  const lines = ["| CPU | Phase | Metric | A median | B median | B vs A (paired) | 95% interval | Pairs |", "| --- | --- | --- | --- | --- | --- | --- | --- |"];
+  const lines = [
+    "| CPU | Phase | Metric | A median | B median | B vs A (paired) | 95% interval | Pairs |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+  ];
   for (const r of rows) {
     const digits = r.kind === "ratio" ? 3 : 1;
     let value = "n/a";
-    if (r.value !== null) value = r.kind === "ratio" ? `x${num(r.value, 3)}` : `${r.value >= 0 ? "+" : ""}${num(r.value)}`;
-    const ci = r.ciLow === null || r.ciHigh === null ? "n/a (under 6 pairs)" : `${num(r.ciLow, digits)} to ${num(r.ciHigh, digits)}`;
-    lines.push(`| ${r.throttle}x | ${r.phase} | ${LABELS[r.metric]} | ${num(r.medianA)} | ${num(r.medianB)} | ${value} | ${ci} | ${r.pairs} |`);
+    if (r.value !== null)
+      value = r.kind === "ratio" ? `x${num(r.value, 3)}` : `${r.value >= 0 ? "+" : ""}${num(r.value)}`;
+    const ci =
+      r.ciLow === null || r.ciHigh === null
+        ? "n/a (under 6 pairs)"
+        : `${num(r.ciLow, digits)} to ${num(r.ciHigh, digits)}`;
+    lines.push(
+      `| ${r.throttle}x | ${r.phase} | ${LABELS[r.metric]} | ${num(r.medianA)} | ${num(r.medianB)} | ${value} | ${ci} | ${r.pairs} |`,
+    );
   }
   return lines.join("\n");
 }
@@ -208,13 +258,19 @@ export function comparisonTable(rows: readonly Comparison[]): string {
 /** Per run and phase: what the script did and how far the tower ran, so a
  *  phase that measured nothing, or an arm whose tower stalled, is visible. */
 export function activityTable(runs: readonly ArmRun[], phases: readonly string[]): string {
-  const lines = ["| CPU | Rep | Arm | Phase | Starts at | Window (s) | Inputs sent | Took effect | Game minutes | Frames |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"];
-  const clock = (m: number): string => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  const lines = [
+    "| CPU | Rep | Arm | Phase | Starts at | Window (s) | Inputs sent | Took effect | Game minutes | Frames |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+  ];
+  const clock = (m: number): string =>
+    `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   for (const r of runs) {
     for (const phase of phases) {
       const m = r.phases[phase];
       if (!m) continue;
-      lines.push(`| ${r.throttle}x | ${r.rep} | ${r.arm} | ${phase} | ${clock(m.minuteOfDayStart)} | ${(m.windowMs / 1000).toFixed(1)} | ${m.actions} | ${m.effective ?? "n/a"} | ${m.simMinutes} | ${m.frames} |`);
+      lines.push(
+        `| ${r.throttle}x | ${r.rep} | ${r.arm} | ${phase} | ${clock(m.minuteOfDayStart)} | ${(m.windowMs / 1000).toFixed(1)} | ${m.actions} | ${m.effective ?? "n/a"} | ${m.simMinutes} | ${m.frames} |`,
+      );
     }
   }
   return lines.join("\n");

@@ -5,14 +5,52 @@ import type { GameMode } from "@verticopolis/components/shared/types";
 const trackEvent = vi.fn();
 vi.mock("./analyticsCore", () => ({ trackEvent: (...args: unknown[]) => trackEvent(...args) }));
 
-const { TDT_IMPORT_ANOMALIES, TDT_TRANSPORT_ANOMALIES, headerNow, tdtImportReadProps, trackFileExported, trackFileImported, trackTdtImportRead } = await import("./analyticsFiles");
+const {
+  TDT_IMPORT_ANOMALIES,
+  TDT_TRANSPORT_ANOMALIES,
+  headerNow,
+  tdtImportReadProps,
+  trackFileExported,
+  trackFileImported,
+  trackTdtImportRead,
+} = await import("./analyticsFiles");
 
 const HEADER = { mode: "modern" as const, star: 4, population: 1234 };
 
 /** Every import count zero, then the overrides. */
 function counts(over: Partial<ImportCounts> = {}): ImportCounts {
   const zero = {} as Record<keyof ImportCounts, number>;
-  for (const key of ["rooms", "offices", "occupiedOffices", "condos", "soldCondos", "hotelRooms", "hotelAsleep", "hotelDirty", "hotelBooked", "asleepConverted", "infested", "venues", "services", "parkingStalls", "construction", "rentsApplied", "twinRooms", "secom", "cathedral", "burned", "unknown", "droppedFloors", "offLot", "overlapping", "misplaced", "clamped", "widthMismatch", "residentsSeeded"] as const) zero[key] = 0;
+  for (const key of [
+    "rooms",
+    "offices",
+    "occupiedOffices",
+    "condos",
+    "soldCondos",
+    "hotelRooms",
+    "hotelAsleep",
+    "hotelDirty",
+    "hotelBooked",
+    "asleepConverted",
+    "infested",
+    "venues",
+    "services",
+    "parkingStalls",
+    "construction",
+    "rentsApplied",
+    "twinRooms",
+    "secom",
+    "cathedral",
+    "burned",
+    "unknown",
+    "droppedFloors",
+    "offLot",
+    "overlapping",
+    "misplaced",
+    "clamped",
+    "widthMismatch",
+    "residentsSeeded",
+  ] as const)
+    zero[key] = 0;
   return { ...zero, ...over };
 }
 
@@ -68,11 +106,33 @@ describe("the tdt_import_read event", () => {
   it("counts each workaround by its report name and totals them", () => {
     const props = tdtImportReadProps(
       facts({
-        counts: counts({ rooms: 40, unknown: 2, droppedFloors: 1, offLot: 3, overlapping: 4, misplaced: 5, clamped: 6, widthMismatch: 7, asleepConverted: 8 }),
+        counts: counts({
+          rooms: 40,
+          unknown: 2,
+          droppedFloors: 1,
+          offLot: 3,
+          overlapping: 4,
+          misplaced: 5,
+          clamped: 6,
+          widthMismatch: 7,
+          asleepConverted: 8,
+        }),
         decodeStats: { droppedShafts: 9, adjustedShafts: 10, droppedFlights: 11 },
       }),
     );
-    expect(props).toMatchObject({ unknown: 2, droppedFloors: 1, offLot: 3, overlapping: 4, misplaced: 5, clamped: 6, widthMismatch: 7, asleepConverted: 8, droppedShafts: 9, adjustedShafts: 10, droppedFlights: 11 });
+    expect(props).toMatchObject({
+      unknown: 2,
+      droppedFloors: 1,
+      offLot: 3,
+      overlapping: 4,
+      misplaced: 5,
+      clamped: 6,
+      widthMismatch: 7,
+      asleepConverted: 8,
+      droppedShafts: 9,
+      adjustedShafts: 10,
+      droppedFlights: 11,
+    });
     expect(props.anomalies).toBe(66);
     expect(props.rooms).toBe(40);
   });
@@ -83,10 +143,22 @@ describe("the tdt_import_read event", () => {
   });
 
   it("sends the tower's size and flags, and a count of the notes, never their text or the tower name", () => {
-    trackTdtImportRead(facts({ peopleCount: 312, decoded: false, notes: ["Private Tower Name had a note", "another"] }));
+    trackTdtImportRead(
+      facts({ peopleCount: 312, decoded: false, notes: ["Private Tower Name had a note", "another"] }),
+    );
     const [name, props] = trackEvent.mock.calls[0]! as [string, Record<string, unknown>];
     expect(name).toBe("tdt_import_read");
-    expect(props).toMatchObject({ star: 3, floors: 12, basements: 2, shafts: 3, flights: 5, decoded: false, hasRoster: true, notes: 2, anomalies: 0 });
+    expect(props).toMatchObject({
+      star: 3,
+      floors: 12,
+      basements: 2,
+      shafts: 3,
+      flights: 5,
+      decoded: false,
+      hasRoster: true,
+      notes: 2,
+      anomalies: 0,
+    });
     const sent = JSON.stringify(props);
     expect(sent).not.toContain("Private Tower Name");
     expect(sent).not.toContain("another");
@@ -116,7 +188,10 @@ describe("headerNow", () => {
   });
 
   it("copies the three fields, so a header object changed in place later does not change them", () => {
-    const reused: { mode: GameMode; star: number; population: number; towerName: string } = { ...HEADER, towerName: "Private Tower Name" };
+    const reused: { mode: GameMode; star: number; population: number; towerName: string } = {
+      ...HEADER,
+      towerName: "Private Tower Name",
+    };
     const later = headerNow(() => reused);
     reused.population = 9999;
     reused.star = 5;

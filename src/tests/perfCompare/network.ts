@@ -42,8 +42,14 @@ const decimal = /^\d+(\.\d{1,3})?$/;
 export function parseNetwork(text: string): NetworkLimit {
   const parts = text.split(",").map((p) => p.trim());
   const [mbps, latencyMs] = parts.map((p) => (decimal.test(p) ? Number(p) : NaN));
-  if (parts.length !== 2 || !(mbps >= NETWORK_MIN_MBPS && mbps <= NETWORK_MAX_MBPS) || !(latencyMs >= 0 && latencyMs <= NETWORK_MAX_LATENCY_MS)) {
-    throw new Error(`--network takes MBPS,LATENCY_MS as plain decimals with up to three places: a rate from ${NETWORK_MIN_MBPS} to ${NETWORK_MAX_MBPS} megabits per second (a slower link would run into the fixed startup timeouts) and an added per-request latency from 0 to ${NETWORK_MAX_LATENCY_MS} ms, for example 10,40`);
+  if (
+    parts.length !== 2 ||
+    !(mbps >= NETWORK_MIN_MBPS && mbps <= NETWORK_MAX_MBPS) ||
+    !(latencyMs >= 0 && latencyMs <= NETWORK_MAX_LATENCY_MS)
+  ) {
+    throw new Error(
+      `--network takes MBPS,LATENCY_MS as plain decimals with up to three places: a rate from ${NETWORK_MIN_MBPS} to ${NETWORK_MAX_MBPS} megabits per second (a slower link would run into the fixed startup timeouts) and an added per-request latency from 0 to ${NETWORK_MAX_LATENCY_MS} ms, for example 10,40`,
+    );
   }
   return { mbps, latencyMs };
 }
@@ -54,7 +60,9 @@ export function describeNetwork(limit: NetworkLimit): string {
 
 /** Which starts a limit shaped, for the report: the throttled cold start exists only when a CPU throttle above 1x is configured. */
 export function limitedStarts(throttles: readonly number[]): string {
-  return Math.max(...throttles) > 1 ? "the cold start, the warm start and the cold start under the heaviest CPU throttle" : "the cold start and the warm start";
+  return Math.max(...throttles) > 1
+    ? "the cold start, the warm start and the cold start under the heaviest CPU throttle"
+    : "the cold start and the warm start";
 }
 
 /** The text that marks a limited run: in the folder name and in the CSV column. */
@@ -75,22 +83,45 @@ function markersIn(name: string, shape: RegExp): string[] {
 /** The marker rule for an explicit `--out` name, as `--aa` has: a limited run's folder carries exactly its own marker, and an unlimited run's folder carries nothing that starts like one. */
 export function networkFolderProblem(name: string, limit: NetworkLimit | null): string | null {
   const loose = markersIn(name, LOOSE_MARKER);
-  if (!limit) return loose.length > 0 ? `--out ${name} names a network-limited folder, but this run has no --network; pass --network or pick another name` : null;
+  if (!limit)
+    return loose.length > 0
+      ? `--out ${name} names a network-limited folder, but this run has no --network; pass --network or pick another name`
+      : null;
   const marker = networkMarker(limit);
   const strict = markersIn(name, STRICT_MARKER);
-  return loose.length === 1 && strict.length === 1 && strict[0] === marker ? null : `--network ${limit.mbps},${limit.latencyMs} needs an --out folder name containing ${marker} as its own part, and nothing else that starts like a limit marker, so the folder cannot be mistaken for a protocol run`;
+  return loose.length === 1 && strict.length === 1 && strict[0] === marker
+    ? null
+    : `--network ${limit.mbps},${limit.latencyMs} needs an --out folder name containing ${marker} as its own part, and nothing else that starts like a limit marker, so the folder cannot be mistaken for a protocol run`;
 }
 
 /** The rows a limit shaped: the cold and warm startup rows and their transfer rows. The saved-tower rows (a scenario in the row) and every other group ran unlimited, and so did the wasm-load rows: `wasmColdLoad` runs on the TypeScript page after the warm start, once the limit is lifted. */
 export function limitedRow(row: { group: string; scenario: string; metric: string }): boolean {
-  return row.scenario === "-" && (row.group === "startup" || row.group === "transfer") && /^(cold|warm) /.test(row.metric);
+  return (
+    row.scenario === "-" && (row.group === "startup" || row.group === "transfer") && /^(cold|warm) /.test(row.metric)
+  );
 }
 
 /** The Chrome DevTools Protocol parameters for a limit; `null` is no limit (latency 0 and throughput -1 mean unlimited). */
-export function networkConditions(limit: NetworkLimit | null): { offline: false; latency: number; downloadThroughput: number; uploadThroughput: number } {
-  if (!limit) return { offline: false, latency: 0, downloadThroughput: CDP_UNLIMITED_THROUGHPUT, uploadThroughput: CDP_UNLIMITED_THROUGHPUT };
+export function networkConditions(limit: NetworkLimit | null): {
+  offline: false;
+  latency: number;
+  downloadThroughput: number;
+  uploadThroughput: number;
+} {
+  if (!limit)
+    return {
+      offline: false,
+      latency: 0,
+      downloadThroughput: CDP_UNLIMITED_THROUGHPUT,
+      uploadThroughput: CDP_UNLIMITED_THROUGHPUT,
+    };
   const bytesPerSecond = (limit.mbps * 1_000_000) / 8;
-  return { offline: false, latency: limit.latencyMs, downloadThroughput: bytesPerSecond, uploadThroughput: bytesPerSecond };
+  return {
+    offline: false,
+    latency: limit.latencyMs,
+    downloadThroughput: bytesPerSecond,
+    uploadThroughput: bytesPerSecond,
+  };
 }
 
 /** Applies a limit to a page's connection. With `null` it lifts the limit and switches the Network domain off again, because a domain left on keeps the fetched bodies in the browser and would change the memory passes of a limited run. */
@@ -114,7 +145,8 @@ export function heldProblem(limit: NetworkLimit, resources: readonly TransferTim
   const bytesPerMs = (limit.mbps * 1_000_000) / 8 / 1000;
   const floorMs = (r: TransferTiming): number => limit.latencyMs + (r.transferSize / bytesPerMs) * SLACK;
   const best = Math.max(...big.map(floorMs));
-  if (best < MIN_PROVABLE_MS) return `${limit.mbps} Mbps with ${limit.latencyMs} ms added latency is too close to local speed to check: the largest transfer has a floor of ${best.toFixed(1)} ms and a local fetch can take ${MIN_PROVABLE_MS} ms; add latency or lower the rate`;
+  if (best < MIN_PROVABLE_MS)
+    return `${limit.mbps} Mbps with ${limit.latencyMs} ms added latency is too close to local speed to check: the largest transfer has a floor of ${best.toFixed(1)} ms and a local fetch can take ${MIN_PROVABLE_MS} ms; add latency or lower the rate`;
   const fast = big.find((r) => r.responseEnd - r.startTime < floorMs(r));
   if (!fast) return null;
   return `${fast.name} moved ${fast.transferSize} bytes in ${(fast.responseEnd - fast.startTime).toFixed(1)} ms, under its floor of ${floorMs(fast).toFixed(1)} ms for ${limit.mbps} Mbps with ${limit.latencyMs} ms added latency (the latency plus half the transfer time at the rate)`;
@@ -125,10 +157,17 @@ const ENGINE_WASM_FILE = ENGINE_PACKAGE_FILES.find((f) => f.endsWith(".wasm"));
 if (!ENGINE_WASM_FILE) throw new Error("ENGINE_PACKAGE_FILES names no .wasm file");
 export const ENGINE_WASM_PATH = `/engine/${ENGINE_WASM_FILE}`;
 
-export function assertHeld(limit: NetworkLimit, resources: readonly TransferTiming[], where: string, engine: EngineName): void {
+export function assertHeld(
+  limit: NetworkLimit,
+  resources: readonly TransferTiming[],
+  where: string,
+  engine: EngineName,
+): void {
   // Every transfer of CHECKED_BYTES or more is timed by heldProblem, so requiring the binary among those times it. A zero-byte preload entry or a small revalidation does not count.
   if (engine === "wasm" && !resources.some((r) => r.name === ENGINE_WASM_PATH && r.transferSize >= CHECKED_BYTES)) {
-    throw new Error(`${where}: the network limit (${describeNetwork(limit)}) could not be proven on the engine package: the page recorded no transfer of ${ENGINE_WASM_PATH} of ${CHECKED_BYTES} bytes or more`);
+    throw new Error(
+      `${where}: the network limit (${describeNetwork(limit)}) could not be proven on the engine package: the page recorded no transfer of ${ENGINE_WASM_PATH} of ${CHECKED_BYTES} bytes or more`,
+    );
   }
   const problem = heldProblem(limit, resources);
   if (problem) throw new Error(`${where}: the network limit (${describeNetwork(limit)}) did not hold: ${problem}`);

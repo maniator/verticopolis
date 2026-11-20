@@ -64,9 +64,9 @@ function padY(): number {
 }
 
 /** Every rule in the file that pins something, as [selector, declarations]. */
-const stickyRules: Array<[string, string]> = [
-  ...CSS.matchAll(/([^{}]*)\{([^{}]*position:\s*sticky[^{}]*)\}/g),
-].map((m) => [m[1].trim(), m[2]]);
+const stickyRules: Array<[string, string]> = [...CSS.matchAll(/([^{}]*)\{([^{}]*position:\s*sticky[^{}]*)\}/g)].map(
+  (m) => [m[1].trim(), m[2]],
+);
 
 describe("pinned dialog action strip", () => {
   const strip = block(STRIP_SELECTOR);
@@ -104,9 +104,7 @@ describe("pinned dialog action strip", () => {
     expect(parts).toContain(`0 ${pad}px 0 var(--r-dark)`);
     // Outermost paints last, so the bevel's own colors must appear in the same
     // order the token file lists them for the bottom edge.
-    expect(parts.indexOf(`0 ${pad - 1}px 0 var(--r-shadow)`)).toBeLessThan(
-      parts.indexOf(`0 ${pad}px 0 var(--r-dark)`),
-    );
+    expect(parts.indexOf(`0 ${pad - 1}px 0 var(--r-shadow)`)).toBeLessThan(parts.indexOf(`0 ${pad}px 0 var(--r-dark)`));
     const tokens = readFileSync(srcFile("styles/retro-tokens.css"), "utf8");
     const bevel = /--bevel-out:([^;]*)/.exec(tokens)?.[1] ?? "";
     expect(bevel).toContain(`inset -1px -1px var(--r-dark)`);

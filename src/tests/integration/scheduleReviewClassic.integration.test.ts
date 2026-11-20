@@ -13,7 +13,10 @@ describe.skipIf(noEngine)("the schedule review on a Classic tower, and across Un
     const g = play(load("sixseven_2"));
     expect(g.reader.header.mode).toBe("classic");
     const shaft = g.reader.tower.transports.find((t) => t.kind.startsWith("elevator") && t.cars > 1)!;
-    const res = g.port.scheduleShaft(shaft.id, scheduleSlots({ activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } }));
+    const res = g.port.scheduleShaft(
+      shaft.id,
+      scheduleSlots({ activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } }),
+    );
     expect(res[0], g.port.lastReason() ?? "").toBe(1);
     return { raw: JSON.parse(g.port.serialize()) as SerializedGame, id: shaft.id, cars: shaft.cars };
   }
@@ -39,7 +42,9 @@ describe.skipIf(noEngine)("the schedule review on a Classic tower, and across Un
     const g = play(raw);
     g.review.tick();
     expect(g.toasts).toHaveLength(1);
-    const [other, third] = g.reader.tower.transports.filter((t) => t.kind.startsWith("elevator") && t.cars > 1 && t.id !== id);
+    const [other, third] = g.reader.tower.transports.filter(
+      (t) => t.kind.startsWith("elevator") && t.cars > 1 && t.id !== id,
+    );
     const edit = (shaftId: number, weekday: number[]) => {
       g.history.capture("Schedule");
       expect(g.port.scheduleShaft(shaftId, scheduleSlots({ activeCars: { weekday, weekend: weekday } }))[0]).toBe(1);
@@ -47,7 +52,10 @@ describe.skipIf(noEngine)("the schedule review on a Classic tower, and across Un
     };
     // The player sets another elevator to a short flat schedule on purpose, then makes and undoes an unrelated edit.
     edit(other!.id, Array(24).fill(1));
-    edit(third!.id, Array.from({ length: 24 }, (_, h) => (h < 12 ? 1 : 2)));
+    edit(
+      third!.id,
+      Array.from({ length: 24 }, (_, h) => (h < 12 ? 1 : 2)),
+    );
     const generation = g.port.generation();
     await g.history.undo();
     // An Undo is a step like an edit and keeps the generation (#1802).

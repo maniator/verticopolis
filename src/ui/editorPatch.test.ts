@@ -23,7 +23,8 @@ import { syncRungSelects } from "./templates/rungPicker";
  *  '+ rent' stepper these identity tests pin; Classic renders the rung
  *  picker, which has its own identity test below) and a standard elevator.
  *  Each refresh is a new card, as the pump reads one. */
-const office = (over: Partial<UnitDetail> = {}, mode: GameMode = "modern") => unitDetail(mode, "office", { id: 1, x: 12, ...over });
+const office = (over: Partial<UnitDetail> = {}, mode: GameMode = "modern") =>
+  unitDetail(mode, "office", { id: 1, x: 12, ...over });
 const lift = (cars: number) => transportDetail("elevatorStandard", 2, { id: 5, cars });
 
 function unitEditor(u: UnitDetail, mode: GameMode = "modern"): TemplateResult {

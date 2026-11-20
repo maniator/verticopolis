@@ -55,7 +55,14 @@ const DAY = 86_400_000;
 /** The reader's header and tower as of the boot, on day `day`. */
 function readerAt(t: { mode: string; star: number; population: number; highestFloor: number; day: number }) {
   return {
-    header: { mode: t.mode, modernCalendar: "realWorld", star: t.star, population: t.population, minutes: t.day * 1440 + 420, day: t.day },
+    header: {
+      mode: t.mode,
+      modernCalendar: "realWorld",
+      star: t.star,
+      population: t.population,
+      minutes: t.day * 1440 + 420,
+      day: t.day,
+    },
     tower: { highestFloor: t.highestFloor },
   };
 }
@@ -117,7 +124,9 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
     const bootSpy = vi.spyOn(gameplaySession, "noteBoot");
     const reader = readerAt({ mode: "modern", star: 3, population: 100, highestFloor: 10, day: 12 });
     const kinds = ["stairs", "escalator", "elevatorStandard", "stairs", "elevatorExpress"];
-    const app = makeApp({ reader: { ...reader, tower: { ...reader.tower, transports: kinds.map((kind) => ({ kind })) } } });
+    const app = makeApp({
+      reader: { ...reader, tower: { ...reader.tower, transports: kinds.map((kind) => ({ kind })) } },
+    });
 
     runBootFlow(app, Date.now());
 

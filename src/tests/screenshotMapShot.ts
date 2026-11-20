@@ -24,7 +24,9 @@ export async function mapForShot(page: Page, where: string, crop: string | undef
   const state = await page.evaluate((selector) => {
     const map = document.getElementById("overview-map");
     const pill = document.getElementById("btn-map");
-    const win = (window as unknown as { overviewMap?: { isOpen(): boolean; setOpen(open: boolean, remember: boolean): void } }).overviewMap;
+    const win = (
+      window as unknown as { overviewMap?: { isOpen(): boolean; setOpen(open: boolean, remember: boolean): void } }
+    ).overviewMap;
     let target: Element | null = null;
     try {
       target = selector === null ? null : document.querySelector(selector);
@@ -53,7 +55,9 @@ export async function mapForShot(page: Page, where: string, crop: string | undef
 export async function restoreMapAfterShot(page: Page): Promise<void> {
   await page.evaluate(() => {
     const map = document.getElementById("overview-map");
-    const win = (window as unknown as { overviewMap?: { isOpen(): boolean; setOpen(open: boolean, remember: boolean): void } }).overviewMap;
+    const win = (
+      window as unknown as { overviewMap?: { isOpen(): boolean; setOpen(open: boolean, remember: boolean): void } }
+    ).overviewMap;
     const reopen = map?.dataset.shotReopen;
     const pillWas = map?.dataset.shotPill;
     if (!map || !win || reopen === undefined) return;

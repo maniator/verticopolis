@@ -52,7 +52,8 @@ function dockerUp() {
 // server runs on the host.
 function ensureDocker() {
   if (dockerUp()) return true;
-  if (process.getuid?.() !== 0 || spawnSync("sh", ["-c", "command -v dockerd"], { stdio: "ignore" }).status !== 0) return false;
+  if (process.getuid?.() !== 0 || spawnSync("sh", ["-c", "command -v dockerd"], { stdio: "ignore" }).status !== 0)
+    return false;
   const logDir = join(process.env.TMPDIR || tmpdir(), "vc-agent-setup");
   mkdirSync(logDir, { recursive: true });
   const log = openSync(join(logDir, "dockerd.log"), "a");
@@ -104,13 +105,27 @@ if (installed && image && dockerHasImage(image)) {
   const uid = process.getuid?.();
   const user = uid && uid !== 0 ? ["-u", `${uid}:${process.getgid?.()}`, "-e", "HOME=/tmp"] : [];
   run("docker", [
-    "run", "--rm", "-i", "--network", "host", "--ipc", "host", ...user, ...mounts,
-    image, "bash", "-c", script, "playwright-mcp", ...extra,
+    "run",
+    "--rm",
+    "-i",
+    "--network",
+    "host",
+    "--ipc",
+    "host",
+    ...user,
+    ...mounts,
+    image,
+    "bash",
+    "-c",
+    script,
+    "playwright-mcp",
+    ...extra,
   ]);
 } else {
   // A preinstalled Chromium (a cloud sandbox), else the repository's own
   // Playwright browser (`npx playwright install chromium`), else the server's.
-  let chromium = process.env.PW_CHROMIUM_PATH || (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : "");
+  let chromium =
+    process.env.PW_CHROMIUM_PATH || (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : "");
   if (!chromium) {
     try {
       const repoPlaywright = createRequire(join(root, "package.json"))("playwright");
@@ -122,7 +137,8 @@ if (installed && image && dockerHasImage(image)) {
   }
   const browserArgs = ["--output-dir", join(root, ".playwright-mcp"), "--isolated"];
   // Headed only where there is a display to show it on (a person's desktop).
-  if (process.platform === "linux" && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) browserArgs.push("--headless");
+  if (process.platform === "linux" && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY)
+    browserArgs.push("--headless");
   // Chromium refuses its sandbox as root (cloud sandboxes run as root).
   if (process.getuid?.() === 0) browserArgs.push("--no-sandbox");
   if (chromium) browserArgs.push("--executable-path", chromium);

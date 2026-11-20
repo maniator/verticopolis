@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendToRelay } from "./analyticsRelay";
-import {
-  gameplaySession,
-  trackEconomyAction,
-  trackEconomyActionOnce,
-  trackEmergencyChoice,
-} from "./analytics";
+import { gameplaySession, trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice } from "./analytics";
 import { bindEngineBridge, forwardGameplayEvents, resetEngineBridge } from "./analyticsEngineBridge";
 
 // The #611 gameplay-analytics surface: the economy_action event (demolish +
@@ -128,7 +123,11 @@ describe("session_emergencies telemetry", () => {
   it("reports how each fire ended: Security, the helicopter, or burned out", () => {
     const out = (by: string) => ({ name: "fire_out", payload: { by } });
     forwardGameplayEvents([fire, out("security"), fire, out("rescue"), fire, out("burnedOut")]);
-    expect(propsFor("fire_outcome")).toEqual([{ outcome: "security" }, { outcome: "rescue" }, { outcome: "burnedOut" }]);
+    expect(propsFor("fire_outcome")).toEqual([
+      { outcome: "security" },
+      { outcome: "rescue" },
+      { outcome: "burnedOut" },
+    ]);
   });
 
   it("emits once at the terminal end EVEN WHEN ALL ZERO (for the denominator)", () => {
@@ -158,7 +157,14 @@ describe("session_emergencies telemetry", () => {
   it("sums every tower the tab played, across a new game in the same batch", () => {
     played();
     // Tower A's last events arrive in the same drain as tower B's founding.
-    forwardGameplayEvents([fire, fire, gutted(1), { name: "tower_founded", payload: { mode: "classic" } }, fire, bomb(0)]);
+    forwardGameplayEvents([
+      fire,
+      fire,
+      gutted(1),
+      { name: "tower_founded", payload: { mode: "classic" } },
+      fire,
+      bomb(0),
+    ]);
     gameplaySession.end(true);
     expect(propsFor("session_emergencies")).toEqual([{ fires: 3, firesGutRooms: 1, bombs: 1 }]);
   });
@@ -166,7 +172,11 @@ describe("session_emergencies telemetry", () => {
   it("folds the engine's last events at the terminal end, so a fire in the final frame counts", () => {
     played();
     const pending = [fire, gutted(1)];
-    bindEngineBridge(() => ({ drainGameplayEvents: () => pending.splice(0) as never, gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } }));
+    bindEngineBridge(() => ({
+      drainGameplayEvents: () => pending.splice(0) as never,
+      gameplayEventsDropped: 0,
+      gameplayEvents: { discardOnHandOff: false },
+    }));
     gameplaySession.end(true);
     expect(propsFor("session_emergencies")).toEqual([{ fires: 1, firesGutRooms: 1, bombs: 0 }]);
   });

@@ -24,13 +24,7 @@ export type NotFoundSite = "game" | "help";
 
 /** What a pick on the page reports in `not_found_pick`: one of its buttons,
  *  the window's close box, or the taskbar's Verticopolis button. */
-export type NotFoundPick =
-  | "game"
-  | "manual"
-  | "changelog"
-  | "rooms"
-  | "close"
-  | "taskbar";
+export type NotFoundPick = "game" | "manual" | "changelog" | "rooms" | "close" | "taskbar";
 
 /** A place the page offers, with the code its pick reports. */
 export interface NotFoundLink {
@@ -73,9 +67,7 @@ export function notFoundSite(
  *  comes first, and its first button is the default. */
 export function notFoundLinks(site: NotFoundSite): NotFoundLink[] {
   const [manual, ...rest] = MANUAL_LINKS;
-  return site === "help"
-    ? [manual, GAME_LINK, ...rest]
-    : [GAME_LINK, manual, ...rest];
+  return site === "help" ? [manual, GAME_LINK, ...rest] : [GAME_LINK, manual, ...rest];
 }
 
 /** What the page shows: the missing `path` (rendered as text, which lit
@@ -147,12 +139,8 @@ const SKYLINE = html`<div class="nf-sky" aria-hidden="true">
 export function notFoundPageTemplate(view: NotFoundView): TemplateResult {
   const { path, site = "game", fromGame = false, clock = "" } = view;
   const links = notFoundLinks(site);
-  const title =
-    site === "help" ? "Verticopolis Player's Manual" : "Verticopolis";
-  const heading =
-    site === "help"
-      ? "Page 404 isn't in the manual."
-      : "Floor 404 hasn't been built yet.";
+  const title = site === "help" ? "Verticopolis Player's Manual" : "Verticopolis";
+  const heading = site === "help" ? "Page 404 isn't in the manual." : "Floor 404 hasn't been built yet.";
   // Every pick reports where it went: a click, keyboard Enter, or a
   // middle-click that opens it in a new tab. A way back to the game closes a
   // game-opened tab instead, as the manual's Back to game does.
@@ -160,8 +148,7 @@ export function notFoundPageTemplate(view: NotFoundView): TemplateResult {
     trackAppAction("not_found_pick", code);
     if (fromGame) backToOpenGame(e);
   };
-  const noted = (code: NotFoundPick) => () =>
-    trackAppAction("not_found_pick", code);
+  const noted = (code: NotFoundPick) => () => trackAppAction("not_found_pick", code);
   const middle = (code: NotFoundPick) => (e: MouseEvent) => {
     if (e.button === MIDDLE_BUTTON) trackAppAction("not_found_pick", code);
   };
@@ -202,14 +189,16 @@ export function notFoundPageTemplate(view: NotFoundView): TemplateResult {
         </div>
         ${SKYLINE}
         <div class="nf-body">
-          ${fromGame
-            ? html`<p
+          ${
+            fromGame
+              ? html`<p
                 id=${BACK_NOTE_ID}
                 class="page-note"
                 tabindex="-1"
                 hidden
               ></p>`
-            : nothing}
+              : nothing
+          }
           <div class="nf-msg">
             ${WARNING_ICON}
             <div>
@@ -256,10 +245,7 @@ function main(): void {
   };
   const fallback = [...root.childNodes];
   const draw = (): void => {
-    render(
-      notFoundPageTemplate({ ...view, clock: trayClock(new Date()) }),
-      root,
-    );
+    render(notFoundPageTemplate({ ...view, clock: trayClock(new Date()) }), root);
   };
   draw();
   for (const node of fallback) node.remove();

@@ -152,8 +152,7 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
  * and the first save commits over it.
  */
 export type FromTowerFileResult =
-  | { readonly ok: true; readonly value: string }
-  | { readonly ok: false; readonly reason: "too-new" | "unreadable" };
+  { readonly ok: true; readonly value: string } | { readonly ok: false; readonly reason: "too-new" | "unreadable" };
 
 export function fromTowerFile(text: string, preserve = false): FromTowerFileResult {
   const trimmed = text.trim();
@@ -230,9 +229,7 @@ export function sameTowerFile(a: string, b: string): boolean {
   const normalize = (s: string) => {
     const trimmed = s.trim();
     const magic = /^VCTOWER(\d+)/.exec(trimmed);
-    return magic
-      ? `${magic[0]}|${trimmed.slice(magic[0].length).replace(/\s+/g, "")}`
-      : trimmed.replace(/\s+/g, "");
+    return magic ? `${magic[0]}|${trimmed.slice(magic[0].length).replace(/\s+/g, "")}` : trimmed.replace(/\s+/g, "");
   };
   return normalize(a) === normalize(b);
 }

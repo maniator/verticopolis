@@ -22,7 +22,13 @@ describe.skipIf(noEngine)("the shaft drag preview's answers on the engine", () =
     reader.update();
     expect(quoteShaft(engine, codes, "elevatorStandard", x, 1, 2).ok).toBe(true);
     // Floor 5 has no structure at the column: the engine refuses the span.
-    expect(quoteShaft(engine, codes, "elevatorStandard", x, 1, 5)).toMatchObject({ ok: false, reason: expect.any(String) });
-    expect([isUnlocked({ reader }, "elevatorStandard"), isUnlocked({ reader }, "elevatorExpress")]).toEqual([true, false]);
+    expect(quoteShaft(engine, codes, "elevatorStandard", x, 1, 5)).toMatchObject({
+      ok: false,
+      reason: expect.any(String),
+    });
+    expect([isUnlocked({ reader }, "elevatorStandard"), isUnlocked({ reader }, "elevatorExpress")]).toEqual([
+      true,
+      false,
+    ]);
   });
 });

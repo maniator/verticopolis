@@ -82,7 +82,8 @@ test.describe("the desk on a computer", () => {
     await enterTower(page);
     await expect(body(page)).toHaveClass(/\bdesk\b/);
     await expect(body(page)).not.toHaveClass(/\bdesk-title\b/);
-    for (const id of ["#desk-win-tower", "#desk-win-info", "#overview-map", "#bulletin-win"]) await expect(page.locator(id)).toBeVisible();
+    for (const id of ["#desk-win-tower", "#desk-win-info", "#overview-map", "#bulletin-win"])
+      await expect(page.locator(id)).toBeVisible();
     for (const id of ["tower", "info", "tools", "map", "bulletin"]) await expect(task(page, id)).toHaveCount(1);
   });
 
@@ -148,7 +149,9 @@ test.describe("the desk on a computer", () => {
     await expect(page.locator(".desk-start")).toBeFocused();
   });
 
-  test("no window is ever lost: Info and Tools never close, and the Window menu brings back a closed or minimized one", async ({ page }) => {
+  test("no window is ever lost: Info and Tools never close, and the Window menu brings back a closed or minimized one", async ({
+    page,
+  }) => {
     await load(page);
     await enterTower(page);
     await expect(page.locator("#desk-win-info .desk-btn-close")).toHaveCount(0);
@@ -159,14 +162,20 @@ test.describe("the desk on a computer", () => {
     await press(page, page.locator("#palette .desk-btn-min"));
     await expect(page.locator("#desk-win-info")).toBeHidden();
     await expect(page.locator("#palette")).toBeHidden();
-    for (const [item, win] of [["#mb-dw-map", "#overview-map"], ["#mb-dw-info", "#desk-win-info"], ["#mb-dw-tools", "#palette"]]) {
+    for (const [item, win] of [
+      ["#mb-dw-map", "#overview-map"],
+      ["#mb-dw-info", "#desk-win-info"],
+      ["#mb-dw-tools", "#palette"],
+    ]) {
       await press(page, page.locator("#mb-window"));
       await press(page, page.locator(item));
       await expect(page.locator(win)).toBeVisible();
     }
   });
 
-  test("a right-click on a taskbar button opens the window menu, and its Minimize sends the window down", async ({ page }) => {
+  test("a right-click on a taskbar button opens the window menu, and its Minimize sends the window down", async ({
+    page,
+  }) => {
     await load(page);
     await enterTower(page);
     const b = await box(task(page, "map"));
@@ -179,7 +188,9 @@ test.describe("the desk on a computer", () => {
     await expect(page.locator("#overview-map")).toBeHidden();
   });
 
-  test("the Control Panel opens from the tray, with no Desktop switch, and Options has none either", async ({ page }) => {
+  test("the Control Panel opens from the tray, with no Desktop switch, and Options has none either", async ({
+    page,
+  }) => {
     await load(page);
     await enterTower(page);
     await press(page, page.locator(".desk-tray-display"));
@@ -211,7 +222,9 @@ test.describe("the desk on other screens", () => {
     await expect(page.locator("#desk-taskbar")).toHaveCount(0);
   });
 
-  test("?desk=on brings the desk to a screen narrower than a computer's, and ?desk=off turns it off", async ({ page }) => {
+  test("?desk=on brings the desk to a screen narrower than a computer's, and ?desk=off turns it off", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 900, height: 700 });
     await load(page);
     await enterTower(page);
@@ -232,10 +245,12 @@ test.describe("the desk on other screens", () => {
     await enterTower(page);
     await drag(page, page.locator("#bulletin-win > .win-title"), 2000, 0);
     await page.setViewportSize({ width: 1100, height: 700 });
-    await expect.poll(async () => {
-      const b = await box(page.locator("#bulletin-win"));
-      return b.x + b.width <= 1100;
-    }).toBe(true);
+    await expect
+      .poll(async () => {
+        const b = await box(page.locator("#bulletin-win"));
+        return b.x + b.width <= 1100;
+      })
+      .toBe(true);
     const tower = await box(page.locator("#desk-win-tower"));
     expect(tower.x + tower.width).toBeLessThanOrEqual(1100);
   });

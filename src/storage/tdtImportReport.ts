@@ -49,11 +49,15 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     );
     // The engine keeps each shaft's 1994 settings block for an export (#305).
     if (shafts > 0) {
-      broughtOver.push("Each elevator's 1994 Elevator window settings, kept for a save back to SimTower (1994); the elevators here run on this game's own schedule.");
+      broughtOver.push(
+        "Each elevator's 1994 Elevator window settings, kept for a save back to SimTower (1994); the elevators here run on this game's own schedule.",
+      );
     }
   }
   if (counts.offices > 0) {
-    broughtOver.push(`${counts.offices} office${counts.offices === 1 ? "" : "s"} (${counts.occupiedOffices} with tenants).`);
+    broughtOver.push(
+      `${counts.offices} office${counts.offices === 1 ? "" : "s"} (${counts.occupiedOffices} with tenants).`,
+    );
   }
   if (counts.condos > 0) {
     broughtOver.push(`${counts.condos} condo${counts.condos === 1 ? "" : "s"} (${counts.soldCondos} sold).`);
@@ -69,9 +73,7 @@ export function importReport(facts: ImportReportFacts): ImportReport {
   if (counts.twinRooms > 0) {
     // The original's twin room is our Twin Room (`hotelDouble`): same width, same two guests.
     broughtOver.push(
-      counts.twinRooms === 1
-        ? "Of those, 1 is a Twin Room."
-        : `Of those, ${counts.twinRooms} are Twin Rooms.`,
+      counts.twinRooms === 1 ? "Of those, 1 is a Twin Room." : `Of those, ${counts.twinRooms} are Twin Rooms.`,
     );
   }
   if (counts.venues > 0) {
@@ -81,7 +83,9 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     broughtOver.push(`${counts.services} service and special facilit${counts.services === 1 ? "y" : "ies"}.`);
   }
   if (counts.rentsApplied > 0) {
-    broughtOver.push(`Rent levels for ${counts.rentsApplied} unit${counts.rentsApplied === 1 ? "" : "s"}, from the save's rent classes.`);
+    broughtOver.push(
+      `Rent levels for ${counts.rentsApplied} unit${counts.rentsApplied === 1 ? "" : "s"}, from the save's rent classes.`,
+    );
   }
   if (counts.parkingStalls > 0 && facts.parkingConnected !== null && facts.parkingConnected <= 512) {
     // 512 is the format's own stall-table size; a bigger count is corrupt and
@@ -91,7 +95,9 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     );
   }
   if (counts.construction > 0) {
-    broughtOver.push(`${counts.construction} room${counts.construction === 1 ? "" : "s"} still under construction; work resumes now.`);
+    broughtOver.push(
+      `${counts.construction} room${counts.construction === 1 ? "" : "s"} still under construction; work resumes now.`,
+    );
   }
   broughtOver.push(`The clock: day ${day}, ${formatClock(facts.minutes)}.`);
 
@@ -102,7 +108,9 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     );
   }
   if (counts.secom > 0) {
-    couldNotBring.push(`${counts.secom} SECOM office${counts.secom === 1 ? "" : "s"} imported as Security (SECOM never shipped in the original).`);
+    couldNotBring.push(
+      `${counts.secom} SECOM office${counts.secom === 1 ? "" : "s"} imported as Security (SECOM never shipped in the original).`,
+    );
   }
   if (counts.cathedral > 0) {
     couldNotBring.push("The Cathedral arrives as our Wedding Hall (a deliberate divergence).");
@@ -138,10 +146,14 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     );
   }
   if (counts.burned > 0) {
-    couldNotBring.push(`${counts.burned} burned-out area${counts.burned === 1 ? " was" : "s were"} cleared back to bare floor.`);
+    couldNotBring.push(
+      `${counts.burned} burned-out area${counts.burned === 1 ? " was" : "s were"} cleared back to bare floor.`,
+    );
   }
   if (counts.unknown > 0) {
-    couldNotBring.push(`${counts.unknown} room${counts.unknown === 1 ? "" : "s"} of a type we don't recognize stayed behind.`);
+    couldNotBring.push(
+      `${counts.unknown} room${counts.unknown === 1 ? "" : "s"} of a type we don't recognize stayed behind.`,
+    );
   }
   if (counts.droppedFloors > 0) {
     couldNotBring.push(
@@ -149,7 +161,9 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     );
   }
   if (counts.offLot > 0) {
-    couldNotBring.push(`${counts.offLot} room${counts.offLot === 1 ? " sat" : "s sat"} outside the lot and stayed behind.`);
+    couldNotBring.push(
+      `${counts.offLot} room${counts.offLot === 1 ? " sat" : "s sat"} outside the lot and stayed behind.`,
+    );
   }
   if (counts.overlapping > 0) {
     couldNotBring.push(
@@ -162,7 +176,9 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     );
   }
   if (counts.clamped > 0) {
-    couldNotBring.push(`${counts.clamped} room${counts.clamped === 1 ? " was" : "s were"} trimmed to fit the lot edge.`);
+    couldNotBring.push(
+      `${counts.clamped} room${counts.clamped === 1 ? " was" : "s were"} trimmed to fit the lot edge.`,
+    );
   }
   if (counts.widthMismatch > 0) {
     couldNotBring.push(

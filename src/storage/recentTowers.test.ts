@@ -1,8 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { dropRecentTower, keepRecentTowers, noteFolderFile, noteRecentTower, noteTowersFile, RECENT_KEY, RECENT_MAX, recentTowers, type RecentTower } from "./recentTowers";
+import {
+  dropRecentTower,
+  keepRecentTowers,
+  noteFolderFile,
+  noteRecentTower,
+  noteTowersFile,
+  RECENT_KEY,
+  RECENT_MAX,
+  recentTowers,
+  type RecentTower,
+} from "./recentTowers";
 
-const towers = (n: number, kind: RecentTower["kind"] = "tower"): RecentTower => ({ place: "towers", id: `id${n}`, name: `Tower ${n}`, kind });
-const folder = (file: string, link = "L1"): RecentTower => ({ place: "folder", id: file, name: file, kind: "tower", link });
+const towers = (n: number, kind: RecentTower["kind"] = "tower"): RecentTower => ({
+  place: "towers",
+  id: `id${n}`,
+  name: `Tower ${n}`,
+  kind,
+});
+const folder = (file: string, link = "L1"): RecentTower => ({
+  place: "folder",
+  id: file,
+  name: file,
+  kind: "tower",
+  link,
+});
 
 beforeEach(() => {
   localStorage.clear();
@@ -51,7 +72,10 @@ describe("the recent towers list", () => {
     noteTowersFile({ id: "f1", name: "Old", kind: "tdt" });
     noteFolderFile({ id: "Sky.vctower", kind: "tower" }, "L9");
     noteFolderFile({ id: "Lost.vctower", kind: "tower" }, null);
-    expect(recentTowers()).toEqual([folder("Sky.vctower", "L9"), { place: "towers", id: "f1", name: "Old", kind: "tdt" }]);
+    expect(recentTowers()).toEqual([
+      folder("Sky.vctower", "L9"),
+      { place: "towers", id: "f1", name: "Old", kind: "tdt" },
+    ]);
   });
 
   it("reads damaged text, wrong shapes and a folder line without its link as nothing", () => {

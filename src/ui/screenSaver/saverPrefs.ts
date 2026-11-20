@@ -47,7 +47,10 @@ function isChoice(v: unknown): v is SaverChoice {
   return v === NO_SAVER || (SAVERS as readonly unknown[]).includes(v);
 }
 
-export function loadSaverPrefs(touchScreen: boolean, storage: Pick<Storage, "getItem"> | null = safeStorage()): SaverPrefs {
+export function loadSaverPrefs(
+  touchScreen: boolean,
+  storage: Pick<Storage, "getItem"> | null = safeStorage(),
+): SaverPrefs {
   const out = defaultSaverPrefs(touchScreen);
   try {
     const raw = storage?.getItem(KEY);

@@ -47,15 +47,22 @@ const charge = (json: string): ChargeOutcome => JSON.parse(json) as ChargeOutcom
  *  so a tile, id or count outside that range is refused here rather than
  *  handed to the engine as a different number. */
 function i32(v: number, what: string): number {
-  if (!Number.isInteger(v) || v > 0x7fffffff || v < -0x80000000) throw new Error(`${what} ${v} is outside the binding's 32-bit range`);
+  if (!Number.isInteger(v) || v > 0x7fffffff || v < -0x80000000)
+    throw new Error(`${what} ${v} is outside the binding's 32-bit range`);
   return v;
 }
 function u32(v: number, what: string): number {
-  if (!Number.isInteger(v) || v < 0 || v > 0xffffffff) throw new Error(`${what} ${v} is outside the binding's unsigned 32-bit range`);
+  if (!Number.isInteger(v) || v < 0 || v > 0xffffffff)
+    throw new Error(`${what} ${v} is outside the binding's unsigned 32-bit range`);
   return v;
 }
 
-interface LogEntry { seq: number; minute: number; text: string; kind: string }
+interface LogEntry {
+  seq: number;
+  minute: number;
+  text: string;
+  kind: string;
+}
 
 const LOG_FROM_START = -0x80000000;
 
@@ -65,11 +72,19 @@ export function wasmFxSlots(handle: WasmEngine): Record<FxSlot, number> {
   const counts = h.counts;
   return {
     santaFxSeq: h.santaFxSeq,
-    explosionSeq: h.explosionFx.seq, explosionFloor: h.explosionFx.floor, explosionX: h.explosionFx.x,
-    thiefSeq: h.thiefFx.seq, thiefCaught: h.thiefFx.caught ? 1 : 0, thiefFloor: h.thiefFx.floor,
-    treasureSeq: h.treasureFx.seq, treasureFloor: h.treasureFx.floor, treasureX: h.treasureFx.x,
+    explosionSeq: h.explosionFx.seq,
+    explosionFloor: h.explosionFx.floor,
+    explosionX: h.explosionFx.x,
+    thiefSeq: h.thiefFx.seq,
+    thiefCaught: h.thiefFx.caught ? 1 : 0,
+    thiefFloor: h.thiefFx.floor,
+    treasureSeq: h.treasureFx.seq,
+    treasureFloor: h.treasureFx.floor,
+    treasureX: h.treasureFx.x,
     vipFxSeq: h.vipFxSeq,
-    fires: counts.fires, firesGutRooms: counts.firesGutRooms, bombs: counts.bombs,
+    fires: counts.fires,
+    firesGutRooms: counts.firesGutRooms,
+    bombs: counts.bombs,
   };
 }
 
@@ -96,7 +111,12 @@ export function wasmCheckpointDetail(handle: WasmEngine): Omit<CheckpointDetail,
   };
 }
 
-interface SavedUnit { id: number; kind: string; rent?: number; noRate?: boolean }
+interface SavedUnit {
+  id: number;
+  kind: string;
+  rent?: number;
+  noRate?: boolean;
+}
 
 const defaultRents = new Map<GameMode, ReadonlyMap<string, number>>();
 
@@ -108,12 +128,18 @@ function rentOf(u: SavedUnit, mode: GameMode): number {
   if (u.rent !== undefined) return u.rent;
   let rents = defaultRents.get(mode);
   if (!rents) {
-    rents = new Map(readCatalog(wasm(), mode).facilities.flatMap((f) => (f.rent ? [[f.key, f.rent.default] as const] : [])));
+    rents = new Map(
+      readCatalog(wasm(), mode).facilities.flatMap((f) => (f.rent ? [[f.key, f.rent.default] as const] : [])),
+    );
     defaultRents.set(mode, rents);
   }
   return rents.get(u.kind) ?? 0;
 }
-interface SavedTransport { id: number; kind: string; cars: number }
+interface SavedTransport {
+  id: number;
+  kind: string;
+  cars: number;
+}
 
 /** The `reload` command's save round trip on a binding instance; the caller
  *  frees the old one. */
@@ -138,8 +164,13 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     money: () => live().money(),
     setMoney: (amount) => live().setMoney(amount),
     build: (kind, floor, x) => outcome(live().build(kind, i32(floor, "floor"), i32(x, "x"))),
-    paintBrush: (kind, floor, tiles) => JSON.parse(live().paintBrush(kind, i32(floor, "floor"), JSON.stringify(tiles))) as { placed: number; reason?: string },
-    buildTransport: (kind, x, bottom, top) => outcome(live().buildTransport(kind, i32(x, "x"), i32(bottom, "bottom"), i32(top, "top"))),
+    paintBrush: (kind, floor, tiles) =>
+      JSON.parse(live().paintBrush(kind, i32(floor, "floor"), JSON.stringify(tiles))) as {
+        placed: number;
+        reason?: string;
+      },
+    buildTransport: (kind, x, bottom, top) =>
+      outcome(live().buildTransport(kind, i32(x, "x"), i32(bottom, "bottom"), i32(top, "top"))),
     // Read raw by the binding, which refuses a malformed argument itself (#996).
     sellAt: (floor, x) => live().sellAt(floor, x),
     unitAt: (floor, x) => {
@@ -231,7 +262,8 @@ export function startWasmHandle(start: Start): WasmEngine {
     const founded = Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode);
     // One star is the founded game itself (the Rust runner, `start_sim` in
     // engine-rs/src/scenario.rs, does the same).
-    if (start.newGame.star === undefined || start.newGame.star === 1) return checked(founded, start.newGame.mode, "new game founded");
+    if (start.newGame.star === undefined || start.newGame.star === 1)
+      return checked(founded, start.newGame.mode, "new game founded");
     // The binding has no star setter: save the founded game, raise the star and
     // load it back, the route the Rust runner takes.
     try {
@@ -248,5 +280,9 @@ export function startWasmHandle(start: Start): WasmEngine {
       founded.free();
     }
   }
-  return checked(Engine.fromVctower(readFileSync(conformanceFile(start.fixture), "utf8"), start.mode ?? null), start.mode, `${start.fixture} loaded`);
+  return checked(
+    Engine.fromVctower(readFileSync(conformanceFile(start.fixture), "utf8"), start.mode ?? null),
+    start.mode,
+    `${start.fixture} loaded`,
+  );
 }

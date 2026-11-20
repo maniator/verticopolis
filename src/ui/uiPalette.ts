@@ -49,7 +49,8 @@ const GROUPS: { title: string; cats: FacilityCategory[] }[] = [
  *  as `Game.mobileMq` in `main.ts`. Only there are the sections tab panels. */
 const TAB_LAYOUT_MQ = "(max-width: 767px), (max-width: 1023px) and (max-height: 599px)";
 
-const ONE_ROW_TAB_LAYOUT_MQ = "(max-width: 1023px) and (max-height: 339.98px) and (orientation: landscape), (max-width: 539.98px) and (orientation: landscape)";
+const ONE_ROW_TAB_LAYOUT_MQ =
+  "(max-width: 1023px) and (max-height: 339.98px) and (orientation: landscape), (max-width: 539.98px) and (orientation: landscape)";
 
 type TabLayoutWatch = { mq: MediaQueryList; onChange: () => void }[];
 const tabLayoutWatch = new WeakMap<UI, TabLayoutWatch>();
@@ -77,12 +78,14 @@ export function paletteWindow(ui: UI): HTMLElement | null {
  *  Modern sub-band marked. Two catalogs with the same key lay out the same
  *  buttons, so only their labels need redrawing. */
 function layoutKey(catalog: Catalog): string {
-  return GROUPS.map((g) =>
-    catalog.facilities
-      .filter((f) => g.cats.includes(f.category))
-      .map((f) => (f.modernOnly ? `${f.key}+` : f.key))
-      .join(","),
-  ).join("|") + (catalog.rules.skyBridge ? "|bridge" : "");
+  return (
+    GROUPS.map((g) =>
+      catalog.facilities
+        .filter((f) => g.cats.includes(f.category))
+        .map((f) => (f.modernOnly ? `${f.key}+` : f.key))
+        .join(","),
+    ).join("|") + (catalog.rules.skyBridge ? "|bridge" : "")
+  );
 }
 
 /** The layout key each palette was built from. */
@@ -128,7 +131,9 @@ function buildPaletteFrom(ui: UI, catalog: Catalog): void {
       for (const kind of modern) section.appendChild(facilityButton(ui, catalog, kind, group.title, true));
       if (bridge) {
         const item = skyBridgeButton(bridge, group.title);
-        makeActivatable(item, item.getAttribute("aria-label") ?? "Sky Bridge", () => ui.selectTool({ type: SKY_BRIDGE_TOOL }));
+        makeActivatable(item, item.getAttribute("aria-label") ?? "Sky Bridge", () =>
+          ui.selectTool({ type: SKY_BRIDGE_TOOL }),
+        );
         section.appendChild(item);
       }
     }
@@ -312,7 +317,9 @@ export function syncPaletteTabs(ui: UI): void {
     if (section) section.hidden = empty;
     // Modern sub-band divider: visible only once a Modern venue in the group unlocks.
     const sub = section?.querySelector<HTMLElement>(".pal-sub");
-    if (sub) sub.hidden = ui.el.palette.querySelectorAll(`.pal-group[data-group="${title}"] .pal-item.pal-mod:not(.locked)`).length === 0;
+    if (sub)
+      sub.hidden =
+        ui.el.palette.querySelectorAll(`.pal-group[data-group="${title}"] .pal-item.pal-mod:not(.locked)`).length === 0;
     // "New" pip: the count grew since the last scan and this is not the open tab.
     const prev = Number(tab.dataset.ucount);
     if (prev >= 0 && count > prev && tab.getAttribute("aria-selected") !== "true") tab.classList.add("has-new");
@@ -447,7 +454,9 @@ function rebuildPalette(ui: UI, catalog: Catalog): void {
   // An item is named by its kind (a build tool) or its tool (Inspect, Bulldoze).
   const itemKey = (el: Element | null): string | undefined =>
     el instanceof HTMLElement && el.classList.contains("pal-item") ? (el.dataset.kind ?? el.dataset.tool) : undefined;
-  const pulsed = [...ui.el.palette.querySelectorAll(".pal-item.tt-pulse")].map(itemKey).filter((k): k is string => k !== undefined);
+  const pulsed = [...ui.el.palette.querySelectorAll(".pal-item.tt-pulse")]
+    .map(itemKey)
+    .filter((k): k is string => k !== undefined);
   const focusedItem = ui.el.palette.contains(document.activeElement) ? itemKey(document.activeElement) : undefined;
   const focusedTab =
     ui.el.paletteTabs?.contains(document.activeElement) && document.activeElement instanceof HTMLElement
@@ -461,7 +470,8 @@ function rebuildPalette(ui: UI, catalog: Catalog): void {
   // key so the pump's next pass writes them.
   ui.paletteScanKey = null;
   const tool = ui.tool;
-  const selector = tool.type === "build" ? `.pal-item[data-kind="${tool.kind}"]` : `.pal-item[data-tool="${tool.type}"]`;
+  const selector =
+    tool.type === "build" ? `.pal-item[data-kind="${tool.kind}"]` : `.pal-item[data-tool="${tool.type}"]`;
   ui.el.palette.querySelector(selector)?.classList.add("active");
   const byKey = (key: string) =>
     ui.el.palette.querySelector<HTMLElement>(`.pal-item[data-kind="${key}"], .pal-item[data-tool="${key}"]`);

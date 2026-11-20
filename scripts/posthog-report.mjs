@@ -443,7 +443,9 @@ function htmlDepth(depth) {
 /** The full self-contained HTML report. */
 function renderHtml(m) {
   const kpis = m.kpis
-    .map(([k, v]) => `<div class="kpi"><div class="kpi-v">${fmt(v)}</div><div class="kpi-k">${escapeHtml(k)}</div></div>`)
+    .map(
+      ([k, v]) => `<div class="kpi"><div class="kpi-v">${fmt(v)}</div><div class="kpi-k">${escapeHtml(k)}</div></div>`,
+    )
     .join("");
   const highlights = m.highlights
     .map(([k, v]) => `<li><span>${escapeHtml(k)}</span><b>${escapeHtml(String(v))}</b></li>`)
@@ -473,7 +475,12 @@ ${sections}
  *  the same caveats rather than a rosier older wording. */
 function markdownDepth(depth) {
   if (!depth || !depth.length) return [];
-  const lines = [`## Depth`, ``, `| Metric | Samples | p50 | p90 | p95 | Max |`, `| --- | ---: | ---: | ---: | ---: | ---: |`];
+  const lines = [
+    `## Depth`,
+    ``,
+    `| Metric | Samples | p50 | p90 | p95 | Max |`,
+    `| --- | ---: | ---: | ---: | ---: | ---: |`,
+  ];
   for (const d of depth) {
     const r = d.row;
     if (r.skipped || r.empty) {
@@ -482,7 +489,9 @@ function markdownDepth(depth) {
       continue;
     }
     const samples = d.unit ? `${fmt(r.n)} ${d.unit}` : fmt(r.n);
-    lines.push(`| ${mdCell(d.label)} | ${samples} | ${fmt(rnd(r.p50))} | ${fmt(rnd(r.p90))} | ${fmt(rnd(r.p95))} | ${fmt(rnd(r.max))} |`);
+    lines.push(
+      `| ${mdCell(d.label)} | ${samples} | ${fmt(rnd(r.p50))} | ${fmt(rnd(r.p90))} | ${fmt(rnd(r.p95))} | ${fmt(rnd(r.max))} |`,
+    );
   }
   lines.push(
     ``,
@@ -533,7 +542,10 @@ function renderMarkdown(m) {
 /** Built-in sample results for --demo, shaped exactly like the normalized query
  *  output, so the same model and renderers exercise a populated report. */
 function demoModel() {
-  const rows = (pairs) => ({ ok: true, rows: pairs.map(([key, events, sessions]) => ({ key: String(key), events, sessions })) });
+  const rows = (pairs) => ({
+    ok: true,
+    rows: pairs.map(([key, events, sessions]) => ({ key: String(key), events, sessions })),
+  });
   const depth = (n, p50, p90, p95, max) => ({ skipped: false, empty: false, n, p50, p90, p95, max });
   return {
     window: { since: "sample", until: "sample", label: "sample" },
@@ -566,28 +578,105 @@ function demoModel() {
       { label: "Fps 5th-percentile low (per page life)", unit: "page lives", row: depth(2100, 42, 22, 15, 60) },
     ],
     sections: [
-      { title: "Tool mix", tables: [{ ok: true, header: "Tool", ...rows([["office", 820, 410], ["fast food", 560, 300], ["floor", 540, 295]]) }] },
+      {
+        title: "Tool mix",
+        tables: [
+          {
+            ok: true,
+            header: "Tool",
+            ...rows([
+              ["office", 820, 410],
+              ["fast food", 560, 300],
+              ["floor", 540, 295],
+            ]),
+          },
+        ],
+      },
       {
         title: "Boots",
         tables: [
-          { ok: true, caption: "By platform", header: "Platform", ...rows([["web", 4200, 2000], ["twa", 900, 500], ["ios", 300, 100]]) },
-          { ok: true, caption: "By reason", header: "Reason", ...rows([["continue", 2600, 1500], ["fresh", 2100, 900], ["update", 480, 360]]) },
+          {
+            ok: true,
+            caption: "By platform",
+            header: "Platform",
+            ...rows([
+              ["web", 4200, 2000],
+              ["twa", 900, 500],
+              ["ios", 300, 100],
+            ]),
+          },
+          {
+            ok: true,
+            caption: "By reason",
+            header: "Reason",
+            ...rows([
+              ["continue", 2600, 1500],
+              ["fresh", 2100, 900],
+              ["update", 480, 360],
+            ]),
+          },
         ],
       },
       {
         title: "App-chrome actions",
-        tables: [{ ok: true, caption: "app_action by action", header: "Action", ...rows([["quick_save", 720, 480], ["settings_open", 410, 300], ["export_save", 160, 140]]) }],
+        tables: [
+          {
+            ok: true,
+            caption: "app_action by action",
+            header: "Action",
+            ...rows([
+              ["quick_save", 720, 480],
+              ["settings_open", 410, 300],
+              ["export_save", 160, 140],
+            ]),
+          },
+        ],
       },
       {
         title: "Economy actions",
-        tables: [{ ok: true, caption: "economy_action by action", header: "Action", ...rows([["demolish", 380, 260], ["price_tune", 180, 170], ["capacity_tune", 80, 78]]) }],
+        tables: [
+          {
+            ok: true,
+            caption: "economy_action by action",
+            header: "Action",
+            ...rows([
+              ["demolish", 380, 260],
+              ["price_tune", 180, 170],
+              ["capacity_tune", 80, 78],
+            ]),
+          },
+        ],
       },
       {
         title: "Emergencies",
         tables: [
-          { ok: true, caption: "Emergency choices by kind", header: "Kind", ...rows([["fireRescue", 150, 130], ["bombThreat", 60, 55]]) },
-          { ok: true, caption: "Emergency choices by decision", header: "Decision", ...rows([["accept", 120, 108], ["decline", 90, 84]]) },
-          { ok: true, caption: "Fire occurrence", header: "Metric", ...rows([["Sessions with a fire", 170, 162], ["Sessions reporting (all played)", 2580, 2580]]) },
+          {
+            ok: true,
+            caption: "Emergency choices by kind",
+            header: "Kind",
+            ...rows([
+              ["fireRescue", 150, 130],
+              ["bombThreat", 60, 55],
+            ]),
+          },
+          {
+            ok: true,
+            caption: "Emergency choices by decision",
+            header: "Decision",
+            ...rows([
+              ["accept", 120, 108],
+              ["decline", 90, 84],
+            ]),
+          },
+          {
+            ok: true,
+            caption: "Fire occurrence",
+            header: "Metric",
+            ...rows([
+              ["Sessions with a fire", 170, 162],
+              ["Sessions reporting (all played)", 2580, 2580],
+            ]),
+          },
         ],
       },
     ],
@@ -612,7 +701,12 @@ async function main() {
   }
 
   const TOTAL_EVENTS = [
-    "boot", "session_end", "first_build", "star_reached", "crash", "update",
+    "boot",
+    "session_end",
+    "first_build",
+    "star_reached",
+    "crash",
+    "update",
     // BOTH new-tower names. `game_started` was renamed to `new_game_started` on
     // 2026-09-14, so every founding before that date is stored under the old
     // name, and the game ships as a PWA / TWA / bundled iOS build whose cached
@@ -620,15 +714,20 @@ async function main() {
     // would make "Towers founded" read a fraction of reality for a full window
     // and print it as a confident number. Summed at the KPI below; drop the old
     // name once no build that emits it is still in the wild.
-    "new_game_started", "game_started",
+    "new_game_started",
+    "game_started",
     // App-chrome (#614), error tracking, and the gameplay economy / emergency
     // surfaces (#611). Each only has history from when its build went live.
-    "app_action", "economy_action", "emergency_choice", "session_emergencies", "$exception",
+    "app_action",
+    "economy_action",
+    "emergency_choice",
+    "session_emergencies",
+    "$exception",
   ];
   const raw = {};
   const q = async (label, query) => {
     const r = await runQuery(query);
-    raw[label] = r.ok ? r.json?.results ?? r.json : { status: r.status, hint: r.hint };
+    raw[label] = r.ok ? (r.json?.results ?? r.json) : { status: r.status, hint: r.hint };
     return r;
   };
 
@@ -679,13 +778,19 @@ async function main() {
   // Fire rate: the sessions (distinct_id) with a session_emergencies row that
   // saw a fire, over the sessions that sent any. Rows come once per played
   // reporting window, so a session can send several; the rate reads sessions. `fires` is a server-trusted integer prop, not user input.
-  const firesRes = await q("session_emergencies_with_fire", buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", WINDOW.hours));
+  const firesRes = await q(
+    "session_emergencies_with_fire",
+    buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", WINDOW.hours),
+  );
   const firesWithFire = countRow(firesRes);
 
   // Sessions that reported at least one `final: true` row (the terminal
   // pagehide). `final` shipped on 2026-09-14, so a window reaching back past
   // that reads low for the days before it.
-  const finalRes = await q("session_end_final", buildFilteredCountQuery("session_end", "properties.final = true", WINDOW.hours));
+  const finalRes = await q(
+    "session_end_final",
+    buildFilteredCountQuery("session_end", "properties.final = true", WINDOW.hours),
+  );
   const finalRows = countRow(finalRes);
   // Both new-tower event names, summed across the 2026-09-14 rename.
   const founded = totals.new_game_started.events + totals.game_started.events;
@@ -725,7 +830,10 @@ async function main() {
       // new-game event fires only on founding. The honest funnel is the
       // dashboard's, which is per session; this line is a sanity check on the
       // two raw counts, so it shows them.
-      ["First builds vs towers founded", `${fmt(totals.first_build.events)} vs ${fmt(founded)} (per tower, not a conversion rate)`],
+      [
+        "First builds vs towers founded",
+        `${fmt(totals.first_build.events)} vs ${fmt(founded)} (per tower, not a conversion rate)`,
+      ],
       // Sessions where SOME page life reported a `pagehide` row. Deliberately not
       // called a terminal-pagehide delivery rate: `final` rides EVERY emission
       // made from `pagehide` that clears the dedup, not just the first, and a
@@ -744,7 +852,10 @@ async function main() {
       ["Typical session fps (p50)", fpsP50 && !fpsP50.skipped && !fpsP50.empty ? fmt(rnd(fpsP50.p50)) : "n/a"],
       // Fire rate: sessions with >=1 fire over all played sessions that reported.
       // "n/a" (not a false 0.0%) when that one query was skipped while totals succeeded.
-      ["Sessions with a fire", firesWithFire.skipped ? "n/a" : pct(firesWithFire.sessions, totals.session_emergencies.sessions)],
+      [
+        "Sessions with a fire",
+        firesWithFire.skipped ? "n/a" : pct(firesWithFire.sessions, totals.session_emergencies.sessions),
+      ],
     ],
     depth,
     sections: [
@@ -786,13 +897,21 @@ async function main() {
       {
         title: "App-chrome actions",
         tables: [
-          { ...appActionByAction, caption: "app_action by action (save / export / TDT / dialog opens / toggles / page landings)", header: "Action" },
+          {
+            ...appActionByAction,
+            caption: "app_action by action (save / export / TDT / dialog opens / toggles / page landings)",
+            header: "Action",
+          },
         ],
       },
       {
         title: "Economy actions",
         tables: [
-          { ...economyByAction, caption: "economy_action by action (demolish / price_tune / capacity_tune)", header: "Action" },
+          {
+            ...economyByAction,
+            caption: "economy_action by action (demolish / price_tune / capacity_tune)",
+            header: "Action",
+          },
         ],
       },
       {
@@ -809,7 +928,11 @@ async function main() {
             header: "Metric",
             rows: [
               { key: "Sessions with a fire", events: firesWithFire.events, sessions: firesWithFire.sessions },
-              { key: "Sessions reporting (all played)", events: totals.session_emergencies.events, sessions: totals.session_emergencies.sessions },
+              {
+                key: "Sessions reporting (all played)",
+                events: totals.session_emergencies.events,
+                sessions: totals.session_emergencies.sessions,
+              },
             ],
           },
         ],
@@ -847,4 +970,18 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
 }
 
 // Exported for unit tests and scripts/engine-reliability.mjs; used directly above.
-export { parseWindow, lit, buildTotalsQuery, buildDepthQuery, buildSessionDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow, runQuery };
+export {
+  parseWindow,
+  lit,
+  buildTotalsQuery,
+  buildDepthQuery,
+  buildSessionDepthQuery,
+  buildBreakdownQuery,
+  buildFilteredCountQuery,
+  rowsToObjects,
+  totalsByEvent,
+  depthRow,
+  breakdownRows,
+  countRow,
+  runQuery,
+};

@@ -51,8 +51,7 @@ function recordOf(store: KeyValueStore | null, sha: string): CrashCount | null {
   }
 }
 
-const countOf = (store: KeyValueStore | null, sha: string): number =>
-  recordOf(store, sha)?.count ?? 0;
+const countOf = (store: KeyValueStore | null, sha: string): number => recordOf(store, sha)?.count ?? 0;
 
 /** Count one crash on this build and return the tab's count, or null when
  *  storage did not keep it: that reload could not be counted, so the caller

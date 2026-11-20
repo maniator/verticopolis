@@ -75,8 +75,13 @@ export function statsModalTemplate(body: TemplateResult): TemplateResult {
  *  already en route. Shared by the template (to render the button) and `showStats`
  *  (to wire its handler) so the two can never disagree, which matters because
  *  `wireActions` throws if it binds a handler to a button that was not rendered. */
-export function canCallExterminator(report: Pick<StatsReport, "housekeeping" | "exterminationDueDay">, catalog: Catalog): boolean {
-  return catalog.economy.exterminator !== null && report.exterminationDueDay === null && report.housekeeping.infested > 0;
+export function canCallExterminator(
+  report: Pick<StatsReport, "housekeeping" | "exterminationDueDay">,
+  catalog: Catalog,
+): boolean {
+  return (
+    catalog.economy.exterminator !== null && report.exterminationDueDay === null && report.housekeeping.infested > 0
+  );
 }
 
 /** A gate's checklist words: fixed, or worded from the tower's top floor (the
@@ -291,7 +296,8 @@ export function incomeSection({ averages, hasData }: StatsReport["income"]): Tem
   const line = (label: string, avg: number, bold = false): TemplateResult =>
     html`<span class="k${bold ? " win-title sm" : ""}">${label}</span><span class="v" style="color:${avg < 0 ? "var(--bad)" : "var(--good)"}${bold ? ";font-weight:600" : ""}">${money(avg)}/day</span>`;
   const half = Math.ceil(rows.length / 2);
-  const col = (items: typeof rows) => html`<div class="col kv">${items.map((r) => line(LEDGER_LABELS[r.cat], r.avg))}</div>`;
+  const col = (items: typeof rows) =>
+    html`<div class="col kv">${items.map((r) => line(LEDGER_LABELS[r.cat], r.avg))}</div>`;
   return html`<div class="stats-section win-title sm">Income (avg / day, last quarter)</div>${col(rows.slice(0, half))}<div class="col kv">${rows.slice(half).map((r) => line(LEDGER_LABELS[r.cat], r.avg))}${line("Net", net, true)}</div>`;
 }
 

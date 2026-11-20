@@ -24,7 +24,8 @@ import { isEngineStopped, isSplashUp } from "./interactionState";
 export const CLOSED_NOTICE = "Your tower is saved. Press Continue to go back to it.";
 
 /** What the player reads in the tower when Close could not save it. */
-export const CLOSE_FAILED_NOTICE = "Couldn't save your tower, so it is still open. Free some browser storage or export it to a file, then try again.";
+export const CLOSE_FAILED_NOTICE =
+  "Couldn't save your tower, so it is still open. Free some browser storage or export it to a file, then try again.";
 
 /** The one-time thank-you to a player whose tower predates 2.0, when that
  *  tower lands back on screen. */

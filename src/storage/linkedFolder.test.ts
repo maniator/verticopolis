@@ -39,7 +39,11 @@ function fakeFolder(name: string, files: Record<string, number[]>, dirs: string[
       const f = disk.get(file);
       if (!f) throw new DOMException("gone", "NotFoundError");
       if (locked.has(file)) throw new DOMException("in use", "NotReadableError");
-      return { size: f.bytes.byteLength, lastModified: f.modified, arrayBuffer: async () => f.bytes.slice().buffer } as unknown as File;
+      return {
+        size: f.bytes.byteLength,
+        lastModified: f.modified,
+        arrayBuffer: async () => f.bytes.slice().buffer,
+      } as unknown as File;
     },
     createWritable: vi.fn(async () => {
       const w = writer(file);
@@ -126,7 +130,9 @@ describe("linking", () => {
   it("asks for read and write access to one folder and remembers it", async () => {
     const folder = fakeFolder("Towers", {});
     await link(folder);
-    expect(picker).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ mode: "readwrite", id: "verticopolis-towers" }));
+    expect(picker).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ mode: "readwrite", id: "verticopolis-towers" }),
+    );
     expect(linkedFolder.state()).toEqual({ name: "Towers", access: "granted" });
     expect(localStorage.getItem("verticopolis-linked-folder")).toBe("Towers");
   });
@@ -157,7 +163,10 @@ describe("after a reload", () => {
     reload();
     expect(linkedFolder.state()).toEqual({ name: "Towers", access: "prompt" });
     expect(linkedFolder.list()).toEqual([]);
-    expect(folder.handle.queryPermission, "the handle stays in IndexedDB until a window shows it").not.toHaveBeenCalled();
+    expect(
+      folder.handle.queryPermission,
+      "the handle stays in IndexedDB until a window shows it",
+    ).not.toHaveBeenCalled();
   });
 
   it("reads the handle back when a window shows the folder", async () => {
@@ -219,7 +228,9 @@ describe("saving", () => {
     await expect(linkedFolder.save("sky", new Uint8Array([2]), false)).rejects.toBeInstanceOf(FileNameTakenError);
     expect(folder.writes).toEqual([]);
     await linkedFolder.save("sky", new Uint8Array([2]), true);
-    expect(folder.writes, "the replace keeps the file's own name").toEqual([{ name: "Sky.vctower", bytes: new Uint8Array([2]) }]);
+    expect(folder.writes, "the replace keeps the file's own name").toEqual([
+      { name: "Sky.vctower", bytes: new Uint8Array([2]) },
+    ]);
   });
 
   it("never replaces a file another program wrote since the list was read, and numbers the save instead", async () => {
@@ -301,15 +312,24 @@ describe("saving", () => {
           held.pop();
         }
       });
-      tail = turn.then(() => undefined, () => undefined);
+      tail = turn.then(
+        () => undefined,
+        () => undefined,
+      );
       return turn;
     });
     vi.stubGlobal("navigator", { ...navigator, locks: { request } });
     try {
       const folder = fakeFolder("Towers", {});
       await link(folder);
-      const [a, b] = await Promise.all([linkedFolder.save("Sky", new Uint8Array([1]), false), linkedFolder.saveNew("Sky", new Uint8Array([2]))]);
-      expect(request.mock.calls.map(([n]) => n)).toEqual(["verticopolis-linked-folder-save", "verticopolis-linked-folder-save"]);
+      const [a, b] = await Promise.all([
+        linkedFolder.save("Sky", new Uint8Array([1]), false),
+        linkedFolder.saveNew("Sky", new Uint8Array([2])),
+      ]);
+      expect(request.mock.calls.map(([n]) => n)).toEqual([
+        "verticopolis-linked-folder-save",
+        "verticopolis-linked-folder-save",
+      ]);
       expect([a.id, b.id]).toEqual(["Sky.vctower", "Sky (2).vctower"]);
       expect(folder.disk.get("Sky.vctower")!.bytes).toEqual(new Uint8Array([1]));
       expect(folder.disk.get("Sky (2).vctower")!.bytes).toEqual(new Uint8Array([2]));

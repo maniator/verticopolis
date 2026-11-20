@@ -77,7 +77,16 @@ describe.skipIf(noEngine)("PortCodes on the engine", () => {
   });
 });
 
-const readings = (c: ClockView) => [c.minutes, c.day, c.dayOfWeek, c.isWeekend, c.quarter, c.year, c.format(), c.formatRetroDate()];
+const readings = (c: ClockView) => [
+  c.minutes,
+  c.day,
+  c.dayOfWeek,
+  c.isWeekend,
+  c.quarter,
+  c.year,
+  c.format(),
+  c.formatRetroDate(),
+];
 
 // The founding minute, an evening, a weekend day, a quarter boundary on the
 // canon calendar, past a canon year and past a real one.
@@ -117,7 +126,9 @@ describe.skipIf(noEngine)("the header's clock on the engine", () => {
       const save = newEngine(1, mode, calendar).serialize();
       MINUTES.forEach((minutes, i) => {
         const moved = JSON.stringify({ ...(JSON.parse(save) as Record<string, unknown>), minutes });
-        expect(readings(clockOf(newViewReader(engineFromSave(moved)).header)), `at minute ${minutes}`).toEqual(expected[i]);
+        expect(readings(clockOf(newViewReader(engineFromSave(moved)).header)), `at minute ${minutes}`).toEqual(
+          expected[i],
+        );
       });
       expect(newViewReader(newEngine(1, mode, calendar)).header).toMatchObject(days);
     });
@@ -125,7 +136,12 @@ describe.skipIf(noEngine)("the header's clock on the engine", () => {
 });
 
 const MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfaction", "cleanliness"];
-const SPOTS = [[1, 170], [2, 170], [3, 200], [4, 170]] as const;
+const SPOTS = [
+  [1, 170],
+  [2, 170],
+  [3, 200],
+  [4, 170],
+] as const;
 
 function renderTower() {
   const d = smallTower((t) => {
@@ -155,7 +171,10 @@ describe.skipIf(noEngine)("PortRenderSim on the engine", () => {
       reader.update();
       const h = reader.header;
       expect([r.population, r.clock.minutes], `step ${i}`).toEqual([h.population, h.minutes]);
-      expect([r.clock.hour, r.clock.minute], `step ${i}`).toEqual([Math.floor((h.minutes % 1440) / 60), Math.floor(h.minutes % 60)]);
+      expect([r.clock.hour, r.clock.minute], `step ${i}`).toEqual([
+        Math.floor((h.minutes % 1440) / 60),
+        Math.floor(h.minutes % 60),
+      ]);
       expect(r.crowd.people.map((p) => p.id)).toEqual(reader.crowd.people.map((p) => p.id));
       expect(r.peakCongestion()).toBeGreaterThanOrEqual(r.congestion());
       for (const m of MODES) expect(Array.isArray(r.floorHeatmap(m)), m).toBe(true);

@@ -16,10 +16,23 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "@verticopolis/components/audio/audioAssets";
-import { engineDistProblems, manifestIntegrityProblems, pageAssetsMissing, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
+import {
+  engineDistProblems,
+  manifestIntegrityProblems,
+  pageAssetsMissing,
+  shellProblems,
+  shellRevisionProblems,
+} from "../src/build/enginePackageBuild.ts";
 import { enginePreloadProblems } from "../src/build/enginePreload.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
-import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "@verticopolis/components/host/engineAssets";
+import {
+  ENGINE_BUILD_ONLY_FILES,
+  ENGINE_DIR,
+  ENGINE_GLUE,
+  ENGINE_RUNTIME_FILES,
+  ENGINE_WASM,
+  glueLoads,
+} from "@verticopolis/components/host/engineAssets";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const SW = resolve(DIST, "sw.js");
@@ -85,10 +98,14 @@ if (urls.length === 0) fail("the precache manifest parsed to zero url entries; t
 const seen = new Map<string, number>();
 for (const u of urls) seen.set(u, (seen.get(u) ?? 0) + 1);
 const dupes = [...seen.entries()].filter(([, n]) => n > 1);
-if (dupes.length > 0) fail(`duplicate precache entries (each asset must be listed once): ${dupes.map(([u, n]) => `${u} x${n}`).join(", ")}`);
+if (dupes.length > 0)
+  fail(
+    `duplicate precache entries (each asset must be listed once): ${dupes.map(([u, n]) => `${u} x${n}`).join(", ")}`,
+  );
 
 const missing = REQUIRED_ICONS.filter((icon) => !seen.has(icon));
-if (missing.length > 0) fail(`expected icons missing from the precache manifest (a narrowed glob or moved file?): ${missing.join(", ")}`);
+if (missing.length > 0)
+  fail(`expected icons missing from the precache manifest (a narrowed glob or moved file?): ${missing.join(", ")}`);
 
 // A tooling build (VC_TOOLING=1, the one CI builds and tests) precaches the
 // tooling engine, which carries test hooks a player never downloads. The
@@ -112,11 +129,14 @@ const total = urls.reduce((sum, u) => {
   }
   if (!existsSync(file)) fail(`precache entry ${u} has no file under dist/; cannot size the precache`);
   const real = relative(realDist, realpathSync(file));
-  if (real === "" || real === ".." || real.startsWith(`..${sep}`) || isAbsolute(real)) fail(`precache entry ${u} links outside dist/`);
+  if (real === "" || real === ".." || real.startsWith(`..${sep}`) || isAbsolute(real))
+    fail(`precache entry ${u} links outside dist/`);
   return sum + (playerSize(u) ?? statSync(file).size);
 }, 0);
 if (total > PRECACHE_BUDGET_BYTES) {
-  fail(`the precache is ${(total / 1048576).toFixed(2)} MiB, over its ${PRECACHE_BUDGET_BYTES / 1048576} MiB budget; every install downloads it, so shrink it or raise PRECACHE_BUDGET_BYTES with the reason`);
+  fail(
+    `the precache is ${(total / 1048576).toFixed(2)} MiB, over its ${PRECACHE_BUDGET_BYTES / 1048576} MiB budget; every install downloads it, so shrink it or raise PRECACHE_BUDGET_BYTES with the reason`,
+  );
 }
 
 // Every build needs the whole package, precached, so a partial build (glue
@@ -133,31 +153,50 @@ const stop = missingEngine(process.env, builtEngine);
 if (stop) fail(stop);
 if (builtEngine) {
   const notBuilt = ENGINE_RUNTIME_FILES.filter((f) => !existsSync(resolve(DIST, f)));
-  if (notBuilt.length > 0) fail(`the engine package in dist/ is incomplete (reinstall it with npm install): ${notBuilt.join(", ")}`);
+  if (notBuilt.length > 0)
+    fail(`the engine package in dist/ is incomplete (reinstall it with npm install): ${notBuilt.join(", ")}`);
   // A file in the package that the list does not classify could be one the
   // game fetches, so it stops the build until someone says which it is.
   const shipped = readdirSync(engineDir, { recursive: true, withFileTypes: true })
     .filter((e) => !e.isDirectory())
     .map((e) => ENGINE_DIR + relative(engineDir, resolve(e.parentPath, e.name)).split(sep).join("/"));
   const unclassified = shipped.filter((f) => !ENGINE_RUNTIME_FILES.includes(f) && !ENGINE_BUILD_ONLY_FILES.includes(f));
-  if (unclassified.length > 0) fail(`dist/${ENGINE_DIR} holds files src/wasmhost/engineAssets.ts does not list; add each with whether the game fetches it at run time: ${unclassified.join(", ")}`);
+  if (unclassified.length > 0)
+    fail(
+      `dist/${ENGINE_DIR} holds files src/wasmhost/engineAssets.ts does not list; add each with whether the game fetches it at run time: ${unclassified.join(", ")}`,
+    );
   // The glue fetches its binary (and would fetch any snippet) relative to
   // itself; each such file must be one the list marks as fetched.
   const glueRefs = glueLoads(readFileSync(resolve(DIST, ENGINE_DIR + ENGINE_GLUE), "utf8")).map((f) => ENGINE_DIR + f);
-  if (!glueRefs.some((f) => f !== ENGINE_DIR + ENGINE_GLUE)) fail(`found no file the engine glue loads beside itself (its binary); did wasm-bindgen's output change shape? (glueLoads in src/wasmhost/engineAssets.ts)`);
+  if (!glueRefs.some((f) => f !== ENGINE_DIR + ENGINE_GLUE))
+    fail(
+      `found no file the engine glue loads beside itself (its binary); did wasm-bindgen's output change shape? (glueLoads in src/wasmhost/engineAssets.ts)`,
+    );
   // The byte check verifies the glue and the binary only, so a glue that
   // pulls in anything else (a snippet) would run bytes nothing has hashed.
   const stray = glueRefs.filter((f) => f !== ENGINE_DIR + ENGINE_GLUE && f !== ENGINE_DIR + ENGINE_WASM);
-  if (stray.length > 0) fail(`the engine glue loads files besides its binary (${stray.join(", ")}); the package check hashes only the glue and the binary, so extend it (design 5.2) before shipping them`);
+  if (stray.length > 0)
+    fail(
+      `the engine glue loads files besides its binary (${stray.join(", ")}); the package check hashes only the glue and the binary, so extend it (design 5.2) before shipping them`,
+    );
   const notRuntime = glueRefs.filter((f) => !ENGINE_RUNTIME_FILES.includes(f));
-  if (notRuntime.length > 0) fail(`the engine glue loads files src/wasmhost/engineAssets.ts does not mark as fetched at run time, so they would not be precached: ${notRuntime.join(", ")}`);
+  if (notRuntime.length > 0)
+    fail(
+      `the engine glue loads files src/wasmhost/engineAssets.ts does not mark as fetched at run time, so they would not be precached: ${notRuntime.join(", ")}`,
+    );
   const absent = ENGINE_RUNTIME_FILES.filter((f) => !seen.has(f));
-  if (absent.length > 0) fail(`engine files the game fetches at run time are missing from the precache manifest, so the WASM engine would not start offline (#945, #985); check the workbox globPatterns and maximumFileSizeToCacheInBytes in vite.config.ts: ${absent.join(", ")}`);
+  if (absent.length > 0)
+    fail(
+      `engine files the game fetches at run time are missing from the precache manifest, so the WASM engine would not start offline (#945, #985); check the workbox globPatterns and maximumFileSizeToCacheInBytes in vite.config.ts: ${absent.join(", ")}`,
+    );
   // A build-only file in the manifest costs every install its download for
   // nothing (THIRD-PARTY.json alone is about 0.6 MB). If the game starts
   // reading one, mark it runtime in engineAssets.ts instead.
   const wasted = ENGINE_BUILD_ONLY_FILES.filter((f) => seen.has(f));
-  if (wasted.length > 0) fail(`engine files the game never fetches are in the precache manifest (src/wasmhost/engineAssets.ts marks them build-only): ${wasted.join(", ")}`);
+  if (wasted.length > 0)
+    fail(
+      `engine files the game never fetches are in the precache manifest (src/wasmhost/engineAssets.ts marks them build-only): ${wasted.join(", ")}`,
+    );
   // The package check (#985 criterion 5): BUILD.json describes the files
   // beside it, and the three engine entries carry the integrity that keeps a
   // body from another build out of the precache.
@@ -175,42 +214,60 @@ if (integrity.length > 0) fail(`the precache manifest's integrity is not sound: 
 // The navigation fallback (#1345) loads through importScripts and is updated
 // with the worker, so the worker must import it and the precache must not
 // list it.
-if (!/importScripts\(\s*["']sw-navigation-fallback\.js["']/.test(sw)) fail("dist/sw.js does not import sw-navigation-fallback.js, so a navigation that fails its integrity would show a blank page");
+if (!/importScripts\(\s*["']sw-navigation-fallback\.js["']/.test(sw))
+  fail(
+    "dist/sw.js does not import sw-navigation-fallback.js, so a navigation that fails its integrity would show a blank page",
+  );
 // The worker checks the page it installs against the `assets/` files already
 // in the precache, which holds only when Workbox stores them first (#1949).
 const pageAt = urls.indexOf("index.html");
 const assetsAfterPage = urls.slice(pageAt + 1).filter((u) => u.startsWith("assets/"));
-if (pageAt === -1 || assetsAfterPage.length > 0) fail(`index.html must come after every assets/ file in the precache manifest, so the installing worker can check the page against them; after it: ${assetsAfterPage.join(", ") || "(no index.html entry)"}`);
+if (pageAt === -1 || assetsAfterPage.length > 0)
+  fail(
+    `index.html must come after every assets/ file in the precache manifest, so the installing worker can check the page against them; after it: ${assetsAfterPage.join(", ") || "(no index.html entry)"}`,
+  );
 // The worker refuses a page that names an assets/ file it does not precache, so
 // one the manifest leaves out (a glob that misses its type, a chunk past the
 // size cap) would fail every install, and a page that names none would leave
 // the check passing everything.
 const pageFiles = pageAssetsMissing(readFileSync(resolve(DIST, "index.html"), "utf8"), new Set(urls));
-if (pageFiles.named.length === 0) fail("dist/index.html names no assets/ file the installing worker's check can read (#1949)");
-if (pageFiles.missing.length > 0) fail(`dist/index.html names assets/ files the precache manifest leaves out, so every worker install would be refused: ${pageFiles.missing.join(", ")}`);
-if (!existsSync(resolve(DIST, "sw-navigation-fallback.js"))) fail("dist/sw-navigation-fallback.js is missing, so the worker would not install");
-if (seen.has("sw-navigation-fallback.js")) fail("sw-navigation-fallback.js is in the precache manifest; the worker imports it, so it must stay out of it");
+if (pageFiles.named.length === 0)
+  fail("dist/index.html names no assets/ file the installing worker's check can read (#1949)");
+if (pageFiles.missing.length > 0)
+  fail(
+    `dist/index.html names assets/ files the precache manifest leaves out, so every worker install would be refused: ${pageFiles.missing.join(", ")}`,
+  );
+if (!existsSync(resolve(DIST, "sw-navigation-fallback.js")))
+  fail("dist/sw-navigation-fallback.js is missing, so the worker would not install");
+if (seen.has("sw-navigation-fallback.js"))
+  fail("sw-navigation-fallback.js is in the precache manifest; the worker imports it, so it must stay out of it");
 // The Help site at /help (release notes included) always comes from the
 // network, never the worker's cache (owner, 2026-11-12): nothing under help/ is
 // precached, and the navigation fallback leaves /help alone.
 const helpCached = urls.filter((u) => u === "help" || u.startsWith("help/"));
-if (helpCached.length > 0) fail(`the Help site must not be precached, but the manifest lists: ${helpCached.join(", ")}`);
+if (helpCached.length > 0)
+  fail(`the Help site must not be precached, but the manifest lists: ${helpCached.join(", ")}`);
 const denylist = sw.match(/NavigationRoute\([^]*?denylist:\[([^]*?)\]\}/)?.[1];
-if (denylist === undefined) fail("found no navigation fallback denylist in dist/sw.js; did the workbox output format change?");
-if (!denylist.includes("/help/")) fail("the navigation fallback does not skip /help, so the worker would answer a Help page with the game");
+if (denylist === undefined)
+  fail("found no navigation fallback denylist in dist/sw.js; did the workbox output format change?");
+if (!denylist.includes("/help/"))
+  fail("the navigation fallback does not skip /help, so the worker would answer a Help page with the game");
 // The page checks the engine against the id compiled into its chunks, and a
 // production bundle must not carry the development serve's skip (#985).
 const shell = shellProblems(DIST, builtEngine);
 if (shell.length > 0) fail(`the shell in dist/ and its engine check are not sound: ${shell.join("; ")}`);
 const revisions = builtEngine ? shellRevisionProblems(DIST) : [];
-if (revisions.length > 0) fail(`the shell in dist/ and the precache revisions of the engine files disagree: ${revisions.join("; ")}`);
+if (revisions.length > 0)
+  fail(`the shell in dist/ and the precache revisions of the engine files disagree: ${revisions.join("; ")}`);
 
 // Today's sounds must play offline too (#985): the lazy chunk that carries
 // Tone.js and every synthesized sound, and each recorded file the audio layer
 // fetches (src/audio/audioAssets.ts, kept complete by audioAssets.test.ts).
 const audioChunks = urls.map((u) => u.split("?")[0]).filter((u) => AUDIO_ENGINE_CHUNK.test(u));
 if (audioChunks.length === 0) {
-  fail(`no precache entry matches the audio engine chunk (${AUDIO_ENGINE_CHUNK}), so an installed game would play no sound offline (#985); check the workbox globPatterns and the chunk's name`);
+  fail(
+    `no precache entry matches the audio engine chunk (${AUDIO_ENGINE_CHUNK}), so an installed game would play no sound offline (#985); check the workbox globPatterns and the chunk's name`,
+  );
 }
 // The chunk is self-contained today. If a later build splits Tone.js (or
 // anything else it uses) into other chunks, every file it loads, directly or
@@ -239,21 +296,32 @@ while (queue.length > 0) {
   // a string that merely looks like a path cannot fail the build.
   const assets = [
     ...[...text.matchAll(/new URL\(\s*["'`]([^"'`:]+)["'`]\s*,\s*import\.meta\.url/g)].map((m) => from(m[1])),
-    ...[...text.matchAll(/["'`](assets\/[\w./-]+\.(?:js|css|wasm|mp3|ogg|wav|m4a|flac|aac|opus|webm|json))["'`]/g)].map((m) => m[1]),
+    ...[...text.matchAll(/["'`](assets\/[\w./-]+\.(?:js|css|wasm|mp3|ogg|wav|m4a|flac|aac|opus|webm|json))["'`]/g)].map(
+      (m) => m[1],
+    ),
   ];
   for (const ref of assets) {
-    if (ref.startsWith("..") || audioDeps.has(ref) || audioChunks.includes(ref) || !existsSync(resolve(DIST, ref))) continue;
+    if (ref.startsWith("..") || audioDeps.has(ref) || audioChunks.includes(ref) || !existsSync(resolve(DIST, ref)))
+      continue;
     audioDeps.add(ref);
     if (ref.endsWith(".js")) queue.push(ref);
   }
 }
 if (unresolved.length > 0) fail(`the audio engine chunk imports files that are not in dist/: ${unresolved.join(", ")}`);
 const unprecached = [...audioDeps].filter((f) => !seen.has(f));
-if (unprecached.length > 0) fail(`the audio engine chunk loads files missing from the precache manifest, so it would not load offline (#985): ${unprecached.join(", ")}`);
+if (unprecached.length > 0)
+  fail(
+    `the audio engine chunk loads files missing from the precache manifest, so it would not load offline (#985): ${unprecached.join(", ")}`,
+  );
 const silent = AUDIO_RUNTIME_FILES.filter((f) => !seen.has(f));
-if (silent.length > 0) fail(`audio files the game fetches at run time are missing from the precache manifest, so they would not play offline (#985): ${silent.join(", ")}`);
+if (silent.length > 0)
+  fail(
+    `audio files the game fetches at run time are missing from the precache manifest, so they would not play offline (#985): ${silent.join(", ")}`,
+  );
 
 console.log(
   `verify-precache: ${urls.length} unique precache entries (${(total / 1048576).toFixed(2)} MiB); all ${REQUIRED_ICONS.length} required icons present exactly once; the audio chunk and ${AUDIO_RUNTIME_FILES.length} audio files are precached; ` +
-    (builtEngine ? `the ${ENGINE_RUNTIME_FILES.length} engine files fetched at run time are precached` : `no engine package in this build (${ALLOW_NO_ENGINE}=1)`),
+    (builtEngine
+      ? `the ${ENGINE_RUNTIME_FILES.length} engine files fetched at run time are precached`
+      : `no engine package in this build (${ALLOW_NO_ENGINE}=1)`),
 );

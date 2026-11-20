@@ -50,7 +50,11 @@ export interface ControlPanel {
 
 /** Build the Control Panel's window (closed). `picked` hears each icon and
  *  `closed` its ✕ (for the analytics). */
-export function buildControlPanel(doc: Document, picked: (icon: ControlIcon) => void, closed?: () => void): ControlPanel {
+export function buildControlPanel(
+  doc: Document,
+  picked: (icon: ControlIcon) => void,
+  closed?: () => void,
+): ControlPanel {
   const frame = buildFrame(doc, "desk-win-control", "Control Panel");
   const root = frame.root;
   root.classList.add("desk-control");

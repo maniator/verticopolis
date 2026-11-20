@@ -50,7 +50,9 @@ export function classifyGesture(
   // in scope (a `const build = tool.type === "build"` alias only narrows under TS's
   // aliased-discriminant analysis — this form doesn't lean on it).
   const dragSized =
-    tool.type === "build" && catalogFacility(catalog, tool.kind).transport && !catalogFacility(catalog, tool.kind).fixedSpan;
+    tool.type === "build" &&
+    catalogFacility(catalog, tool.kind).transport &&
+    !catalogFacility(catalog, tool.kind).fixedSpan;
   const paint = tool.type === "build" && isPaintKind(tool.kind);
   // A room build (anything buildable that isn't transport or a paint strip) owns
   // the one-finger touch drag too, so it can preview an offset ghost and place on

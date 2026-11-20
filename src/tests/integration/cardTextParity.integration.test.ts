@@ -53,20 +53,25 @@ import { CARD_TEXT_WRITER, writeAfterPassingRun } from "../goldens/updateGate";
  */
 
 const WRITING = CARD_TEXT_WRITER === "rust";
-if (WRITING && !hasWasmPackage()) throw new Error("the card-text sweep needs the engine package (VC_CARD_TEXT_UPDATE=rust); run npm install");
+if (WRITING && !hasWasmPackage())
+  throw new Error("the card-text sweep needs the engine package (VC_CARD_TEXT_UPDATE=rust); run npm install");
 
 const fresh: CardTextGolden[] = [];
 writeAfterPassingRun(
   "card-text lines",
   WRITING,
-  () => CARD_TEXT_MODES.flatMap((m) => CARD_TEXT_CASES.filter((n) => !fresh.some((g) => g.mode === m && g.case === n)).map((n) => `${m}: ${n}`)),
+  () =>
+    CARD_TEXT_MODES.flatMap((m) =>
+      CARD_TEXT_CASES.filter((n) => !fresh.some((g) => g.mode === m && g.case === n)).map((n) => `${m}: ${n}`),
+    ),
   () => fresh.forEach(writeCardTextGolden),
 );
 
 type RustPort = EnginePort & { free(): void };
 
 const roomsOf = (units: CardTextGolden["units"]) => units.map((u) => `${u.kind} #${u.id} on floor ${u.floor}`).sort();
-const shaftsOf = (transports: readonly { readonly kind: string; readonly id: number }[]) => transports.map((t) => `${t.kind} #${t.id}`).sort();
+const shaftsOf = (transports: readonly { readonly kind: string; readonly id: number }[]) =>
+  transports.map((t) => `${t.kind} #${t.id}`).sort();
 
 describe("the card-text golden's files", () => {
   it("are a tower and its lines for every case and mode, and nothing else", () => {
@@ -74,13 +79,17 @@ describe("the card-text golden's files", () => {
     expect(new Set(want).size, "two cases share a file name").toBe(want.length);
     expect(readdirSync(CARD_TEXT_DIR).sort()).toEqual([...want].sort());
   });
-
 });
 
 describe.skipIf(!hasWasmPackage())("the card-text sweep's kinds", () => {
   it.each(CARD_TEXT_MODES)("%s: build every kind in the engine's catalog but the unswept ones", (mode) => {
     const kinds = readCatalog(wasm(), mode).facilities.map((f) => f.key);
-    expect(kindsNoCaseBuilds(kinds, CARD_TEXT_CASES.map((n) => readCardTextGolden(mode, n)))).toEqual([]);
+    expect(
+      kindsNoCaseBuilds(
+        kinds,
+        CARD_TEXT_CASES.map((n) => readCardTextGolden(mode, n)),
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -108,13 +117,16 @@ describe.skipIf(!hasWasmPackage())("the Rust card prints the lines the TypeScrip
           const units = golden.units.map((u) => {
             const got = textOf(kit.diagnostics.unit(u.id, true));
             if (JSON.stringify(u.lines) !== JSON.stringify(got)) {
-              misses.push(`${u.kind} #${u.id} floor ${u.floor}\n  golden: ${JSON.stringify(u.lines)}\n  Rust:   ${JSON.stringify(got)}`);
+              misses.push(
+                `${u.kind} #${u.id} floor ${u.floor}\n  golden: ${JSON.stringify(u.lines)}\n  Rust:   ${JSON.stringify(got)}`,
+              );
             }
             return { ...u, lines: got };
           });
           const transports = golden.transports.map((t) => {
             const got = textOf(kit.diagnostics.transport(t.id));
-            if (JSON.stringify(t.lines) !== JSON.stringify(got)) misses.push(`${t.kind} #${t.id}\n  golden: ${JSON.stringify(t.lines)}\n  Rust:   ${JSON.stringify(got)}`);
+            if (JSON.stringify(t.lines) !== JSON.stringify(got))
+              misses.push(`${t.kind} #${t.id}\n  golden: ${JSON.stringify(t.lines)}\n  Rust:   ${JSON.stringify(got)}`);
             return { ...t, lines: got };
           });
           const printed: CardTextGolden = { case: name, mode, units, transports };
@@ -135,7 +147,9 @@ describe.skipIf(!hasWasmPackage())("the Rust card prints the lines the TypeScrip
 // After the sweep, so a refresh checks the lines it is about to write.
 describe("the card-text golden's lines", () => {
   it("differ between each variant and its plain case", () => {
-    const goldens = WRITING ? fresh : CARD_TEXT_MODES.flatMap((m) => CARD_TEXT_CASES.map((n) => readCardTextGolden(m, n)));
+    const goldens = WRITING
+      ? fresh
+      : CARD_TEXT_MODES.flatMap((m) => CARD_TEXT_CASES.map((n) => readCardTextGolden(m, n)));
     expect(variantsPrintingAlike(goldens)).toEqual([]);
   });
 });

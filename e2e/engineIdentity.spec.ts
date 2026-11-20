@@ -39,7 +39,9 @@ async function swapInBinary(page: Page, from: string, to: string): Promise<void>
 }
 
 async function openAbout(page: Page): Promise<void> {
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngineBoot, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngineBoot, undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
     (window as any).game.ui.showAbout();
@@ -93,7 +95,7 @@ test("the main-thread engine shows its record and the source hash BUILD.json rec
   await expect(page.locator("#modal")).toContainText(`Rust engine ${record.crate.version} (${short(record.sources)})`);
   const block = page.locator("#modal .help-diagnostics");
   await expect(block).not.toContainText(record.crate.name);
- 
+
   const copied = await copyDiagnostics(page);
   expect(copied).toContain(`Engine crate: ${record.crate.name} ${record.crate.version}`);
   expect(copied).toContain(`Source hash in the engine binary: ${short(record.sources)}`);
@@ -106,14 +108,20 @@ test("the main-thread engine shows its record and the source hash BUILD.json rec
 // "no section" and "malformed section" are reachable only on a development serve,
 // which skips the check. buildSection.test.ts and engineDiagnostics.test.ts
 // cover how each is read and drawn.
-test("a binary built from other sources is refused before it runs, and the stop screen copies the reason", async ({ page }) => {
+test("a binary built from other sources is refused before it runs, and the stop screen copies the reason", async ({
+  page,
+}) => {
   const record = await buildRecord(page);
   const tampered = `${record.sources.startsWith("0") ? "1" : "0"}${record.sources.slice(1)}`;
   await swapInBinary(page, record.sources, tampered);
   await page.goto("/");
   await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
   const boot = await page.evaluate(() => (window as any).__vcEngineBoot);
-  expect(boot.failure).toMatchObject({ stage: "load", reason: "package-mismatch", package: { kind: "mismatch", file: "wasm" } });
+  expect(boot.failure).toMatchObject({
+    stage: "load",
+    reason: "package-mismatch",
+    package: { kind: "mismatch", file: "wasm" },
+  });
   expect(boot.binary, "a refused binary is never compiled, so its section is never read").toBeUndefined();
   expect(await copyDiagnosticsFromStopScreen(page)).toContain("Reason: package-mismatch");
 });

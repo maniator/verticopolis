@@ -13,10 +13,14 @@ export const ENGINE_FILES = ["engine/verticopolis_engine.js", "engine/verticopol
 
 /** Wait until the page runs on the engine, then lift the title screen. */
 export async function hostedGame(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: { sim: unknown } };
-    return !!w.__vcEngine?.status.hosted && !!w.game;
-  }, undefined, { timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: { sim: unknown } };
+      return !!w.__vcEngine?.status.hosted && !!w.game;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
   await page.evaluate(() => document.getElementById("splash")?.remove());
 }
 
@@ -47,7 +51,9 @@ export async function installWorker(page: Page): Promise<void> {
 export async function expectControlledWithEngine(page: Page): Promise<void> {
   await page.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 30_000 });
   const cached = await page.evaluate(async (files) => {
-    const hits = await Promise.all(files.map((f) => caches.match(new URL(f, document.baseURI).href, { ignoreSearch: true })));
+    const hits = await Promise.all(
+      files.map((f) => caches.match(new URL(f, document.baseURI).href, { ignoreSearch: true })),
+    );
     return hits.map((r) => r?.ok ?? false);
   }, ENGINE_FILES);
   expect(cached, "the engine glue and binary are in the service worker's precache").toEqual([true, true]);
@@ -69,7 +75,10 @@ export function watch(page: Page): { errors: string[]; failed: string[] } {
 /** Whether the engine's own save holds a lobby at floor 1, column `x`. */
 export function lobbyAt(page: Page, x: number): Promise<boolean> {
   return page.evaluate(
-    (at) => (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === at),
+    (at) =>
+      (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some(
+        (u) => u.kind === "lobby" && u.x === at,
+      ),
     x,
   );
 }
@@ -97,7 +106,11 @@ export function recordAudio(page: Page): AudioResponse[] {
     // Any sound file the page asks for is recorded, listed or not, so one the
     // list lacks shows up as its own path and fails expectAudioFromWorker.
     const sound = /\/audio\/|\.(?:mp3|ogg|wav|m4a|flac|aac|opus|webm)$/i.test(path);
-    const file = AUDIO_ENGINE_CHUNK.test(path) ? "audio engine chunk" : sound ? (AUDIO_RUNTIME_FILES.find((f) => path.endsWith(`/${f}`)) ?? path) : undefined;
+    const file = AUDIO_ENGINE_CHUNK.test(path)
+      ? "audio engine chunk"
+      : sound
+        ? (AUDIO_RUNTIME_FILES.find((f) => path.endsWith(`/${f}`)) ?? path)
+        : undefined;
     if (file) responses.push({ file, ok: r.ok(), fromSW: r.fromServiceWorker() });
   });
   return responses;
@@ -106,7 +119,10 @@ export function recordAudio(page: Page): AudioResponse[] {
 /** Every audio file was fetched, each one answered by the service worker. */
 export function expectAudioFromWorker(responses: AudioResponse[]): void {
   expect(new Set(responses.map((r) => r.file))).toEqual(new Set(["audio engine chunk", ...AUDIO_RUNTIME_FILES]));
-  expect(responses.filter((r) => !r.ok || !r.fromSW), "every audio file is served by the service worker").toEqual([]);
+  expect(
+    responses.filter((r) => !r.ok || !r.fromSW),
+    "every audio file is served by the service worker",
+  ).toEqual([]);
 }
 
 /**
@@ -120,8 +136,14 @@ export function expectAudioFromWorker(responses: AudioResponse[]): void {
  * no lobby there yet.
  */
 export async function expectSoundsAfterGesture(page: Page): Promise<void> {
-  const before = await page.evaluate(() => ({ started: (window as any).game.audio.started, muted: (window as any).game.audio.muted }));
-  expect(before, "the game starts no audio before a gesture, and is not muted").toEqual({ started: false, muted: false });
+  const before = await page.evaluate(() => ({
+    started: (window as any).game.audio.started,
+    muted: (window as any).game.audio.muted,
+  }));
+  expect(before, "the game starts no audio before a gesture, and is not muted").toEqual({
+    started: false,
+    muted: false,
+  });
 
   // The first gesture starts the audio (src/game/inputKeys.ts's kick). A
   // click is a real user activation; a modifier-only key press is not.
@@ -138,15 +160,24 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
     };
     return Object.keys(probes).filter((k) => probes[k] === undefined);
   });
-  expect(absentAtStart, "the engine objects this test observes exist (renamed in ToneAudioEngine.ts or toneCrowd.ts?)").toEqual([]);
-  await page.waitForFunction(() => (window as any).game.audio.impl.master.context.state === "running", undefined, { timeout: 30_000 });
+  expect(
+    absentAtStart,
+    "the engine objects this test observes exist (renamed in ToneAudioEngine.ts or toneCrowd.ts?)",
+  ).toEqual([]);
+  await page.waitForFunction(() => (window as any).game.audio.impl.master.context.state === "running", undefined, {
+    timeout: 30_000,
+  });
   // The crowd's recordings decode from the cache (the layer stays tone-only,
   // and silent about it, if they never arrive, so wait for them explicitly).
   // `ready` means the talk seed decoded and was masked.
-  await page.waitForFunction(() => {
-    const voices = (window as any).game.audio.impl.crowd?.voices;
-    return !!voices?.ready && !!voices.laughs?.loaded;
-  }, undefined, { timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const voices = (window as any).game.audio.impl.crowd?.voices;
+      return !!voices?.ready && !!voices.laughs?.loaded;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
 
   // Count what the engine plays from here on: the cues it is asked for, and
   // the notes its voices actually trigger (the composed program's voices and

@@ -55,7 +55,8 @@ async function startupAt(at: number): Promise<void> {
   document.body.appendChild(document.importNode(cover, true));
   const live = document.getElementById("boot-cover")!;
   const ease = at * at * (3 - 2 * at);
-  const set = (sel: string, css: Record<string, string>) => Object.assign(live.querySelector<HTMLElement>(sel)!.style, { animation: "none", ...css });
+  const set = (sel: string, css: Record<string, string>) =>
+    Object.assign(live.querySelector<HTMLElement>(sel)!.style, { animation: "none", ...css });
   set(".boot-night", { opacity: String(0.78 * (1 - ease)) });
   set(".boot-stars", { opacity: String(1 - 0.45 * ease) });
   set(".boot-sun", { transform: `translate(-50%, calc(-50% + ${(34 * (1 - ease)).toFixed(2)}vh))` });
@@ -80,7 +81,13 @@ async function heroFrame(page: Page): Promise<void> {
 }
 
 const startupShots = (suffix: string): Shot[] =>
-  ([["night", 0], ["sunrise", 0.5], ["dawn", 1]] as const).map(([name, at]) => ({
+  (
+    [
+      ["night", 0],
+      ["sunrise", 0.5],
+      ["dawn", 1],
+    ] as const
+  ).map(([name, at]) => ({
     name: `startup-${name}${suffix}`,
     wait: 200,
     setup: (page: Page) => page.evaluate(startupAt, at),
@@ -97,9 +104,23 @@ export const DESK_SCENES: Scene[] = [
       // The default layout: Tools, the tower, Info, the Map and the Bulletin.
       { name: "desk-windows", clock: 11, setup: park },
       // The Verticopolis button's menu.
-      { name: "desk-start-menu", clock: 11, setup: async (page) => { await closeMenus(page); await press(page, ".desk-start"); } },
+      {
+        name: "desk-start-menu",
+        clock: 11,
+        setup: async (page) => {
+          await closeMenus(page);
+          await press(page, ".desk-start");
+        },
+      },
       // The desk's Window menu in the tower's menu bar.
-      { name: "desk-window-menu", clock: 11, setup: async (page) => { await closeMenus(page); await press(page, "#mb-window"); } },
+      {
+        name: "desk-window-menu",
+        clock: 11,
+        setup: async (page) => {
+          await closeMenus(page);
+          await press(page, "#mb-window");
+        },
+      },
       // A window's menu, from a right-click on the Map's taskbar button.
       {
         name: "desk-context-menu",
@@ -111,7 +132,15 @@ export const DESK_SCENES: Scene[] = [
         },
       },
       // The Control Panel, from the tray's monitor icon.
-      { name: "desk-control-panel", clock: 11, setup: async (page) => { await closeMenus(page); await press(page, ".desk-tray-display"); await park(page); } },
+      {
+        name: "desk-control-panel",
+        clock: 11,
+        setup: async (page) => {
+          await closeMenus(page);
+          await press(page, ".desk-tray-display");
+          await park(page);
+        },
+      },
       // The Map and the Bulletin minimized to the taskbar.
       {
         name: "desk-minimized",
@@ -124,7 +153,15 @@ export const DESK_SCENES: Scene[] = [
         },
       },
       // The tower maximized: the small windows float over it, below its menus.
-      { name: "desk-maximized", clock: 11, drawSettle: true, setup: async (page) => { await press(page, "#desk-win-tower .desk-btn-max"); await park(page); } },
+      {
+        name: "desk-maximized",
+        clock: 11,
+        drawSettle: true,
+        setup: async (page) => {
+          await press(page, "#desk-win-tower .desk-btn-max");
+          await park(page);
+        },
+      },
       // Restored, then moved and made smaller from its size grip, with the
       // Map and the Bulletin back from the taskbar.
       {

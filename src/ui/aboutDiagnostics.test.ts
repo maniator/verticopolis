@@ -67,7 +67,12 @@ describe("aboutRows over the components package's own report", () => {
         binary: { state: "ok", sourceHash: sources },
       } as never,
       host: { hosted: true },
-      expected: { package: "54a702deb9fe".padEnd(64, "0"), files: {} as never, sources, crate: { name: "example-engine", version: crateVersion } },
+      expected: {
+        package: "54a702deb9fe".padEnd(64, "0"),
+        files: {} as never,
+        sources,
+        crate: { name: "example-engine", version: crateVersion },
+      },
       userAgent: "Mozilla/5.0",
       date: "2026-11-19T22:40:19.672Z",
     });
@@ -83,7 +88,13 @@ describe("aboutRows over the components package's own report", () => {
   it("shows both crates and the mismatch when the engine is not the one the page expected", () => {
     const off = report("9.8.6");
     expect(off.state).toBe("mismatch");
-    expect(labels(aboutRows(off.rows))).toEqual(["Commit", "Crate this page expects", "Engine crate", "Save version", "Mismatch"]);
+    expect(labels(aboutRows(off.rows))).toEqual([
+      "Commit",
+      "Crate this page expects",
+      "Engine crate",
+      "Save version",
+      "Mismatch",
+    ]);
   });
 });
 
@@ -106,7 +117,12 @@ describe("withComponents", () => {
   });
 
   it("appends to a report with no App row, and leaves the report alone without a version", () => {
-    const bare: DiagnosticsReport = { state: "unavailable", summary: "x", rows: [], text: "Verticopolis diagnostics\nx" };
+    const bare: DiagnosticsReport = {
+      state: "unavailable",
+      summary: "x",
+      rows: [],
+      text: "Verticopolis diagnostics\nx",
+    };
     const appended = withComponents({ ...bare, rows: [{ label: "Date", value: "now" }] }, "0.2.1");
     expect(labels(appended.rows)).toEqual(["Date", "Components"]);
     expect(withComponents(bare, "0.2.1").text).toBe("Verticopolis diagnostics\nx\nComponents: 0.2.1");

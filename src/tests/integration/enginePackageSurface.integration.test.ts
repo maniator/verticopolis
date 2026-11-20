@@ -20,12 +20,13 @@ import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
  * them is stale.
  */
 
-
 describe.skipIf(!hasWasmPackage())("engine package surface", () => {
   it("one module exports catalog(mode), and its Engine no longer has the relay ops", () => {
     const mod = wasm();
     expect(typeof mod.catalog).toBe("function");
-    const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "catalog-digests.json"), "utf8")) as { catalogs: Record<string, string> };
+    const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "catalog-digests.json"), "utf8")) as {
+      catalogs: Record<string, string>;
+    };
     for (const mode of ["classic", "modern"] as const) {
       expect(digest(catalogLockView(JSON.parse(mod.catalog!(mode))))).toBe(lock.catalogs[mode]);
     }
@@ -53,9 +54,12 @@ describe.skipIf(!hasWasmPackage())("engine package surface", () => {
   // The web build's copy of the package; a checkout that builds it only for
   // the jobs that serve it (#958) has no copy to check, so the case skips.
   const SHIPPED_GLUE = resolve(REPO_ROOT, "src/public/engine/verticopolis_engine.js");
-  it.skipIf(!existsSync(SHIPPED_GLUE))("the shipped glue in src/public/engine exports the catalog and roomTiers", () => {
-    const glue = readFileSync(SHIPPED_GLUE, "utf8");
-    expect(glue).toMatch(/export function catalog\(/);
-    expect(glue).toMatch(/\broomTiers\(/);
-  });
+  it.skipIf(!existsSync(SHIPPED_GLUE))(
+    "the shipped glue in src/public/engine exports the catalog and roomTiers",
+    () => {
+      const glue = readFileSync(SHIPPED_GLUE, "utf8");
+      expect(glue).toMatch(/export function catalog\(/);
+      expect(glue).toMatch(/\broomTiers\(/);
+    },
+  );
 });

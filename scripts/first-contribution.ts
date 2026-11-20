@@ -44,8 +44,7 @@ const env = (name: string): string => {
 
 const repo = env("GH_REPO");
 
-const gh = (args: string[]): string =>
-  execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+const gh = (args: string[]): string => execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 /** One JSON value per line, so paginated pages need no merging. */
 const ghLines = (path: string, jq: string): unknown[] =>
   gh(["api", "--paginate", path, "--jq", jq])
@@ -64,24 +63,13 @@ const port: WelcomePort = {
   readMessage: (path) => readFileSync(resolve(root, path), "utf8"),
   // @json keeps each body on one line; ghLines parses it back to the text.
   listCommentBodies: (number) =>
-    ghLines(
-      `repos/${repo}/issues/${number}/comments?per_page=100`,
-      ".[] | .body | @json",
-    ) as string[],
+    ghLines(`repos/${repo}/issues/${number}/comments?per_page=100`, ".[] | .body | @json") as string[],
   postComment(number, body) {
     if (dryRun) {
       console.log(`Would post on #${number}:\n${body}`);
       return;
     }
-    gh([
-      "api",
-      "-X",
-      "POST",
-      `repos/${repo}/issues/${number}/comments`,
-      "-f",
-      `body=${body}`,
-      "--silent",
-    ]);
+    gh(["api", "-X", "POST", `repos/${repo}/issues/${number}/comments`, "-f", `body=${body}`, "--silent"]);
   },
 };
 
@@ -121,16 +109,14 @@ const events: ContributionEvent[] = sweep
       },
     ];
 
-if (sweep)
-  console.log(`${events.length} pull request(s) opened in the sweep window.`);
+if (sweep) console.log(`${events.length} pull request(s) opened in the sweep window.`);
 // One pull request that fails (a GitHub error, a locked thread) must not
 // stop the sweep from reaching the older ones, so each is tried on its own
 // and the run fails at the end.
 let failed = 0;
 for (const event of events) {
   try {
-    if (!Number.isInteger(event.number) || event.number <= 0)
-      throw new Error(`NUMBER is not an issue number`);
+    if (!Number.isInteger(event.number) || event.number <= 0) throw new Error(`NUMBER is not an issue number`);
     const outcome = welcomeFirstContribution(event, port);
     console.log(
       outcome.posted

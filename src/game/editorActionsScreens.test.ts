@@ -26,7 +26,11 @@ describe("EditorActions: a theater's second screen", () => {
   });
 
   it("steps the second screen's Auto-rebook choice from its own, leaving the first screen's", async () => {
-    const { actions, cards, codes, deps, port } = setup({ setFilm: () => rec("setFilm", true) }, undefined, catalogFor("modern"));
+    const { actions, cards, codes, deps, port } = setup(
+      { setFilm: () => rec("setFilm", true) },
+      undefined,
+      catalogFor("modern"),
+    );
     cards.unit.mockReturnValueOnce({
       id: office.id,
       kind: "cinema",

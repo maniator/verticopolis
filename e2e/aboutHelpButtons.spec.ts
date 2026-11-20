@@ -16,7 +16,9 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 async function onGame(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => document.getElementById("splash")?.remove());
   await expect(page.locator("#mb-help")).toBeVisible();
 }
@@ -37,7 +39,10 @@ test("Help > About opens About this game with its privacy link and no What's new
   await expect(about).toBeVisible();
   await expect(about.locator(".help-diagnostics")).toBeVisible();
   await expect(about.locator('a[data-act="privacy"]')).toHaveAttribute("href", "/help/privacy/?from=game&via=about");
-  await expect(about.locator('a[data-act="report"]')).toHaveAttribute("href", /^https:\/\/github\.com\/Verticopolis\/web\/issues\/new\?template=bug_report\.yml&/);
+  await expect(about.locator('a[data-act="report"]')).toHaveAttribute(
+    "href",
+    /^https:\/\/github\.com\/Verticopolis\/web\/issues\/new\?template=bug_report\.yml&/,
+  );
   // The old Help menu's What's new went away with #2063.
   await expect(about.locator('[data-act="whats-new"]')).toHaveCount(0);
 
@@ -49,7 +54,9 @@ test("Help > Player's Manual opens the Help site in a new tab marked as coming f
   await onGame(page);
   // `vite preview` has no help site: its fallback would serve the game's own
   // page and boot a second game in the tab. Answer /help/ with a stand-in page.
-  await page.context().route("**/help/**", (route) => route.fulfill({ contentType: "text/html", body: "<title>Help</title>" }));
+  await page
+    .context()
+    .route("**/help/**", (route) => route.fulfill({ contentType: "text/html", body: "<title>Help</title>" }));
   const popup = page.waitForEvent("popup");
   await pickFromHelp(page, "#btn-help");
   const tab = await popup;
@@ -68,7 +75,9 @@ test("offline, Help and About's privacy link say where the page is and open no t
   await context.setOffline(true);
   try {
     await pickFromHelp(page, "#btn-help");
-    await expect(page.getByText("The manual needs an internet connection. It is at help.verticopolis.com.").first()).toBeVisible();
+    await expect(
+      page.getByText("The manual needs an internet connection. It is at help.verticopolis.com.").first(),
+    ).toBeVisible();
 
     await pickFromHelp(page, "#btn-about");
     const about = page.getByRole("dialog", { name: /About this game/ });

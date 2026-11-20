@@ -47,14 +47,14 @@ jobs:
     # write access adds the override label. Checked before the model is
     # called, so the run in flight can overshoot by its own cost.
     env:
-      PR_AGENT_COST_CAP_USD: '2.00'
+      PR_AGENT_COST_CAP_USD: "2.00"
       # Second cap that does not depend on PR-Agent knowing the model's price:
       # an unpriced model can print a $0.00 estimate for a real bill.
-      PR_AGENT_INPUT_TOKEN_CAP: '1000000'
+      PR_AGENT_INPUT_TOKEN_CAP: "1000000"
       # Third cap that counts commands, not what PR-Agent prints: a committable
       # /improve publishes inline suggestions and no run details block, so its
       # spending is invisible to the other two caps.
-      PR_AGENT_RUN_CAP: '20'
+      PR_AGENT_RUN_CAP: "20"
       PR_AGENT_OVERRIDE_LABEL: pr-agent-override
     steps:
       - name: Compare the running total with the cap
@@ -97,10 +97,10 @@ jobs:
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          github_action_config.auto_review: 'false'
-          github_action_config.auto_describe: 'false'
-          github_action_config.auto_improve: 'false'
-          config.restricted_mode: 'true'
+          github_action_config.auto_review: "false"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_improve: "false"
+          config.restricted_mode: "true"
 
       # PR-Agent edits its review and suggestion comments in place, so each one
       # shows only its latest run. This step keeps one running comment per PR

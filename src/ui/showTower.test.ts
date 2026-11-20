@@ -3,7 +3,8 @@ import { makeUI, mountAppDom } from "../tests/uiFixture";
 import { HudTower, pump, show } from "./hud.fixture";
 
 /** The texts on the toast rail, newest last. */
-const toasts = (): (string | null)[] => Array.from(document.getElementById("toast-wrap")!.children, (c) => c.textContent);
+const toasts = (): (string | null)[] =>
+  Array.from(document.getElementById("toast-wrap")!.children, (c) => c.textContent);
 /** The bulletin's lines in the order the window shows them, newest on top. */
 const bulletin = (): (string | null)[] => Array.from(document.getElementById("log")!.children, (c) => c.textContent);
 

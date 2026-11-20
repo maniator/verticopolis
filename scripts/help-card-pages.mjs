@@ -90,12 +90,15 @@ export function staleCards(pages, manifest) {
     const drawn = manifest[file];
     if (!drawn) problems.push(`${file}: no record of what this card shows (a new page?); ${fix}`);
     else {
-      if (drawn.title !== p.title) problems.push(`${file}: the card says "${drawn.title}" but the page's title is now "${p.title}"; ${fix}`);
-      if (drawn.description !== p.description) problems.push(`${file}: the card's description is not the page's current one; ${fix}`);
+      if (drawn.title !== p.title)
+        problems.push(`${file}: the card says "${drawn.title}" but the page's title is now "${p.title}"; ${fix}`);
+      if (drawn.description !== p.description)
+        problems.push(`${file}: the card's description is not the page's current one; ${fix}`);
     }
   }
   for (const file of Object.keys(manifest)) {
-    if (!live.has(file)) problems.push(`${file}: recorded, but no page has this card any more; delete the card and run ${REGENERATE}`);
+    if (!live.has(file))
+      problems.push(`${file}: recorded, but no page has this card any more; delete the card and run ${REGENERATE}`);
   }
   return problems;
 }

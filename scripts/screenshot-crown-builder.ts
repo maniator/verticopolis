@@ -22,10 +22,11 @@ export function topOutTowerWithHall(): void {
   // The hero tower's lower banks already hold some columns, so take the first
   // free one rather than hard-coding an x that a layout tweak would collide with.
   let express: { ok: boolean; reason?: string } = { ok: false, reason: "no free column" };
-  for (let x = left + 2; x < right - 6 && !express.ok; x++) express = s.tower.placeTransport("elevatorExpress", x, 1, HALL_FLOOR);
+  for (let x = left + 2; x < right - 6 && !express.ok; x++)
+    express = s.tower.placeTransport("elevatorExpress", x, 1, HALL_FLOOR);
   if (!express.ok) throw new Error(`crown express failed: ${express.reason}`);
   for (let f = 41; f < HALL_FLOOR; f++) {
-    for (let x = left + 30; x + 1 <= right; ) {
+    for (let x = left + 30; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);

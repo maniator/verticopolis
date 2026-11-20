@@ -14,7 +14,11 @@ const GENERATION = 4;
 
 /** A port whose undo and redo answer `status`, with the engine's notice and
  *  refusal reason (`null`: the engine gave none). */
-function historyPort(status: number = UNDO_DONE, notice?: string, reason: string | null = "Not enough money to undo that.") {
+function historyPort(
+  status: number = UNDO_DONE,
+  notice?: string,
+  reason: string | null = "Not enough money to undo that.",
+) {
   return mockPort({
     undoCapture: () => undefined,
     undoCommit: () => true,
@@ -40,7 +44,10 @@ describe("createAppHistory", () => {
     expect(enginePort.undoCommit).toHaveBeenCalledOnce();
     await hist.undo();
     expect(enginePort.undo).toHaveBeenCalledOnce();
-    expect(app.followSwap, "a step keeps the camera, the scene and the tower's latches").toHaveBeenCalledExactlyOnceWith("step");
+    expect(
+      app.followSwap,
+      "a step keeps the camera, the scene and the tower's latches",
+    ).toHaveBeenCalledExactlyOnceWith("step");
     expect(app.ui.toast).toHaveBeenCalledExactlyOnceWith("Undid: build", "info");
     await hist.redo();
     expect(enginePort.redo).toHaveBeenCalledOnce();
@@ -87,10 +94,28 @@ describe("createAppHistory", () => {
       redo: () => (order.push("redo"), Float64Array.of(UNDO_DONE, GENERATION)),
       undoNotice: () => undefined,
     });
-    const hist = createAppHistory({ enginePort, ui: { toast: vi.fn() }, followSwap: vi.fn(), showSteps: record("show") });
+    const hist = createAppHistory({
+      enginePort,
+      ui: { toast: vi.fn() },
+      followSwap: vi.fn(),
+      showSteps: record("show"),
+    });
     hist.capture("a");
     for (const call of [hist.commit, hist.undo, hist.redo, hist.discard, hist.clear]) await call();
-    expect(order).toEqual(["capture", "show", "commit", "show", "undo", "show", "redo", "show", "discard", "show", "clear", "show"]);
+    expect(order).toEqual([
+      "capture",
+      "show",
+      "commit",
+      "show",
+      "undo",
+      "show",
+      "redo",
+      "show",
+      "discard",
+      "show",
+      "clear",
+      "show",
+    ]);
   });
 
   it("shows the steps once the host has followed a step", async () => {

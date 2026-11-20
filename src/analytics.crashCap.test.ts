@@ -29,7 +29,9 @@ const context = { version: "2.25.2", star: 3, population: 800 };
 
 /** Every `crash` event the relay saw, in order, as [name, props] pairs. */
 function crashCalls(): Array<[string, Record<string, unknown>]> {
-  return vi.mocked(sendToRelay).mock.calls.filter(([name]) => name === "crash") as Array<[string, Record<string, unknown>]>;
+  return vi.mocked(sendToRelay).mock.calls.filter(([name]) => name === "crash") as Array<
+    [string, Record<string, unknown>]
+  >;
 }
 
 describe("crash event cap and dedup", () => {
@@ -69,7 +71,14 @@ describe("crash event cap and dedup", () => {
   it("reports a repeat-flagged loop even when no earlier crash shape preceded it", () => {
     // A loop whose first screen is already a repeat (the loss landed within 90s of
     // one from a previous page), so there is only ever one shape to report.
-    const crash = { kind: "webgl-context-lost", repeat: true, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    const crash = {
+      kind: "webgl-context-lost",
+      repeat: true,
+      recoveryFailed: false,
+      saveFlushed: true,
+      behindSplash: false,
+      ...context,
+    };
     for (let i = 0; i < 25; i++) gameplaySession.noteCrash(crash);
     const crashes = crashCalls();
     expect(crashes).toHaveLength(1);
@@ -92,7 +101,14 @@ describe("crash event cap and dedup", () => {
   });
 
   it("stops at the per-page-life cap even for genuinely distinct crash shapes", () => {
-    const base = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    const base = {
+      kind: "webgl-context-lost",
+      repeat: false,
+      recoveryFailed: false,
+      saveFlushed: true,
+      behindSplash: false,
+      ...context,
+    };
     // 16 distinct fingerprints: the cap has to hold whether or not the dedup
     // catches them first, since distinct-but-endless is a flood too.
     for (let i = 0; i < 16; i++) gameplaySession.noteCrash({ ...base, kind: `synthetic-loss-${i}` });
@@ -100,7 +116,14 @@ describe("crash event cap and dedup", () => {
   });
 
   it("re-opens the cap when the budget is handed back", () => {
-    const crash = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    const crash = {
+      kind: "webgl-context-lost",
+      repeat: false,
+      recoveryFailed: false,
+      saveFlushed: true,
+      behindSplash: false,
+      ...context,
+    };
     gameplaySession.noteCrash(crash);
     gameplaySession.noteCrash(crash); // deduped
     // A new measurement window, then the crash slots released (the session reset).
@@ -111,7 +134,14 @@ describe("crash event cap and dedup", () => {
   });
 
   it("keeps the crash budget across a new measurement window on its own", () => {
-    const crash = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    const crash = {
+      kind: "webgl-context-lost",
+      repeat: false,
+      recoveryFailed: false,
+      saveFlushed: true,
+      behindSplash: false,
+      ...context,
+    };
     gameplaySession.noteCrash(crash);
     gameplaySession.startEpoch(); // the window moves; the flood guard does not follow it
     gameplaySession.noteCrash(crash);
@@ -130,7 +160,14 @@ describe("crash event cap and dedup", () => {
     // re-shows in place, which is how one page life reached 8,269 events), and a
     // crash that survives a reload is a new incident worth reporting: the player
     // asked for a fresh page and the GPU died again.
-    const crash = { kind: "webgl-context-lost", repeat: true, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    const crash = {
+      kind: "webgl-context-lost",
+      repeat: true,
+      recoveryFailed: false,
+      saveFlushed: true,
+      behindSplash: false,
+      ...context,
+    };
     for (let i = 0; i < 25; i++) gameplaySession.noteCrash({ ...crash, kind: `loss-${i}` });
     expect(crashCalls()).toHaveLength(10); // this page life is spent
 
@@ -141,8 +178,19 @@ describe("crash event cap and dedup", () => {
   });
 
   describe("session_crashes summary (#841)", () => {
-    const loop = { kind: "webgl-context-lost", repeat: true, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
-    const summaries = () => vi.mocked(sendToRelay).mock.calls.filter(([name]) => name === "session_crashes").map(([, props]) => props);
+    const loop = {
+      kind: "webgl-context-lost",
+      repeat: true,
+      recoveryFailed: false,
+      saveFlushed: true,
+      behindSplash: false,
+      ...context,
+    };
+    const summaries = () =>
+      vi
+        .mocked(sendToRelay)
+        .mock.calls.filter(([name]) => name === "session_crashes")
+        .map(([, props]) => props);
 
     it("counts every crash screen the cap and dedup hide, and sends the total once at the terminal hide", () => {
       for (let i = 0; i < 40; i++) gameplaySession.noteCrash(loop);

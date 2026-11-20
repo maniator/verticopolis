@@ -30,17 +30,22 @@ interface Pick {
  *  early; in TypeScript mode the app is built inside module evaluation.
  *  These events time boot ordering, so they get no cross-engine verdict
  *  (docs/performance/ts-vs-wasm.md, Startup). */
-const BOOT_ORDER = "boot order differs between engines: WASM awaits its package before building the app, so these page events fire at different points of boot";
+const BOOT_ORDER =
+  "boot order differs between engines: WASM awaits its package before building the app, so these page events fire at different points of boot";
 
 /** From the engine loaded (boot publishing its state, just before the app
  *  is created) to the game being ready: the app's creation on both engines,
  *  plus the host attach on WASM (#1254). Null when either mark is missing or
  *  the mark came after ready, which would mean boot no longer publishes
  *  before it creates the app (pageProbes.test.ts guards that order). */
-const loadedToReady = (s: StartupSample | null | undefined): number | null => (s && typeof s.gameReadyMs === "number" && typeof s.engineLoadedMs === "number" && s.engineLoadedMs <= s.gameReadyMs ? s.gameReadyMs - s.engineLoadedMs : null);
+const loadedToReady = (s: StartupSample | null | undefined): number | null =>
+  s && typeof s.gameReadyMs === "number" && typeof s.engineLoadedMs === "number" && s.engineLoadedMs <= s.gameReadyMs
+    ? s.gameReadyMs - s.engineLoadedMs
+    : null;
 
 /** The split after the engine loaded covers different work on each engine. */
-const SPLIT = "the span covers different work on each engine: the app's creation on TypeScript, the creation plus the host attach on WASM (#1254); its paired difference is reported under M5's lines";
+const SPLIT =
+  "the span covers different work on each engine: the app's creation on TypeScript, the creation plus the host attach on WASM (#1254); its paired difference is reported under M5's lines";
 
 /** Engine caveats that do not apply when both slots ran one engine. */
 const ENGINE_CAVEATS: readonly string[] = [BOOT_ORDER, SPLIT];
@@ -53,9 +58,18 @@ export const SAVED_SPLIT = "cold loaded to ready (saved tower)";
  *  (report.ts, #1254): when the engine loaded (on WASM, the end of the
  *  package load), the warm start, the split after the engine loaded, and the
  *  cold start with each scenario's save. Named here, beside the rows. */
-export const REPORTED_DIFFERENCES: readonly string[] = ["cold engine loaded", "warm engine loaded", "warm game ready", "cold loaded to ready", "warm loaded to ready", SAVED_READY, SAVED_SPLIT];
+export const REPORTED_DIFFERENCES: readonly string[] = [
+  "cold engine loaded",
+  "warm engine loaded",
+  "warm game ready",
+  "cold loaded to ready",
+  "warm loaded to ready",
+  SAVED_READY,
+  SAVED_SPLIT,
+];
 
-const bytes = (served: readonly ServedRequest[] | undefined): number | null => (served ? served.reduce((s, x) => s + x.bytes, 0) : null);
+const bytes = (served: readonly ServedRequest[] | undefined): number | null =>
+  served ? served.reduce((s, x) => s + x.bytes, 0) : null;
 
 /** Served bytes of one build category (the same categories as the bundle
  *  table), so the before-ready and after-ready split reads per category. */
@@ -64,7 +78,18 @@ export function bytesIn(served: readonly ServedRequest[] | undefined, category: 
   return served.filter((x) => categorize(x.path.replace(/^\//, "")) === category).reduce((s, x) => s + x.bytes, 0);
 }
 
-const SERVED_CATEGORIES: Category[] = ["html", "app-js", "css", "wasm-glue", "wasm-binary", "audio-js", "audio-assets", "images", "service-worker", "other"];
+const SERVED_CATEGORIES: Category[] = [
+  "html",
+  "app-js",
+  "css",
+  "wasm-glue",
+  "wasm-binary",
+  "audio-js",
+  "audio-assets",
+  "images",
+  "service-worker",
+  "other",
+];
 
 /** A verdict needs this many samples per side; below it, "inconclusive". */
 export const MIN_VERDICT_N = 6;
@@ -96,7 +121,13 @@ export function attributionShares(a: Attribution): AttributionShares | null {
   if (!(total > 0)) return null;
   const serialize = Math.min(exports, Math.max(0, a.byExport.serialize?.ms ?? 0));
   const parse = Math.min(host, Math.max(0, a.parseMs));
-  return { tick: tick / total, serialize: serialize / total, syncReads: (exports - serialize) / total, parse: parse / total, merge: (host - parse) / total };
+  return {
+    tick: tick / total,
+    serialize: serialize / total,
+    syncReads: (exports - serialize) / total,
+    parse: parse / total,
+    merge: (host - parse) / total,
+  };
 }
 
 function picks(scenarios: readonly string[], throttles: readonly string[]): Pick[] {
@@ -105,7 +136,18 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   const startup = (phase: "cold" | "warm" | "cold4x") => {
     const throttle = phase === "cold4x" ? slow : "1";
     const label = phase === "cold4x" ? "cold" : phase;
-    const p = (metric: string, unit: string, value: Pick["value"], engines?: EngineName[], noVerdict?: string) => out.push({ group: "startup", scenario: "-", throttle, metric: `${label} ${metric}`, unit, better: "lower", value, engines, noVerdict });
+    const p = (metric: string, unit: string, value: Pick["value"], engines?: EngineName[], noVerdict?: string) =>
+      out.push({
+        group: "startup",
+        scenario: "-",
+        throttle,
+        metric: `${label} ${metric}`,
+        unit,
+        better: "lower",
+        value,
+        engines,
+        noVerdict,
+      });
     p("game ready", "ms", (r) => r[phase]?.gameReadyMs);
     p("first frame after ready", "ms", (r) => r[phase]?.firstFrameMs);
     p("DOMContentLoaded", "ms", (r) => r[phase]?.domContentLoadedMs, undefined, BOOT_ORDER);
@@ -116,12 +158,48 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
     p("engine loaded", "ms", (r) => r[phase]?.engineLoadedMs, undefined, BOOT_ORDER);
     p("loaded to ready", "ms", (r) => loadedToReady(r[phase]), undefined, SPLIT);
     if (phase === "cold4x") return;
-    out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `${phase} bytes served before ready`, unit: "bytes", better: "lower", value: (r) => bytes(r[phase]?.servedBeforeReady) });
-    out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `${phase} bytes served total`, unit: "bytes", better: "lower", value: (r) => { const a = bytes(r[phase]?.servedBeforeReady); const b = bytes(r[phase]?.servedAfterReady); return a === null || b === null ? null : a + b; } });
+    out.push({
+      group: "transfer",
+      scenario: "-",
+      throttle: "1",
+      metric: `${phase} bytes served before ready`,
+      unit: "bytes",
+      better: "lower",
+      value: (r) => bytes(r[phase]?.servedBeforeReady),
+    });
+    out.push({
+      group: "transfer",
+      scenario: "-",
+      throttle: "1",
+      metric: `${phase} bytes served total`,
+      unit: "bytes",
+      better: "lower",
+      value: (r) => {
+        const a = bytes(r[phase]?.servedBeforeReady);
+        const b = bytes(r[phase]?.servedAfterReady);
+        return a === null || b === null ? null : a + b;
+      },
+    });
     if (phase !== "cold") return;
     for (const c of SERVED_CATEGORIES) {
-      out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `cold before ready: ${c}`, unit: "bytes", better: "lower", value: (r) => bytesIn(r.cold?.servedBeforeReady, c) });
-      out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `cold after ready: ${c}`, unit: "bytes", better: "lower", value: (r) => bytesIn(r.cold?.servedAfterReady, c) });
+      out.push({
+        group: "transfer",
+        scenario: "-",
+        throttle: "1",
+        metric: `cold before ready: ${c}`,
+        unit: "bytes",
+        better: "lower",
+        value: (r) => bytesIn(r.cold?.servedBeforeReady, c),
+      });
+      out.push({
+        group: "transfer",
+        scenario: "-",
+        throttle: "1",
+        metric: `cold after ready: ${c}`,
+        unit: "bytes",
+        better: "lower",
+        value: (r) => bytesIn(r.cold?.servedAfterReady, c),
+      });
     }
   };
   startup("cold");
@@ -131,36 +209,122 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   // reported beside M5 and gating nothing. A row without a sample (a failed
   // check, an older result) adds nothing.
   for (const s of scenarios) {
-    const saved = (metric: string, value: Pick["value"], noVerdict?: string) => out.push({ group: "startup", scenario: s, throttle: "1", metric, unit: "ms", better: "lower", value, noVerdict });
+    const saved = (metric: string, value: Pick["value"], noVerdict?: string) =>
+      out.push({ group: "startup", scenario: s, throttle: "1", metric, unit: "ms", better: "lower", value, noVerdict });
     saved(SAVED_READY, (r) => r.coldSaved?.[s]?.sample?.gameReadyMs);
     saved(SAVED_SPLIT, (r) => loadedToReady(r.coldSaved?.[s]?.sample), SPLIT);
   }
   // Only visits whose service worker activated and that ran on the
   // requested engine count.
-  out.push({ group: "transfer", scenario: "-", throttle: "1", metric: "first visit with service worker, bytes served", unit: "bytes", better: "lower", value: (r) => { const f = r.firstVisitWithServiceWorker; return f?.swActive && f.onlineEngineActive === (r.ranEngine ?? r.engine) ? bytes(f.served) : null; } });
-  for (const [metric, key] of [["fetch", "fetchMs"], ["compile", "compileMs"], ["instantiate", "instantiateMs"], ["first Engine", "firstEngineMs"]] as const) {
-    out.push({ group: "wasm-load", scenario: "-", throttle: "1", metric: `cold ${metric}`, unit: "ms", better: "lower", value: (r) => r.wasmCold?.[key], engines: ["ts"] });
+  out.push({
+    group: "transfer",
+    scenario: "-",
+    throttle: "1",
+    metric: "first visit with service worker, bytes served",
+    unit: "bytes",
+    better: "lower",
+    value: (r) => {
+      const f = r.firstVisitWithServiceWorker;
+      return f?.swActive && f.onlineEngineActive === (r.ranEngine ?? r.engine) ? bytes(f.served) : null;
+    },
+  });
+  for (const [metric, key] of [
+    ["fetch", "fetchMs"],
+    ["compile", "compileMs"],
+    ["instantiate", "instantiateMs"],
+    ["first Engine", "firstEngineMs"],
+  ] as const) {
+    out.push({
+      group: "wasm-load",
+      scenario: "-",
+      throttle: "1",
+      metric: `cold ${metric}`,
+      unit: "ms",
+      better: "lower",
+      value: (r) => r.wasmCold?.[key],
+      engines: ["ts"],
+    });
   }
   // The load steps again in a blank page of a context of its own (#1005):
   // no event loop of the app in the timings, and each way compiles on its own.
-  const idle = (metric: string, value: Pick["value"]) => out.push({ group: "wasm-load", scenario: "-", throttle: "1", metric, unit: "ms", better: "lower", value, engines: ["ts"] });
+  const idle = (metric: string, value: Pick["value"]) =>
+    out.push({
+      group: "wasm-load",
+      scenario: "-",
+      throttle: "1",
+      metric,
+      unit: "ms",
+      better: "lower",
+      value,
+      engines: ["ts"],
+    });
   idle("idle fetch (headers)", (r) => r.wasmIdle?.buffered?.responseMs);
   idle("idle fetch (body)", (r) => r.wasmIdle?.buffered?.bodyMs);
   idle("idle compile (after the whole download)", (r) => r.wasmIdle?.buffered?.compileMs);
   idle("idle streamed (headers)", (r) => r.wasmIdle?.streamed?.responseMs);
   idle("idle streamed (request to module)", (r) => r.wasmIdle?.streamed?.totalMs);
   for (const s of scenarios) {
-    out.push({ group: "memory", scenario: s, throttle: "1", metric: "adopt (load the save)", unit: "ms", better: "lower", value: (r) => r.scenarios[s]?.adoptMs });
-    out.push({ group: "memory", scenario: s, throttle: "1", metric: "JS heap used", unit: "bytes", better: "lower", value: (r) => r.scenarios[s]?.memory.jsHeapUsedBytes });
-    out.push({ group: "memory", scenario: s, throttle: "1", metric: "WASM linear memory", unit: "bytes", better: "lower", value: (r) => r.scenarios[s]?.memory.wasmMemoryBytes, engines: ["wasm"] });
-    out.push({ group: "memory", scenario: s, throttle: "1", metric: "browser process PSS", unit: "bytes", better: "lower", value: (r) => r.scenarios[s]?.memory.processPssBytes });
+    out.push({
+      group: "memory",
+      scenario: s,
+      throttle: "1",
+      metric: "adopt (load the save)",
+      unit: "ms",
+      better: "lower",
+      value: (r) => r.scenarios[s]?.adoptMs,
+    });
+    out.push({
+      group: "memory",
+      scenario: s,
+      throttle: "1",
+      metric: "JS heap used",
+      unit: "bytes",
+      better: "lower",
+      value: (r) => r.scenarios[s]?.memory.jsHeapUsedBytes,
+    });
+    out.push({
+      group: "memory",
+      scenario: s,
+      throttle: "1",
+      metric: "WASM linear memory",
+      unit: "bytes",
+      better: "lower",
+      value: (r) => r.scenarios[s]?.memory.wasmMemoryBytes,
+      engines: ["wasm"],
+    });
+    out.push({
+      group: "memory",
+      scenario: s,
+      throttle: "1",
+      metric: "browser process PSS",
+      unit: "bytes",
+      better: "lower",
+      value: (r) => r.scenarios[s]?.memory.processPssBytes,
+    });
     // The JS heap alone leaves the engine's linear memory out on WASM, so
     // the comparable figure is the sum.
-    out.push({ group: "memory", scenario: s, throttle: "1", metric: "JS heap + WASM linear memory", unit: "bytes", better: "lower", value: (r) => { const m = r.scenarios[s]?.memory; return m ? m.jsHeapUsedBytes + (m.wasmMemoryBytes ?? 0) : null; } });
+    out.push({
+      group: "memory",
+      scenario: s,
+      throttle: "1",
+      metric: "JS heap + WASM linear memory",
+      unit: "bytes",
+      better: "lower",
+      value: (r) => {
+        const m = r.scenarios[s]?.memory;
+        return m ? m.jsHeapUsedBytes + (m.wasmMemoryBytes ?? 0) : null;
+      },
+    });
     for (const t of throttles) {
       for (const mode of ["hosted", "raw"] as const) {
         const g: Group = mode === "hosted" ? "sim-hosted" : "sim-raw";
-        const step = (metric: string, unit: string, better: "lower" | "higher", value: Pick["value"], engines?: EngineName[]) => out.push({ group: g, scenario: s, throttle: t, metric, unit, better, value, engines });
+        const step = (
+          metric: string,
+          unit: string,
+          better: "lower" | "higher",
+          value: Pick["value"],
+          engines?: EngineName[],
+        ) => out.push({ group: g, scenario: s, throttle: t, metric, unit, better, value, engines });
         step("total for fixed duration", "ms", "lower", (r) => r.scenarios[s]?.[mode][t]?.totalMs);
         step("step median", "ms", "lower", (r) => r.scenarios[s]?.[mode][t]?.stepMedianMs);
         step("step p95", "ms", "lower", (r) => r.scenarios[s]?.[mode][t]?.stepP95Ms);
@@ -172,11 +336,13 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
           // Every share row below comes from `attributionShares`, so the
           // rows of one pass share one denominator and add to one; the
           // medians across repetitions do not add to one exactly.
-          const part = (...keys: (keyof AttributionShares)[]) => (r: ProcessRun) => {
-            const a = r.scenarios[s]?.hosted[t]?.attribution;
-            const shares = a ? attributionShares(a) : null;
-            return shares ? keys.reduce((sum, k) => sum + shares[k], 0) : null;
-          };
+          const part =
+            (...keys: (keyof AttributionShares)[]) =>
+            (r: ProcessRun) => {
+              const a = r.scenarios[s]?.hosted[t]?.attribution;
+              const shares = a ? attributionShares(a) : null;
+              return shares ? keys.reduce((sum, k) => sum + shares[k], 0) : null;
+            };
           step("share in the engine's tick", "ratio", "lower", part("tick"), ["wasm"]);
           step("share in exports the host reads", "ratio", "lower", part("serialize", "syncReads"), ["wasm"]);
           step("share in host JS sync", "ratio", "lower", part("parse", "merge"), ["wasm"]);
@@ -189,12 +355,37 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
           step("share in per-step sync reads", "ratio", "lower", part("syncReads"), ["wasm"]);
           step("share in JSON.parse", "ratio", "lower", part("parse"), ["wasm"]);
           step("share in merge and the rest of host JS", "ratio", "lower", part("merge"), ["wasm"]);
-          step("serialize calls", "count", "lower", (r) => { const a = r.scenarios[s]?.hosted[t]?.attribution; return a?.byExport ? (a.byExport.serialize?.calls ?? 0) : null; }, ["wasm"]);
+          step(
+            "serialize calls",
+            "count",
+            "lower",
+            (r) => {
+              const a = r.scenarios[s]?.hosted[t]?.attribution;
+              return a?.byExport ? (a.byExport.serialize?.calls ?? 0) : null;
+            },
+            ["wasm"],
+          );
         }
       }
-      for (const [group, slot] of [["frames", "frames"], ["frames-audio", "framesAudio"]] as const) {
-        const f = (metric: string, unit: string, better: "lower" | "higher", key: keyof NonNullable<ProcessRun["scenarios"][string]["frames"][string]>) =>
-          out.push({ group, scenario: s, throttle: t, metric, unit, better, value: (r) => r.scenarios[s]?.[slot]?.[t]?.[key] as number | undefined });
+      for (const [group, slot] of [
+        ["frames", "frames"],
+        ["frames-audio", "framesAudio"],
+      ] as const) {
+        const f = (
+          metric: string,
+          unit: string,
+          better: "lower" | "higher",
+          key: keyof NonNullable<ProcessRun["scenarios"][string]["frames"][string]>,
+        ) =>
+          out.push({
+            group,
+            scenario: s,
+            throttle: t,
+            metric,
+            unit,
+            better,
+            value: (r) => r.scenarios[s]?.[slot]?.[t]?.[key] as number | undefined,
+          });
         f("frame time median", "ms", "lower", "medianMs");
         f("frame time p95", "ms", "lower", "p95Ms");
         f("frame time p99", "ms", "lower", "p99Ms");
@@ -211,7 +402,12 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   return out;
 }
 
-export function aggregate(runs: readonly ProcessRun[], scenarios: readonly string[], throttles: readonly number[], aa: EngineName | null): MetricRow[] {
+export function aggregate(
+  runs: readonly ProcessRun[],
+  scenarios: readonly string[],
+  throttles: readonly number[],
+  aa: EngineName | null,
+): MetricRow[] {
   const rows: MetricRow[] = [];
   const good = runs.filter((r) => r.ok);
   for (const p of picks(scenarios, throttles.map(String))) {
@@ -221,7 +417,9 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
     // The cold WASM load times a fixed download that no slot's engine
     // changes, so it has nothing to calibrate.
     if (aa && (p.group === "wasm-load" || (p.engines && !p.engines.includes(aa)))) continue;
-    for (const engine of aa && p.engines ? (["ts", "wasm"] as EngineName[]) : p.engines ?? (["ts", "wasm"] as EngineName[])) {
+    for (const engine of aa && p.engines
+      ? (["ts", "wasm"] as EngineName[])
+      : (p.engines ?? (["ts", "wasm"] as EngineName[]))) {
       const values: number[] = [];
       const reps: number[] = [];
       for (const r of good) {
@@ -234,7 +432,19 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
       }
       // Both slots ran one engine, so the caveats between engines do not apply.
       const noVerdict = aa && p.noVerdict && ENGINE_CAVEATS.includes(p.noVerdict) ? undefined : p.noVerdict;
-      rows.push({ group: p.group, scenario: p.scenario, throttle: p.throttle, metric: p.metric, unit: p.unit, better: p.better, engine, values, reps, summary: values.length ? summarize(values) : null, ...(noVerdict ? { noVerdict } : {}) });
+      rows.push({
+        group: p.group,
+        scenario: p.scenario,
+        throttle: p.throttle,
+        metric: p.metric,
+        unit: p.unit,
+        better: p.better,
+        engine,
+        values,
+        reps,
+        summary: values.length ? summarize(values) : null,
+        ...(noVerdict ? { noVerdict } : {}),
+      });
     }
   }
   return rows;
@@ -265,7 +475,9 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[], aa
     const other = aa ? 'slot "wasm"' : "WASM";
     if (ts.summary.median === 0) {
       // No ratio against zero (a byte count of 0, no clamped frames).
-      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: ${base} median is 0, ${other} median ${wasm.summary.median}`);
+      skipped.push(
+        `${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: ${base} median is 0, ${other} median ${wasm.summary.median}`,
+      );
       continue;
     }
     // Pair the two engines by repetition; a repetition missing on either
@@ -326,7 +538,10 @@ export function missingSamples(rows: readonly MetricRow[], runs: readonly Proces
   const out: string[] = [];
   for (const r of rows) {
     const expected = runs.filter((x) => x.ok && x.engine === r.engine).length;
-    if (r.values.length < expected) out.push(`${r.group} ${r.scenario} ${r.throttle}x ${r.metric} (${r.engine}): ${r.values.length} of ${expected} processes produced a value`);
+    if (r.values.length < expected)
+      out.push(
+        `${r.group} ${r.scenario} ${r.throttle}x ${r.metric} (${r.engine}): ${r.values.length} of ${expected} processes produced a value`,
+      );
   }
   return out;
 }

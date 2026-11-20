@@ -150,14 +150,16 @@ export function captureOutgoing(app: Pick<GameApp, "enginePort">, kind: SwapKind
 function ownFile(reopened: string | null): Pick<Outgoing, "fileId" | "linked"> {
   const fileId = currentFileId();
   const linked = currentLinkedFile();
-  if (linked !== null && linked !== reopened) return { fileId: null, linked: { id: linked, link: linkedFolder.linkId() } };
+  if (linked !== null && linked !== reopened)
+    return { fileId: null, linked: { id: linked, link: linkedFolder.linkId() } };
   return { fileId: fileId === reopened ? null : fileId };
 }
 
 /** The Auto-save's own file, unless it is the one about to open again. */
 function crashCopyOwnFile(reopened: string | null): Pick<Outgoing, "fileId" | "linked"> {
   const ref = crashCopyRef();
-  if (ref?.linked && ref.linked.id !== reopened) return { fileId: null, linked: { id: ref.linked.id, link: ref.linked.link } };
+  if (ref?.linked && ref.linked.id !== reopened)
+    return { fileId: null, linked: { id: ref.linked.id, link: ref.linked.link } };
   return { fileId: ref?.file !== undefined && ref.file !== reopened ? ref.file : null };
 }
 
@@ -182,7 +184,9 @@ export function keptSettled(): Promise<void> {
 /** Tell the player their last tower could not be kept, and count it. */
 function keepFailed(app: Pick<GameApp, "ui">): "failed" {
   trackAppAction("tower_kept", "failed");
-  app.ui.sayVisibly("Your last tower couldn't be kept in My Towers. Save the tower you're in with File > Save As… to be safe.");
+  app.ui.sayVisibly(
+    "Your last tower couldn't be kept in My Towers. Save the tower you're in with File > Save As… to be safe.",
+  );
   return "failed";
 }
 
@@ -207,7 +211,9 @@ function offerDownload(app: Pick<GameApp, "ui">, name: string, bytes: Uint8Array
  * Keep the captured tower once the swap is done. Answers what happened, for
  * tests; never rejects. Says where the tower went, or offers it as a file.
  */
-export function keepOutgoing(app: Pick<GameApp, "enginePort" | "ui">): Promise<"file" | "folder" | "new" | "offered" | "failed" | null> {
+export function keepOutgoing(
+  app: Pick<GameApp, "enginePort" | "ui">,
+): Promise<"file" | "folder" | "new" | "offered" | "failed" | null> {
   const o = pending;
   pending = null;
   if (!o || app.enginePort.generation() === o.generation) return Promise.resolve(null);
@@ -275,7 +281,8 @@ async function keptInOwnFile(id: string, bytes: Uint8Array): Promise<boolean> {
 /** Write a folder tower back into its file there, while the folder it came
  *  through is linked and open with the browser's OK. Answers whether it did. */
 async function keptInFolder(linked: NonNullable<Outgoing["linked"]>, bytes: Uint8Array): Promise<boolean> {
-  if (linked.link === null || linkedFolder.linkId() !== linked.link || linkedFolder.state()?.access !== "granted") return false;
+  if (linked.link === null || linkedFolder.linkId() !== linked.link || linkedFolder.state()?.access !== "granted")
+    return false;
   try {
     await linkedFolder.saveOver(linked.id, bytes);
     return true;

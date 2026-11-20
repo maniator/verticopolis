@@ -2,13 +2,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  chromium,
-  test,
-  expect,
-  type BrowserContext,
-  type Page,
-} from "@playwright/test";
+import { chromium, test, expect, type BrowserContext, type Page } from "@playwright/test";
 
 /**
  * The folder linked on the player's computer, in the Open and Save As windows
@@ -32,9 +26,7 @@ test.beforeEach(async ({ baseURL }) => {
     baseURL,
     viewport: { width: 1280, height: 800 },
     serviceWorkers: "block",
-    ...(process.env.PW_CHROMIUM_PATH
-      ? { executablePath: process.env.PW_CHROMIUM_PATH }
-      : {}),
+    ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
   });
   await ctx.addInitScript((name) => {
     (window as any).showDirectoryPicker = async () =>
@@ -52,12 +44,9 @@ test.afterEach(async () => {
 /** Load the game with a fresh tower on the Rust engine. */
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(
-    () =>
-      !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted,
-    undefined,
-    { timeout: 30_000 },
-  );
+  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
     document.getElementById("onboard")?.remove();
@@ -73,16 +62,13 @@ async function fileMenu(page: Page, item: RegExp): Promise<void> {
 /** The files in the stand-in folder on disk, by name. */
 const onDisk = (page: Page) =>
   page.evaluate(async (name) => {
-    const folder = await (
-      await navigator.storage.getDirectory()
-    ).getDirectoryHandle(name);
+    const folder = await (await navigator.storage.getDirectory()).getDirectoryHandle(name);
     const names: string[] = [];
     for await (const entry of (folder as any).values()) names.push(entry.name);
     return names.sort();
   }, FOLDER);
 
-const rowNames = (page: Page) =>
-  page.locator(".fd-row .fd-name-cell").allTextContents();
+const rowNames = (page: Page) => page.locator(".fd-row .fd-name-cell").allTextContents();
 
 test("links a folder, saves a tower into it, and lists it in Open without Delete or Rename", async () => {
   const page = await ctx.newPage();
@@ -95,10 +81,7 @@ test("links a folder, saves a tower into it, and lists it in Open without Delete
   await page.locator("#fd-name").fill("Linked One");
   await page.locator(".fd-primary").click();
   await expect(page.locator(".fd")).toBeHidden();
-  expect(
-    await onDisk(page),
-    "the tower is a .vctower file in the folder",
-  ).toEqual(["Linked One.vctower"]);
+  expect(await onDisk(page), "the tower is a .vctower file in the folder").toEqual(["Linked One.vctower"]);
 
   // Save As remembered the folder, and the Open window starts there too.
   await fileMenu(page, /^Open…/);
@@ -134,22 +117,16 @@ test("after a reload the folder comes back in Look in, and a tower opens from it
 
   await page.reload();
   await boot(page);
-  const before = await page.evaluate(() =>
-    (window as any).game.enginePort.generation(),
-  );
+  const before = await page.evaluate(() => (window as any).game.enginePort.generation());
   await fileMenu(page, /^Open…/);
   await page.locator(".fd-look").click();
-  await page
-    .getByRole("menuitem", { name: `${FOLDER} on this computer` })
-    .click();
+  await page.getByRole("menuitem", { name: `${FOLDER} on this computer` }).click();
   await expect.poll(() => rowNames(page)).toEqual(["Kept"]);
   await page.locator(".fd-row", { hasText: "Kept" }).dblclick();
   await expect(page.locator(".fd")).toBeHidden();
-  await page.waitForFunction(
-    (gen) => (window as any).game.enginePort.generation() !== gen,
-    before,
-    { timeout: 10_000 },
-  );
+  await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, {
+    timeout: 10_000,
+  });
 
   // Unlinking keeps the file on disk.
   await fileMenu(page, /^Open…/);
@@ -191,7 +168,9 @@ test("the autosave writes a linked tower's own file there, and that file opens t
     delete save.appVersion;
     return save;
   });
-  await expect.poll(() => file("Kept.vctower"), { message: "the autosave wrote the tower's file on disk" }).not.toEqual(saved);
+  await expect
+    .poll(() => file("Kept.vctower"), { message: "the autosave wrote the tower's file on disk" })
+    .not.toEqual(saved);
   expect(await onDisk(page), "no second copy beside it").toEqual(["Kept.vctower"]);
 
   // Copy what the autosave wrote aside, so the copy kept on leaving can't stand in for it.
@@ -208,7 +187,9 @@ test("the autosave writes a linked tower's own file there, and that file opens t
   await expect.poll(() => rowNames(page)).toContain("Autosaved");
   await page.locator(".fd-row", { hasText: "Autosaved" }).dblclick();
   await expect(page.locator(".fd")).toBeHidden();
-  await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, { timeout: 10_000 });
+  await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, {
+    timeout: 10_000,
+  });
   const opened = await page.evaluate(() => {
     const save = JSON.parse((window as any).game.enginePort.serialize());
     delete save.savedAt;

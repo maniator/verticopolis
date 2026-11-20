@@ -22,7 +22,10 @@ export const CONTROL_MODES: readonly ModeName[] = ["ts", "wasm", "wasm-frame"];
  *  without saying anything about the machine. */
 const CONTROL_METRICS = /^(wall time, |main-thread time, |bare engine, )/;
 
-export type CrossInput = Pick<WorkerResults, "config" | "environment" | "browser" | "scenarios" | "metrics" | "validation">;
+export type CrossInput = Pick<
+  WorkerResults,
+  "config" | "environment" | "browser" | "scenarios" | "metrics" | "validation"
+>;
 
 export interface CrossRow {
   group: string;
@@ -63,7 +66,10 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
  *  than the commit under test. */
 export function crossErrors(before: CrossInput, after: CrossInput, minReps: number): string[] {
   const errors: string[] = [];
-  for (const [name, r] of [["before", before], ["after", after]] as const) {
+  for (const [name, r] of [
+    ["before", before],
+    ["after", after],
+  ] as const) {
     if (!r.validation.ok) errors.push(`the ${name} run failed its own validation`);
     if (r.config.quick) errors.push(`the ${name} run is a --quick smoke run`);
     if (r.config.reps < minReps) errors.push(`the ${name} run has ${r.config.reps} repetitions; ${minReps} are needed`);
@@ -71,10 +77,29 @@ export function crossErrors(before: CrossInput, after: CrossInput, minReps: numb
   }
   if (before.environment.commit === after.environment.commit) errors.push("both runs are the same commit");
   if (!same(before.config, after.config)) errors.push("the two runs used different configurations");
-  if (!same(before.scenarios.map((s) => [s.name, s.sha256]), after.scenarios.map((s) => [s.name, s.sha256]))) errors.push("the two runs measured different towers");
-  const machine = (r: CrossInput) => ({ ...r.browser, cpu: r.environment.cpuModel, cpus: r.environment.logicalCpus, memory: r.environment.totalMemoryBytes, os: r.environment.os, kernel: r.environment.kernel, arch: r.environment.arch, node: r.environment.node, playwright: r.environment.playwright });
+  if (
+    !same(
+      before.scenarios.map((s) => [s.name, s.sha256]),
+      after.scenarios.map((s) => [s.name, s.sha256]),
+    )
+  )
+    errors.push("the two runs measured different towers");
+  const machine = (r: CrossInput) => ({
+    ...r.browser,
+    cpu: r.environment.cpuModel,
+    cpus: r.environment.logicalCpus,
+    memory: r.environment.totalMemoryBytes,
+    os: r.environment.os,
+    kernel: r.environment.kernel,
+    arch: r.environment.arch,
+    node: r.environment.node,
+    playwright: r.environment.playwright,
+  });
   if (!same(machine(before), machine(after))) errors.push("the two runs differ in browser, machine or toolchain");
-  if (after.environment.mergeBase !== before.environment.commit) errors.push(`the after run's merge base with main (${after.environment.mergeBase ?? "unknown"}) is not the before run's commit (${before.environment.commit}): the pair is not main versus main plus the change`);
+  if (after.environment.mergeBase !== before.environment.commit)
+    errors.push(
+      `the after run's merge base with main (${after.environment.mergeBase ?? "unknown"}) is not the before run's commit (${before.environment.commit}): the pair is not main versus main plus the change`,
+    );
   return errors;
 }
 
@@ -99,7 +124,22 @@ export function crossRun(before: CrossInput, after: CrossInput, opts: CrossOptio
     });
     if (pairs.length === 0) continue;
     const p = pairedRatio(pairs);
-    rows.push({ group: a.group, scenario: a.scenario, throttle: a.throttle, metric: a.metric, unit: a.unit, better: a.better, mode: a.mode, role: CONTROL_MODES.includes(a.mode) ? "control" : "subject", ratio: p.ratio, ciLow: p.ciLow, ciHigh: p.ciHigh, n: p.n, zeroReference, verdict: verdict(p, band) });
+    rows.push({
+      group: a.group,
+      scenario: a.scenario,
+      throttle: a.throttle,
+      metric: a.metric,
+      unit: a.unit,
+      better: a.better,
+      mode: a.mode,
+      role: CONTROL_MODES.includes(a.mode) ? "control" : "subject",
+      ratio: p.ratio,
+      ciLow: p.ciLow,
+      ciHigh: p.ciHigh,
+      n: p.n,
+      zeroReference,
+      verdict: verdict(p, band),
+    });
   }
   const bad = new Map<string, { scenario: string; throttle: string; rows: string[] }>();
   const controls = rows.filter((r) => r.role === "control" && CONTROL_METRICS.test(r.metric));
@@ -117,18 +157,40 @@ export function crossRun(before: CrossInput, after: CrossInput, opts: CrossOptio
     if (r.role !== "subject" || r.group === "startup" || r.group === "memory") continue;
     if (controls.some((c) => c.scenario === r.scenario && c.throttle === r.throttle)) continue;
     const key = `${r.scenario}|${r.throttle}`;
-    if (!bad.has(key)) bad.set(key, { scenario: r.scenario, throttle: r.throttle, rows: ["no control row to vouch for this scenario and throttle"] });
+    if (!bad.has(key))
+      bad.set(key, {
+        scenario: r.scenario,
+        throttle: r.throttle,
+        rows: ["no control row to vouch for this scenario and throttle"],
+      });
   }
   return { errors: [], voided: [...bad.values()], rows };
 }
 
 export function crossMarkdown(before: CrossInput, after: CrossInput, result: CrossResult): string {
-  const lines = ["# perf:worker before and after", "", `Before: \`${before.environment.commit}\`. After: \`${after.environment.commit}\`. Ratios are after over before (below 1 is faster for times).`, ""];
-  if (result.errors.length > 0) return [...lines, "**Not comparable:**", ...result.errors.map((e) => `- ${e}`), ""].join("\n");
-  if (result.voided.length > 0) lines.push("**Void (a control moved):**", ...result.voided.map((v) => `- ${v.scenario} at ${v.throttle}x: ${v.rows.join("; ")}`), "");
+  const lines = [
+    "# perf:worker before and after",
+    "",
+    `Before: \`${before.environment.commit}\`. After: \`${after.environment.commit}\`. Ratios are after over before (below 1 is faster for times).`,
+    "",
+  ];
+  if (result.errors.length > 0)
+    return [...lines, "**Not comparable:**", ...result.errors.map((e) => `- ${e}`), ""].join("\n");
+  if (result.voided.length > 0)
+    lines.push(
+      "**Void (a control moved):**",
+      ...result.voided.map((v) => `- ${v.scenario} at ${v.throttle}x: ${v.rows.join("; ")}`),
+      "",
+    );
   else lines.push("Every control row is equivalent within the band.", "");
-  lines.push("| scenario | throttle | metric | mode | role | ratio | 95% CI | n | verdict |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  lines.push(
+    "| scenario | throttle | metric | mode | role | ratio | 95% CI | n | verdict |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+  );
   const f = (x: number | null) => (x === null ? "-" : x.toFixed(3));
-  for (const r of result.rows) lines.push(`| ${r.scenario} | ${r.throttle} | ${r.metric} | ${r.mode} | ${r.role} | ${f(r.ratio)} | ${f(r.ciLow)} to ${f(r.ciHigh)} | ${r.n} | ${r.verdict} |`);
+  for (const r of result.rows)
+    lines.push(
+      `| ${r.scenario} | ${r.throttle} | ${r.metric} | ${r.mode} | ${r.role} | ${f(r.ratio)} | ${f(r.ciLow)} to ${f(r.ciHigh)} | ${r.n} | ${r.verdict} |`,
+    );
   return [...lines, ""].join("\n");
 }

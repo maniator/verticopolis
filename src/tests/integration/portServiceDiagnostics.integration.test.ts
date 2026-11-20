@@ -68,7 +68,8 @@ function recyclingTower(mode: GameMode, offices: number, singles = 0): Draft {
   const at = (i: number) => ({ floor: 2 + Math.floor(i / perFloor), x: 110 + (i % perFloor) * office });
   for (let i = 0; i < offices; i++) placeUnit(sim, "office", at(i).floor, at(i).x).state = "occupied";
   const { floor, x } = at(offices);
-  for (let i = 0; i < singles; i++) placeUnit(sim, "hotelSingle", floor, x + i * widthOf("hotelSingle")).state = "occupied";
+  for (let i = 0; i < singles; i++)
+    placeUnit(sim, "hotelSingle", floor, x + i * widthOf("hotelSingle")).state = "occupied";
   return sim;
 }
 
@@ -106,7 +107,17 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
         // value into a number first, so the port's type is what keeps a
         // non-number out.)
         const h = f.hotel.id;
-        const malformed = [undefined, h + 0.5, -h, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 99_999_999, h + 2 ** 32, h - 2 ** 32];
+        const malformed = [
+          undefined,
+          h + 0.5,
+          -h,
+          Number.NaN,
+          Number.POSITIVE_INFINITY,
+          Number.NEGATIVE_INFINITY,
+          99_999_999,
+          h + 2 ** 32,
+          h - 2 ** 32,
+        ];
         for (const id of malformed) {
           const ask = (port: EnginePort) => port.serviceDiagnostics(id as number);
           expect(ask(rust), `Rust, id ${String(id)}`).toBeUndefined();
@@ -146,7 +157,9 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
     try {
       expect(rust.serviceDiagnostics(f.connectedParking.id)?.parking.status).toBe("connected");
       expect(rust.serviceDiagnostics(f.disconnectedParking.id)?.parking).toMatchObject({
-        status: "disconnected", have: null, shortage: null,
+        status: "disconnected",
+        have: null,
+        shortage: null,
       });
       expect(rust.serviceDiagnostics(f.ramp.id)?.parking.status).toBe("ramp");
     } finally {
@@ -167,7 +180,10 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
     // of workers in the tower (one stall covers them), then one office more
     // (the demand rounds up to a second space the tower lacks).
     const atOneSpace = PARKING_WORKERS_PER_SPACE / OFFICE_POPULATION - 1;
-    for (const [added, overOneSpace] of [[atOneSpace, false], [atOneSpace + 1, true]] as const) {
+    for (const [added, overOneSpace] of [
+      [atOneSpace, false],
+      [atOneSpace + 1, true],
+    ] as const) {
       // Modern counts the cars, a space per 24 workers. Classic's rule asks
       // for one free stall for every office (#1970), so it counts one
       // (#2024) and never runs a stall short here.
@@ -177,13 +193,19 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
         const f = serviceDiagnosticsFixture(start, mode);
         const draft = f.sim as unknown as Draft;
         const width = widthOf("office");
-        for (let x = 160; x < 160 + added * width; x++) expect(draft.tower.place("floor", 3, x).ok, `floor tile at x ${x}`).toBe(true);
+        for (let x = 160; x < 160 + added * width; x++)
+          expect(draft.tower.place("floor", 3, x).ok, `floor tile at x ${x}`).toBe(true);
         for (let i = 0; i < added; i++) placeUnit(draft, "office", 3, 160 + i * width).state = "occupied";
         const rust = fromFixture(f.sim);
         try {
           expect(rust.serviceDiagnostics(f.ramp.id)?.parking.status).toBe("ramp");
           expect(rust.serviceDiagnostics(f.connectedParking.id)?.parking).toMatchObject({
-            status: "connected", shortage, have: 1, total: shortage ? 2 : 1, offices: shortage ? 2 : 1, suites: 0,
+            status: "connected",
+            shortage,
+            have: 1,
+            total: shortage ? 2 : 1,
+            offices: shortage ? 2 : 1,
+            suites: 0,
           });
         } finally {
           rust.free();
@@ -198,7 +220,15 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
     // short of it one person over (2,501 people for a day's 2,500).
     const RECYCLING_CASES = [
       { name: "well over capacity", floors: 24, offices: 0, singles: 0, population: 2_592, met: false, clamped: true },
-      { name: "one person over capacity", floors: 0, offices: 416, singles: 5, population: 2_501, met: false, clamped: false },
+      {
+        name: "one person over capacity",
+        floors: 0,
+        offices: 416,
+        singles: 5,
+        population: 2_501,
+        met: false,
+        clamped: false,
+      },
       { name: "at capacity", floors: 0, offices: 416, singles: 4, population: 2_500, met: true, clamped: false },
       { name: "well under capacity", floors: 1, offices: 0, singles: 0, population: 108, met: true, clamped: false },
       { name: "with no one to serve", floors: 0, offices: 0, singles: 0, population: 0, met: true, clamped: false },
@@ -216,7 +246,11 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
           const counted = population(rust);
           expect(counted).toBe(people);
           expect(counted > RECYCLING_POP_PER_CENTER, `population ${counted}`).toBe(!met);
-          const actual = { capacity: rust.recyclingCapacity(), fill: rust.recyclingFill(), met: rust.recyclingDemandMet() };
+          const actual = {
+            capacity: rust.recyclingCapacity(),
+            fill: rust.recyclingFill(),
+            met: rust.recyclingDemandMet(),
+          };
           expect(actual).toMatchObject({ capacity: RECYCLING_POP_PER_CENTER, met });
           expect(actual.fill > 0, `fill ${actual.fill}`).toBe(people > 0);
           expect(actual.fill === 1, `fill ${actual.fill}`).toBe(clamped);
@@ -272,8 +306,14 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
         // Units and shafts share one id counter, so each read refuses the
         // other's ids: a shaft has no service facts, and a room no shaft card.
         const tower = (f.sim as unknown as Draft).tower;
-        expect(tower.units.some((u) => u.id === shaft.id), "a unit with the shaft's id").toBe(false);
-        expect(tower.transports.some((t) => t.id === f.shop.id), "a shaft with the shop's id").toBe(false);
+        expect(
+          tower.units.some((u) => u.id === shaft.id),
+          "a unit with the shaft's id",
+        ).toBe(false);
+        expect(
+          tower.transports.some((t) => t.id === f.shop.id),
+          "a shaft with the shop's id",
+        ).toBe(false);
         expect(rust.serviceDiagnostics(shaft.id), "Rust, the shaft's id").toBeUndefined();
         expect(card(rust, f.shop.id), "Rust shaft card, the shop's id").toEqual([]);
       } finally {
@@ -316,7 +356,9 @@ describe.skipIf(!hasWasmPackage())("Rust/WASM service diagnostics from determini
     try {
       const actual = rust.serviceDiagnostics(f.housekeeping.id);
       expect(actual?.housekeeping).toMatchObject({
-        status: "adequate", maidsPerUnit: 6, roomsPerMaid: 19,
+        status: "adequate",
+        maidsPerUnit: 6,
+        roomsPerMaid: 19,
       });
       expect(actual?.housekeeping.rooms).toBeGreaterThan(0);
     } finally {

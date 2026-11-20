@@ -6,8 +6,13 @@ import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../../game
 import type { CrashDescription } from "../../game/crashReport";
 import { crashTower } from "../../game/crashReport.fixture";
 
-
-const CRASH: CrashDescription = { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false };
+const CRASH: CrashDescription = {
+  kind: "webgl-context-lost",
+  repeat: false,
+  saveFlushed: true,
+  behindSplash: false,
+  recoveryFailed: false,
+};
 
 describe("crash report packaging", () => {
   it("buildCrashDetails captures the build, the tower summary, and the frame-error trail", () => {
@@ -67,7 +72,14 @@ describe("crash report packaging", () => {
     const trapped = (): never => {
       throw new Error("unreachable executed");
     };
-    const view = { get header(): never { return trapped(); }, get tower(): never { return trapped(); } };
+    const view = {
+      get header(): never {
+        return trapped();
+      },
+      get tower(): never {
+        return trapped();
+      },
+    };
     const tower = { view, port: { serialize: trapped } };
     const details = buildCrashDetails(tower, CRASH, { version: "1.2.3", speed: 1, frameErrors: [] });
     expect(details.tower).toBeNull();

@@ -55,7 +55,9 @@ describe.skipIf(!hasWasmPackage())("the Rust schedule facts and presets through 
       const rust = openEngine(f);
       try {
         const none = new Float64Array(0);
-        expect(rust.scheduleFacts(f.standard, none, false).advice.status).toBe(mode === "modern" ? "no-cars" : "unavailable-in-mode");
+        expect(rust.scheduleFacts(f.standard, none, false).advice.status).toBe(
+          mode === "modern" ? "no-cars" : "unavailable-in-mode",
+        );
         expect(rust.schedulePreset(f.standard, "stage-up-tower").status).toBe("no-cars");
         expect(rust.scheduleFacts(9999, none, false).advice.status).toBe("refused");
       } finally {

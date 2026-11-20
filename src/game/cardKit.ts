@@ -87,18 +87,31 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     }
     const header = app.reader.header;
     const key = JSON.stringify([
-      port.generation(), header.revision, Math.floor(header.minutes / 60),
-      header.population, header.star,
-      u.kind, u.state, u.noRate, u.rent, u.price, u.satisfaction,
-      u.occupants, u.residents, u.served, u.reachable, u.vacateReason,
+      port.generation(),
+      header.revision,
+      Math.floor(header.minutes / 60),
+      header.population,
+      header.star,
+      u.kind,
+      u.state,
+      u.noRate,
+      u.rent,
+      u.price,
+      u.satisfaction,
+      u.occupants,
+      u.residents,
+      u.served,
+      u.reachable,
+      u.vacateReason,
       u.floorHasLobby,
     ]);
     // Recycling fill can change between hours, so these lines are never
     // stored; each read puts them between the kept halves, after the lobby
     // advice and above any gripe or notice.
-    const recycling = u.kind === "recycling" && !INERT_STATES.has(u.state)
-      ? () => recyclingLinesOf(port.recyclingCard(), catalogOf(app).rules.advisesFixes)
-      : undefined;
+    const recycling =
+      u.kind === "recycling" && !INERT_STATES.has(u.state)
+        ? () => recyclingLinesOf(port.recyclingCard(), catalogOf(app).rules.advisesFixes)
+        : undefined;
     // The notice deadline counts down minute by minute while the key moves
     // hourly, so a card with a notice is read whole each time. Only a
     // hand-edited save can put a recycling center on notice.
@@ -119,7 +132,9 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     cards,
     catalog: () => catalogOf(app),
     diagnostics: {
-      invalidate: () => { diagnosticCache = undefined; },
+      invalidate: () => {
+        diagnosticCache = undefined;
+      },
       unit: (id, fresh = false) => portUnitLines(id, fresh),
       transport: (id) => {
         const shaft = cards.shaft(id);
@@ -130,7 +145,9 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     previewRentBatch: (kind, target, opts) => {
       const rec = port.quoteRentBatch(codes.kind(kind), batchTargetCode(target), opts.onlyDefaultPriced ?? false);
       if (codes.slot(rec, "quoteRentBatch", "ok") !== 1) return null;
-      return Object.fromEntries(BATCH_COUNTERS.map((name) => [name, codes.slot(rec, "quoteRentBatch", name)])) as unknown as BatchRentResult;
+      return Object.fromEntries(
+        BATCH_COUNTERS.map((name) => [name, codes.slot(rec, "quoteRentBatch", name)]),
+      ) as unknown as BatchRentResult;
     },
   };
 }

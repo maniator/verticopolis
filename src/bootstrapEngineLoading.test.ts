@@ -21,7 +21,9 @@ vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => ({
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {
   const real = document.createElement.bind(document);
-  vi.spyOn(document, "createElement").mockImplementation((tag: string) => (tag === "canvas" ? ({ getContext: () => ({}) } as unknown as HTMLCanvasElement) : real(tag)));
+  vi.spyOn(document, "createElement").mockImplementation((tag: string) =>
+    tag === "canvas" ? ({ getContext: () => ({}) } as unknown as HTMLCanvasElement) : real(tag),
+  );
 }
 
 describe("bootGame, the engine loading line (#1132)", () => {
@@ -68,7 +70,16 @@ describe("bootGame, the engine loading line (#1132)", () => {
     sessionStorage.setItem(MISMATCH_RELOAD_KEY, JSON.stringify([__APP_SHA__]));
     const run = bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() }))).catch((e: unknown) => e);
     await vi.waitFor(() => expect(held.fail).not.toBe(noop));
-    held.fail(new EnginePackageError("mismatch", "the wasm is not the file expected (aaaaaaaaaaaa)", { file: "wasm", expected: null, found: "aaaaaaaaaaaa", expectedPackage: null, servedPackage: null, controlled: false }));
+    held.fail(
+      new EnginePackageError("mismatch", "the wasm is not the file expected (aaaaaaaaaaaa)", {
+        file: "wasm",
+        expected: null,
+        found: "aaaaaaaaaaaa",
+        expectedPackage: null,
+        servedPackage: null,
+        controlled: false,
+      }),
+    );
     expect(((await run) as Error).message).toMatch(/\(load\): package-mismatch, mismatch$/);
   });
 });

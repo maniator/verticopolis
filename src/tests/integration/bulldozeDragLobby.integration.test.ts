@@ -99,7 +99,8 @@ function wired(t: Tower) {
         s.id,
         {
           z: 1,
-          contains: (wx: number, wy: number) => t.sim.tower.transportAt(Math.ceil(-wy / FLOOR), Math.floor(wx / TILE))?.id === s.id,
+          contains: (wx: number, wy: number) =>
+            t.sim.tower.transportAt(Math.ceil(-wy / FLOOR), Math.floor(wx / TILE))?.id === s.id,
         },
       ]),
     );

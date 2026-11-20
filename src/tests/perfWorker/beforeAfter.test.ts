@@ -4,7 +4,20 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Metric } from "./analysis";
 import { compareRuns, resolveControls } from "./beforeAfter";
-import { after, BLOCK, both, before, LOW, MERGES, MODES, results, row, SWIFT, TIME, type Spec } from "./beforeAfterFixture";
+import {
+  after,
+  BLOCK,
+  both,
+  before,
+  LOW,
+  MERGES,
+  MODES,
+  results,
+  row,
+  SWIFT,
+  TIME,
+  type Spec,
+} from "./beforeAfterFixture";
 import { comparisonCsv, comparisonMarkdown, main, parseBeforeAfterArgs } from "./beforeAfterMain";
 import type { WorkerResults } from "./main";
 import type { ModeName } from "./pageWorker";
@@ -28,7 +41,13 @@ describe("compareRuns", () => {
 
   it("reads a rate the other way round, in the ratio, its interval and the difference", () => {
     const f = (r: number) => 1 + 0.1 * ((r % 3) - 1);
-    const c = compareRuns(before({ wobble: 0 }), after({ wobble: 0, valueFor: (m, n, r, base) => (m === "wasm-worker" && n === LOW ? base * 0.5 * f(r) : undefined) }));
+    const c = compareRuns(
+      before({ wobble: 0 }),
+      after({
+        wobble: 0,
+        valueFor: (m, n, r, base) => (m === "wasm-worker" && n === LOW ? base * 0.5 * f(r) : undefined),
+      }),
+    );
     const s = row(c, "wasm-worker", LOW);
     // Ratios 30 / (15 f): three of 1.818, three of 2.0 and four of 2.222; the interval takes order statistics 2 and 9.
     expect(s.ratio).toBeCloseTo(2, 6);
@@ -57,21 +76,30 @@ describe("compareRuns", () => {
 
   it("lets a control that moved block the row even when it has too few pairs, and puts void before thin", () => {
     // ts has 9 pairs and sits at 1.3x while wasm has 10 and vouches: the subject is void all the same.
-    const c = compareRuns(before(), after({ scale: { ts: 1.3, "wasm-worker": 1.2 }, scaleOnly: TIME, skipRep: 3, skipRepFor: "ts" }), { controls: both });
+    const c = compareRuns(
+      before(),
+      after({ scale: { ts: 1.3, "wasm-worker": 1.2 }, scaleOnly: TIME, skipRep: 3, skipRepFor: "ts" }),
+      { controls: both },
+    );
     expect(row(c, "ts", TIME).pairs).toBe(9);
     expect(row(c, "ts", TIME).status).toBe("control-drift");
     expect(row(c, "wasm", TIME).status).toBe("control-ok");
     expect(row(c, "wasm-worker", TIME).status).toBe("void");
     expect(row(c, "wasm-worker", TIME).voidedBy.join(" ")).toMatch(/ts 1\.30x \(only 9 pairs, but it moved\)/);
     // With the subject short of pairs as well, void still comes before thin.
-    const v = compareRuns(before(), after({ scale: { ts: 1.3, "wasm-worker": 1.2 }, scaleOnly: TIME, skipRep: 3 }), { controls: both });
+    const v = compareRuns(before(), after({ scale: { ts: 1.3, "wasm-worker": 1.2 }, scaleOnly: TIME, skipRep: 3 }), {
+      controls: both,
+    });
     expect(row(v, "wasm-worker", TIME).pairs).toBe(9);
     expect(row(v, "wasm-worker", TIME).status).toBe("void");
   });
 
   it("judges a control on its median: a noisy control with a steady median vouches and shows up as noisy", () => {
     // The same wobble in both runs cannot make a ratio wide, so use real independent noise of 12%.
-    const c = compareRuns(before({ jitter: 0.12, seed: 1 }), after({ jitter: 0.12, seed: 2, commit: "a".repeat(40), hash: "h1" }));
+    const c = compareRuns(
+      before({ jitter: 0.12, seed: 1 }),
+      after({ jitter: 0.12, seed: 2, commit: "a".repeat(40), hash: "h1" }),
+    );
     const noisy = c.rows.filter((r) => r.role === "control" && r.status === "control-noisy");
     expect(noisy.length).toBeGreaterThan(0);
     for (const n of noisy) expect(factor(n.ciLow!, 0.05) || factor(n.ciHigh!, 0.05)).toBe(true);
@@ -81,7 +109,10 @@ describe("compareRuns", () => {
   });
 
   it("an A/A pair of one commit comes out usable: no void rows, a net ratio around 1 with its interval", () => {
-    const c = compareRuns(before({ jitter: 0.04, seed: 11 }), results({ jitter: 0.04, seed: 12, startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" }));
+    const c = compareRuns(
+      before({ jitter: 0.04, seed: 11 }),
+      results({ jitter: 0.04, seed: 12, startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" }),
+    );
     expect(c.kind).toBe("A/A");
     expect(c.options.controls).toEqual(["ts", "wasm", "wasm-frame"]);
     const subjects = c.rows.filter((r) => r.role === "subject");
@@ -114,8 +145,13 @@ describe("compareRuns", () => {
 
   it("pairs by repetition number: a repetition missing from AFTER costs one pair and shifts none", () => {
     // BEFORE rep r is 100 + 10 r, AFTER rep r is twice that; pairing by index after dropping rep 3 would not give exactly 2.
-    const valueFor = (scale: number) => (m: ModeName, n: string, r: number): number | undefined => (m === "wasm-worker" && n === TIME ? (100 + 10 * r) * scale : undefined);
-    const c = compareRuns(before({ valueFor: valueFor(1) }), after({ skipRep: 3, valueFor: valueFor(2) }), { minPairs: 6 });
+    const valueFor =
+      (scale: number) =>
+      (m: ModeName, n: string, r: number): number | undefined =>
+        m === "wasm-worker" && n === TIME ? (100 + 10 * r) * scale : undefined;
+    const c = compareRuns(before({ valueFor: valueFor(1) }), after({ skipRep: 3, valueFor: valueFor(2) }), {
+      minPairs: 6,
+    });
     const s = row(c, "wasm-worker", TIME);
     expect(s.pairs).toBe(9);
     expect(s.ratio).toBe(2);
@@ -124,11 +160,16 @@ describe("compareRuns", () => {
     // The medians are over the 9 paired repetitions (100 + 10 r without r = 3); all 10 BEFORE values would give another median.
     expect(s.beforeMedian).toBeCloseTo(100 + 10 * 5, 6);
     expect(s.afterMedian).toBeCloseTo(2 * (100 + 10 * 5), 6);
-    expect(compareRuns(before(), after({ skipRep: 3 })).rows.find((r) => r.role === "subject" && r.metric === TIME)!.status).toBe("thin");
+    expect(
+      compareRuns(before(), after({ skipRep: 3 })).rows.find((r) => r.role === "subject" && r.metric === TIME)!.status,
+    ).toBe("thin");
   });
 
   it("reads blocking that goes from 0 to 400 ms on the difference", () => {
-    const c = compareRuns(before(), after({ valueFor: (m, n) => (m === "wasm-worker" && n === BLOCK ? 400 : undefined) }));
+    const c = compareRuns(
+      before(),
+      after({ valueFor: (m, n) => (m === "wasm-worker" && n === BLOCK ? 400 : undefined) }),
+    );
     const s = row(c, "wasm-worker", BLOCK);
     expect(s.basis).toBe("difference");
     expect(s.ratio).toBeNull();
@@ -146,7 +187,10 @@ describe("compareRuns", () => {
   });
 
   it("puts a rate that fell to zero on the difference too, positive for worse", () => {
-    const c = compareRuns(before(), after({ valueFor: (m, n) => (m === "wasm-worker" && n === "mean FPS" ? 0 : undefined) }));
+    const c = compareRuns(
+      before(),
+      after({ valueFor: (m, n) => (m === "wasm-worker" && n === "mean FPS" ? 0 : undefined) }),
+    );
     const s = row(c, "wasm-worker", "mean FPS");
     expect(s.zeroReference).toBe(10);
     expect(s.basis).toBe("difference");
@@ -154,21 +198,30 @@ describe("compareRuns", () => {
     expect(s.diffMedian).toBeCloseTo(60, -1);
     expect(s.status).toBe("ok");
     // One zero in ten pairs also moves the row to the difference.
-    const one = compareRuns(before(), after({ valueFor: (m, n, r) => (m === "wasm-worker" && n === "mean FPS" && r === 4 ? 0 : undefined) }));
+    const one = compareRuns(
+      before(),
+      after({ valueFor: (m, n, r) => (m === "wasm-worker" && n === "mean FPS" && r === 4 ? 0 : undefined) }),
+    );
     expect(row(one, "wasm-worker", "mean FPS").basis).toBe("difference");
     expect(row(one, "wasm-worker", "mean FPS").zeroReference).toBe(1);
     expect(row(one, "wasm-worker", "mean FPS").pairs).toBe(10);
   });
 
   it("voids a difference-basis row when its control left zero", () => {
-    const c = compareRuns(before(), after({ valueFor: (m, n) => ((m === "wasm-worker" || m === "ts") && n === BLOCK ? 400 : undefined) }));
+    const c = compareRuns(
+      before(),
+      after({ valueFor: (m, n) => ((m === "wasm-worker" || m === "ts") && n === BLOCK ? 400 : undefined) }),
+    );
     expect(row(c, "ts", BLOCK).status).toBe("control-drift");
     expect(row(c, "wasm-worker", BLOCK).status).toBe("void");
     expect(row(c, "wasm-worker", BLOCK).voidedBy[0]).toMatch(/ts 400\.00 ms from 0/);
   });
 
   it("derives the unthrottled label from the mode and throttle alone", () => {
-    const strip = (r: WorkerResults): WorkerResults => ({ ...r, metrics: r.metrics.map(({ unthrottled: _u, ...m }) => m as Metric) });
+    const strip = (r: WorkerResults): WorkerResults => ({
+      ...r,
+      metrics: r.metrics.map(({ unthrottled: _u, ...m }) => m as Metric),
+    });
     const c = compareRuns(strip(before()), strip(after()));
     expect(row(c, "wasm-worker", TIME, "4").unthrottled).toBe("worker");
     expect(row(c, "wasm-worker", TIME, "1").unthrottled).toBeUndefined();
@@ -178,7 +231,10 @@ describe("compareRuns", () => {
   it("chooses the default controls by whether the commit or the engine build differs", () => {
     expect(compareRuns(before(), after()).options.controls).toEqual(["ts"]);
     expect(compareRuns(before(), after()).options.subjects).toEqual(["wasm", "wasm-frame", "wasm-worker"]);
-    expect(compareRuns(before(), results({ startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" })).options.controls).toEqual(["ts", "wasm", "wasm-frame"]);
+    expect(
+      compareRuns(before(), results({ startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" })).options
+        .controls,
+    ).toEqual(["ts", "wasm", "wasm-frame"]);
     expect(resolveControls(before(), after(), { controls: ["wasm"] })).toEqual(["wasm"]);
   });
 
@@ -195,17 +251,29 @@ describe("compareRuns", () => {
   });
 
   it("calls two runs of one build an A/A comparison", () => {
-    expect(compareRuns(before(), results({ startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" })).kind).toBe("A/A");
+    expect(
+      compareRuns(before(), results({ startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" })).kind,
+    ).toBe("A/A");
   });
 
   it("keeps the roles from the argument order whichever run came first, and refuses runs that overlap", () => {
-    const first = after({ scale: { "wasm-worker": 1.2 }, startedAt: "2026-10-21T02:00:00Z", generatedAt: "2026-10-21T06:00:00Z" });
+    const first = after({
+      scale: { "wasm-worker": 1.2 },
+      startedAt: "2026-10-21T02:00:00Z",
+      generatedAt: "2026-10-21T06:00:00Z",
+    });
     const c = compareRuns(before(), first);
     expect(c.problems).toEqual([]);
     expect(row(c, "wasm-worker", TIME).ratio).toBeCloseTo(1.2, 1);
-    expect(compareRuns(before(), after({ startedAt: "2026-10-21T11:00:00Z" })).problems.join(" ")).toMatch(/overlapped/);
-    expect(compareRuns(before(), after({ generatedAt: null })).problems.join(" ")).toMatch(/no readable start or finish time/);
-    expect(compareRuns(before(), after({ startedAt: "garbage" })).problems.join(" ")).toMatch(/no readable start or finish time/);
+    expect(compareRuns(before(), after({ startedAt: "2026-10-21T11:00:00Z" })).problems.join(" ")).toMatch(
+      /overlapped/,
+    );
+    expect(compareRuns(before(), after({ generatedAt: null })).problems.join(" ")).toMatch(
+      /no readable start or finish time/,
+    );
+    expect(compareRuns(before(), after({ startedAt: "garbage" })).problems.join(" ")).toMatch(
+      /no readable start or finish time/,
+    );
   });
 
   it("refuses runs that are not protocol evidence or that differ in more than the build", () => {
@@ -233,7 +301,12 @@ describe("compareRuns", () => {
     // A run without a cold start (the read is absent; null would be a failed read) is not held to it.
     expect(problems({ rendererEndCold: undefined })).toBe("");
     // The cold-start read is part of the browser identity.
-    expect(compareRuns(before(), after({ rendererEndCold: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 Direct3D11 vs_5_0 ps_5_0, D3D11)" })).problems.join("\n")).toMatch(/different WebGL renderers|differ in browser/);
+    expect(
+      compareRuns(
+        before(),
+        after({ rendererEndCold: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 Direct3D11 vs_5_0 ps_5_0, D3D11)" }),
+      ).problems.join("\n"),
+    ).toMatch(/different WebGL renderers|differ in browser/);
   });
 
   it("refuses repeated or out-of-range repetitions, mismatched lengths, non-finite values and a metric listed twice", () => {
@@ -244,7 +317,9 @@ describe("compareRuns", () => {
     };
     expect(withMetric((m) => (m.reps = m.reps.map(() => 0))).join(" ")).toMatch(/repeat or fall outside/);
     expect(withMetric((m) => (m.values = m.values.slice(1))).join(" ")).toMatch(/do not line up/);
-    expect(withMetric((m) => (m.values = m.values.map((v, i) => (i === 0 ? (null as unknown as number) : v)))).join(" ")).toMatch(/not a finite number/);
+    expect(
+      withMetric((m) => (m.values = m.values.map((v, i) => (i === 0 ? (null as unknown as number) : v)))).join(" "),
+    ).toMatch(/not a finite number/);
     expect(withMetric((m) => (m.reps = m.reps.map((x) => x + 5))).join(" ")).toMatch(/repeat or fall outside/);
     expect(withMetric((m, all) => all.push({ ...m })).join(" ")).toMatch(/listed twice/);
   });
@@ -264,14 +339,20 @@ describe("compareRuns", () => {
   });
 
   it("refuses subject and control lists that leave nothing to compare, and runs with no subject row", () => {
-    expect(compareRuns(before(), after(), { subjects: ["ts"], controls: ["ts"] }).problems.join(" ")).toMatch(/ts is both a control and a subject/);
+    expect(compareRuns(before(), after(), { subjects: ["ts"], controls: ["ts"] }).problems.join(" ")).toMatch(
+      /ts is both a control and a subject/,
+    );
     expect(compareRuns(before(), after(), { subjects: [] }).problems.join(" ")).toMatch(/no subject mode/);
-    expect(compareRuns(before(), after(), { controls: [], subjects: ["wasm-worker"] }).problems.join(" ")).toMatch(/none of the control modes/);
+    expect(compareRuns(before(), after(), { controls: [], subjects: ["wasm-worker"] }).problems.join(" ")).toMatch(
+      /none of the control modes/,
+    );
     const bare = (r: WorkerResults): WorkerResults => ({ ...r, metrics: r.metrics.filter((m) => m.mode === "ts") });
     const c = compareRuns(bare(before()), bare(after()));
     expect(c.problems.join(" ")).toMatch(/no subject metric is in both runs/);
     expect(c.rows).toEqual([]);
-    expect(compareRuns({ ...before(), metrics: [] }, { ...after(), metrics: [] }).problems.join(" ")).toMatch(/no subject metric/);
+    expect(compareRuns({ ...before(), metrics: [] }, { ...after(), metrics: [] }).problems.join(" ")).toMatch(
+      /no subject metric/,
+    );
   });
 
   it("lists the modes it left out", () => {
@@ -289,7 +370,9 @@ describe("output", () => {
     const c = compareRuns(before(), after({ scale: { "wasm-worker": 1.2 } }));
     const csv = comparisonCsv(c);
     const header = csv.split("\n")[0].split(",");
-    expect(header).toEqual(expect.arrayContaining(["basis", "net_ratio", "diff_worse_is_positive", "notes", "unthrottled"]));
+    expect(header).toEqual(
+      expect.arrayContaining(["basis", "net_ratio", "diff_worse_is_positive", "notes", "unthrottled"]),
+    );
     expect(header[header.length - 1]).toBe("unthrottled");
     expect(csv.trim().split("\n")).toHaveLength(c.rows.length + 1);
     const md = comparisonMarkdown(c, "2026-10-21T15:00:00Z");
@@ -299,8 +382,15 @@ describe("output", () => {
     expect(md).toMatch(/net of control/);
     expect(md).toMatch(/What this comparison cannot tell/);
     expect(md).toMatch(/harness hash/);
-    expect(comparisonMarkdown(compareRuns(before(), after({ dirty: true })), "t")).toMatch(/cannot be compared.*\n\n- AFTER: it ran on a dirty tree/s);
-    expect(comparisonMarkdown(compareRuns(before(), results({ startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" })), "t")).toMatch(/every ratio here is noise/);
+    expect(comparisonMarkdown(compareRuns(before(), after({ dirty: true })), "t")).toMatch(
+      /cannot be compared.*\n\n- AFTER: it ran on a dirty tree/s,
+    );
+    expect(
+      comparisonMarkdown(
+        compareRuns(before(), results({ startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" })),
+        "t",
+      ),
+    ).toMatch(/every ratio here is noise/);
   });
 
   it("marks every 4x worker row with the dagger in the markdown and csv, and states the main-thread-only vouching", () => {
@@ -327,13 +417,19 @@ describe("output", () => {
   });
 
   it("lists a drifted control and the void rows it caused", () => {
-    const md = comparisonMarkdown(compareRuns(before(), after({ scale: { wasm: 1.3, "wasm-worker": 1.1 } }), { controls: both }), "t");
+    const md = comparisonMarkdown(
+      compareRuns(before(), after({ scale: { wasm: 1.3, "wasm-worker": 1.1 } }), { controls: both }),
+      "t",
+    );
     expect(md).toMatch(/Controls that moved, are noisy, flat or thin/);
     expect(md).toMatch(/VOID \(control moved: wasm 1\.30x\)/);
   });
 
   it("words a noisy control as noisy and shows pairs and the net ratio per row", () => {
-    const c = compareRuns(before({ jitter: 0.12, seed: 1 }), after({ jitter: 0.12, seed: 2, commit: "a".repeat(40), hash: "h1" }));
+    const c = compareRuns(
+      before({ jitter: 0.12, seed: 1 }),
+      after({ jitter: 0.12, seed: 2, commit: "a".repeat(40), hash: "h1" }),
+    );
     const md = comparisonMarkdown(c, "t");
     expect(md).toMatch(/noisy but its median held/);
     expect(md).not.toMatch(/TOO NOISY TO VOUCH/);
@@ -350,10 +446,41 @@ describe("output", () => {
 
 describe("parseBeforeAfterArgs", () => {
   it("takes two folders in order and the options", () => {
-    expect(parseBeforeAfterArgs(["a", "b", "--out", "o", "--controls", "ts,wasm", "--subjects", "wasm-worker", "--tolerance", "0.03", "--min-pairs", "12"])).toEqual({ before: "a", after: "b", out: "o", options: { controls: ["ts", "wasm"], subjects: ["wasm-worker"], tolerance: 0.03, minPairs: 12 } });
+    expect(
+      parseBeforeAfterArgs([
+        "a",
+        "b",
+        "--out",
+        "o",
+        "--controls",
+        "ts,wasm",
+        "--subjects",
+        "wasm-worker",
+        "--tolerance",
+        "0.03",
+        "--min-pairs",
+        "12",
+      ]),
+    ).toEqual({
+      before: "a",
+      after: "b",
+      out: "o",
+      options: { controls: ["ts", "wasm"], subjects: ["wasm-worker"], tolerance: 0.03, minPairs: 12 },
+    });
   });
   it("refuses a missing folder or out, a bad mode, a mode in both lists, and repeats", () => {
-    for (const bad of [["a", "--out", "o"], ["a", "b"], ["a", "b", "c", "--out", "o"], ["a", "b", "--out", "o", "--controls", "nope"], ["a", "b", "--out", "o", "--tolerance", "2"], ["a", "b", "--out", "o", "--min-pairs", "3"], ["a", "b", "--out", "o", "--out", "p"], ["a", "b", "--out", "o", "--x", "1"], ["a", "b", "--out", "o", "--controls", "ts", "--subjects", "ts"]]) expect(() => parseBeforeAfterArgs(bad), bad.join(" ")).toThrow();
+    for (const bad of [
+      ["a", "--out", "o"],
+      ["a", "b"],
+      ["a", "b", "c", "--out", "o"],
+      ["a", "b", "--out", "o", "--controls", "nope"],
+      ["a", "b", "--out", "o", "--tolerance", "2"],
+      ["a", "b", "--out", "o", "--min-pairs", "3"],
+      ["a", "b", "--out", "o", "--out", "p"],
+      ["a", "b", "--out", "o", "--x", "1"],
+      ["a", "b", "--out", "o", "--controls", "ts", "--subjects", "ts"],
+    ])
+      expect(() => parseBeforeAfterArgs(bad), bad.join(" ")).toThrow();
   });
 });
 
@@ -369,8 +496,11 @@ describe("main", () => {
     const ok = folder(root, "after", after({ scale: { "wasm-worker": 1.1 } }));
     const bad = folder(root, "dirty", after({ dirty: true }));
     expect(main([b, ok, "--out", "out1"], root, () => "t")).toBe(0);
-    for (const f of ["comparison.json", "comparison.csv", "comparison.md"]) expect(readFileSync(join(root, "out1", f), "utf8").length).toBeGreaterThan(10);
-    expect(JSON.parse(readFileSync(join(root, "out1", "comparison.json"), "utf8")).before.sha256).toMatch(/^[0-9a-f]{64}$/);
+    for (const f of ["comparison.json", "comparison.csv", "comparison.md"])
+      expect(readFileSync(join(root, "out1", f), "utf8").length).toBeGreaterThan(10);
+    expect(JSON.parse(readFileSync(join(root, "out1", "comparison.json"), "utf8")).before.sha256).toMatch(
+      /^[0-9a-f]{64}$/,
+    );
     expect(main([b, bad, "--out", "out2"], root, () => "t")).toBe(1);
     expect(() => main([b, ok, "--out", "out1"], root)).toThrow(/already exists/);
     expect(() => main([b, "missing", "--out", "out3"], root)).toThrow(/no results.json/);
@@ -382,7 +512,9 @@ describe("main", () => {
     const compareShaped = JSON.parse(JSON.stringify(before())) as WorkerResults;
     delete (compareShaped.config as { modes?: unknown }).modes;
     const c = folder(root, "compare", compareShaped);
-    expect(() => main([c, a, "--out", "o1"], root)).toThrow(/is not a perf:worker results.json \(config.modes is missing/);
+    expect(() => main([c, a, "--out", "o1"], root)).toThrow(
+      /is not a perf:worker results.json \(config.modes is missing/,
+    );
     expect(() => main([b, c, "--out", "o2"], root)).toThrow(/config.modes is missing/);
   });
   it("exits 0 for all-void or all-uncontrolled results (the exit code says only that the runs compared), and 1 when no subject row exists", () => {

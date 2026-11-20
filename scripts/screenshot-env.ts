@@ -36,7 +36,8 @@ export type OutDir = keyof typeof DIRS;
 // preinstalled sandbox Chromium if present; else undefined so Playwright
 // launches its OWN bundled browser (the normal `npm run screenshots` dev machine).
 const SANDBOX_CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-export const EXECUTABLE = process.env.PW_CHROME || pinnedImageChrome() || (existsSync(SANDBOX_CHROME) ? SANDBOX_CHROME : undefined);
+export const EXECUTABLE =
+  process.env.PW_CHROME || pinnedImageChrome() || (existsSync(SANDBOX_CHROME) ? SANDBOX_CHROME : undefined);
 
 /** The pinned Playwright image's full Chromium, found the way CI finds it
  *  (`ls -d /ms-playwright/chromium-*\/chrome-linux*\/chrome | head -1`). The
@@ -46,8 +47,12 @@ export const EXECUTABLE = process.env.PW_CHROME || pinnedImageChrome() || (exist
 function pinnedImageChrome(): string | undefined {
   const root = "/ms-playwright";
   if (!existsSync(root)) return undefined;
-  for (const dir of readdirSync(root).filter((d) => /^chromium-\d+$/.test(d)).sort()) {
-    for (const sub of readdirSync(`${root}/${dir}`).filter((d) => d.startsWith("chrome-linux")).sort()) {
+  for (const dir of readdirSync(root)
+    .filter((d) => /^chromium-\d+$/.test(d))
+    .sort()) {
+    for (const sub of readdirSync(`${root}/${dir}`)
+      .filter((d) => d.startsWith("chrome-linux"))
+      .sort()) {
       const chrome = `${root}/${dir}/${sub}/chrome`;
       if (existsSync(chrome)) return chrome;
     }

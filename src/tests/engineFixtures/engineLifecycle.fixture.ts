@@ -172,7 +172,11 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
     it("refuses a save it cannot read, and keeps the tower and its generation", () => {
       const s = subject(make);
       const [save, generation] = [s.port.serialize(), s.port.generation()];
-      for (const load of [(p: EnginePort) => p.loadSave("not a save"), (p: EnginePort) => p.restore("not a save"), (p: EnginePort) => p.loadSave("null")]) {
+      for (const load of [
+        (p: EnginePort) => p.loadSave("not a save"),
+        (p: EnginePort) => p.restore("not a save"),
+        (p: EnginePort) => p.loadSave("null"),
+      ]) {
         expect(done(load(s.port))).toBe(false);
         expect(typeof s.port.lastReason()).toBe("string");
         expect([s.port.serialize(), s.port.generation()]).toEqual([save, generation]);
@@ -208,12 +212,30 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
       const ids = { office: -1, shaft: -1, food: -1 };
       const unit = (k: string) => mustFind(s.reader.tower.units, (u) => u.kind === k && u.floor >= 2).id;
       const steps: Step[] = [
-        { name: "an office", run: (p) => p.buildAt(kind("office"), 2, mid - 4), moves: true, after: () => (ids.office = unit("office")) },
+        {
+          name: "an office",
+          run: (p) => p.buildAt(kind("office"), 2, mid - 4),
+          moves: true,
+          after: () => (ids.office = unit("office")),
+        },
         ...[2, 3].flatMap((floor) =>
-          Array.from({ length: 11 }, (_, i): Step => ({ name: `a floor tile on ${floor} at ${mid + 5 + i}`, run: (p) => p.buildAt(kind("floor"), floor, mid + 5 + i), moves: true })),
+          Array.from({ length: 11 }, (_, i): Step => ({
+            name: `a floor tile on ${floor} at ${mid + 5 + i}`,
+            run: (p) => p.buildAt(kind("floor"), floor, mid + 5 + i),
+            moves: true,
+          })),
         ),
-        { name: "a floor brush", run: (p) => p.paintTiles(kind("floor"), 2, Float64Array.of(mid + 16, mid + 17)), moves: true },
-        { name: "a shaft", run: (p) => p.buildShaft(kind("elevatorStandard"), mid + 8, 1, 2), moves: true, after: () => (ids.shaft = s.reader.tower.transports[0].id) },
+        {
+          name: "a floor brush",
+          run: (p) => p.paintTiles(kind("floor"), 2, Float64Array.of(mid + 16, mid + 17)),
+          moves: true,
+        },
+        {
+          name: "a shaft",
+          run: (p) => p.buildShaft(kind("elevatorStandard"), mid + 8, 1, 2),
+          moves: true,
+          after: () => (ids.shaft = s.reader.tower.transports[0].id),
+        },
         { name: "a car", run: (p) => p.changeCars(ids.shaft, true), moves: true },
         { name: "a car off", run: (p) => p.changeCars(ids.shaft, false), moves: true },
         { name: "a drag opened", run: (p) => p.startExtend(ids.shaft), moves: false },
@@ -222,16 +244,35 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
         { name: "a skipped stop", run: (p) => p.markStop(ids.shaft, 2, false), moves: true },
         { name: "the stops cleared", run: (p) => p.dropStops(ids.shaft), moves: true },
         { name: "express stops", run: (p) => p.expressStops(ids.shaft), moves: true },
-        { name: "a schedule", run: (p) => p.scheduleShaft(ids.shaft, scheduleSlots({ waitingCarResponse: 7 })), moves: true },
+        {
+          name: "a schedule",
+          run: (p) => p.scheduleShaft(ids.shaft, scheduleSlots({ waitingCarResponse: 7 })),
+          moves: true,
+        },
         { name: "a label", run: (p) => p.labelUnit(ids.office, "Contract Office"), moves: true },
         { name: "a rent step", run: (p) => p.stepRent(ids.office, 1), moves: true },
         { name: "a price", run: (p) => p.setRent(ids.office, 0), moves: true },
         { name: "a rent batch", run: (p) => p.rentBatch(kind("office"), NaN, false), moves: true },
         { name: "No Rate, which Modern rules refuse", run: (p) => p.noRate(ids.office), moves: false, refused: true },
-        { name: "a fast food", run: (p) => p.buildAt(kind("fastFood"), 3, mid - 4), moves: true, after: () => (ids.food = unit("fastFood")) },
+        {
+          name: "a fast food",
+          run: (p) => p.buildAt(kind("fastFood"), 3, mid - 4),
+          moves: true,
+          after: () => (ids.food = unit("fastFood")),
+        },
         { name: "a variety reroll", run: (p) => p.rerollUnit(ids.food), moves: true },
-        { name: "a film policy on a room that has none", run: (p) => p.setFilm(ids.food, filmPolicy("feature"), 0), moves: false, refused: true },
-        { name: "the exterminator, with nothing to treat", run: (p) => p.bookExterminator(), moves: false, refused: true },
+        {
+          name: "a film policy on a room that has none",
+          run: (p) => p.setFilm(ids.food, filmPolicy("feature"), 0),
+          moves: false,
+          refused: true,
+        },
+        {
+          name: "the exterminator, with nothing to treat",
+          run: (p) => p.bookExterminator(),
+          moves: false,
+          refused: true,
+        },
         { name: "an answer with no emergency", run: (p) => p.answerChoice(true), moves: false, refused: true },
         { name: "bridging flipped", run: (p) => p.flipAutoBridge(), moves: false },
         { name: "bridging set", run: (p) => p.chooseAutoBridge(true), moves: false },
@@ -290,7 +331,13 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
         const off = run(s, (p) => p.chooseAutoBridge(false), "off");
         expect([done(off), slot("chooseAutoBridge", off, "value")]).toEqual([false, 1]);
       });
-      expect(slot("chooseAutoBridge", must(s, (p) => p.chooseAutoBridge(true), "on"), "value")).toBe(1);
+      expect(
+        slot(
+          "chooseAutoBridge",
+          must(s, (p) => p.chooseAutoBridge(true), "on"),
+          "value",
+        ),
+      ).toBe(1);
       expect(s.port.autoBridge()).toBe(true);
     });
 
@@ -362,7 +409,14 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
       Object.assign(tower, { star: 3, money: 10_000_000 });
       const s = subject(make, tower);
       const tiles = Float64Array.of(MID + 14, MID + 15, MID + 16, MID + 17);
-      for (const floor of [2, 3]) expect(slot("paintTiles", must(s, (p) => p.paintTiles(kind("floor"), floor, tiles), `floor ${floor}`), "placed")).toBe(4);
+      for (const floor of [2, 3])
+        expect(
+          slot(
+            "paintTiles",
+            must(s, (p) => p.paintTiles(kind("floor"), floor, tiles), `floor ${floor}`),
+            "placed",
+          ),
+        ).toBe(4);
       must(s, (p) => p.buildShaft(kind("elevatorExpress"), MID + 14, 1, 3), "an express");
       const shaft = mustFind(s.reader.tower.transports, (t) => t.kind === "elevatorExpress").id;
       const save = s.port.serialize();
@@ -383,7 +437,13 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
         const s = subject(make, tower);
         must(s, (p) => p.buildAt(kind("office"), 2, MID - 4), `${m}: an office on 2`);
         const tiles = Float64Array.from({ length: 8 }, (_, i) => MID + 8 + i);
-        expect(slot("paintTiles", must(s, (p) => p.paintTiles(kind("floor"), 2, tiles), `${m}: floor 2`), "placed")).toBe(8);
+        expect(
+          slot(
+            "paintTiles",
+            must(s, (p) => p.paintTiles(kind("floor"), 2, tiles), `${m}: floor 2`),
+            "placed",
+          ),
+        ).toBe(8);
         const escalator = (p: EnginePort) => p.buildShaft(kind("escalator"), MID + 8, 1, 2);
         if (m === "classic") {
           const save = s.port.serialize();
@@ -452,8 +512,25 @@ interface Step {
  */
 function reference(port: EnginePort): string {
   const save = JSON.parse(port.serialize()) as SerializedGame;
-  const units = save.units.map((u) => [u.kind, u.floor, u.x, u.label ?? "", u.rent ?? "", u.noRate === true, u.filmPolicy ?? "", u.subtype ?? ""]);
-  const shafts = save.transports.map((t) => [t.kind, t.x, t.bottom, t.top, t.cars, t.skipFloors ?? [], t.schedule ?? null]);
+  const units = save.units.map((u) => [
+    u.kind,
+    u.floor,
+    u.x,
+    u.label ?? "",
+    u.rent ?? "",
+    u.noRate === true,
+    u.filmPolicy ?? "",
+    u.subtype ?? "",
+  ]);
+  const shafts = save.transports.map((t) => [
+    t.kind,
+    t.x,
+    t.bottom,
+    t.top,
+    t.cars,
+    t.skipFloors ?? [],
+    t.schedule ?? null,
+  ]);
   return JSON.stringify([save.money, units, shafts]);
 }
 

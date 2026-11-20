@@ -19,7 +19,14 @@ const escalator = (expectFail: boolean) => [
   { op: "setMoney", amount: 500000000 },
   { op: "buildRow", kind: "lobby", floor: 1, from: 167, to: 206 },
   { op: "buildRow", kind: "floor", floor: 2, from: 168, to: 205 },
-  { op: "buildTransport", kind: "escalator", x: 200, bottom: 1, top: 2, ...(expectFail ? { expectFail: true, reason: "Escalator unlocks at 3★." } : {}) },
+  {
+    op: "buildTransport",
+    kind: "escalator",
+    x: 200,
+    bottom: 1,
+    top: 2,
+    ...(expectFail ? { expectFail: true, reason: "Escalator unlocks at 3★." } : {}),
+  },
 ];
 
 /** A refused build at the opened star, now and after one hour of play. */
@@ -63,7 +70,12 @@ describe.skipIf(!hasWasmPackage())("a new game that opens at a higher star", () 
 
   // Four stars needs a favorable VIP visit in play, so a start at four or five
   // has had one, as a `.TDT` import at that star does (#1288).
-  it.each([[1, false, 0], [3, false, 0], [4, true, 1], [5, true, 1]])("opens at %i stars with vipFavorable %s and %i VIP visits", (star, favorable, visits) => {
+  it.each([
+    [1, false, 0],
+    [3, false, 0],
+    [4, true, 1],
+    [5, true, 1],
+  ])("opens at %i stars with vipFavorable %s and %i VIP visits", (star, favorable, visits) => {
     const w = startWasmHandle({ newGame: { seed: 1, mode: "classic", star } });
     try {
       const save = JSON.parse(w.serialize()) as { star: number; vipFavorable: boolean; vipVisits: number };

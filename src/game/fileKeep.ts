@@ -1,5 +1,11 @@
 import { trackAppAction } from "../analytics";
-import { cleanFileName, fileSpace, FileSpaceFullError, type TowerFileEntry, type TowerFileKind } from "../storage/fileSpace";
+import {
+  cleanFileName,
+  fileSpace,
+  FileSpaceFullError,
+  type TowerFileEntry,
+  type TowerFileKind,
+} from "../storage/fileSpace";
 import { noteTowersFile } from "../storage/recentTowers";
 import type { FileNote } from "../ui/fileDialog";
 import { setCurrentFile } from "./currentFile";
@@ -37,13 +43,18 @@ async function holds(entry: TowerFileEntry, bytes: Uint8Array): Promise<boolean>
  * A tower file becomes the live tower's file. Never rejects; null when the
  * folder is closed or the write failed (the tower is open either way).
  */
-export async function keepOpenedFile(filename: string, bytes: Uint8Array, kind: TowerFileKind): Promise<TowerFileEntry | null> {
+export async function keepOpenedFile(
+  filename: string,
+  bytes: Uint8Array,
+  kind: TowerFileKind,
+): Promise<TowerFileEntry | null> {
   // A file picked while the folder is still opening waits for it.
   if (!(await fileSpace.open())) return null;
   try {
     const name = baseName(filename) || "Tower";
     const same = fileSpace.find(name);
-    const entry = same && same.kind === kind && (await holds(same, bytes)) ? same : await fileSpace.add(name, kind, bytes);
+    const entry =
+      same && same.kind === kind && (await holds(same, bytes)) ? same : await fileSpace.add(name, kind, bytes);
     if (entry !== same) trackAppAction("file_add", "picked");
     if (kind === "tower") setCurrentFile(entry.id);
     // The file now in My Towers is the one File > Open Recent opens again.
@@ -54,4 +65,3 @@ export async function keepOpenedFile(filename: string, bytes: Uint8Array, kind: 
     return null;
   }
 }
-

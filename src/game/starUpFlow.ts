@@ -29,7 +29,9 @@ export function maybeShowStarUp(app: GameApp, splashUp: boolean): void {
   if (!climb || splashUp || hasBlockingModal(app) || dialogHoldsWork(app) || app.reader.header.pendingChoice) return;
   app.pendingStarUp = null;
   const catalog = catalogOf(app);
-  const screen = starUpScreen(climb.from, climb.to, catalog, () => statsReport(app.enginePort.statsSheet(), app.portCodes));
+  const screen = starUpScreen(climb.from, climb.to, catalog, () =>
+    statsReport(app.enginePort.statsSheet(), app.portCodes),
+  );
   app.shownStar = true;
   // The mode and the rating, such as "modern-3": whether players see the box
   // for each climb `star_reached` counts.

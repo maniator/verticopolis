@@ -10,20 +10,26 @@ import { expectEngineHosted } from "./helpers";
  * installed, and on a phone-sized screen its "all cars, all hours" button is on screen and puts the
  * whole fleet on every hour of both day types.
  */
-const TOWER = readFileSync(new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower.vctower", import.meta.url), "utf8");
+const TOWER = readFileSync(
+  new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower.vctower", import.meta.url),
+  "utf8",
+);
 const SHAFT = 1139;
 const PHONE = { width: 390, height: 844 };
 
 /** A day's hours of a shaft's schedule: the port's slots hold a row flag, then 24 weekday counts, a flag, then 24 weekend counts. */
 const hours = (page: Page, id: number, day: "weekday" | "weekend") =>
   page.evaluate(
-    ({ shaft, from }) => Array.from((window as any).game.enginePort.shaftSchedule(shaft) as Float64Array).slice(from, from + 24),
+    ({ shaft, from }) =>
+      Array.from((window as any).game.enginePort.shaftSchedule(shaft) as Float64Array).slice(from, from + 24),
     { shaft: id, from: day === "weekday" ? 1 : 26 },
   );
 
 test.setTimeout(120_000);
 
-test("a car bought on a scheduled shaft keeps the cut-back hours, and the dialog runs every car on a phone", async ({ page }) => {
+test("a car bought on a scheduled shaft keeps the cut-back hours, and the dialog runs every car on a phone", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.waitForFunction(() => !!(window as any).game, undefined, { timeout: 30_000 });
   await page.evaluate((text) => {
@@ -74,7 +80,9 @@ test("a car bought on a scheduled shaft keeps the cut-back hours, and the dialog
   await expectEngineHosted(page);
 });
 
-test("a car sold and bought back leaves a cut-back hour as it was and fills the whole-fleet hours, each day type on its own", async ({ page }) => {
+test("a car sold and bought back leaves a cut-back hour as it was and fills the whole-fleet hours, each day type on its own", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.waitForFunction(() => !!(window as any).game, undefined, { timeout: 30_000 });
   await page.evaluate((text) => {

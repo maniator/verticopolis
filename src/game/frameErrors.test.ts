@@ -141,11 +141,23 @@ describe("noteFrameError", () => {
       now += 2001;
       noteFrameError(app, new Error(`chip ${i}`), "traffic");
     }
-    expect(firstLines(app)).toEqual(["root cause", "[traffic] chip 3", "[traffic] chip 4", "[traffic] chip 5", "[traffic] chip 6"]);
+    expect(firstLines(app)).toEqual([
+      "root cause",
+      "[traffic] chip 3",
+      "[traffic] chip 4",
+      "[traffic] chip 5",
+      "[traffic] chip 6",
+    ]);
     // The next frame failure replaces the older frame entry.
     now += 2001;
     noteFrameError(app, new Error("second frame"));
-    expect(firstLines(app)).toEqual(["[traffic] chip 3", "[traffic] chip 4", "[traffic] chip 5", "[traffic] chip 6", "second frame"]);
+    expect(firstLines(app)).toEqual([
+      "[traffic] chip 3",
+      "[traffic] chip 4",
+      "[traffic] chip 5",
+      "[traffic] chip 6",
+      "second frame",
+    ]);
   });
 
   it("drops the oldest entry when a source's first failure meets a full ring", () => {
@@ -158,7 +170,13 @@ describe("noteFrameError", () => {
       now += 2001;
     }
     noteFrameError(app, new Error("frame"));
-    expect(firstLines(app)).toEqual(["[traffic] chip 1", "[traffic] chip 2", "[traffic] chip 3", "[traffic] chip 4", "frame"]);
+    expect(firstLines(app)).toEqual([
+      "[traffic] chip 1",
+      "[traffic] chip 2",
+      "[traffic] chip 3",
+      "[traffic] chip 4",
+      "frame",
+    ]);
   });
 
   it("keeps a frame failure whose message starts like the chip's tag as the frame guard's", () => {

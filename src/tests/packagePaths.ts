@@ -32,12 +32,15 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
  *  reads from the installed conformance package; any other path is read from
  *  this repository. */
 export function conformanceFile(path: string): string {
-  return path.startsWith("conformance/") ? resolve(CONFORMANCE_ROOT, path.slice("conformance/".length)) : resolve(REPO, path);
+  return path.startsWith("conformance/")
+    ? resolve(CONFORMANCE_ROOT, path.slice("conformance/".length))
+    : resolve(REPO, path);
 }
 
 const SRC = resolve(REPO, "src");
 /** The `src/` folders that moved to the components package, by their old name. */
-const MOVED = /^(render|presentation|catalog|shared|engineBinding|simport|wasmhost|events|audio|styles)\/|^ui\/(movableWindow|menuBar|uiModal|modalPrecedence|icons|iconPaths\.generated|format|escape|overviewMapInput|desk\/desk(Window|Geometry))|^styles\.css$/;
+const MOVED =
+  /^(render|presentation|catalog|shared|engineBinding|simport|wasmhost|events|audio|styles)\/|^ui\/(movableWindow|menuBar|uiModal|modalPrecedence|icons|iconPaths\.generated|format|escape|overviewMapInput|desk\/desk(Window|Geometry))|^styles\.css$/;
 
 /**
  * A file a test reads by its path under `src/`. A file that moved to the

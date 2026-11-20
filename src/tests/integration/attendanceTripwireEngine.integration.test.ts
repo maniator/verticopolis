@@ -43,7 +43,12 @@ function mixedTower(leg: Leg): PortSim {
     for (let x = 0; x < 40; x++) expect(draft.tower.place("floor", f, x).ok).toBe(true);
   }
   expect(draft.tower.placeTransport("elevatorStandard", 36, 1, 6).ok).toBe(true);
-  for (const [kind, floor, x] of [["partyHall", 2, 0], ["fastFood", 4, 0], ["office", 4, 18], ["hotelSingle", 5, 0]] as const) {
+  for (const [kind, floor, x] of [
+    ["partyHall", 2, 0],
+    ["fastFood", 4, 0],
+    ["office", 4, 18],
+    ["hotelSingle", 5, 0],
+  ] as const) {
     const r = draft.tower.place(kind, floor, x);
     expect(r.ok, `${kind} placed: ${r.reason}`).toBe(true);
   }
@@ -131,7 +136,9 @@ describeEngines("attendance tally tripwire: tallies reconcile against live peopl
     // The frame names every room the tower holds, so the reconcile walks
     // every unit the original did except the floor and lobby tiles, which no
     // person names as a venue or an origin (not checked here).
-    const roomIds = roomTallies(sim).map((r) => r.id).sort((a, b) => a - b);
+    const roomIds = roomTallies(sim)
+      .map((r) => r.id)
+      .sort((a, b) => a - b);
     const unitIds = sim.state.tower.units
       .filter((u) => u.kind !== "floor" && u.kind !== "lobby")
       .map((u) => u.id)
@@ -162,7 +169,10 @@ describeEngines("attendance tally tripwire: tallies reconcile against live peopl
     reconcile(sim);
     // The bulldoze leaves its guests live, so the ghost-origin drain below has
     // someone to route through finish().
-    expect(liveWith(sim, (p) => p.originUnitId === room), "ghost-origin guests survive the bulldoze").toBeGreaterThan(0);
+    expect(
+      liveWith(sim, (p) => p.originUnitId === room),
+      "ghost-origin guests survive the bulldoze",
+    ).toBeGreaterThan(0);
     // Jump to the quiet night (02:00 is at or after every point the capped
     // search can reach, so the clock never rewinds). The hall is closed, so
     // no fresh attendee holds the tally up; the ghost-origin dwellers wind
@@ -202,7 +212,10 @@ describeEngines("attendance tally tripwire: mid-visit teardown (issue #302 scena
     // The build command answers no id, so bind by the hall's own tiles: exactly
     // one unit stands there, and it is the new fastFood.
     const there = sim.state.tower.units.filter((u) => u.floor === hall.floor && u.x === hall.x && u.kind !== "floor");
-    expect(there.map((u) => u.kind), "one rebuilt unit on the hall's tiles").toEqual(["fastFood"]);
+    expect(
+      there.map((u) => u.kind),
+      "one rebuilt unit on the hall's tiles",
+    ).toEqual(["fastFood"]);
     const fresh = there[0];
     expect(fresh!.id).not.toBe(hall.id);
     // Sever the return path too: bulldozing the only elevator while ghost
@@ -222,7 +235,10 @@ describeEngines("attendance tally tripwire: mid-visit teardown (issue #302 scena
     // hotelCustomersIn or outForMeal reads 0 through the frame (see
     // `roomTallies`), so for those two only a rise above 0 shows.
     sim.setClock(minutes(2, 1));
-    expect(liveWith(sim, (p) => p.venueUnitId === hall.id), "ghost visitors are left to drain").toBeGreaterThan(0);
+    expect(
+      liveWith(sim, (p) => p.venueUnitId === hall.id),
+      "ghost visitors are left to drain",
+    ).toBeGreaterThan(0);
     let freshTouched = false;
     for (let m = 0; m < 220 && liveWith(sim, (p) => p.venueUnitId === hall.id) > 0; m++) {
       sim.tick(1);
@@ -292,7 +308,10 @@ describeEngines("attendance tally tripwire: mid-visit teardown (issue #302 scena
       const before = sim.state.tower.units.map((u) => u.state);
       const pending = sim.state.events.pending;
       expect(() => sim.startFireAt(id), why).toThrow(/refused/);
-      expect(sim.state.tower.units.map((u) => u.state), `${why}: no room changed`).toEqual(before);
+      expect(
+        sim.state.tower.units.map((u) => u.state),
+        `${why}: no room changed`,
+      ).toEqual(before);
       expect(sim.state.events.pending, `${why}: the choice is as it was`).toEqual(pending);
     };
     refused(lobby, "a lobby tile cannot catch fire");

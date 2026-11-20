@@ -133,9 +133,14 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     // default (the classic catalog's starting money), so a retune of the starting balance can
     // never leave a stale literal passing for the wrong reason.
     for (const bad of [NaN, "1000", undefined]) {
-      expect(resave(leg, { ...data, money: bad }).money, `money ${bad}`).toBe(catalogFor("classic").economy.startingMoney);
+      expect(resave(leg, { ...data, money: bad }).money, `money ${bad}`).toBe(
+        catalogFor("classic").economy.startingMoney,
+      );
     }
-    for (const bad of [Infinity, -Infinity]) expectInfinityHandled(leg, { ...data, money: bad }, (save) => expect(save.money, `money ${bad}`).toBe(catalogFor("classic").economy.startingMoney));
+    for (const bad of [Infinity, -Infinity])
+      expectInfinityHandled(leg, { ...data, money: bad }, (save) =>
+        expect(save.money, `money ${bad}`).toBe(catalogFor("classic").economy.startingMoney),
+      );
     // Legal debt (the sign) round-trips intact.
     expect(resave(leg, { ...data, money: -50_000 }).money).toBe(-50_000);
 
@@ -150,7 +155,10 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     for (const bad of [NaN, "600", undefined]) {
       expect(() => load(leg, { ...data, minutes: bad }), `minutes ${bad}`).toThrow(/no game clock/);
     }
-    for (const bad of [Infinity, -Infinity]) expectInfinityHandled(leg, { ...data, minutes: bad }, (save) => expect(save.minutes, `minutes ${bad}`).toBe(7 * 60));
+    for (const bad of [Infinity, -Infinity])
+      expectInfinityHandled(leg, { ...data, minutes: bad }, (save) =>
+        expect(save.minutes, `minutes ${bad}`).toBe(7 * 60),
+      );
     // A legitimate fractional minute count round-trips exactly: real play
     // accumulates sub-minute steps, so the coercion must not floor a valid save.
     expect(resave(leg, { ...data, minutes: 420.5 }).minutes).toBe(420.5);
@@ -163,7 +171,9 @@ describeEngines("save fields the engine keeps across a load", (leg: Leg) => {
     // unchanged and does not fall through the "newer than this build" path.
     const played = playedSave(leg);
     // Tenant the office, so the population check below has people to lose.
-    const office = (played.units as { kind: string; state: string; occupants: number }[]).find((u) => u.kind === "office")!;
+    const office = (played.units as { kind: string; state: string; occupants: number }[]).find(
+      (u) => u.kind === "office",
+    )!;
     office.state = "occupied";
     office.occupants = 6;
     const data = resave(leg, played);

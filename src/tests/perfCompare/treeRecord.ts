@@ -44,13 +44,31 @@ const EXCLUDE = [":(exclude)docs/performance/results"];
  * one git configuration; it is not promised to match another machine's.
  */
 const DIFF_CONFIG = ["-c", "diff.suppressBlankEmpty=false", "-c", "core.compression=-1", "-c", "core.quotepath=true"];
-const DIFF_FLAGS = ["--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--src-prefix=a/", "--dst-prefix=b/", "-U3", "--inter-hunk-context=0", "--diff-algorithm=myers", "--indent-heuristic", "-O/dev/null", "--ignore-submodules=none"];
+const DIFF_FLAGS = [
+  "--binary",
+  "--full-index",
+  "--no-color",
+  "--no-ext-diff",
+  "--no-textconv",
+  "--no-renames",
+  "--src-prefix=a/",
+  "--dst-prefix=b/",
+  "-U3",
+  "--inter-hunk-context=0",
+  "--diff-algorithm=myers",
+  "--indent-heuristic",
+  "-O/dev/null",
+  "--ignore-submodules=none",
+];
 
 const text = (out: Buffer | string | null): string | null => (out === null ? null : out.toString());
 
 /** `git` runs git with literal arguments and returns its stdout unmodified (bytes or text), or
  *  null on failure; `read` returns a file's bytes, or null when unreadable. */
-export function treeRecord(git: (args: string[]) => Buffer | string | null, read: (path: string) => Buffer | null): TreeRecord {
+export function treeRecord(
+  git: (args: string[]) => Buffer | string | null,
+  read: (path: string) => Buffer | null,
+): TreeRecord {
   const status = text(git(["status", "--porcelain", "--untracked-files=normal", "--", ".", ...EXCLUDE]));
   const diff = git([...DIFF_CONFIG, "diff", "HEAD", ...DIFF_FLAGS, "--", ".", ...EXCLUDE]);
   const others = text(git(["ls-files", "--others", "--exclude-standard", "-z", "--", ".", ...EXCLUDE]));
@@ -76,7 +94,12 @@ export function treeRecord(git: (args: string[]) => Buffer | string | null, read
     diffSha256: diff && diff.length ? sha256(diff) : null,
     untracked,
     hidden,
-    complete: status !== null && diff !== null && others !== null && tagged !== null && untracked.every((u) => u.sha256 !== UNREADABLE),
+    complete:
+      status !== null &&
+      diff !== null &&
+      others !== null &&
+      tagged !== null &&
+      untracked.every((u) => u.sha256 !== UNREADABLE),
   };
 }
 
@@ -92,16 +115,28 @@ const cell = (x: string): string => x.replace(/\|/g, "\\|");
 export function treeSummary(t: TreeRecord | undefined, dirty?: boolean): string | null {
   if (!t) return null;
   if (t.porcelain === null) return "git could not report the working tree (the run is void)";
-  const hidden = t.hidden?.length ? `changes hidden from git status by assume-unchanged or skip-worktree: ${t.hidden.slice(0, SHOWN_UNTRACKED).map(cell).join("; ")}${t.hidden.length > SHOWN_UNTRACKED ? `; and ${t.hidden.length - SHOWN_UNTRACKED} more` : ""}` : null;
+  const hidden = t.hidden?.length
+    ? `changes hidden from git status by assume-unchanged or skip-worktree: ${t.hidden.slice(0, SHOWN_UNTRACKED).map(cell).join("; ")}${t.hidden.length > SHOWN_UNTRACKED ? `; and ${t.hidden.length - SHOWN_UNTRACKED} more` : ""}`
+    : null;
   if (t.porcelain.length === 0 && !hidden) {
-    if (dirty) return "the run was flagged dirty but git status shows nothing outside docs/performance/results (the record is incomplete, the run is void)";
-    return t.complete ? "clean (nothing outside docs/performance/results)" : "git could not finish the working-tree record (the run is void)";
+    if (dirty)
+      return "the run was flagged dirty but git status shows nothing outside docs/performance/results (the record is incomplete, the run is void)";
+    return t.complete
+      ? "clean (nothing outside docs/performance/results)"
+      : "git could not finish the working-tree record (the run is void)";
   }
   const parts = [t.porcelain.length ? `status: ${cell(t.porcelain.join("; "))}` : "status shows nothing"];
-  parts.push(`tracked changes SHA-256 ${t.diffSha256 ?? (t.complete ? "none (no tracked changes)" : "unavailable (git could not produce the diff)")}`);
+  parts.push(
+    `tracked changes SHA-256 ${t.diffSha256 ?? (t.complete ? "none (no tracked changes)" : "unavailable (git could not produce the diff)")}`,
+  );
   if (t.untracked.length) {
-    const shown = t.untracked.slice(0, SHOWN_UNTRACKED).map((u) => `${cell(u.path)} ${u.sha256}`).join("; ");
-    parts.push(`untracked: ${shown}${t.untracked.length > SHOWN_UNTRACKED ? `; and ${t.untracked.length - SHOWN_UNTRACKED} more` : ""}`);
+    const shown = t.untracked
+      .slice(0, SHOWN_UNTRACKED)
+      .map((u) => `${cell(u.path)} ${u.sha256}`)
+      .join("; ");
+    parts.push(
+      `untracked: ${shown}${t.untracked.length > SHOWN_UNTRACKED ? `; and ${t.untracked.length - SHOWN_UNTRACKED} more` : ""}`,
+    );
   }
   if (hidden) parts.push(hidden);
   if (!t.complete) parts.push("the record is incomplete (the run is void)");
@@ -109,4 +144,5 @@ export function treeSummary(t: TreeRecord | undefined, dirty?: boolean): string 
 }
 
 /** The validation error for a working-tree record git could not finish, or null. A run without a record (an older harness) is judged elsewhere. */
-export const incompleteTreeError = (t: TreeRecord | undefined): string | null => (t && !t.complete ? "git could not finish the working-tree record, so the run cannot be tied to a tree" : null);
+export const incompleteTreeError = (t: TreeRecord | undefined): string | null =>
+  t && !t.complete ? "git could not finish the working-tree record, so the run cannot be tied to a tree" : null;

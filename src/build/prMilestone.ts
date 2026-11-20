@@ -70,8 +70,7 @@ export function milestonePullRequest(
     };
 
   const open = port.openMilestones();
-  const titleOf = (number: number | null): string | undefined =>
-    open.find((m) => m.number === number)?.title;
+  const titleOf = (number: number | null): string | undefined => open.find((m) => m.number === number)?.title;
 
   let target: number | null = null;
   let reason = "";

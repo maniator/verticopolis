@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { MAP_OPEN_STORAGE_KEY, MAP_OPEN_VALUE } from "../../ui/overviewMapPrefs";
-import { checkMapAb, checkMapAbFolder, MAP_AB_LIMITATION, MAP_AB_OPEN_SLOT, MAP_AB_VIEWPORT, mapAbBanner, mapOpenInSlot, storeMapSlot } from "./mapAb";
+import {
+  checkMapAb,
+  checkMapAbFolder,
+  MAP_AB_LIMITATION,
+  MAP_AB_OPEN_SLOT,
+  MAP_AB_VIEWPORT,
+  mapAbBanner,
+  mapOpenInSlot,
+  storeMapSlot,
+} from "./mapAb";
 import { DEFAULT_VIEWPORT, limitations, makeConfig, parseArgs } from "./main";
 
 /** `perf:worker --aa wasm --map-ab` (#343): the Map closed in slot "ts" and open in slot "wasm". */
@@ -16,8 +25,14 @@ describe("the Map A/B pass", () => {
 
   it("renders at the desktop size unless --viewport says otherwise, so the open Map is the desktop window", () => {
     expect(parseArgs(["--aa", "wasm", "--map-ab"]).viewport).toEqual(MAP_AB_VIEWPORT);
-    expect(parseArgs(["--aa", "wasm", "--map-ab", "--viewport", "390x844"]).viewport).toEqual({ width: 390, height: 844 });
-    expect(parseArgs(["--viewport", "390x844", "--aa", "wasm", "--map-ab"]).viewport).toEqual({ width: 390, height: 844 });
+    expect(parseArgs(["--aa", "wasm", "--map-ab", "--viewport", "390x844"]).viewport).toEqual({
+      width: 390,
+      height: 844,
+    });
+    expect(parseArgs(["--viewport", "390x844", "--aa", "wasm", "--map-ab"]).viewport).toEqual({
+      width: 390,
+      height: 844,
+    });
     expect(parseArgs(["--aa", "wasm"]).viewport).toEqual(DEFAULT_VIEWPORT);
   });
 
@@ -39,7 +54,9 @@ describe("the Map A/B pass", () => {
 
   it("stores the slot's choice under both layout keys, and nothing outside the pass", async () => {
     const scripts: { keys: string[]; value: string }[] = [];
-    const ctx = { addInitScript: async (_fn: unknown, arg: { keys: string[]; value: string }) => void scripts.push(arg) };
+    const ctx = {
+      addInitScript: async (_fn: unknown, arg: { keys: string[]; value: string }) => void scripts.push(arg),
+    };
     await storeMapSlot(ctx as never, true, "wasm");
     await storeMapSlot(ctx as never, true, "ts");
     await storeMapSlot(ctx as never, undefined, "wasm");

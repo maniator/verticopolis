@@ -16,7 +16,13 @@
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
-import { checkEngineBundle, ENGINE_PACKAGE_FILES, precacheManifest, repoRelativeSource, type EmittedChunk } from "../src/build/engineBundle.ts";
+import {
+  checkEngineBundle,
+  ENGINE_PACKAGE_FILES,
+  precacheManifest,
+  repoRelativeSource,
+  type EmittedChunk,
+} from "../src/build/engineBundle.ts";
 import { ENGINE_DIR, ENGINE_GLUE } from "@verticopolis/components/host/enginePackageNames";
 import { TOOLING_METHODS } from "@verticopolis/components/binding/toolingMethods";
 import { MAPLESS_PUBLIC_SCRIPTS } from "../src/build/publicFiles.ts";
@@ -35,7 +41,8 @@ function filesUnder(dir: string, keep: (name: string) => boolean): string[] {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     const st = lstatSync(p);
-    if (st.isSymbolicLink()) fail(`${relative(DIST, p)} is a symbolic link; the build writes none, so it cannot be checked`);
+    if (st.isSymbolicLink())
+      fail(`${relative(DIST, p)} is a symbolic link; the build writes none, so it cannot be checked`);
     if (st.isDirectory()) out.push(...filesUnder(p, keep));
     else if (keep(name)) out.push(p);
   }
@@ -87,7 +94,14 @@ const engineDir = join(DIST, ENGINE_DIR);
 const enginePackageBuilt = existsSync(engineDir) && readdirSync(engineDir).length > 0;
 const gluePath = join(engineDir, ENGINE_GLUE);
 const engineGlue = enginePackageBuilt && existsSync(gluePath) ? readFileSync(gluePath, "utf8") : null;
-const result = checkEngineBundle({ tooling, chunks, precache, enginePackageBuilt, engineGlue, toolingMethods: TOOLING_METHODS });
+const result = checkEngineBundle({
+  tooling,
+  chunks,
+  precache,
+  enginePackageBuilt,
+  engineGlue,
+  toolingMethods: TOOLING_METHODS,
+});
 if (result.errors.length > 0) fail(`\n  - ${result.errors.join("\n  - ")}`);
 console.log(
   `verify-engine-bundle: ${tooling ? "tooling " : ""}build, ${chunks.length} scripts checked; ` +

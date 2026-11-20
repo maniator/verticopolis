@@ -1,6 +1,14 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BAR_SHOWING_CLASS, BRIDGE_PATH, bridgeHelpBar, linkToGame, startHelpBar, stateText, type GameLink } from "./helpBar";
+import {
+  BAR_SHOWING_CLASS,
+  BRIDGE_PATH,
+  bridgeHelpBar,
+  linkToGame,
+  startHelpBar,
+  stateText,
+  type GameLink,
+} from "./helpBar";
 import { GONE_AFTER_MS, HELLO_EVERY_MS, type BarChannel, type GameStatus } from "./helpBarProtocol";
 
 const TAB = "00000000000000aa";
@@ -86,7 +94,9 @@ describe("the Help bar's words", () => {
     expect(stateText({ speed: 0, heldForHelp: true, visible: false })).toBe("Paused while you read.");
     expect(stateText({ speed: 0, heldForHelp: false, visible: true })).toBe("Paused.");
     expect(stateText({ speed: 2, heldForHelp: false, visible: true })).toBe("Running.");
-    expect(stateText({ speed: 2, heldForHelp: false, visible: false })).toBe("Your tower will run when you can see it.");
+    expect(stateText({ speed: 2, heldForHelp: false, visible: false })).toBe(
+      "Your tower will run when you can see it.",
+    );
   });
 });
 
@@ -241,7 +251,8 @@ function watchedFrame(): {
   const frame = make("iframe");
   const win = { postMessage: vi.fn() };
   Object.defineProperty(frame, "contentWindow", { get: () => win });
-  vi.spyOn(document, "createElement").mockImplementation(((tag: string) => (tag === "iframe" ? frame : make(tag))) as typeof document.createElement);
+  vi.spyOn(document, "createElement").mockImplementation(((tag: string) =>
+    tag === "iframe" ? frame : make(tag)) as typeof document.createElement);
   return { frame, win };
 }
 

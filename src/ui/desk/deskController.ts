@@ -1,14 +1,38 @@
 import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
 import { browserStorage } from "../overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../paletteCollapse";
-import { defaultLayout, fitRect, parseLayout, TOOLS_LIMITS, TOWER_LIMITS, type DeskRect, type DeskWindowId } from "@verticopolis/components/windows/desk/deskGeometry";
+import {
+  defaultLayout,
+  fitRect,
+  parseLayout,
+  TOOLS_LIMITS,
+  TOWER_LIMITS,
+  type DeskRect,
+  type DeskWindowId,
+} from "@verticopolis/components/windows/desk/deskGeometry";
 import { read, write, type Store } from "./deskStore";
 import { DeskTitle } from "./deskTitle";
 import { buildControlPanel } from "./deskControlPanel";
-import { deskTaskResult, trackDeskClose, trackDeskStartOpen, trackDeskTask, trackDeskTray, trackDeskWindow, trackWindowMenuOpen, trackWindowMenuPick } from "./deskAnalytics";
+import {
+  deskTaskResult,
+  trackDeskClose,
+  trackDeskStartOpen,
+  trackDeskTask,
+  trackDeskTray,
+  trackDeskWindow,
+  trackWindowMenuOpen,
+  trackWindowMenuPick,
+} from "./deskAnalytics";
 import { DeskTaskbar, type TaskEntry } from "./deskTaskbar";
 import { runWindowCommand, windowMenuState } from "@verticopolis/components/windows/desk/deskWindowMenu";
-import { buildFrame, DESK_ACTIVE_CLASS, DeskWindow, titleButton, type DeskChange, type DeskWindowSpec } from "@verticopolis/components/windows/desk/deskWindow";
+import {
+  buildFrame,
+  DESK_ACTIVE_CLASS,
+  DeskWindow,
+  titleButton,
+  type DeskChange,
+  type DeskWindowSpec,
+} from "@verticopolis/components/windows/desk/deskWindow";
 
 /**
  * The 1994 desk (option C, picked by the owner on 2026-11-15): on a computer,
@@ -188,7 +212,8 @@ export class DeskController {
     this.move(doc.getElementById("topbar"), info.body);
     // Status Bar and Full Screen join the Window menu while the desk is up.
     const windowMenu = doc.getElementById("mb-window-menu");
-    if (windowMenu) for (const id of ["mb-win-statusbar", "mb-fullscreen"]) this.move(doc.getElementById(id), windowMenu);
+    if (windowMenu)
+      for (const id of ["mb-win-statusbar", "mb-fullscreen"]) this.move(doc.getElementById(id), windowMenu);
 
     // Tools and the small windows the game already draws.
     const palette = doc.getElementById("palette");
@@ -200,7 +225,12 @@ export class DeskController {
     if (palette?.classList.contains(PALETTE_COLLAPSED_CLASS)) doc.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.click();
     const item = (id: string) => () => doc.getElementById(id)?.click();
 
-    const spec = (id: DeskWindowId, el: HTMLElement, label: () => string, rest: Partial<DeskWindowSpec> & Pick<DeskWindowSpec, "isOpen">): DeskWindowSpec => ({
+    const spec = (
+      id: DeskWindowId,
+      el: HTMLElement,
+      label: () => string,
+      rest: Partial<DeskWindowSpec> & Pick<DeskWindowSpec, "isOpen">,
+    ): DeskWindowSpec => ({
       id,
       el,
       label,
@@ -212,17 +242,57 @@ export class DeskController {
       ...rest,
     });
     const add = (s: DeskWindowSpec) => this.wins.set(s.id, new DeskWindow(s));
-    add(spec("tower", tower.root, () => this.towerTitleText(), { layer: "app", limits: TOWER_LIMITS, canMax: true, isOpen: () => true, close: () => doc.getElementById("mb-close")?.click() }));
+    add(
+      spec("tower", tower.root, () => this.towerTitleText(), {
+        layer: "app",
+        limits: TOWER_LIMITS,
+        canMax: true,
+        isOpen: () => true,
+        close: () => doc.getElementById("mb-close")?.click(),
+      }),
+    );
     add(spec("info", info.root, () => "Info", { isOpen: () => true }));
-    if (palette) add(spec("tools", palette, () => "Tools", { limits: TOOLS_LIMITS, heightOnly: true, isOpen: () => true }));
-    if (map) add(spec("map", map, () => "Map", { isOpen: () => !map.hidden, open: item("mb-win-map"), close: () => map.querySelector<HTMLElement>(".overview-map-close")?.click() }));
-    if (bulletin) add(spec("bulletin", bulletin, () => "Bulletin", { isOpen: () => !bulletin.hidden, open: item("mb-win-bulletin"), close: () => bulletin.querySelector<HTMLElement>('[data-close="bulletin-win"]')?.click() }));
-    if (towerInfo) add(spec("towerInfo", towerInfo, () => "Tower Info", { isOpen: () => !towerInfo.hidden, open: item("mb-win-tower"), close: () => towerInfo.querySelector<HTMLElement>('[data-close="tower-win"]')?.click() }));
+    if (palette)
+      add(spec("tools", palette, () => "Tools", { limits: TOOLS_LIMITS, heightOnly: true, isOpen: () => true }));
+    if (map)
+      add(
+        spec("map", map, () => "Map", {
+          isOpen: () => !map.hidden,
+          open: item("mb-win-map"),
+          close: () => map.querySelector<HTMLElement>(".overview-map-close")?.click(),
+        }),
+      );
+    if (bulletin)
+      add(
+        spec("bulletin", bulletin, () => "Bulletin", {
+          isOpen: () => !bulletin.hidden,
+          open: item("mb-win-bulletin"),
+          close: () => bulletin.querySelector<HTMLElement>('[data-close="bulletin-win"]')?.click(),
+        }),
+      );
+    if (towerInfo)
+      add(
+        spec("towerInfo", towerInfo, () => "Tower Info", {
+          isOpen: () => !towerInfo.hidden,
+          open: item("mb-win-tower"),
+          close: () => towerInfo.querySelector<HTMLElement>('[data-close="tower-win"]')?.click(),
+        }),
+      );
 
     // The Control Panel: closed until the Verticopolis menu or the tray opens it.
-    const control = buildControlPanel(doc, (icon) => trackAppAction("desk_control", icon), () => trackDeskClose("control"));
+    const control = buildControlPanel(
+      doc,
+      (icon) => trackAppAction("desk_control", icon),
+      () => trackDeskClose("control"),
+    );
     desk.appendChild(control.root);
-    add(spec("control", control.root, () => "Control Panel", { isOpen: control.isOpen, open: control.open, close: control.close }));
+    add(
+      spec("control", control.root, () => "Control Panel", {
+        isOpen: control.isOpen,
+        open: control.open,
+        close: control.close,
+      }),
+    );
     this.syncControl = control.sync;
     const openControl = () => {
       control.open();
@@ -242,7 +312,9 @@ export class DeskController {
         state: (id) => windowMenuState(this.wins.get(id as DeskWindowId), this.active),
         run: (id, command) => {
           trackWindowMenuPick(id, command);
-          runWindowCommand(this.wins.get(id as DeskWindowId), command, (w) => (w.minimized ? this.bringUp(w.spec.id) : this.focus(w)));
+          runWindowCommand(this.wins.get(id as DeskWindowId), command, (w) =>
+            w.minimized ? this.bringUp(w.spec.id) : this.focus(w),
+          );
         },
         opened: (_id, from) => trackWindowMenuOpen(from),
       },
@@ -305,7 +377,12 @@ export class DeskController {
     // Info's strip takes the width between Tools and the column first, so the
     // tower opens under it at the height the strip really has.
     if (this.infoFrame) this.infoFrame.style.width = `${defaultLayout(w, h).info.w}px`;
-    const first = defaultLayout(w, h, this.infoFrame?.offsetHeight || undefined, this.wins.get("map")?.spec.el.offsetHeight || undefined);
+    const first = defaultLayout(
+      w,
+      h,
+      this.infoFrame?.offsetHeight || undefined,
+      this.wins.get("map")?.spec.el.offsetHeight || undefined,
+    );
     for (const [id, win] of this.wins) {
       win.place(fitRect(saved[id] ?? first[id], w, h, win.spec.limits));
     }
@@ -415,7 +492,8 @@ export class DeskController {
 
   private changed(id: DeskWindowId, what: DeskChange): void {
     if (what === "move" || what === "resize") this.save();
-    if (what === "max" || what === "unmax") write(this.store, DESK_KEY.max, what === "max" && id === "tower" ? "tower" : "");
+    if (what === "max" || what === "unmax")
+      write(this.store, DESK_KEY.max, what === "max" && id === "tower" ? "tower" : "");
     if (what === "max" && id === "tower") this.clearTowerChrome();
     if (what === "unmax" && id === "tower" && this.steppedDown.size) {
       this.restoreSteppedDown();
@@ -462,12 +540,17 @@ export class DeskController {
         const w = this.wins.get(id);
         if (!w) continue;
         // A window the game just opened comes up in front, unminimized.
-        if (w.spec.isOpen() && (r.oldValue?.includes(PALETTE_COLLAPSED_CLASS) || (r.attributeName === "hidden" && r.oldValue !== null))) this.bringUp(id);
+        if (
+          w.spec.isOpen() &&
+          (r.oldValue?.includes(PALETTE_COLLAPSED_CLASS) || (r.attributeName === "hidden" && r.oldValue !== null))
+        )
+          this.bringUp(id);
         else if (!w.spec.isOpen() && w === this.active) this.focusNext();
       }
       this.refresh();
     });
-    for (const el of els) if (el) watcher.observe(el, { attributes: true, attributeFilter: ["hidden", "class"], attributeOldValue: true });
+    for (const el of els)
+      if (el) watcher.observe(el, { attributes: true, attributeFilter: ["hidden", "class"], attributeOldValue: true });
     const name = this.doc.getElementById("sb-tower");
     if (name) watcher.observe(name, { childList: true, characterData: true, subtree: true });
     const sound = this.doc.getElementById("mb-sound");

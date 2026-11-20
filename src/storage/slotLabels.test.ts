@@ -3,7 +3,8 @@ import { cleanSlotName, SLOT_NAME_MAX, slotLabel } from "./slotLabels";
 
 afterEach(() => localStorage.clear());
 
-const store = (names: unknown) => localStorage.setItem("vc.slotNames", typeof names === "string" ? names : JSON.stringify(names));
+const store = (names: unknown) =>
+  localStorage.setItem("vc.slotNames", typeof names === "string" ? names : JSON.stringify(names));
 
 describe("save slot names, as 4.1 and 4.2 left them", () => {
   it("reads each slot's own name, and none for a slot without one", () => {

@@ -34,7 +34,12 @@ function fakeApp(answer: Record<string, number>, reason = "Point at the gap.", b
     commitUndo: vi.fn(() => steps.push("commit")),
     build: { buildSkyBridge: vi.fn((): SkyBridgeClick => ({ ok: true, tiles: 4, restyled: false })) },
     // Sky lobbies stand at columns 119 and 124 of floor 30, past the bridge.
-    reader: { tower: { skyBridges: () => bridges, structureKindAt: (f: number, x: number) => (f === 30 && (x === 119 || x === 124) ? "lobby" : undefined) } },
+    reader: {
+      tower: {
+        skyBridges: () => bridges,
+        structureKindAt: (f: number, x: number) => (f === 30 && (x === 119 || x === 124) ? "lobby" : undefined),
+      },
+    },
     engine: { preview: { kind: "lobby" } as unknown },
     ui: { toast: vi.fn() },
   };
@@ -48,7 +53,10 @@ describe("tapSkyBridge", () => {
     const { app, game } = fakeApp(BRIDGE);
     tapSkyBridge(game, 121, 30);
     expect(updateBuildPreview).toHaveBeenLastCalledWith(game, 121, 30, false);
-    expect(app.ui.toast).toHaveBeenCalledExactlyOnceWith("Sky bridge: 4 tiles, $44,000. Tap it again to build.", "info");
+    expect(app.ui.toast).toHaveBeenCalledExactlyOnceWith(
+      "Sky bridge: 4 tiles, $44,000. Tap it again to build.",
+      "info",
+    );
     expect(app.build.buildSkyBridge).not.toHaveBeenCalled();
     expect(app.captureUndo).not.toHaveBeenCalled();
   });
@@ -63,7 +71,9 @@ describe("tapSkyBridge", () => {
   });
 
   it("changes a finished bridge's look on one tap, as its own undo step", () => {
-    const { app, game, steps } = fakeApp({ ok: 0 }, "This sky bridge is already finished.", [{ floor: 30, from: 120, to: 124, look: 1 }]);
+    const { app, game, steps } = fakeApp({ ok: 0 }, "This sky bridge is already finished.", [
+      { floor: 30, from: 120, to: 124, look: 1 },
+    ]);
     tapSkyBridge(game, 122, 30);
     expect(app.build.buildSkyBridge).toHaveBeenCalledExactlyOnceWith(122, 30);
     expect(steps).toEqual([`capture:${BRIDGE_LOOK_STEP}`, "commit"]);
@@ -152,7 +162,12 @@ describe("KeyboardPlay with the Sky Bridge tool", () => {
   });
 
   it("Enter speaks the engine's reason when it lays nothing", () => {
-    const { kb, announce } = keyboard({ ok: false, reason: "A sky bridge crosses open air.", tiles: 0, restyled: false });
+    const { kb, announce } = keyboard({
+      ok: false,
+      reason: "A sky bridge crosses open air.",
+      tiles: 0,
+      restyled: false,
+    });
     kb.commitCursor();
     expect(announce).toHaveBeenCalledExactlyOnceWith("A sky bridge crosses open air.");
   });

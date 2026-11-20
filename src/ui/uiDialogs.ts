@@ -46,7 +46,12 @@ export function showStats(ui: UI, body: TemplateResult, handlers: Record<string,
 }
 
 /** The elevator schedule review (#1548). Handlers are keyed by the template's `data-act` values; `focus` names the button to focus. */
-export function showScheduleReview(ui: UI, rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): HTMLElement {
+export function showScheduleReview(
+  ui: UI,
+  rows: readonly ReviewRow[],
+  handlers: Record<string, () => void> = {},
+  focus?: string,
+): HTMLElement {
   const box = ui.openModalTemplate(scheduleReviewTemplate(rows), { displaceable: true });
   ui.wireActions(box, handlers);
   // A redraw after a choice replaces the button that was pressed; keep the player's place.
@@ -59,16 +64,13 @@ export function showScheduleReview(ui: UI, rows: readonly ReviewRow[], handlers:
  *  it is only ever reached from a deliberate tap on an install affordance. The
  *  `variant` picks the iOS Safari steps or the Chrome/Edge browser-menu steps. */
 export function showInstallHelp(ui: UI, variant: InstallHelpVariant = "ios"): void {
-  ui.openModalTemplate(installHelpTemplate(() => ui.closeModal(), variant), { displaceable: true });
+  ui.openModalTemplate(
+    installHelpTemplate(() => ui.closeModal(), variant),
+    { displaceable: true },
+  );
 }
 
-export function confirmModal(
-  ui: UI,
-  title: string,
-  body: string,
-  onYes: () => void,
-  yesLabel = "Confirm",
-): void {
+export function confirmModal(ui: UI, title: string, body: string, onYes: () => void, yesLabel = "Confirm"): void {
   // The lit template binds both actions inline with @click, so there is no
   // wireActions pass. There is no [data-act="close"] button; the title-bar ✕
   // still exists and closes through the dialog's cancel path.
@@ -141,7 +143,6 @@ export function confirmExport(ui: UI): void {
     },
   });
 }
-
 
 /** What the player is told when a report's tower is lost, wherever it is lost. */
 const DROPPED = (kind: "import" | "export") =>
@@ -320,7 +321,9 @@ export function showUpdatePrompt(
   // and the dismissal paths. No wireActions pass, no [data-act="close"].
   // The release notes link opens a new tab, which in the installed app means
   // leaving it for the system browser, so it shows in a browser tab only.
-  ui.openModalTemplate(updatePromptTemplate(info, { onLater: later, onUpdate: update }, { releaseNotesLink: !isInstalledStandalone() }));
+  ui.openModalTemplate(
+    updatePromptTemplate(info, { onLater: later, onUpdate: update }, { releaseNotesLink: !isInstalledStandalone() }),
+  );
   dialog.onclick = (e) => {
     if (e.target === dialog) later();
   }; // backdrop
@@ -350,5 +353,8 @@ export function showUpdateChip(_ui: UI, onClick: () => void): void {
  *  `onDisplaced` runs when something does (an emergency rolled while they were
  *  up), so the frame loop can bring them back once the way is clear (#1134). */
 export function congratsTower(ui: UI, onDisplaced: () => void): void {
-  ui.openModalTemplate(congratsTemplate(ui.cb.getCatalog().world.maxFloor, () => ui.closeModal()), { displaceable: true, onDisplaced });
+  ui.openModalTemplate(
+    congratsTemplate(ui.cb.getCatalog().world.maxFloor, () => ui.closeModal()),
+    { displaceable: true, onDisplaced },
+  );
 }

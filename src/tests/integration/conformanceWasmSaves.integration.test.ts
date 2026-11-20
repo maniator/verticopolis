@@ -31,7 +31,14 @@ import { describe, expect, it } from "vitest";
 import type { Engine, encodeVctower } from "@verticopolis/engine/tooling/node/verticopolis_engine";
 import type { SerializedGame } from "@verticopolis/components/shared/types";
 import { importTower } from "../fixtures/saveText";
-import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped, parseSaveJson } from "../../storage/saveCompression";
+import {
+  MAX_SAVE_INFLATED_BYTES,
+  STORE_MAGIC,
+  TOWER_FILE_MAGIC,
+  fromBase64,
+  inflateCapped,
+  parseSaveJson,
+} from "../../storage/saveCompression";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
@@ -41,7 +48,9 @@ const FIXTURES = resolve(CONFORMANCE_ROOT, "fixtures");
 const fixtures = readdirSync(FIXTURES)
   .filter((f) => f.endsWith(".vctower"))
   .sort();
-const cases = (JSON.parse(readFileSync(resolve(CONFORMANCE_ROOT, "loader-cases.json"), "utf8")) as { cases: LoaderCase[] }).cases;
+const cases = (
+  JSON.parse(readFileSync(resolve(CONFORMANCE_ROOT, "loader-cases.json"), "utf8")) as { cases: LoaderCase[] }
+).cases;
 
 interface LoaderCase {
   id: string;
@@ -55,12 +64,14 @@ const rustSaves = (): RustSaves => wasm() as unknown as RustSaves;
 const run = hasWasmPackage();
 
 /** The save JSON text inside a `.vctower` file. */
-const jsonOfFile = (file: string): string => new TextDecoder().decode(inflateCapped(fromBase64(file.slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, ""))));
+const jsonOfFile = (file: string): string =>
+  new TextDecoder().decode(inflateCapped(fromBase64(file.slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, ""))));
 
 /** The path of the first value that differs between two parsed saves, or null. */
 export function firstDifference(a: unknown, b: unknown, path = "$"): string | null {
   if (Object.is(a, b)) return null;
-  if (typeof a !== typeof b || a === null || b === null || typeof a !== "object") return `${path}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`;
+  if (typeof a !== typeof b || a === null || b === null || typeof a !== "object")
+    return `${path}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`;
   if (Array.isArray(a) !== Array.isArray(b)) return `${path}: array vs object`;
   const ka = Object.keys(a);
   const kb = Object.keys(b as object);
@@ -117,30 +128,35 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
   /** The save with each transport's own keys sorted: the one place the two writers' key order is known to differ. */
   const transportKeysSorted = (save: Record<string, unknown>): Record<string, unknown> => ({
     ...save,
-    transports: (save.transports as Array<Record<string, unknown>>).map((t) => Object.fromEntries(Object.entries(t).sort(([x], [y]) => x.localeCompare(y, "en")))),
+    transports: (save.transports as Array<Record<string, unknown>>).map((t) =>
+      Object.fromEntries(Object.entries(t).sort(([x], [y]) => x.localeCompare(y, "en"))),
+    ),
   });
 
-  it.each(fixtures)("%s: the written file is the web import's text up to a transport's key order, and the binding text only adds .0", async (name) => {
-    const text = readFileSync(resolve(FIXTURES, name), "utf8");
-    const ts = JSON.stringify((await importTower(text)).serialize());
-    const engine = wasm().Engine.fromVctower(text);
-    try {
-      const rust = engine.serialize();
-      expect((rust.match(/\d\.0(?=[,}\]])/g) ?? []).length, name).toBeGreaterThan(0);
-      expect(canonical(rust), name).toBe(canonical(ts));
-      const stamp = 1_760_000_000_123;
-      const fileOfRust = jsonOfFile(rustSaves().encodeVctower(rust, "3.0.0", stamp));
-      const fileOfTs = jsonOfFile(rustSaves().encodeVctower(ts, "3.0.0", stamp));
-      expect(fileOfRust.length, name).toBe(fileOfTs.length);
-      // Numbers printed the JavaScript way: re-printing changes nothing.
-      expect(JSON.stringify(JSON.parse(fileOfRust)), name).toBe(fileOfRust);
-      const a = JSON.stringify(transportKeysSorted(JSON.parse(fileOfRust)));
-      const b = JSON.stringify(transportKeysSorted(JSON.parse(fileOfTs)));
-      expect(a, name).toBe(b);
-    } finally {
-      engine.free();
-    }
-  });
+  it.each(fixtures)(
+    "%s: the written file is the web import's text up to a transport's key order, and the binding text only adds .0",
+    async (name) => {
+      const text = readFileSync(resolve(FIXTURES, name), "utf8");
+      const ts = JSON.stringify((await importTower(text)).serialize());
+      const engine = wasm().Engine.fromVctower(text);
+      try {
+        const rust = engine.serialize();
+        expect((rust.match(/\d\.0(?=[,}\]])/g) ?? []).length, name).toBeGreaterThan(0);
+        expect(canonical(rust), name).toBe(canonical(ts));
+        const stamp = 1_760_000_000_123;
+        const fileOfRust = jsonOfFile(rustSaves().encodeVctower(rust, "3.0.0", stamp));
+        const fileOfTs = jsonOfFile(rustSaves().encodeVctower(ts, "3.0.0", stamp));
+        expect(fileOfRust.length, name).toBe(fileOfTs.length);
+        // Numbers printed the JavaScript way: re-printing changes nothing.
+        expect(JSON.stringify(JSON.parse(fileOfRust)), name).toBe(fileOfRust);
+        const a = JSON.stringify(transportKeysSorted(JSON.parse(fileOfRust)));
+        const b = JSON.stringify(transportKeysSorted(JSON.parse(fileOfTs)));
+        expect(a, name).toBe(b);
+      } finally {
+        engine.free();
+      }
+    },
+  );
 
   // The loader table's cases (forged and hand-edited saves) are replayed
   // against their recorded state hashes by the Rust test
@@ -152,7 +168,8 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
 
 /** The tower fixture, renamed so the save is `bytes` long once serialized and stamped. */
 describe.runIf(run)("saves audit: text and size edges through the engine", () => {
-  const base = (): SerializedGame => decodeVctower(readFileSync(resolve(FIXTURES, "split-tower.vctower"), "utf8"), "split-tower") as SerializedGame;
+  const base = (): SerializedGame =>
+    decodeVctower(readFileSync(resolve(FIXTURES, "split-tower.vctower"), "utf8"), "split-tower") as SerializedGame;
 
   const names: Array<[string, string]> = [
     ["astral characters", "Tower \u{1F3D9}\u{FE0F} \u{1D4B3}\u{1F680}"],

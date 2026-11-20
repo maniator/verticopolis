@@ -45,7 +45,11 @@ function readCss(rel: string): string {
 /* The game page's whole cascade: styles.css plus the shared-chrome imports the
    dialog box actually wears (.win lives in retro-components). retro-page.css
    is standalone-page chrome and never loads in the game document. */
-const SHEETS = [stripComments(gameStylesheet()), readCss("styles/retro-components.css"), readCss("styles/retro-tokens.css")];
+const SHEETS = [
+  stripComments(gameStylesheet()),
+  readCss("styles/retro-components.css"),
+  readCss("styles/retro-tokens.css"),
+];
 
 interface Rule {
   selector: string;
@@ -227,7 +231,9 @@ describe("one scroll container per dialog", () => {
     // the .es-grid well (#513). So is the Open and Save As windows' file list
     // (owner, 2026-11-15, the classic Open dialog): a list box that scrolls
     // in place, capped at min(15em, 40vh) (min(18em, 46vh) on a phone).
-    const scrollers = ALL_RULES.filter((r) => !r.conditional && inDialogSubtree(r.selector) && scrollsVertically(r.body));
+    const scrollers = ALL_RULES.filter(
+      (r) => !r.conditional && inDialogSubtree(r.selector) && scrollsVertically(r.body),
+    );
     expect(scrollers.map((r) => r.selector)).toEqual([".modal-box", ".whatsnew-log", ".fd-rows"]);
   });
 
@@ -236,7 +242,9 @@ describe("one scroll container per dialog", () => {
     // 200px well (#513): overlay scrollbars are invisible there and the cap
     // keeps the steppers and OK button within a swipe. That is the ONLY
     // sanctioned second scroller, and only under a condition.
-    const scrollers = ALL_RULES.filter((r) => r.conditional && inDialogSubtree(r.selector) && scrollsVertically(r.body));
+    const scrollers = ALL_RULES.filter(
+      (r) => r.conditional && inDialogSubtree(r.selector) && scrollsVertically(r.body),
+    );
     expect(scrollers.length).toBeGreaterThan(0);
     for (const r of scrollers) {
       expect(r.selector, "only .es-grid may scroll under a media condition").toBe(".es-grid");

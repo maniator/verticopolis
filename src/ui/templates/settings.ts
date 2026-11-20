@@ -34,7 +34,12 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * `showSettings` reads the live tower state and sets the initial checked
  * value.
  */
-export function settingsTemplate(version: string, showBuilding = false, engine = "", showPassersBy = false): TemplateResult {
+export function settingsTemplate(
+  version: string,
+  showBuilding = false,
+  engine = "",
+  showPassersBy = false,
+): TemplateResult {
   const passersBy = showPassersBy
     ? html`
       <div class="set-row">

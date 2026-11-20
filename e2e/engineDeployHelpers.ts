@@ -11,7 +11,8 @@ import type { Deployment, Deployments } from "./deployments";
 export const short = (id: string): string => id.slice(0, 12);
 
 /** A new context on the deployments' origin. */
-export const newContext = (browser: Browser, deployments: Deployments): Promise<BrowserContext> => browser.newContext({ baseURL: deployments.origin });
+export const newContext = (browser: Browser, deployments: Deployments): Promise<BrowserContext> =>
+  browser.newContext({ baseURL: deployments.origin });
 
 /** What the precache holds for the engine files: each key (path and query) with the SHA-256 of its body. */
 export async function engineEntries(page: Page): Promise<Record<string, string>> {
@@ -23,7 +24,9 @@ export async function engineEntries(page: Page): Promise<Record<string, string>>
         const url = new URL(request.url);
         if (!url.pathname.startsWith("/engine/")) continue;
         const digest = await crypto.subtle.digest("SHA-256", await (await cache.match(request))!.arrayBuffer());
-        found[`${url.pathname}${url.search}`] = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+        found[`${url.pathname}${url.search}`] = [...new Uint8Array(digest)]
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
       }
     }
     return found;

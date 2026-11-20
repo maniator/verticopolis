@@ -10,8 +10,15 @@ import { draftTower, type Draft } from "./portSim";
 
 /** The parts of the engine's catalog the fixtures and suites read. */
 export interface CatalogFacts {
-  readonly world: { readonly lotWidth: number; readonly maxFloor: number; readonly minFloor: number; readonly lobbyInterval: number };
-  readonly economy: Readonly<Record<string, unknown>> & { readonly calendars: readonly { readonly key: string; readonly maintenancePeriodDays: number }[] };
+  readonly world: {
+    readonly lotWidth: number;
+    readonly maxFloor: number;
+    readonly minFloor: number;
+    readonly lobbyInterval: number;
+  };
+  readonly economy: Readonly<Record<string, unknown>> & {
+    readonly calendars: readonly { readonly key: string; readonly maintenancePeriodDays: number }[];
+  };
 }
 
 /** The engine's catalog for `mode`. */
@@ -48,7 +55,8 @@ export function mustBuild(draft: Draft, kind: FacilityKind, x: number, bottom: n
 /** Place a room and assert it seated, returning its record view. */
 export function placeUnit(draft: Draft, kind: FacilityKind, floor: number, x: number): Unit {
   const r = draft.tower.place(kind, floor, x);
-  if (!r.ok || r.unitId === undefined) throw new Error(`place ${kind} at ${floor},${x} failed: ${r.reason ?? "no reason"}`);
+  if (!r.ok || r.unitId === undefined)
+    throw new Error(`place ${kind} at ${floor},${x} failed: ${r.reason ?? "no reason"}`);
   const u = draft.tower.getUnit(r.unitId);
   if (!u) throw new Error(`place ${kind} at ${floor},${x}: unit ${r.unitId} not found`);
   return u as unknown as Unit;

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { GONE_AFTER_MS, HELLO_EVERY_MS, STATUS_EVERY_MS, barMessage, isBarMessage, isGameStatus, isTabId, newTabId } from "./helpBarProtocol";
+import {
+  GONE_AFTER_MS,
+  HELLO_EVERY_MS,
+  STATUS_EVERY_MS,
+  barMessage,
+  isBarMessage,
+  isGameStatus,
+  isTabId,
+  newTabId,
+} from "./helpBarProtocol";
 
 const STATUS = {
   game: "status",
@@ -19,12 +28,14 @@ const STATUS = {
 describe("the Help bar's messages", () => {
   it("knows a bar's three requests and nothing else", () => {
     for (const bar of ["hello", "run", "pause"]) expect(isBarMessage({ bar })).toBe(true);
-    for (const data of [null, undefined, "hello", {}, { bar: "close" }, { bar: 1 }]) expect(isBarMessage(data)).toBe(false);
+    for (const data of [null, undefined, "hello", {}, { bar: "close" }, { bar: 1 }])
+      expect(isBarMessage(data)).toBe(false);
   });
 
   it("takes a request naming a well-formed tab, and drops a bad tab", () => {
     expect(isBarMessage({ bar: "run", tab: STATUS.tab })).toBe(true);
-    for (const tab of ["", "xyz", "0123456789ABCDEF", "0123456789abcdef0", 7, null]) expect(isBarMessage({ bar: "run", tab }), String(tab)).toBe(false);
+    for (const tab of ["", "xyz", "0123456789ABCDEF", "0123456789abcdef0", 7, null])
+      expect(isBarMessage({ bar: "run", tab }), String(tab)).toBe(false);
   });
 
   it("names the tab on the wire only when there is one", () => {

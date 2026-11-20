@@ -48,7 +48,10 @@ export function checkAutosaveSeeds(scenarios: readonly Pick<Scenario, "name" | "
   for (const sc of scenarios) {
     // An empty tower would pass the runner's population check without the
     // save ever loading.
-    if (!(sc.population > 0)) throw new Error(`${sc.name}: the saved-tower start needs a tower with people in it; this save has population ${sc.population}`);
+    if (!(sc.population > 0))
+      throw new Error(
+        `${sc.name}: the saved-tower start needs a tower with people in it; this save has population ${sc.population}`,
+      );
     let handed: string | null = null;
     const read = withAutosave(autosaveSeed(sc).value, () =>
       SaveGame.loadResult((text) => {
@@ -61,7 +64,9 @@ export function checkAutosaveSeeds(scenarios: readonly Pick<Scenario, "name" | "
     let what = "a different tower";
     if (handed === null) what = "no tower";
     else if (same) what = "loaded";
-    throw new Error(`${sc.name}: the autosave seed does not load back (${what}${read.corrupt ? ", read as corrupt" : ""})`);
+    throw new Error(
+      `${sc.name}: the autosave seed does not load back (${what}${read.corrupt ? ", read as corrupt" : ""})`,
+    );
   }
 }
 
@@ -100,13 +105,18 @@ function withAutosave<T>(value: string, fn: () => T): T {
 /** The context's storage state: the seed in the autosave slot of the app's
  *  origin. Playwright writes it while it creates the context, before any of
  *  the context's pages open, so no seeding runs inside the timed start. */
-export function autosaveState(origin: string, seed: AutosaveSeed): { cookies: []; origins: { origin: string; localStorage: { name: string; value: string }[] }[] } {
+export function autosaveState(
+  origin: string,
+  seed: AutosaveSeed,
+): { cookies: []; origins: { origin: string; localStorage: { name: string; value: string }[] }[] } {
   return { cookies: [], origins: [{ origin, localStorage: [{ name: AUTOSAVE_KEY, value: seed.value }] }] };
 }
 
 /** Page function: whether the boot loaded a readable autosave, and the
  *  booted tower's population. */
 export function bootedTower(): { loaded: boolean; corrupt: boolean; population: number } {
-  const g = (window as unknown as { game: { hadReadableSave: boolean; saveWasCorrupt: boolean; sim: { population: number } } }).game;
+  const g = (
+    window as unknown as { game: { hadReadableSave: boolean; saveWasCorrupt: boolean; sim: { population: number } } }
+  ).game;
   return { loaded: g.hadReadableSave, corrupt: g.saveWasCorrupt, population: g.sim.population };
 }

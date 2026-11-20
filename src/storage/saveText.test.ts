@@ -41,7 +41,9 @@ describe("stampText", () => {
     for (const name of ['My "savedAt', "savedAt", 'appVersion":1', 'x\\"appVersion']) {
       const body = `{"minutes":1.0,"towerName":${JSON.stringify(name)},"units":[]}`;
       const { json, stamp } = stampText(body);
-      expect(json, name).toBe(`${body.slice(0, -1)},"savedAt":${stamp.savedAt},"appVersion":${JSON.stringify(stamp.appVersion)}}`);
+      expect(json, name).toBe(
+        `${body.slice(0, -1)},"savedAt":${stamp.savedAt},"appVersion":${JSON.stringify(stamp.appVersion)}}`,
+      );
     }
     // A key that ends in the word: its opening quote is escaped.
     const keyed = `{"minutes":1.0,"labels":{${JSON.stringify('My "savedAt')}:1}}`;
@@ -49,7 +51,11 @@ describe("stampText", () => {
   });
 
   it("restamps through a parse when a stamp key sits after an escaped backslash or before spaced colon", () => {
-    for (const body of ['{"minutes":1.0,"towerName":"a\\\\","savedAt":5}', '{"minutes":1.0,"appVersion" : "old"}', '{"minutes":1.0,"view":{"savedAt":5}}']) {
+    for (const body of [
+      '{"minutes":1.0,"towerName":"a\\\\","savedAt":5}',
+      '{"minutes":1.0,"appVersion" : "old"}',
+      '{"minutes":1.0,"view":{"savedAt":5}}',
+    ]) {
       const { json, stamp } = stampText(body);
       expect(json, body).toBe(parsedStamp(body, stamp.savedAt, stamp.appVersion));
     }

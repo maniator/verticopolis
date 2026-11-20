@@ -82,15 +82,11 @@ describe("isDifferentBuild — running vs deployed", () => {
 
   it("detects a different sha even when the version string is unchanged", () => {
     // An internal-only rebuild bumps the sha but not the version.
-    expect(isDifferentBuild({ version: "1.50.0", sha: "abcdef0", notes: [] }, running.version, running.sha)).toBe(
-      true,
-    );
+    expect(isDifferentBuild({ version: "1.50.0", sha: "abcdef0", notes: [] }, running.version, running.sha)).toBe(true);
   });
 
   it("detects a newer version string", () => {
-    expect(isDifferentBuild({ version: "1.51.0", sha: "abcdef0", notes: [] }, running.version, running.sha)).toBe(
-      true,
-    );
+    expect(isDifferentBuild({ version: "1.51.0", sha: "abcdef0", notes: [] }, running.version, running.sha)).toBe(true);
   });
 
   it("ignores an absent sha on the payload and falls back to the version", () => {
@@ -142,11 +138,17 @@ describe("classifyUpdate: game, engine or both", () => {
   });
 
   it("calls a Rust rebuild without a crate bump an engine update", () => {
-    expect(classifyUpdate(fp({ rust: "r2" }), fp())).toEqual({ kind: "engine", engineLine: "Rust engine 0.24.0 (new build)" });
+    expect(classifyUpdate(fp({ rust: "r2" }), fp())).toEqual({
+      kind: "engine",
+      engineLine: "Rust engine 0.24.0 (new build)",
+    });
   });
 
   it("ignores a TypeScript engine hash an older build still reports", () => {
-    const old = (ts: string): BuildFingerprint => ({ shell: "s1", engine: { crate: "0.24.0", rust: "r1", ts } as BuildFingerprint["engine"] });
+    const old = (ts: string): BuildFingerprint => ({
+      shell: "s1",
+      engine: { crate: "0.24.0", rust: "r1", ts } as BuildFingerprint["engine"],
+    });
     expect(classifyUpdate(old("t2"), old("t1"))).toBeNull();
   });
 
@@ -185,7 +187,10 @@ describe("withUpdateKind and the fingerprint in version.json", () => {
 });
 
 describe("notes since the player's version (#1897)", () => {
-  const rel = (version: string, ...notes: string[]) => ({ version, notes: notes.length ? notes : [`${version} note.`] });
+  const rel = (version: string, ...notes: string[]) => ({
+    version,
+    notes: notes.length ? notes : [`${version} note.`],
+  });
   /** What a 3.0.3 build's version.json carries: its own notes and the versions before it, newest first. */
   const incoming = (over: Partial<UpdateInfo> = {}): UpdateInfo => ({
     version: "3.0.3",
@@ -216,7 +221,10 @@ describe("notes since the player's version (#1897)", () => {
   });
 
   it("never repeats the running version's notes: a player on 3.0.0 updating to 3.0.1 sees only 3.0.1", () => {
-    const shown = notesSinceRunning(incoming({ version: "3.0.1", notes: ["3.0.1 note."], releases: [rel("3.0.1"), rel("3.0.0"), rel("2.90.0")] }), "3.0.0");
+    const shown = notesSinceRunning(
+      incoming({ version: "3.0.1", notes: ["3.0.1 note."], releases: [rel("3.0.1"), rel("3.0.0"), rel("2.90.0")] }),
+      "3.0.0",
+    );
     expect(shownVersions(shown)).toEqual(["3.0.1"]);
     expect(shown.releases?.flatMap((r) => r.notes)).toEqual(["3.0.1 note."]);
   });
@@ -244,7 +252,10 @@ describe("notes since the player's version (#1897)", () => {
   });
 
   it("keeps a version newer than the incoming one out, and sorts whatever order arrives", () => {
-    const shown = notesSinceRunning(incoming({ releases: [rel("3.0.1"), rel("3.0.4"), rel("3.0.3"), rel("3.0.2")] }), "3.0.0");
+    const shown = notesSinceRunning(
+      incoming({ releases: [rel("3.0.1"), rel("3.0.4"), rel("3.0.3"), rel("3.0.2")] }),
+      "3.0.0",
+    );
     expect(shownVersions(shown)).toEqual(["3.0.3", "3.0.2", "3.0.1"]);
   });
 
@@ -264,9 +275,17 @@ describe("notes since the player's version (#1897)", () => {
     const long = "x".repeat(MAX_NOTE_LEN + 10);
     const rest = Array.from({ length: MAX_NOTES }, (_, i) => `n${i}`);
     const parsed = parseUpdateInfo({
-      releases: [{ version: "3.0.1", notes: [long, ...rest] }, { version: 7, notes: ["a"] }, { version: "3.0.0", notes: [] }, null, "x"],
+      releases: [
+        { version: "3.0.1", notes: [long, ...rest] },
+        { version: 7, notes: ["a"] },
+        { version: "3.0.0", notes: [] },
+        null,
+        "x",
+      ],
     });
-    expect(parsed?.releases).toEqual([{ version: "3.0.1", notes: [long.slice(0, MAX_NOTE_LEN), ...rest.slice(0, MAX_NOTES - 1)] }]);
+    expect(parsed?.releases).toEqual([
+      { version: "3.0.1", notes: [long.slice(0, MAX_NOTE_LEN), ...rest.slice(0, MAX_NOTES - 1)] },
+    ]);
     const many = Array.from({ length: MAX_RELEASES + 5 }, (_, i) => ({ version: `1.0.${i}`, notes: ["n"] }));
     expect(parseUpdateInfo({ releases: many })?.releases).toHaveLength(MAX_RELEASES);
     expect(parseUpdateInfo({ releases: "nope" })?.releases).toEqual([]);

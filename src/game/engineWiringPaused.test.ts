@@ -161,7 +161,10 @@ describe("a drag begun while the clock ran, after the game pauses", () => {
     hooks.onActionMove!(16, 2, null);
     hooks.onActionUp!();
     expect(app.build.paintFloorRun, "no tile after the pause").toHaveBeenCalledOnce();
-    expect(app.ui.toast, "the stop says why, once for the drag").toHaveBeenCalledExactlyOnceWith(UNPAUSE_TO_BUILD, "bad");
+    expect(app.ui.toast, "the stop says why, once for the drag").toHaveBeenCalledExactlyOnceWith(
+      UNPAUSE_TO_BUILD,
+      "bad",
+    );
   });
 
   it("lays no deferred touch strip on release in Classic, and says why once", () => {

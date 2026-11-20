@@ -1,11 +1,24 @@
 import type { UI } from "./UI";
 import { render } from "lit-html";
-import { elevatorScheduleTemplate, floorLabel, type FloorRow, type SchedCtx, type SchedState, type SchedHandlers } from "./templates/elevatorSchedule";
+import {
+  elevatorScheduleTemplate,
+  floorLabel,
+  type FloorRow,
+  type SchedCtx,
+  type SchedState,
+  type SchedHandlers,
+} from "./templates/elevatorSchedule";
 import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
 import type { OriginRings } from "@verticopolis/components/shared/engineTypes";
 import { SCHEDULE_HOURS } from "@verticopolis/components/port/scheduleSlots";
 import { hotspotFloors, type ElevatorScheduleUX } from "./scheduleDialogRules";
-import type { AssistedPreset, AutoTuneProposal, PresetProposal, ScheduleFacts, SchedulePresetName } from "@verticopolis/components/port/enginePort";
+import type {
+  AssistedPreset,
+  AutoTuneProposal,
+  PresetProposal,
+  ScheduleFacts,
+  SchedulePresetName,
+} from "@verticopolis/components/port/enginePort";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
 import { autoAnnouncement, fillFromProposal, tunedAnnouncement } from "./uiElevatorScheduleAuto";
 
@@ -101,7 +114,10 @@ export function showElevatorScheduleDialog(
 
   const readFloors = (): FloorRow[] => ctx.stops.read();
   const servedFloorsAsc = (floors: FloorRow[]): number[] =>
-    floors.filter((f) => f.served).map((f) => f.floor).sort((x, y) => x - y);
+    floors
+      .filter((f) => f.served)
+      .map((f) => f.floor)
+      .sort((x, y) => x - y);
 
   /** The visible day's origin map at hour `h`, gated on that day's warm demand
    *  curve so origins never outrun the demand gate (#465). */
@@ -116,12 +132,17 @@ export function showElevatorScheduleDialog(
   // Modern), so the grid never marks a chip on a
   // skipped row and OK re-commits a floor the car can actually wait at.
   const initialFloors = readFloors();
-  const seed = ctx.facts({ homeFloors: ctx.current?.homeFloors ? [...ctx.current.homeFloors] : undefined }, ctx.initialWeekend);
+  const seed = ctx.facts(
+    { homeFloors: ctx.current?.homeFloors ? [...ctx.current.homeFloors] : undefined },
+    ctx.initialWeekend,
+  );
   const base0 = seed.staging?.baseLobby ?? ctx.bottom;
   const fullRow = (): number[] => Array(SCHEDULE_HOURS).fill(ctx.cars);
   const seedRow = (r: readonly number[] | undefined): number[] => {
     const out = fullRow();
-    if (r) for (let h = 0; h < SCHEDULE_HOURS; h++) if (Number.isFinite(r[h])) out[h] = Math.max(0, Math.min(ctx.cars, Math.floor(r[h])));
+    if (r)
+      for (let h = 0; h < SCHEDULE_HOURS; h++)
+        if (Number.isFinite(r[h])) out[h] = Math.max(0, Math.min(ctx.cars, Math.floor(r[h])));
     return out;
   };
   // A refused seed query keeps the stored homes where they are readable; the
@@ -130,7 +151,10 @@ export function showElevatorScheduleDialog(
     const home = ctx.current?.homeFloors?.[i];
     return home !== undefined && Number.isFinite(home) ? home : base0;
   };
-  const seedHomes = (): number[] => (seed.homeFloors.length === ctx.cars ? [...seed.homeFloors] : Array.from({ length: ctx.cars }, (_, i) => storedHome(i)));
+  const seedHomes = (): number[] =>
+    seed.homeFloors.length === ctx.cars
+      ? [...seed.homeFloors]
+      : Array.from({ length: ctx.cars }, (_, i) => storedHome(i));
 
   const state: SchedState = {
     day: ctx.initialWeekend ? "weekend" : "weekday",
@@ -142,7 +166,10 @@ export function showElevatorScheduleDialog(
     floors: initialFloors,
     base: base0,
     schedule: {
-      activeCars: { weekday: seedRow(ctx.current?.activeCars?.weekday), weekend: seedRow(ctx.current?.activeCars?.weekend) },
+      activeCars: {
+        weekday: seedRow(ctx.current?.activeCars?.weekday),
+        weekend: seedRow(ctx.current?.activeCars?.weekend),
+      },
       homeFloors: seedHomes(),
       waitingCarResponse: ctx.current?.waitingCarResponse ?? 0,
       standardFloorDeparture: ctx.current?.standardFloorDeparture ?? DEFAULT_SFD,
@@ -291,7 +318,8 @@ export function showElevatorScheduleDialog(
     unfoldOnAdvice();
     rerender();
   };
-  const curRow = (): number[] => (state.day === "weekend" ? state.schedule.activeCars.weekend! : state.schedule.activeCars.weekday!);
+  const curRow = (): number[] =>
+    state.day === "weekend" ? state.schedule.activeCars.weekend! : state.schedule.activeCars.weekday!;
   /** The ascending inclusive hour span the docked stepper edits. */
   const span = (): [number, number] => {
     const a = state.selectedHour;
@@ -356,7 +384,11 @@ export function showElevatorScheduleDialog(
     onWcrStep: (dir) => {
       const wcr = Math.max(0, Math.min(30, state.schedule.waitingCarResponse + dir));
       state.schedule.waitingCarResponse = wcr;
-      announce(wcr === 0 ? "Waiting Car Response: 0. Idle cars answer the nearest call." : `Waiting Car Response set to ${wcr}. Higher holds idle cars in place longer.`);
+      announce(
+        wcr === 0
+          ? "Waiting Car Response: 0. Idle cars answer the nearest call."
+          : `Waiting Car Response set to ${wcr}. Higher holds idle cars in place longer.`,
+      );
       after();
     },
     onSfdStep: (dir) => {
@@ -409,7 +441,11 @@ export function showElevatorScheduleDialog(
       homesDirty = true;
       after();
     },
-    onAllCars: () => { state.schedule.activeCars = { weekday: fullRow(), weekend: fullRow() }; announce(`All ${ctx.cars} cars now run every hour, both day types.`); after(); },
+    onAllCars: () => {
+      state.schedule.activeCars = { weekday: fullRow(), weekend: fullRow() };
+      announce(`All ${ctx.cars} cars now run every hour, both day types.`);
+      after();
+    },
     onPreset: (p: AssistedPreset) => {
       const preset = ctx.preset(p);
       if (preset.status !== "available") return; // the mode offers no presets; the buttons are not shown
@@ -443,7 +479,8 @@ export function showElevatorScheduleDialog(
       // Auto-tune button, it seeds the staging floors only when the player
       // has set none; the morning re-tune never touches them.
       state.schedule.autoTune = !state.schedule.autoTune;
-      if (state.schedule.autoTune) fillFromProposal(state.schedule, ctx.autoTune(workingDraft(), state.day === "weekend"), fullRow, !homesDirty);
+      if (state.schedule.autoTune)
+        fillFromProposal(state.schedule, ctx.autoTune(workingDraft(), state.day === "weekend"), fullRow, !homesDirty);
       announce(autoAnnouncement(state.schedule.autoTune));
       after();
     },
@@ -454,16 +491,18 @@ export function showElevatorScheduleDialog(
     onOk: () => {
       if (applying) return;
       applying = true;
-      void cb.apply({
-        activeCars: {
-          weekday: [...state.schedule.activeCars.weekday!],
-          weekend: [...state.schedule.activeCars.weekend!],
-        },
-        waitingCarResponse: state.schedule.waitingCarResponse,
-        standardFloorDeparture: state.schedule.standardFloorDeparture,
-        homeFloors: [...state.schedule.homeFloors],
-        autoTune: state.schedule.autoTune,
-      }).finally(() => box.isConnected && ui.closeModal());
+      void cb
+        .apply({
+          activeCars: {
+            weekday: [...state.schedule.activeCars.weekday!],
+            weekend: [...state.schedule.activeCars.weekend!],
+          },
+          waitingCarResponse: state.schedule.waitingCarResponse,
+          standardFloorDeparture: state.schedule.standardFloorDeparture,
+          homeFloors: [...state.schedule.homeFloors],
+          autoTune: state.schedule.autoTune,
+        })
+        .finally(() => box.isConnected && ui.closeModal());
     },
     onCancel: () => {
       // A dirty working copy takes two presses: the first arms "Discard changes?",

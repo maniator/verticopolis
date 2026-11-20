@@ -21,7 +21,12 @@ const base = {
   "public/engine/BUILD.json": "{}",
   "ui/panel.test.ts": "t",
 };
-const pkg = (version: string, sources: string): ExpectedEnginePackage => ({ package: "p", files: {}, crate: { name: "vc", version }, sources });
+const pkg = (version: string, sources: string): ExpectedEnginePackage => ({
+  package: "p",
+  files: {},
+  crate: { name: "vc", version },
+  sources,
+});
 
 describe("the build fingerprint", () => {
   it("changes the shell part with shell sources and not with engine, package or test files", () => {

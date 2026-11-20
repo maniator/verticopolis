@@ -39,8 +39,7 @@ const t = sim.tower;
 sim.star = 3;
 
 for (let x = 0; x < TOWER_W; x++) must(t.place("lobby", 1, x).ok, `lobby 1,${x}`);
-for (let f = 2; f <= TOP; f++)
-  for (let x = 0; x < TOWER_W; x++) must(t.place("floor", f, x).ok, `floor ${f},${x}`);
+for (let f = 2; f <= TOP; f++) for (let x = 0; x < TOWER_W; x++) must(t.place("floor", f, x).ok, `floor ${f},${x}`);
 
 const shaft = t.placeTransport("elevatorStandard", 0, 1, TOP);
 must(shaft.ok, `shaft: ${shaft.reason}`);
@@ -52,8 +51,13 @@ must(theaters >= 0 && halls >= 0 && theaters + halls <= 16, "at most 16 venues")
 type Venue = { kind: FacilityKind; floor: number; x: number };
 const venues: Venue[] = [];
 const SLOT_X = [6, 37, 68, 99];
-const kinds: FacilityKind[] = [...Array<FacilityKind>(theaters).fill("cinema"), ...Array<FacilityKind>(halls).fill("partyHall")];
-kinds.forEach((kind, i) => venues.push({ kind, floor: 2 + 2 * Math.floor(i / SLOT_X.length), x: SLOT_X[i % SLOT_X.length] }));
+const kinds: FacilityKind[] = [
+  ...Array<FacilityKind>(theaters).fill("cinema"),
+  ...Array<FacilityKind>(halls).fill("partyHall"),
+];
+kinds.forEach((kind, i) =>
+  venues.push({ kind, floor: 2 + 2 * Math.floor(i / SLOT_X.length), x: SLOT_X[i % SLOT_X.length] }),
+);
 for (const v of venues) {
   const r = t.place(v.kind, v.floor, v.x);
   must(r.ok, `place ${v.kind} at floor ${v.floor}, x ${v.x}: ${r.reason}`);

@@ -3,7 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const core = vi.hoisted(() => ({ trackEvent: vi.fn() }));
 vi.mock("./analyticsCore", () => core);
 
-import { MENU_ITEM_CODES, clearMenuPicks, menuItemCodeOf, menuNameOf, trackMenuDismiss, trackMenuOpen, trackMenuPick } from "./analyticsMenus";
+import {
+  MENU_ITEM_CODES,
+  clearMenuPicks,
+  menuItemCodeOf,
+  menuNameOf,
+  trackMenuDismiss,
+  trackMenuOpen,
+  trackMenuPick,
+} from "./analyticsMenus";
 
 beforeEach(() => {
   core.trackEvent.mockClear();
@@ -38,7 +46,13 @@ describe("menu analytics", () => {
     ]);
     clearMenuPicks();
     trackMenuPick({ ...pick, item: "map", grayed: false, state: "on" });
-    expect(core.trackEvent).toHaveBeenLastCalledWith("menu_pick", { ...pick, item: "map", grayed: false, state: "on", after: "none" });
+    expect(core.trackEvent).toHaveBeenLastCalledWith("menu_pick", {
+      ...pick,
+      item: "map",
+      grayed: false,
+      state: "on",
+      after: "none",
+    });
   });
 
   it("opens and dismissals go out as they are", () => {

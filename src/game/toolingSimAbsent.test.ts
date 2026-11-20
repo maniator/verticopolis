@@ -17,7 +17,11 @@ describe("toolingSimAbsent", () => {
   });
 
   it("refuses a hand-built tower and an edit follow-up by name", () => {
-    expect(() => absent.adoptToolingSim(app, {} as Parameters<typeof tooling.adoptToolingSim>[1], false)).toThrow(/adoptSim is for tooling builds only/);
-    expect(() => absent.followToolingEdit({} as Parameters<typeof tooling.followToolingEdit>[0])).toThrow(/followEdit is for tooling builds only/);
+    expect(() => absent.adoptToolingSim(app, {} as Parameters<typeof tooling.adoptToolingSim>[1], false)).toThrow(
+      /adoptSim is for tooling builds only/,
+    );
+    expect(() => absent.followToolingEdit({} as Parameters<typeof tooling.followToolingEdit>[0])).toThrow(
+      /followEdit is for tooling builds only/,
+    );
   });
 });

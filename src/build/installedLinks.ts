@@ -46,7 +46,8 @@ export function installedLinkProblems(dir: string, label = "node_modules"): stri
       const kind = entryKind(nested);
       if (kind === "link") problems.push(`${rel}/node_modules is a link`);
       else if (kind === "dir") problems.push(...installedLinkProblems(nested, `${rel}/node_modules`));
-      else if (kind === "unreadable") problems.push(`${rel}/node_modules cannot be read, so it cannot be checked for linked packages`);
+      else if (kind === "unreadable")
+        problems.push(`${rel}/node_modules cannot be read, so it cannot be checked for linked packages`);
     }
   }
   return problems;

@@ -10,7 +10,14 @@ import { fileURLToPath } from "node:url";
 /** The path a built page is served at: `rooms/venues/index.html` →
  *  `/help/rooms/venues/`, or `/rooms/venues/` when `base` is the root (""). */
 export function servedPath(file, base = "/help") {
-  return base + "/" + file.replace(/\\/g, "/").replace(/(^|\/)index\.html$/, "$1").replace(/\.html$/, "/");
+  return (
+    base +
+    "/" +
+    file
+      .replace(/\\/g, "/")
+      .replace(/(^|\/)index\.html$/, "$1")
+      .replace(/\.html$/, "/")
+  );
 }
 
 /** Every id on a page. */
@@ -33,7 +40,8 @@ export function brokenLinks(pages, base = "/help") {
       const path = url.pathname.endsWith("/") ? url.pathname : url.pathname + "/";
       const target = ids.get(path);
       if (!target) broken.push(`${from} → ${href} (no such page)`);
-      else if (url.hash && !target.has(decodeURIComponent(url.hash.slice(1)))) broken.push(`${from} → ${href} (no such section)`);
+      else if (url.hash && !target.has(decodeURIComponent(url.hash.slice(1))))
+        broken.push(`${from} → ${href} (no such section)`);
     }
   }
   return broken;

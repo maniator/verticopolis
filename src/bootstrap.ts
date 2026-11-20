@@ -6,20 +6,42 @@ import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { removeLegacyCohortKeys } from "./engineCrash/legacyKeys";
 import { MISMATCH_RELOAD_LINE, claimMismatchReload, reloadForMatchingFiles } from "./engineCrash/mismatchReload";
-import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, markCrashReload, reloadSoon, tabStore } from "./engineCrash/crashReload";
+import {
+  CRASH_RELOAD_LINE,
+  countRustCrash,
+  crashOutcome,
+  markCrashReload,
+  reloadSoon,
+  tabStore,
+} from "./engineCrash/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "@verticopolis/components/host/rustEngine";
 import { openSaves } from "./storage/SaveGame";
 import { BOOT_SEED, bootTower, type BootTower } from "./game/bootTower";
 import { setSlotPopulationReader } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { populationReaderFromModule } from "@verticopolis/components/host/slotPopulation";
-import { noteEngineAttempt, noteEngineCrashReload, noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
+import {
+  noteEngineAttempt,
+  noteEngineCrashReload,
+  noteEngineFallback,
+  noteEngineSettled,
+  noteEngineWriterLatched,
+} from "./analyticsEngineStatus";
 import { startEngagementWatch } from "./game/engagementWatch";
 import { TRAP_REASON, noteEngineThrow, runningTowerStage, watchEngineTraps } from "./game/engineFault";
 import { trapKind } from "@verticopolis/components/host/hostFault";
 import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
-import { bootFailureReason, deferEngineIdentity, engineFailureCopy, failBoot, loadBootEngine, publishBootState, settleEngineIdentity, type EngineBootState } from "@verticopolis/components/host/engineBoot";
+import {
+  bootFailureReason,
+  deferEngineIdentity,
+  engineFailureCopy,
+  failBoot,
+  loadBootEngine,
+  publishBootState,
+  settleEngineIdentity,
+  type EngineBootState,
+} from "@verticopolis/components/host/engineBoot";
 import { refreshSplashVersion } from "@verticopolis/components/host/engineLabel";
 import { APP_VERSION } from "./appVersion";
 import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
@@ -119,9 +141,11 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
         style="margin:auto;max-width:100%;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:16px;align-items:center"
       >
         <div>${content}</div>
-        ${withReload
-          ? html`<button style="padding:8px 24px;font:inherit;cursor:pointer" @click=${() => location.reload()}>Reload</button>`
-          : nothing}
+        ${
+          withReload
+            ? html`<button style="padding:8px 24px;font:inherit;cursor:pointer" @click=${() => location.reload()}>Reload</button>`
+            : nothing
+        }
       </div>
     </div>`,
     host,
@@ -133,11 +157,17 @@ let inertWatch: MutationObserver | null = null;
 /** Stop the game with the wasm-only build's engine failure: what happened,
  *  why, and what to try. Covers the title screen and any running tower, like
  *  every other boot-fallback message. */
-export function showEngineFailure(state: EngineBootState, online = typeof navigator === "undefined" || navigator.onLine !== false): void {
+export function showEngineFailure(
+  state: EngineBootState,
+  online = typeof navigator === "undefined" || navigator.onLine !== false,
+): void {
   if (!state.failure) return;
   const failure = state.failure;
   const offerRepair = repairOffered(failure, pageControlled());
-  const copy = engineFailureCopy(state.failure, online, { secure: typeof window === "undefined" || window.isSecureContext !== false, repair: offerRepair });
+  const copy = engineFailureCopy(state.failure, online, {
+    secure: typeof window === "undefined" || window.isSecureContext !== false,
+    repair: offerRepair,
+  });
   stopGame(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
       <p><b>${copy.headline}</b></p>
@@ -146,16 +176,24 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
         ${copy.steps.map((step) => html`<li>${step}</li>`)}
       </ul>
       <p>
-        ${offerRepair
-          ? html`<button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="repair-engine" @click=${runEngineRepair}>Repair engine files</button>
+        ${
+          offerRepair
+            ? html`<button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="repair-engine" @click=${runEngineRepair}>Repair engine files</button>
               <span class="engine-failure-repair-status" role="status" aria-live="polite" style="margin:0 .5em;opacity:.8"></span>`
-          : nothing}
-        <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="download-failure-report" @click=${(event: Event) => {
+            : nothing
+        }
+        <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="download-failure-report" @click=${(
+          event: Event,
+        ) => {
           const result = downloadEngineFailureArchive(failure);
-          const status = (event.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-report-status");
-          if (status) status.textContent = result === "saved"
-            ? "Report downloaded. Attach the zip to a bug report if you choose."
-            : "The report could not be downloaded. Your stored save was not changed.";
+          const status = (event.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(
+            ".engine-failure-report-status",
+          );
+          if (status)
+            status.textContent =
+              result === "saved"
+                ? "Report downloaded. Attach the zip to a bug report if you choose."
+                : "The report could not be downloaded. Your stored save was not changed.";
         }}>Download crash report</button>
         <span class="engine-failure-report-status" role="status" aria-live="polite" style="margin-left:.5em;opacity:.8"></span>
         <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="copy-diagnostics" @click=${copyEngineDiagnostics}>Copy diagnostics</button>
@@ -313,7 +351,9 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // refused package is named by its code and kind, never by its file or
       // digests (those stay on the console and in `__vcEngineBoot`).
       const f = bootState.failure;
-      throw new Error(`the Rust engine did not start (${f?.stage}): ${f?.package ? `${f.reason}, ${f.package.kind}` : f?.message}`);
+      throw new Error(
+        `the Rust engine did not start (${f?.stage}): ${f?.package ? `${f.reason}, ${f.package.kind}` : f?.message}`,
+      );
     };
     // Engine files from another build than this page (a cached older page
     // meeting a newer deploy) take one reload per build per tab, which fetches
@@ -437,7 +477,10 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // A game stopped on its engine takes an update at once instead: the
       // prompt would sit under the engine-failure message, and a fixed deploy
       // is the way out.
-      registerPWA({ onUpdateAvailable: (activate, info) => (isEngineStopped() ? void activate() : app.onUpdateAvailable(activate, info)) });
+      registerPWA({
+        onUpdateAvailable: (activate, info) =>
+          isEngineStopped() ? void activate() : app.onUpdateAvailable(activate, info),
+      });
       // The engine's identity record waits for the first frame (#1254); the
       // title screen's version line is drawn again once it is read.
       afterFirstFrame(() => {

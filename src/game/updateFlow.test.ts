@@ -41,7 +41,17 @@ function makeApp(over: Partial<Record<string, unknown>> = {}) {
     saveLoad: { saveBeforeUpdate, save },
     ...over,
   };
-  return { app: app as unknown as GameApp, raw: app, captured, showUpdateChip, uiShowPrompt: showUpdatePrompt, toast, saveBeforeUpdate, save, isModalOpen };
+  return {
+    app: app as unknown as GameApp,
+    raw: app,
+    captured,
+    showUpdateChip,
+    uiShowPrompt: showUpdatePrompt,
+    toast,
+    saveBeforeUpdate,
+    save,
+    isModalOpen,
+  };
 }
 
 /** A fake app already in the "coast is clear" state: a pending update waiting,
@@ -78,7 +88,10 @@ describe("onUpdateAvailable", () => {
 
   it("defaults missing info to null", () => {
     const { app, raw } = makeApp();
-    onUpdateAvailable(app, vi.fn(async () => {}));
+    onUpdateAvailable(
+      app,
+      vi.fn(async () => {}),
+    );
     expect(raw.pendingUpdateInfo).toBeNull();
   });
 });
@@ -173,7 +186,9 @@ describe("showUpdatePrompt remembers the notes it shows (#1897)", () => {
     };
     localStorage.setItem(NOTES_SEEN_KEY, ahead(2)); // the other tab's prompt
     showUpdatePrompt(app);
-    expect((captured.last?.info as { releases: { version: string }[] }).releases.map((r) => r.version)).toEqual([ahead(3)]);
+    expect((captured.last?.info as { releases: { version: string }[] }).releases.map((r) => r.version)).toEqual([
+      ahead(3),
+    ]);
     expect(localStorage.getItem(NOTES_SEEN_KEY)).toBe(ahead(3));
   });
 });

@@ -40,7 +40,10 @@ import { FRAME_DAYS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * the engine package is built.
  */
 
-if (UPDATE && !hasWasmPackage()) throw new Error("the frame-day golden needs the engine package (VC_FRAME_DAYS_UPDATE=1), and @verticopolis/engine/tooling is not installed; run npm install");
+if (UPDATE && !hasWasmPackage())
+  throw new Error(
+    "the frame-day golden needs the engine package (VC_FRAME_DAYS_UPDATE=1), and @verticopolis/engine/tooling is not installed; run npm install",
+  );
 
 /** A fresh Rust engine; the case loads or founds its own tower over the
  *  placeholder it starts with. The views are hashed in canonical form, as the
@@ -102,16 +105,20 @@ describe.skipIf(!hasWasmPackage())("the frame-day golden on the Rust engine", ()
   });
 
   for (const c of FRAME_DAY_CASES) {
-    it(c.id, () => {
-      const got = run(c);
-      // Checked before a refresh writes it, too.
-      expect(frameDayProblems(c, got)).toEqual([]);
-      if (UPDATE) {
-        fresh[c.id] = got;
-        return;
-      }
-      expect(firstFrameDayDifference(got, pinned.cases[c.id])).toBeNull();
-    }, 120_000);
+    it(
+      c.id,
+      () => {
+        const got = run(c);
+        // Checked before a refresh writes it, too.
+        expect(frameDayProblems(c, got)).toEqual([]);
+        if (UPDATE) {
+          fresh[c.id] = got;
+          return;
+        }
+        expect(firstFrameDayDifference(got, pinned.cases[c.id])).toBeNull();
+      },
+      120_000,
+    );
   }
 
   it("plays a case the same way twice in one process", () => {
@@ -127,6 +134,8 @@ describe.skipIf(!hasWasmPackage())("the frame-day golden on the Rust engine", ()
     const c = FRAME_DAY_CASES.find((x) => x.id === "new Classic game at speed 3")!;
     const plain = run(c);
     const changed = run(c, (engine) => engine.setMoney(1));
-    expect(firstFrameDayDifference(changed, plain)).toMatch(new RegExp(`^checkpoint ${FIRST_FRAME_CHECKPOINT} \\(minute \\d+\\): state `));
+    expect(firstFrameDayDifference(changed, plain)).toMatch(
+      new RegExp(`^checkpoint ${FIRST_FRAME_CHECKPOINT} \\(minute \\d+\\): state `),
+    );
   }, 120_000);
 });

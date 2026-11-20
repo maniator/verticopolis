@@ -16,7 +16,7 @@ describe("the docs title bar", () => {
     const html = siteName('Tower <"one"> & two', "T&T");
     expect(html).toContain("Tower &lt;&quot;one&quot;&gt; &amp; two");
     expect(html).toContain("T&amp;T");
-    expect(html).not.toContain("<\"one\">");
+    expect(html).not.toContain('<"one">');
   });
 
   it("links the game and GitHub, with the game button marked for the help site's Back to game", () => {

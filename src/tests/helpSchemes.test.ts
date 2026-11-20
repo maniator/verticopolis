@@ -81,18 +81,27 @@ describe("the manual wears the game's appearance scheme", () => {
   });
 
   it("on its own host, wears the scheme the game's cookie shares, over the kept one", () => {
-    expect(boot("", "standard", false, `other=1; ${SCHEME_COOKIE}=skyline`)).toEqual({ worn: "skyline", kept: "skyline" });
+    expect(boot("", "standard", false, `other=1; ${SCHEME_COOKIE}=skyline`)).toEqual({
+      worn: "skyline",
+      kept: "skyline",
+    });
     expect(boot("", "skyline", false, `${SCHEME_COOKIE}=standard; other=1`)).toEqual({ worn: null, kept: "standard" });
   });
 
   it("on its own host, falls back to the kept scheme when the cookie is missing or unknown", () => {
     expect(boot("", "high_contrast", false, "")).toEqual({ worn: "high_contrast", kept: "high_contrast" });
-    expect(boot("", "high_contrast", false, `${SCHEME_COOKIE}=luna`)).toEqual({ worn: "high_contrast", kept: "high_contrast" });
+    expect(boot("", "high_contrast", false, `${SCHEME_COOKIE}=luna`)).toEqual({
+      worn: "high_contrast",
+      kept: "high_contrast",
+    });
     expect(boot("", null, true, `${SCHEME_COOKIE}=skyline`).worn).toBe("skyline");
   });
 
   it("lets a game link win over the cookie", () => {
-    expect(boot("?from=game&scheme=high_contrast", null, false, `${SCHEME_COOKIE}=skyline`)).toEqual({ worn: "high_contrast", kept: "high_contrast" });
+    expect(boot("?from=game&scheme=high_contrast", null, false, `${SCHEME_COOKIE}=skyline`)).toEqual({
+      worn: "high_contrast",
+      kept: "high_contrast",
+    });
   });
 
   it("under /help on the game's origin, never reads a cookie", () => {

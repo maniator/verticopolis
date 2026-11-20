@@ -23,7 +23,9 @@ describe("service shortfall gripe copy", () => {
 
   it("tells both parking lines that a garage can run past the tower (#2212)", () => {
     for (const cause of ["parking", "homeParking"] as const) {
-      expect(gripeCopy({ advises: true, cause, coverage: 0.25 })).toMatch(/; basements can run wider than the tower above\.$/);
+      expect(gripeCopy({ advises: true, cause, coverage: 0.25 })).toMatch(
+        /; basements can run wider than the tower above\.$/,
+      );
     }
   });
 
@@ -53,7 +55,11 @@ describe("Classic names the cause only (#549)", () => {
     { cause: "noise", club: true },
     { cause: "noise", club: true, adjacent: true },
     { cause: "congestion", binding: "elevator" },
-    { cause: "congestion", binding: "elevator", roomyShaft: { name: "Standard Elevator", bottom: 1, top: 15, cars: 3, maxCars: 8 } },
+    {
+      cause: "congestion",
+      binding: "elevator",
+      roomyShaft: { name: "Standard Elevator", bottom: 1, top: 15, cars: 3, maxCars: 8 },
+    },
     { cause: "congestion", binding: "none" },
     { cause: "congestion", binding: "walkways" },
     { cause: "congestion", binding: "walkways", elevatorHere: true },
@@ -83,7 +89,9 @@ describe("Classic names the cause only (#549)", () => {
 
   it("keeps the facts a Classic gripe states", () => {
     expect(gripeCopy({ advises: false, cause: "rent" })).toBe("the rent is above the going rate.");
-    expect(gripeCopy({ advises: false, cause: "trash", coverage: 0.5 })).toBe("trash piling up: recycling handles 50% of the tower.");
+    expect(gripeCopy({ advises: false, cause: "trash", coverage: 0.5 })).toBe(
+      "trash piling up: recycling handles 50% of the tower.",
+    );
     expect(gripeCopy({ advises: false, cause: "congestion", binding: "stairs", elevatorHere: true })).toBe(
       "crowded stairs, jammed by the other floors they serve.",
     );
@@ -109,12 +117,16 @@ describe("Classic names the cause only (#549)", () => {
     );
     const notice = { reason: "noise" as const, minutesLeft: 600, satisfaction: 0.1, keepAt: 0.4 };
     expect(noticeCopy({ ...notice, advises: false })[1]).toBe("They stay if satisfaction reaches 40% (now 10%).");
-    expect(noticeCopy({ ...notice, advises: true })[1]).toBe("Fix the cause and get satisfaction to 40% to keep them (now 10%).");
+    expect(noticeCopy({ ...notice, advises: true })[1]).toBe(
+      "Fix the cause and get satisfaction to 40% to keep them (now 10%).",
+    );
   });
 
   it("names a far lobby and what it does, without the sky lobby to build", () => {
     const far = { sinking: true, quotesDistance: false, distance: 18, slotFloor: 15 };
-    expect(lobbyWarningCopy({ ...far, advises: false })).toBe("Too far from any lobby. Satisfaction sinks until tenants give notice.");
+    expect(lobbyWarningCopy({ ...far, advises: false })).toBe(
+      "Too far from any lobby. Satisfaction sinks until tenants give notice.",
+    );
     expect(lobbyWarningCopy({ ...far, advises: true })).toBe(
       "Too far from any lobby. Satisfaction sinks until tenants give notice. Build the sky lobby on floor 15 to lift these tenants.",
     );

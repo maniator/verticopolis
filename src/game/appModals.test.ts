@@ -28,7 +28,9 @@ vi.mock("../analyticsEngineBridge", () => ({ flushBeforeTowerSwap: vi.fn() }));
 /** The outgoing tower's analytics events fold before the engine swaps (#2392). */
 function flushedBeforeSwap(loadSave: ReturnType<typeof vi.fn>): void {
   expect(flushBeforeTowerSwap).toHaveBeenCalledTimes(1);
-  expect(vi.mocked(flushBeforeTowerSwap).mock.invocationCallOrder[0]).toBeLessThan(loadSave.mock.invocationCallOrder[0]!);
+  expect(vi.mocked(flushBeforeTowerSwap).mock.invocationCallOrder[0]).toBeLessThan(
+    loadSave.mock.invocationCallOrder[0]!,
+  );
 }
 
 beforeEach(() => {

@@ -10,7 +10,11 @@
  * `false` stops the loop, for a block whose precondition failed (audio that
  * would not start).
  */
-export async function eachScenarioFresh<T extends { name: string }>(scenarios: readonly T[], fresh: (sc: T) => Promise<void>, body: (sc: T) => Promise<void | false>): Promise<void> {
+export async function eachScenarioFresh<T extends { name: string }>(
+  scenarios: readonly T[],
+  fresh: (sc: T) => Promise<void>,
+  body: (sc: T) => Promise<void | false>,
+): Promise<void> {
   for (const sc of scenarios) {
     await fresh(sc);
     if ((await body(sc)) === false) return;

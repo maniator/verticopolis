@@ -29,13 +29,32 @@ const ABSENT_IDS = [0, -1, 999_999];
 /** How many units and shafts a checkpoint reads the cards of, spread over the list. */
 const CARDS_PER_CHECKPOINT = 12;
 
-const spread = <T>(xs: T[]): T[] => xs.filter((_, i) => i % Math.max(1, Math.floor(xs.length / CARDS_PER_CHECKPOINT)) === 0);
+const spread = <T>(xs: T[]): T[] =>
+  xs.filter((_, i) => i % Math.max(1, Math.floor(xs.length / CARDS_PER_CHECKPOINT)) === 0);
 
 /** The HUD strip's counters (`towerStats`), the housekeeping coverage and
  *  the onboarding facts, each key the engine answers. */
 const TOWER_STATS_KEYS = [
-  "basements", "condos", "dirty", "elevators", "fires", "floors", "hotelRooms", "money", "occupiedHotel", "occupiedOffices",
-  "offices", "parkingSpaces", "population", "restaurants", "shops", "soldCondos", "star", "transports", "vacant", "vacantNoRate",
+  "basements",
+  "condos",
+  "dirty",
+  "elevators",
+  "fires",
+  "floors",
+  "hotelRooms",
+  "money",
+  "occupiedHotel",
+  "occupiedOffices",
+  "offices",
+  "parkingSpaces",
+  "population",
+  "restaurants",
+  "shops",
+  "soldCondos",
+  "star",
+  "transports",
+  "vacant",
+  "vacantNoRate",
 ];
 const COVERAGE_KEYS = ["crews", "dailyCapacity", "dirty", "infested", "maids", "outOfReach", "rooms"];
 const ONBOARDING_KEYS = ["connect", "floor", "lobby", "office", "play"];
@@ -50,8 +69,15 @@ const isCard = (v: unknown): boolean => typeof v === "object" && v !== null && !
 /** One checkpoint: the decoded stats screen against the getter, then a read
  *  of every other getter, counted. */
 function probe(h: WasmEngine, id: string): void {
-  const report = parse(h.statsReport()) as { strandedFloors: number[]; housekeeping: { infested: number }; elevators: { cars: number }[] };
-  expect(JSON.parse(JSON.stringify(statsReport(h.statsSheet(), new PortCodes(h)))), `${id} checkpoint ${compared.checkpoints}`).toEqual(report);
+  const report = parse(h.statsReport()) as {
+    strandedFloors: number[];
+    housekeeping: { infested: number };
+    elevators: { cars: number }[];
+  };
+  expect(
+    JSON.parse(JSON.stringify(statsReport(h.statsSheet(), new PortCodes(h)))),
+    `${id} checkpoint ${compared.checkpoints}`,
+  ).toEqual(report);
   const save = JSON.parse(h.serialize()) as { money: number; units: { id: number }[]; transports: { id: number }[] };
   const at = `${id} checkpoint ${compared.checkpoints}`;
   // The HUD strip: every counter a number, and the cash the save holds.
@@ -61,7 +87,8 @@ function probe(h: WasmEngine, id: string): void {
   expect(stats.money, `${at} towerStats.money`).toBe(save.money);
   const coverage = parse(h.housekeepingCoverage()) as Record<string, unknown>;
   expect(Object.keys(coverage).sort(), `${at} housekeepingCoverage`).toEqual(COVERAGE_KEYS);
-  for (const key of COVERAGE_KEYS) expect(coverage[key], `${at} housekeepingCoverage.${key}`).toEqual(expect.any(Number));
+  for (const key of COVERAGE_KEYS)
+    expect(coverage[key], `${at} housekeepingCoverage.${key}`).toEqual(expect.any(Number));
   const facts = parse(h.onboardingFacts()) as Record<string, unknown>;
   expect(Object.keys(facts).sort(), `${at} onboardingFacts`).toEqual(ONBOARDING_KEYS);
   for (const key of ONBOARDING_KEYS) expect(facts[key], `${at} onboardingFacts.${key}`).toEqual(expect.any(Boolean));
@@ -91,7 +118,11 @@ describe.skipIf(!hasWasmPackage())("panel getters through the WASM binding", () 
   for (const file of files) {
     const scenario = loadScenario(resolve(SCENARIO_DIR, file));
     it(`${scenario.id}: the decoded stats screen matches the getter at every checkpoint`, () => {
-      runScenario(scenario, probedWasmStart((h) => probe(h, scenario.id)), []);
+      runScenario(
+        scenario,
+        probedWasmStart((h) => probe(h, scenario.id)),
+        [],
+      );
     }, 240_000);
   }
 

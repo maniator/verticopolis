@@ -52,7 +52,14 @@ export const WINDOW = {
 } as const;
 
 /** The lit colors a made-up tower picks from. */
-export const WINDOW_MIX: readonly string[] = [WINDOW.office, WINDOW.home, WINDOW.hotel, WINDOW.home, WINDOW.office, WINDOW.shop];
+export const WINDOW_MIX: readonly string[] = [
+  WINDOW.office,
+  WINDOW.home,
+  WINDOW.hotel,
+  WINDOW.home,
+  WINDOW.office,
+  WINDOW.shop,
+];
 
 /** A whole number from `lo` to `hi`, both included. */
 export function intIn(rng: Rng, lo: number, hi: number): number {

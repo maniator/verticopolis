@@ -5,13 +5,25 @@ import type { LinkedFolderState } from "../storage/linkedFolder";
 import { showFileDialog, type FileDialogCtx, type FileNote } from "./fileDialog";
 import { resetFilePlaceForTests, type LinkedPlaceCtx } from "./fileDialogPlaces";
 
-const entry = (id: string, name: string, kind: TowerFileEntry["kind"] = "tower"): TowerFileEntry => ({ id, name, kind, size: 100, modified: 10 });
+const entry = (id: string, name: string, kind: TowerFileEntry["kind"] = "tower"): TowerFileEntry => ({
+  id,
+  name,
+  kind,
+  size: 100,
+  modified: 10,
+});
 
 let box: HTMLElement | null;
 let ui: { openModalTemplate: ReturnType<typeof vi.fn>; closeModal: ReturnType<typeof vi.fn> };
 let folder: LinkedFolderState | null;
-let linked: { [K in keyof LinkedPlaceCtx]: LinkedPlaceCtx[K] extends (...a: never[]) => unknown ? ReturnType<typeof vi.fn> & LinkedPlaceCtx[K] : LinkedPlaceCtx[K] };
-let ctx: FileDialogCtx & { [K in "open" | "save" | "duplicate" | "rename" | "remove" | "add"]: ReturnType<typeof vi.fn> };
+let linked: {
+  [K in keyof LinkedPlaceCtx]: LinkedPlaceCtx[K] extends (...a: never[]) => unknown
+    ? ReturnType<typeof vi.fn> & LinkedPlaceCtx[K]
+    : LinkedPlaceCtx[K];
+};
+let ctx: FileDialogCtx & {
+  [K in "open" | "save" | "duplicate" | "rename" | "remove" | "add"]: ReturnType<typeof vi.fn>;
+};
 let changed: (() => void)[];
 let mirroring: boolean;
 
@@ -77,9 +89,14 @@ function show(mode: "open" | "saveAs", over: Partial<FileDialogCtx> = {}) {
 
 const q = <T extends HTMLElement = HTMLElement>(sel: string) => box!.querySelector<T>(sel)!;
 const rowNames = () => [...box!.querySelectorAll(".fd-row .fd-name-cell")].map((e) => e.textContent);
-const buttons = () => [...box!.querySelectorAll<HTMLButtonElement>("button")].map((b) => b.textContent?.trim().replace(/\s+/g, " "));
-const button = (text: string) => [...box!.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.trim().replace(/\s+/g, " ").startsWith(text))!;
-const lookItems = () => [...box!.querySelectorAll(".fd-look-item")].map((e) => e.textContent?.trim().replace(/\s+/g, " "));
+const buttons = () =>
+  [...box!.querySelectorAll<HTMLButtonElement>("button")].map((b) => b.textContent?.trim().replace(/\s+/g, " "));
+const button = (text: string) =>
+  [...box!.querySelectorAll<HTMLButtonElement>("button")].find((b) =>
+    b.textContent?.trim().replace(/\s+/g, " ").startsWith(text),
+  )!;
+const lookItems = () =>
+  [...box!.querySelectorAll(".fd-look-item")].map((e) => e.textContent?.trim().replace(/\s+/g, " "));
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
@@ -144,7 +161,9 @@ describe("the Look in box", () => {
     show("open");
     q(".fd-look").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
     expect(box!.querySelector(".fd-look-pop")).not.toBeNull();
-    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    document.activeElement!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    );
     expect(box!.querySelector(".fd-look-pop")).toBeNull();
     expect(document.activeElement).toBe(q(".fd-look"));
   });
@@ -164,7 +183,11 @@ describe("the Look in box", () => {
     folder = { name: "Towers", access: "granted" };
     show("open", { startIn: "linked" });
     q(".fd-look").click();
-    expect(lookItems().slice(-3)).toEqual(["Link a different folder…", "Keep a copy of my towers here too", 'Unlink "Towers"its files stay']);
+    expect(lookItems().slice(-3)).toEqual([
+      "Link a different folder…",
+      "Keep a copy of my towers here too",
+      'Unlink "Towers"its files stay',
+    ]);
     const item = () => q(".fd-mirror");
     expect(item().getAttribute("role")).toBe("menuitemcheckbox");
     expect(item().getAttribute("aria-checked")).toBe("false");

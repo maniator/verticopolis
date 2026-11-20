@@ -55,7 +55,8 @@ async function openScheduleDialog(page: import("playwright").Page, kind: string,
       const before = document.querySelector("#modal .modal-box");
       open.click();
       const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
-      if (!box || box === before || !box.querySelector(".es-body")) throw new Error("the schedule dialog did not mount");
+      if (!box || box === before || !box.querySelector(".es-body"))
+        throw new Error("the schedule dialog did not mount");
       // Dirty the working copy through a real control: a preset click routes
       // through onPreset, which lands in after() and sets the dirty flag
       // exactly as a player's edit would.
@@ -78,12 +79,14 @@ async function openScheduleDialog(page: import("playwright").Page, kind: string,
       // Mid-scroll, with the same below-the-fold floor as the 27b shot.
       box.scrollTop = Math.floor((box.scrollHeight - box.clientHeight) / 2);
       const left = box.scrollHeight - box.clientHeight - box.scrollTop;
-      if (left <= strip.offsetHeight) throw new Error("too little of the dialog is below the fold for the pin to be doing anything");
+      if (left <= strip.offsetHeight)
+        throw new Error("too little of the dialog is below the fold for the pin to be doing anything");
       // The whole point is that the warning is ON SCREEN while the player is
       // somewhere in the middle of a long dialog.
       const r = warn.getBoundingClientRect();
       const b = box.getBoundingClientRect();
-      if (r.bottom > b.bottom + 1 || r.top < b.top) throw new Error("the unsaved-changes warning is not visible in the scrollport");
+      if (r.bottom > b.bottom + 1 || r.top < b.top)
+        throw new Error("the unsaved-changes warning is not visible in the scrollport");
     },
     { k: kind, stage: stageUnsaved },
   );
@@ -104,7 +107,8 @@ async function checkAuto(page: import("playwright").Page, tick: boolean, hint: s
       if (!box.checked) throw new Error("the Auto box is not ticked");
       const presets = [...document.querySelectorAll<HTMLButtonElement>("#modal .es-presets .btn")];
       if (!presets.length || presets.some((b) => !b.disabled)) throw new Error("the presets are not locked under Auto");
-      if (document.querySelector("#modal .es-autotune")) throw new Error("the one-time Auto-tune button shows under Auto");
+      if (document.querySelector("#modal .es-autotune"))
+        throw new Error("the one-time Auto-tune button shows under Auto");
       const hints = [...document.querySelectorAll("#modal .es-hint")].map((p) => p.textContent);
       if (!hints.includes(hint)) throw new Error(`the Auto hint is missing: ${hint}`);
     },
@@ -112,7 +116,8 @@ async function checkAuto(page: import("playwright").Page, tick: boolean, hint: s
   );
 }
 
-const AUTO_ON_HINT = "Auto re-tunes the car counts every morning from measured traffic. Uncheck Auto to set them by hand.";
+const AUTO_ON_HINT =
+  "Auto re-tunes the car counts every morning from measured traffic. Uncheck Auto to set them by hand.";
 const AUTO_WAITING_HINT = "Auto starts once this shaft has measured a day of traffic.";
 
 export const SCHEDULE_SCENES: Scene[] = [
@@ -166,10 +171,12 @@ export const SCHEDULE_SCENES: Scene[] = [
             // own natural position is past it. A 1px overflow would satisfy a
             // bare `scrollTop > 0` while pinned and unpinned render identically.
             const left = box.scrollHeight - box.clientHeight - box.scrollTop;
-            if (left <= strip.offsetHeight) throw new Error("too little of the dialog is below the fold for the pin to be doing anything");
+            if (left <= strip.offsetHeight)
+              throw new Error("too little of the dialog is below the fold for the pin to be doing anything");
             const boxBottom = box.getBoundingClientRect().bottom;
             const stripBottom = strip.getBoundingClientRect().bottom;
-            if (stripBottom > boxBottom + 1) throw new Error("the action strip is not pinned; this shot would prove nothing");
+            if (stripBottom > boxBottom + 1)
+              throw new Error("the action strip is not pinned; this shot would prove nothing");
           });
         },
         wait: 300,
@@ -406,7 +413,10 @@ export const SCHEDULE_SCENES: Scene[] = [
               box.scrollTop = t;
               found = inBand();
             }
-            if (!found) throw new Error("no scroll offset puts a line of body text in the band below the strip, so this shot would prove nothing");
+            if (!found)
+              throw new Error(
+                "no scroll offset puts a line of body text in the band below the strip, so this shot would prove nothing",
+              );
           });
         },
         wait: 400,

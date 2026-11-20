@@ -65,7 +65,10 @@ async function clickIfVisible(page: Page, selector: string, timeout = 2000): Pro
 /** Pick a palette tool the way a player does: open its group's tab first
  *  when the palette shows one group at a time (the phone layout). */
 async function pickTool(page: Page, selector: string): Promise<void> {
-  const group = await page.$eval(selector, (el) => el.getAttribute("data-group") ?? el.closest(".pal-group")?.getAttribute("data-group") ?? null);
+  const group = await page.$eval(
+    selector,
+    (el) => el.getAttribute("data-group") ?? el.closest(".pal-group")?.getAttribute("data-group") ?? null,
+  );
   if (group) await clickIfVisible(page, `.pal-tab[data-group="${group}"]`);
   await page.click(selector, { timeout: 5000 });
 }
@@ -144,7 +147,12 @@ export async function preparePhase(page: Page, name: PhaseName): Promise<{ x: nu
 
 /** Place an office and undo it, once a second, cycling through `spots`.
  *  A placement counts when the tower gained an office; only those are undone. */
-async function build(page: Page, vp: Viewport, end: number, spots: readonly { x: number; y: number }[]): Promise<PhaseActions> {
+async function build(
+  page: Page,
+  vp: Viewport,
+  end: number,
+  spots: readonly { x: number; y: number }[],
+): Promise<PhaseActions> {
   await pickTool(page, '.pal-item[data-kind="office"]');
   const tick = pacer(page, 500);
   let placed = 0;
@@ -185,7 +193,13 @@ async function inspect(page: Page, vp: Viewport, end: number): Promise<PhaseActi
 }
 
 /** Run one phase's interaction for `ms` milliseconds. */
-export async function runPhase(page: Page, name: PhaseName, vp: Viewport, ms: number, spots: readonly { x: number; y: number }[] = []): Promise<PhaseActions> {
+export async function runPhase(
+  page: Page,
+  name: PhaseName,
+  vp: Viewport,
+  ms: number,
+  spots: readonly { x: number; y: number }[] = [],
+): Promise<PhaseActions> {
   const end = Date.now() + ms;
   switch (name) {
     case "idle":

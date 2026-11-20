@@ -1,4 +1,10 @@
-import { catalogFacility, type Catalog, type CatalogCalendar, type CatalogRent, type CatalogRentCadence } from "@verticopolis/components/catalog/catalogTypes";
+import {
+  catalogFacility,
+  type Catalog,
+  type CatalogCalendar,
+  type CatalogRent,
+  type CatalogRentCadence,
+} from "@verticopolis/components/catalog/catalogTypes";
 import type { CalendarKind, PriceOptions, PriceRung } from "@verticopolis/components/shared/engineTypes";
 import type { FacilityKind } from "@verticopolis/components/shared/types";
 
@@ -25,7 +31,8 @@ export function priceOptionsFromRent(rent: CatalogRent | null): PriceOptions | n
   }
   const rungs = rent.rungs.map((r): PriceRung => {
     const label = RUNG_LABELS[r.level];
-    if (label === undefined || label !== r.label) throw new Error(`the catalog's rent ladder has an unknown rung: ${r.level} "${r.label}"`);
+    if (label === undefined || label !== r.label)
+      throw new Error(`the catalog's rent ladder has an unknown rung: ${r.level} "${r.label}"`);
     return { level: r.level as PriceRung["level"], label, value: r.value };
   });
   return { shape: "ladder", rungs, noRate: true };

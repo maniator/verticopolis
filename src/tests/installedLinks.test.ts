@@ -59,7 +59,9 @@ describe("installedLinkProblems", () => {
     expect(installedLinkProblems(join(tmpdir(), "vc-no-such-folder-974"))).toEqual([]);
     const file = join(tree([]), "..", "a-file");
     writeFileSync(file, "");
-    expect(installedLinkProblems(file)).toEqual(["node_modules cannot be read, so it cannot be checked for linked packages"]);
+    expect(installedLinkProblems(file)).toEqual([
+      "node_modules cannot be read, so it cannot be checked for linked packages",
+    ]);
     expect(installedLinkProblems(resolve(__dirname, "../../node_modules"))).toEqual([]);
   });
 });

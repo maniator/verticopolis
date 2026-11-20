@@ -5,7 +5,16 @@ import { FLOOR } from "@verticopolis/components/render/scale";
 import { MAP_OPEN_STORAGE_KEY, MAP_OPEN_VALUE } from "./overviewMapPrefs";
 import type { OverviewMapDeps } from "./overviewMapWindow";
 import { MAP_DOM_ID } from "./overviewMapDom";
-import { CROP, disposeRigs, pointer, rig, rootEl, silent2d, towerSource, viewCanvas } from "./overviewMapWindow.fixture";
+import {
+  CROP,
+  disposeRigs,
+  pointer,
+  rig,
+  rootEl,
+  silent2d,
+  towerSource,
+  viewCanvas,
+} from "./overviewMapWindow.fixture";
 
 beforeEach(() => vi.restoreAllMocks());
 afterEach(() => disposeRigs());
@@ -98,14 +107,26 @@ describe("overview map window: opening and closing (CAP-1)", () => {
     const close = document.querySelector(".overview-map-close") as HTMLButtonElement;
     close.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
     close.dispatchEvent(new MouseEvent("click", { detail: 0, bubbles: true }));
-    const repeat = new KeyboardEvent("keydown", { key: "Enter", code: "Enter", repeat: true, bubbles: true, cancelable: true });
+    const repeat = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    });
     document.getElementById(MAP_DOM_ID.toggle)!.dispatchEvent(repeat);
     expect(repeat.defaultPrevented).toBe(true);
   });
 
   it("lets a held Tab move on past the Map button", () => {
     rig({ phone: true });
-    const tab = new KeyboardEvent("keydown", { key: "Tab", code: "Tab", repeat: true, bubbles: true, cancelable: true });
+    const tab = new KeyboardEvent("keydown", {
+      key: "Tab",
+      code: "Tab",
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    });
     document.getElementById(MAP_DOM_ID.toggle)!.dispatchEvent(tab);
     expect(tab.defaultPrevented).toBe(false);
   });
@@ -171,7 +192,9 @@ describe("overview map window: frames (CAP-6)", () => {
     rig();
     expect(viewCanvas().width).toBe(200);
     expect(viewCanvas().height).toBe(288);
-    expect(document.getElementById(MAP_DOM_ID.summary)!.textContent).toBe("Tower map: 10 floors above ground. The view is above the top floor, 10.");
+    expect(document.getElementById(MAP_DOM_ID.summary)!.textContent).toBe(
+      "Tower map: 10 floors above ground. The view is above the top floor, 10.",
+    );
   });
 
   it("reads the tower and the camera only, and does no work on an unchanged frame", () => {
@@ -207,7 +230,8 @@ describe("overview map window: frames (CAP-6)", () => {
   it("draws a tall lobby hall at its full height from the halls it is given, read once per rebuild (#308)", () => {
     const tallLobbies = vi.fn(() => [{ floor: 1, x0: 100, x1: 149, height: 3 }]);
     const r = rig({ tallLobbies });
-    const model = (r.win as unknown as { model: { marks: ReadonlyArray<{ kind: string; rect: { h: number } }> } }).model;
+    const model = (r.win as unknown as { model: { marks: ReadonlyArray<{ kind: string; rect: { h: number } }> } })
+      .model;
     r.win.frame();
     expect(tallLobbies).toHaveBeenCalledTimes(1);
     const [oneStory, hall] = model.marks.filter((m) => m.kind === "lobby");
@@ -226,7 +250,9 @@ describe("overview map window: frames (CAP-6)", () => {
     const r = rig();
     r.cam.posY = -5 * FLOOR;
     r.win.frame();
-    expect(document.getElementById(MAP_DOM_ID.summary)!.textContent).toBe("Tower map: 10 floors above ground. The view is at floor 5.");
+    expect(document.getElementById(MAP_DOM_ID.summary)!.textContent).toBe(
+      "Tower map: 10 floors above ground. The view is at floor 5.",
+    );
   });
 });
 
@@ -259,7 +285,8 @@ describe("overview map window: focus and keys (CAP-5)", () => {
     const r = rig();
     const game = vi.fn();
     window.addEventListener("keydown", game);
-    for (const key of ["ArrowUp", "Enter", "Delete", "x", "w"]) viewCanvas().dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    for (const key of ["ArrowUp", "Enter", "Delete", "x", "w"])
+      viewCanvas().dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
     window.removeEventListener("keydown", game);
     expect(game).not.toHaveBeenCalled();
     expect(r.moves).toEqual([{ tile: 100, floor: 24 }]);
@@ -270,7 +297,9 @@ describe("overview map window: focus and keys (CAP-5)", () => {
     const close = document.querySelector(".overview-map-close") as HTMLButtonElement;
     const game = vi.fn();
     window.addEventListener("keydown", game);
-    const keys = ["Enter", "x", "Delete"].map((key) => new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    const keys = ["Enter", "x", "Delete"].map(
+      (key) => new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
     for (const k of keys) close.dispatchEvent(k);
     window.removeEventListener("keydown", game);
     expect(game).not.toHaveBeenCalled();

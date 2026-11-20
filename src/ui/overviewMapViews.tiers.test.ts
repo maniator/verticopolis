@@ -16,7 +16,13 @@ const office = (id: number): MapViewRoom => ({ id, kind: "office", floor: 3, x: 
 
 /** The Eval and Pricing views over a fake tower, a fake engine read and an
  *  injected clock and gesture, mounted in a window as the game builds them. */
-function onTab(view: MapViewId, rows: Array<[number, EvalTier, RentTier]> = [[1, "excellent", "average"], [2, "terrible", "high"]]) {
+function onTab(
+  view: MapViewId,
+  rows: Array<[number, EvalTier, RentTier]> = [
+    [1, "excellent", "average"],
+    [2, "terrible", "high"],
+  ],
+) {
   const clock = { minutes: 7 * 60 };
   const tower = { rooms: [office(1), office(2)] as ReadonlyArray<MapViewRoom> };
   const engine = { rows, gesture: 0 };
@@ -41,7 +47,8 @@ function fakeCtx(): MapPaintContext & { fills: number[] } {
   return { fills, fillStyle: "", fillRect: () => fills.push(1), clearRect: () => {} };
 }
 const plain: PatternSource = { get: (fill) => fill };
-const legendOf = (view: MapViewId) => document.querySelector(`.overview-map-legend[data-view="${view}"]`) as HTMLElement;
+const legendOf = (view: MapViewId) =>
+  document.querySelector(`.overview-map-legend[data-view="${view}"]`) as HTMLElement;
 
 afterEach(() => disposeRigs());
 
@@ -118,7 +125,10 @@ describe("the Eval and Pricing views", () => {
     expect(v.due(layout, false)).toBe(false);
     expect(tiers.read).toHaveBeenCalledTimes(1);
     engine.gesture = 0;
-    engine.rows = [[1, "good", "low"], [3, "good", "low"]];
+    engine.rows = [
+      [1, "good", "low"],
+      [3, "good", "low"],
+    ];
     expect(v.due(layout, false)).toBe(true);
     expect(tiers.read).toHaveBeenCalledTimes(2);
     expect(v.due(layout, false)).toBe(false);
@@ -174,7 +184,12 @@ describe("the Eval and Pricing views", () => {
   });
 
   it("paint nothing without a tier reader", () => {
-    const v = new OverviewMapViews({ rooms: () => [office(1)], roomById: () => undefined, minutes: () => 0, floorsOf: () => 1 });
+    const v = new OverviewMapViews({
+      rooms: () => [office(1)],
+      roomById: () => undefined,
+      minutes: () => 0,
+      floorsOf: () => 1,
+    });
     rig({ views: v });
     pickView("eval");
     expect(v.due(layout, false)).toBe(true);

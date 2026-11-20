@@ -18,7 +18,14 @@ const FIXTURES = "node_modules/@verticopolis/engine/conformance/fixtures";
 const saveOf = (name: string) => JSON.stringify(decodeVctower(readFileSync(`${FIXTURES}/${name}.vctower`, "utf8")));
 
 const shaftsOf = (engine: EnginePort): ShaftFacts[] =>
-  look(engine).tower.transports.map((t) => ({ id: t.id as number, kind: t.kind as FacilityKind, x: t.x as number, bottom: t.bottom as number, top: t.top as number, cars: t.cars as number }));
+  look(engine).tower.transports.map((t) => ({
+    id: t.id as number,
+    kind: t.kind as FacilityKind,
+    x: t.x as number,
+    bottom: t.bottom as number,
+    top: t.top as number,
+    cars: t.cars as number,
+  }));
 
 function reviewOf(name: string) {
   const engine = engineFromSave(saveOf(name));
@@ -49,7 +56,8 @@ describe.skipIf(noEngine)("shortFleets on the repository fixtures (#1548)", () =
   });
 
   it("says nothing about the fixtures that carry no authored schedule", () => {
-    for (const name of ["sixseven_2", "sixseven-december", "towerone_6"]) expect(reviewOf(name).found, name).toEqual([]);
+    for (const name of ["sixseven_2", "sixseven-december", "towerone_6"])
+      expect(reviewOf(name).found, name).toEqual([]);
   });
 
   it("never edits the fixture bytes", () => {

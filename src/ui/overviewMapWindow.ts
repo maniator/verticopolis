@@ -13,15 +13,46 @@
  */
 import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
 import type { ViewPlacement } from "@verticopolis/components/render/overviewMap/extent";
-import { dragCenter, mapPointToCenter, rectContains, type MapLayout, type MapRect } from "@verticopolis/components/render/overviewMap/geometry";
+import {
+  dragCenter,
+  mapPointToCenter,
+  rectContains,
+  type MapLayout,
+  type MapRect,
+} from "@verticopolis/components/render/overviewMap/geometry";
 import { OverviewMapModel, type MapFrameInput } from "@verticopolis/components/render/overviewMap/model";
-import { createPatternSource, paintGapsAndShafts, paintMapMarks, type PatternSource } from "@verticopolis/components/render/overviewMap/paint";
+import {
+  createPatternSource,
+  paintGapsAndShafts,
+  paintMapMarks,
+  type PatternSource,
+} from "@verticopolis/components/render/overviewMap/paint";
 import { MAP_MIN_GAP_CSS_PX } from "@verticopolis/components/render/overviewMap/gaps";
-import { MAP_BACKDROP, groundShare, paintViewMark, viewMarkBand } from "@verticopolis/components/render/overviewMap/viewMark";
+import {
+  MAP_BACKDROP,
+  groundShare,
+  paintViewMark,
+  viewMarkBand,
+} from "@verticopolis/components/render/overviewMap/viewMark";
 import { buildMapDom, ContextWatch } from "./overviewMapDom";
 import { MapKeyKeeper, PointerFocusClaim } from "./overviewMapKeys";
 import { WorldPress } from "./overviewMapWorldPress";
-import { cameraCenter, clientToMap, grabRect, isKeyboardClick, isPrimaryPress, keyTarget, MAP_KEY, type MapPress, MAP_MOUSE_TARGET_CSS, MAP_TOUCH_TARGET_CSS, noButtonHeld, passesMapKey, pastTapSlop, pixelRatio } from "@verticopolis/components/windows/overviewMapInput";
+import {
+  cameraCenter,
+  clientToMap,
+  grabRect,
+  isKeyboardClick,
+  isPrimaryPress,
+  keyTarget,
+  MAP_KEY,
+  type MapPress,
+  MAP_MOUSE_TARGET_CSS,
+  MAP_TOUCH_TARGET_CSS,
+  noButtonHeld,
+  passesMapKey,
+  pastTapSlop,
+  pixelRatio,
+} from "@verticopolis/components/windows/overviewMapInput";
 import { mapStartsOpen, rememberMapOpen, type MapLayoutClass } from "./overviewMapPrefs";
 import { mapSummary } from "./overviewMapText";
 import type { MutableMapCamera, OverviewMapDeps } from "./overviewMapDeps";
@@ -118,7 +149,10 @@ export class OverviewMapWindow {
     // keys with the world. Buttons keep their default (a mouse close blurs the
     // close button), so their pressed look still shows in every browser, and
     // the View dropdown keeps it so it opens (it hands focus back itself).
-    this.root.addEventListener("mousedown", (e) => e.target instanceof HTMLButtonElement || e.target instanceof HTMLSelectElement || e.preventDefault());
+    this.root.addEventListener(
+      "mousedown",
+      (e) => e.target instanceof HTMLButtonElement || e.target instanceof HTMLSelectElement || e.preventDefault(),
+    );
     // A pinch or Ctrl+wheel over the window never zooms the page.
     this.root.addEventListener("wheel", (e) => e.ctrlKey && e.preventDefault(), { passive: false });
     this.viewCanvas.addEventListener("focus", () => {
@@ -142,7 +176,9 @@ export class OverviewMapWindow {
     this.keys = new MapKeyKeeper(this.root);
     this.pointerFocus = new PointerFocusClaim(this.keys);
     doc.defaultView?.addEventListener("blur", this.onWindowBlur);
-    this.contexts = new ContextWatch([this.towerCanvas, this.viewCanvas], [this.towerCtx, this.viewCtx], () => this.forgetDrawing());
+    this.contexts = new ContextWatch([this.towerCanvas, this.viewCanvas], [this.towerCtx, this.viewCtx], () =>
+      this.forgetDrawing(),
+    );
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(() => (this.sizeDirty = true));
       this.resizeObserver.observe(this.body);
@@ -249,7 +285,8 @@ export class OverviewMapWindow {
       if (this.towerCtx && this.patterns) {
         paintMapMarks(this.towerCtx, layout.width, layout.height, this.model.marks, this.model.gaps, this.patterns);
         // A view's rooms go under the gaps and the shafts, as on the Edit view.
-        if (this.deps.views?.paintOver(this.towerCtx, this.patterns)) paintGapsAndShafts(this.towerCtx, this.model.marks, this.model.gaps, this.patterns);
+        if (this.deps.views?.paintOver(this.towerCtx, this.patterns))
+          paintGapsAndShafts(this.towerCtx, this.model.marks, this.model.gaps, this.patterns);
         this.root.dataset.mapDrawn = "true";
       }
       const ground = `${(groundShare(layout) * 100).toFixed(2)}%`;
@@ -302,7 +339,9 @@ export class OverviewMapWindow {
   /** Measure the box again, and start new pattern tiles (they fill lazily). */
   private restart(): void {
     this.sizeDirty = true;
-    this.patterns = this.towerCtx ? createPatternSource(() => this.root.ownerDocument.createElement("canvas"), this.towerCtx) : null;
+    this.patterns = this.towerCtx
+      ? createPatternSource(() => this.root.ownerDocument.createElement("canvas"), this.towerCtx)
+      : null;
   }
 
   /** Write the summary only when it changed, so a screen reader is not sent the
@@ -381,7 +420,8 @@ export class OverviewMapWindow {
     // A primary pointer means no other of its kind is down: a touch id, or a
     // press by another pointer of the same kind, is left over from a lost
     // release (a pen can get a new id per contact).
-    if (e.isPrimary && this.press?.pointerType === e.pointerType && this.press.pointerId !== e.pointerId) this.press = null;
+    if (e.isPrimary && this.press?.pointerType === e.pointerType && this.press.pointerId !== e.pointerId)
+      this.press = null;
     if (e.pointerType === "touch" && e.isPrimary) this.outsideTouches.clear();
     const layout = this.model.layout;
     // A second finger while one is down is not the map's, and neither is a
@@ -399,7 +439,15 @@ export class OverviewMapWindow {
     const p = this.mapPoint(e);
     const placement = this.model.placement;
     const area = placement ? this.grabArea(layout, placement, e.pointerType !== "mouse") : null;
-    this.press = { pointerId: e.pointerId, pointerType: e.pointerType, onMark: !!area && rectContains(area, p.x, p.y), start: p, last: p, layout, traveled: false };
+    this.press = {
+      pointerId: e.pointerId,
+      pointerType: e.pointerType,
+      onMark: !!area && rectContains(area, p.x, p.y),
+      start: p,
+      last: p,
+      layout,
+      traveled: false,
+    };
   }
 
   private onPointerMove(e: PointerEvent): void {
@@ -487,4 +535,3 @@ export class OverviewMapWindow {
     this.toggle.remove();
   }
 }
-

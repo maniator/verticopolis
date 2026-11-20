@@ -40,7 +40,7 @@ export function buildFrontDoorTowers(): void {
     for (let f = 2; f <= 3; f++) for (let x = lo; x <= hi; x++) s.tower.place("floor", f, x);
     if (!s.tower.placeTransport("elevatorStandard", lo + 5, 1, 3).ok) throw new Error(`no elevator at ${lo + 5}`);
     for (let f = 2; f <= 3; f++) {
-      for (let x = lo + 8; x + 9 <= hi + 1; ) {
+      for (let x = lo + 8; x + 9 <= hi + 1;) {
         const r = s.tower.place("office", f, x);
         if (!r.ok) {
           x += 1;

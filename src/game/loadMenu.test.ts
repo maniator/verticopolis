@@ -15,7 +15,13 @@ vi.mock("./titleScreen", () => ({ welcomeFounder: fake.welcomeFounder }));
 import type { GameApp } from "../main";
 import { LOAD_FAILED, loadSave, openLive } from "./loadMenu";
 
-let app: { ui: { cb: { onLoadSlot: ReturnType<typeof vi.fn> }; sayVisibly: ReturnType<typeof vi.fn>; toast: ReturnType<typeof vi.fn> } };
+let app: {
+  ui: {
+    cb: { onLoadSlot: ReturnType<typeof vi.fn> };
+    sayVisibly: ReturnType<typeof vi.fn>;
+    toast: ReturnType<typeof vi.fn>;
+  };
+};
 
 beforeEach(() => {
   Object.assign(fake, { splash: false, loaded: true });

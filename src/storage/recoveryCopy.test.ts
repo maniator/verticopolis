@@ -13,8 +13,8 @@ describe("readRecoveryText", () => {
   });
 
   it("reads the legacy autosave key when only it is stored", () => {
-    localStorage.setItem("simtower-clone-save", "{\"legacy\":true}");
-    expect(readRecoveryText()).toBe("{\"legacy\":true}");
+    localStorage.setItem("simtower-clone-save", '{"legacy":true}');
+    expect(readRecoveryText()).toBe('{"legacy":true}');
   });
 
   it("falls back to the unreadable stash, and is null with nothing stored", () => {

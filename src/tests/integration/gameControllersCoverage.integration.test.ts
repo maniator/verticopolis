@@ -6,14 +6,26 @@ import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { draftTower, draftFromSave, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
-import type { BatchRentOptions, BatchRentResult, BatchTarget, PriceOptions } from "@verticopolis/components/shared/engineTypes";
+import type {
+  BatchRentOptions,
+  BatchRentResult,
+  BatchTarget,
+  PriceOptions,
+} from "@verticopolis/components/shared/engineTypes";
 import { priceOptionsFor } from "../../ui/catalogPricing";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
 import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
 import type { Transport, Unit } from "@verticopolis/components/shared/types";
 import type { Picked, TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
-import { kitOf, portOf, unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
+import {
+  kitOf,
+  portOf,
+  unitEditor,
+  transportEditor,
+  editorPortDeps,
+  inspectorPortDeps,
+} from "../../game/cardKit.fixture";
 import { render, type TemplateResult } from "lit-html";
 import { SaveGame } from "../../storage/SaveGame";
 import { closeFileSpaceForTests, fileSpace } from "../../storage/fileSpace";
@@ -60,7 +72,8 @@ const shaftOf = (sim: Draft, id: number) => shaftsOf(sim).find((t) => t.id === i
 /** Whether a shaft stops at a floor (its save's skip list). */
 const stopsAt = (sim: Draft, id: number, floor: number) => !(shaftOf(sim, id)!.skipFloors ?? []).includes(floor);
 /** Mark a stop through the port; true when the engine took it. */
-const markStop = (sim: Draft, id: number, floor: number, stop: boolean) => portOf(sim).markStop(id, floor, stop)[0] === 1;
+const markStop = (sim: Draft, id: number, floor: number, stop: boolean) =>
+  portOf(sim).markStop(id, floor, stop)[0] === 1;
 /** Move a shaft's ends in its save, as an old save or a forged one holds it. */
 function resize(sim: Draft, id: number, bottom: number, top: number): void {
   const t = sim.tower.transports.find((r) => r.id === id)! as unknown as Transport;
@@ -719,7 +732,12 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
     vi.spyOn(ports.port, "scheduleShaft").mockReturnValueOnce(Float64Array.of(0, 0));
     vi.spyOn(ports.port, "lastReason").mockReturnValueOnce(INVALID_COMMAND);
     const spoken = announced.length;
-    await scheduleDlg!.cb.apply({ activeCars: { weekday: [], weekend: [] }, waitingCarResponse: 0, standardFloorDeparture: 0, homeFloors: [] });
+    await scheduleDlg!.cb.apply({
+      activeCars: { weekday: [], weekend: [] },
+      waitingCarResponse: 0,
+      standardFloorDeparture: 0,
+      homeFloors: [],
+    });
     expect(last(f.sfx)).toBe("error");
     expect(last(f.toasts)).toEqual({ text: INVALID_COMMAND, kind: "bad" });
     expect(announced.length).toBe(spoken);
@@ -739,10 +757,18 @@ describe.skipIf(noEngine)("EditorActions (dialogs, extend billing, per-kind butt
         ports.viewReader.update();
         expect(ports.viewReader.header.mode).toBe(mode);
         for (const scheduleAssist of [true, false]) {
-          useTowerCatalogSource(ports.port, (m) => ({ ...catalogFor(m), rules: { ...catalogFor(m).rules, scheduleAssist } }));
+          useTowerCatalogSource(ports.port, (m) => ({
+            ...catalogFor(m),
+            rules: { ...catalogFor(m).rules, scheduleAssist },
+          }));
           scheduleDlg = null;
           await editor.handleEditAction("schedule", root);
-          expect(scheduleDlg!.ctx.ux, `${mode}, scheduleAssist ${scheduleAssist}`).toEqual({ presets: scheduleAssist, autoTune: scheduleAssist, advice: scheduleAssist, rawGridDefault: !scheduleAssist });
+          expect(scheduleDlg!.ctx.ux, `${mode}, scheduleAssist ${scheduleAssist}`).toEqual({
+            presets: scheduleAssist,
+            autoTune: scheduleAssist,
+            advice: scheduleAssist,
+            rawGridDefault: !scheduleAssist,
+          });
         }
       }
     } finally {
@@ -1098,20 +1124,22 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     crashScreens = [];
     armed = 0;
     recoveries = [];
-    saveLoad = new SaveLoad(withPorts({
-      getSim: () => sim,
-      getView: () => null,
-      adoptSim: (s) => {
-        // The app follows the adopted tower, as GameApp.adoptSim does.
-        adopted.push(s);
-        sim = s;
-      },
-      ui: f.ui,
-      showCrashScreen: (info) => crashScreens.push(info),
-      showRecoveryWait: (behindSplash) => showGraphicsRecovery(behindSplash),
-      attemptGraphicsRecovery: (done) => recoveries.push(done),
-      armOnboarding: () => armed++,
-    }));
+    saveLoad = new SaveLoad(
+      withPorts({
+        getSim: () => sim,
+        getView: () => null,
+        adoptSim: (s) => {
+          // The app follows the adopted tower, as GameApp.adoptSim does.
+          adopted.push(s);
+          sim = s;
+        },
+        ui: f.ui,
+        showCrashScreen: (info) => crashScreens.push(info),
+        showRecoveryWait: (behindSplash) => showGraphicsRecovery(behindSplash),
+        attemptGraphicsRecovery: (done) => recoveries.push(done),
+        armOnboarding: () => armed++,
+      }),
+    );
   });
 
   afterEach(() => {
@@ -1152,7 +1180,11 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     const spy = vi.spyOn(SaveGame, "saveAsync").mockImplementation(async (s) => {
       // The engine hands the autosave its stamped bytes, never a text.
       if (typeof s === "string") throw new Error("the autosave was handed a text");
-      const save = JSON.parse(new TextDecoder().decode(s())) as { money: number; savedAt: unknown; appVersion: unknown };
+      const save = JSON.parse(new TextDecoder().decode(s())) as {
+        money: number;
+        savedAt: unknown;
+        appVersion: unknown;
+      };
       expect(typeof save.savedAt).toBe("number");
       expect(typeof save.appVersion).toBe("string");
       savedMoney.push(save.money);
@@ -1233,7 +1265,9 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     // The engine refuses the file (a stamp it rejects, a save past the cap):
     // the controller surfaces its reason as a toast and downloads nothing.
     const write = vi.spyOn(portOf(sim), "exportVctowerBytes").mockReturnValue(undefined);
-    const reason = vi.spyOn(portOf(sim), "lastReason").mockReturnValue("This tower's save data is larger than 32 MB, the most a save can hold.");
+    const reason = vi
+      .spyOn(portOf(sim), "lastReason")
+      .mockReturnValue("This tower's save data is larger than 32 MB, the most a save can hold.");
     try {
       await saveLoad.exportGame();
       expect(f.downloads).toHaveLength(0);
@@ -1313,7 +1347,12 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     expect(adopted).toEqual([sim]);
     expect(adopted[0].money).toBe(1_234_500);
     expect(loadAuto()!.money).toBe(777); // current tower kept safe
-    await vi.waitFor(() => expect(last(f.toasts)).toEqual({ text: 'Tower imported. The 1994 file is in My Towers as "LEGACY".', kind: "good" }));
+    await vi.waitFor(() =>
+      expect(last(f.toasts)).toEqual({
+        text: 'Tower imported. The 1994 file is in My Towers as "LEGACY".',
+        kind: "good",
+      }),
+    );
     const kept = fileSpace.list();
     expect(kept.map((e) => [e.name, e.kind])).toEqual([["LEGACY", "tdt"]]);
     expect(await fileSpace.read(kept[0].id)).toEqual(bytes);
@@ -1335,7 +1374,9 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     await saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "NOFOLDER.TDT");
     f.importReports[0].open();
     expect(adopted).toHaveLength(1);
-    await vi.waitFor(() => expect(last(f.toasts)).toEqual({ text: "Tower imported. Use File > Save As… to keep it.", kind: "good" }));
+    await vi.waitFor(() =>
+      expect(last(f.toasts)).toEqual({ text: "Tower imported. Use File > Save As… to keep it.", kind: "good" }),
+    );
   });
 
   itTdt("importLegacy: each report opens its own file, whatever was read after it", async () => {
@@ -1388,7 +1429,12 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
       behindSplash: false,
       recoveryFailed: true,
     });
-    expect(crashScreens[0].save).toEqual({ flushed: true, behindSplash: false, storageBlame: false, hadPriorSave: false });
+    expect(crashScreens[0].save).toEqual({
+      flushed: true,
+      behindSplash: false,
+      storageBlame: false,
+      hadPriorSave: false,
+    });
     // No silent auto-reload: the reload (and its session stamps) is the
     // player's Reload button.
     expect(reload).not.toHaveBeenCalled();
@@ -1519,7 +1565,12 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     // A prior autosave exists, so the screen reassures the player it's safe
     // (don't imply total loss and send them off to clear the very save that
     // survived).
-    expect(crashScreens[0].save).toEqual({ flushed: false, behindSplash: false, storageBlame: true, hadPriorSave: true });
+    expect(crashScreens[0].save).toEqual({
+      flushed: false,
+      behindSplash: false,
+      storageBlame: true,
+      hadPriorSave: true,
+    });
     expect(crashScreens[0].crash.saveFlushed).toBe(false);
     // A failed setItem never clobbers — the prior tower is still loadable.
     expect(loadAuto()?.money).toBe(555_000);
@@ -1538,7 +1589,12 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     expect(() => saveLoad.recoverFromContextLoss()).not.toThrow();
     expect(crashScreens).toHaveLength(1);
     // Storage is unreadable, so no false "your last saved tower is safe" claim.
-    expect(crashScreens[0].save).toEqual({ flushed: false, behindSplash: false, storageBlame: true, hadPriorSave: false });
+    expect(crashScreens[0].save).toEqual({
+      flushed: false,
+      behindSplash: false,
+      storageBlame: true,
+      hadPriorSave: false,
+    });
     saveSpy.mockRestore();
     hasSaveSpy.mockRestore();
   });
@@ -1577,7 +1633,12 @@ describe.skipIf(noEngine)("SaveLoad (persistence, update flush, GPU-loss recover
     saveLoad.recoverFromContextLoss();
     expect(crashScreens).toHaveLength(1);
     // The prior tower is still safe, so still reassure.
-    expect(crashScreens[0].save).toEqual({ flushed: false, behindSplash: false, storageBlame: false, hadPriorSave: true });
+    expect(crashScreens[0].save).toEqual({
+      flushed: false,
+      behindSplash: false,
+      storageBlame: false,
+      hadPriorSave: true,
+    });
     spy.mockRestore();
   });
 
@@ -1648,7 +1709,11 @@ describe.skipIf(noEngine)("KeyboardPlay (cursor bounds, transport anchor flow, p
   let keyboard: KeyboardPlay;
   let f: ReturnType<typeof fakes>;
   let office: Unit;
-  let engine: { ensureVisible: () => void; preview: TowerEngine["preview"]; transportPreview: TowerEngine["transportPreview"] };
+  let engine: {
+    ensureVisible: () => void;
+    preview: TowerEngine["preview"];
+    transportPreview: TowerEngine["transportPreview"];
+  };
   let previewCalls: { tile: number; floor: number }[];
   let selections: (Picked | null)[];
   let undoLog: string[];
@@ -1768,14 +1833,12 @@ describe.skipIf(noEngine)("KeyboardPlay (cursor bounds, transport anchor flow, p
     expect(engine.transportPreview).toBeNull();
     // The engine reports the shaft for build depth, with its top floor as the
     // reach, whichever input built it.
-    expect(new PortEvents(portOf(sim)).drainGameplayEvents()).toContainEqual({ name: "facility_placed", payload: { kind: "elevatorStandard", floor: 2, count: 1 } });
+    expect(new PortEvents(portOf(sim)).drainGameplayEvents()).toContainEqual({
+      name: "facility_placed",
+      payload: { kind: "elevatorStandard", floor: 2, count: 1 },
+    });
     // Both presses bracket undo like any other gesture.
-    expect(undoLog).toEqual([
-      "capture:Build Standard Elevator",
-      "commit",
-      "capture:Build Standard Elevator",
-      "commit",
-    ]);
+    expect(undoLog).toEqual(["capture:Build Standard Elevator", "commit", "capture:Build Standard Elevator", "commit"]);
   });
 
   it("resetAnchor drops a pending anchor: the next Enter re-anchors instead of building", async () => {
@@ -1847,9 +1910,12 @@ describe.skipIf(noEngine)("KeyboardPlay (cursor bounds, transport anchor flow, p
     expect(last(announced)).toBe(`Could not bulldoze ${fac("office").name}`);
     expect(last(f.sfx)).toBe("error");
     expect(undoLog.slice(-6)).toEqual([
-      "capture:Bulldoze", "commit",
-      "capture:Bulldoze", "commit",
-      "capture:Bulldoze", "commit",
+      "capture:Bulldoze",
+      "commit",
+      "capture:Bulldoze",
+      "commit",
+      "capture:Bulldoze",
+      "commit",
     ]);
   });
 

@@ -46,28 +46,39 @@ describe("adopting a confirmed .TDT import", () => {
     expect(port.loadTdt).toHaveBeenCalledExactlyOnceWith(FILE.bytes, FILE.filename);
     expect(trackFileImported).toHaveBeenCalledExactlyOnceWith("tdt", expect.any(Function));
     expect(vi.mocked(trackFileImported).mock.calls[0]![1]()).toBe(HEADER);
-    expect(vi.mocked(trackFileImported).mock.invocationCallOrder[0]).toBeGreaterThan(deps.towerSwapped.mock.invocationCallOrder[0]!);
+    expect(vi.mocked(trackFileImported).mock.invocationCallOrder[0]).toBeGreaterThan(
+      deps.towerSwapped.mock.invocationCallOrder[0]!,
+    );
   });
 
   it("keeps the 1994 file in My Towers and says where", async () => {
     const { deps } = setup();
     adoptConfirmedLegacyImport(deps as never, "Old Tower", () => {}, FILE);
     expect(keepOpenedFile).toHaveBeenCalledExactlyOnceWith("OLD.TDT", FILE.bytes, "tdt");
-    await vi.waitFor(() => expect(deps.ui.toast).toHaveBeenCalledWith('Tower imported. The 1994 file is in My Towers as "OLD".', "good"));
+    await vi.waitFor(() =>
+      expect(deps.ui.toast).toHaveBeenCalledWith('Tower imported. The 1994 file is in My Towers as "OLD".', "good"),
+    );
   });
 
   it("says how to keep the tower when My Towers could not keep the file", async () => {
     vi.mocked(keepOpenedFile).mockResolvedValue(null);
     const { deps } = setup();
     adoptConfirmedLegacyImport(deps as never, "Old Tower", () => {}, FILE);
-    await vi.waitFor(() => expect(deps.ui.toast).toHaveBeenCalledWith("Tower imported. Use File > Save As… to keep it.", "good"));
+    await vi.waitFor(() =>
+      expect(deps.ui.toast).toHaveBeenCalledWith("Tower imported. Use File > Save As… to keep it.", "good"),
+    );
   });
 
   it("says so when the tower it replaces could not be saved first", () => {
     const { deps } = setup();
-    adoptConfirmedLegacyImport(deps as never, "Old Tower", () => {
-      throw new Error("full");
-    }, FILE);
+    adoptConfirmedLegacyImport(
+      deps as never,
+      "Old Tower",
+      () => {
+        throw new Error("full");
+      },
+      FILE,
+    );
     expect(deps.ui.toast).toHaveBeenCalledWith(expect.stringMatching(/couldn't be backed up/), "bad");
     expect(deps.towerSwapped).toHaveBeenCalledOnce();
   });

@@ -67,7 +67,15 @@ function viewOf(t: Tower) {
 function makeApp(
   tool: GameApp["tool"],
   tower: Tower = {},
-  answers: { quote?: (x: number) => { ok: boolean; cost: number }; shaftOk?: boolean; reason?: string; height?: number; rise?: number | ((x: number) => number); walkTop?: number; tallLobbies?: number[] } = {},
+  answers: {
+    quote?: (x: number) => { ok: boolean; cost: number };
+    shaftOk?: boolean;
+    reason?: string;
+    height?: number;
+    rise?: number | ((x: number) => number);
+    walkTop?: number;
+    tallLobbies?: number[];
+  } = {},
   build: Record<string, ReturnType<typeof vi.fn>> = {},
 ) {
   const enginePort = mockPort({
@@ -78,7 +86,9 @@ function makeApp(
     quoteShaft: () => record("quoteShaft", { ok: answers.shaftOk === false ? 0 : 1 }),
     lastReason: () => answers.reason,
     setLobbyHeight: vi.fn(),
-    lobbyRise: vi.fn((_floor: number, x: number) => (typeof answers.rise === "function" ? answers.rise(x) : (answers.rise ?? 1))),
+    lobbyRise: vi.fn((_floor: number, x: number) =>
+      typeof answers.rise === "function" ? answers.rise(x) : (answers.rise ?? 1),
+    ),
     walkwayTop: vi.fn((_kind: number, _x: number, _bottom: number, top: number) => answers.walkTop ?? top),
     lobbyHeights: vi.fn(() => new Float64Array(answers.tallLobbies ?? [])),
   });
@@ -118,7 +128,9 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("pickedAt", () => {
   it("resolves the room the view answers at a cell, and no structure tile", () => {
-    const { app, raw } = makeApp(buildTool("office"), { rooms: { "2:12": { id: 5, kind: "office" }, "1:25": { id: 0, kind: "lobby" } } });
+    const { app, raw } = makeApp(buildTool("office"), {
+      rooms: { "2:12": { id: 5, kind: "office" }, "1:25": { id: 0, kind: "lobby" } },
+    });
     expect(pickedAt(app, 2, 12)).toEqual({ type: "unit", id: 5, kind: "office" });
     expect(raw.reader.tower.unitAt).toHaveBeenLastCalledWith(2, 12);
     expect(pickedAt(app, 1, 25), "a lobby tile is not pickable").toBeNull();
@@ -136,11 +148,18 @@ describe("pickedAt", () => {
 
 describe("placeSimpleBuild", () => {
   it("paint: reports ok from the brush's placed count and passes the reason through", () => {
-    const paintBrush = vi.fn().mockReturnValueOnce({ placed: 3 }).mockReturnValueOnce({ placed: 0, reason: "Floor already built here" });
+    const paintBrush = vi
+      .fn()
+      .mockReturnValueOnce({ placed: 3 })
+      .mockReturnValueOnce({ placed: 0, reason: "Floor already built here" });
     const { app } = makeApp(buildTool("floor"), {}, {}, { paintBrush });
     expect(placeSimpleBuild(app, "floor", 14, 2)).toEqual({ what: "paint", ok: true, reason: undefined });
     expect(paintBrush).toHaveBeenCalledWith("floor", 14, 2);
-    expect(placeSimpleBuild(app, "floor", 14, 2)).toEqual({ what: "paint", ok: false, reason: "Floor already built here" });
+    expect(placeSimpleBuild(app, "floor", 14, 2)).toEqual({
+      what: "paint",
+      ok: false,
+      reason: "Floor already built here",
+    });
   });
 
   it("flight: routes a fixed-span transport through tryBuildTransport across two floors", () => {
@@ -219,7 +238,12 @@ describe("updateBuildPreview", () => {
   it("drag-sized transport: a single-floor ghost keyed to the unlock, with no quote", () => {
     const { app, raw, enginePort } = makeApp(buildTool("elevatorStandard"), { unlocked: false });
     updateBuildPreview(app, 14, 2);
-    expect(raw.engine.preview).toEqual({ kind: "elevatorStandard", floor: 2, x: snapX(CAT, "elevatorStandard", 14), valid: false });
+    expect(raw.engine.preview).toEqual({
+      kind: "elevatorStandard",
+      floor: 2,
+      x: snapX(CAT, "elevatorStandard", 14),
+      valid: false,
+    });
     expect(raw.engine.transportPreview).toBeNull();
     expect(enginePort.quoteShaft).not.toHaveBeenCalled();
   });
@@ -231,7 +255,10 @@ describe("updateBuildPreview", () => {
     expect(own).toBe(snapX(CAT, "office", 399));
     useTowerCatalogSource(app.enginePort, (mode) => {
       const base = catalogFor(mode);
-      return { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2 } : f)) };
+      return {
+        ...base,
+        facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2 } : f)),
+      };
     });
     try {
       updateBuildPreview(app, 399, 2);
@@ -253,7 +280,13 @@ describe("updateBuildPreview", () => {
       withRefusalRule(app, previewNamesRefusal, () => updateBuildPreview(app, 21, 6));
       expect(enginePort.quoteBuild).toHaveBeenCalledExactlyOnceWith(code("kinds", "office"), 6, x);
       const reason = previewNamesRefusal ? "No floor here." : undefined;
-      expect(raw.engine.preview, `rule ${previewNamesRefusal}`).toEqual({ kind: "office", floor: 6, x, valid: false, reason });
+      expect(raw.engine.preview, `rule ${previewNamesRefusal}`).toEqual({
+        kind: "office",
+        floor: 6,
+        x,
+        valid: false,
+        reason,
+      });
       expect(raw.buildRefusalShowing).toBe(previewNamesRefusal);
       expect(raw.inspectAnchor).toEqual(
         previewNamesRefusal ? { x: x + Math.floor(width / 2), left: x + Math.floor(width / 2), floor: 6 } : null,
@@ -267,7 +300,9 @@ describe("updateBuildPreview", () => {
 
   it("floor brush: previews the centered strip and quotes the tile against the tower", () => {
     const tiles = brushTiles(14);
-    const { app, raw, enginePort } = makeApp(buildTool("floor"), { structure: { ...run(1, 0, 40, "lobby"), ...run(2, 12, 13, "floor") } });
+    const { app, raw, enginePort } = makeApp(buildTool("floor"), {
+      structure: { ...run(1, 0, 40, "lobby"), ...run(2, 12, 13, "floor") },
+    });
     updateBuildPreview(app, 14, 2);
     expect(raw.engine.preview).toMatchObject({
       kind: "floor",
@@ -301,23 +336,37 @@ describe("updateBuildPreview", () => {
     // Floor 2 is built over 0..11 on a full ground lobby; the brush at 12
     // spans 8..15 and lays only 12..15, and keeps its left end on the floor.
     const tiles = brushTiles(12);
-    const { app, raw } = makeApp(buildTool("floor"), { structure: { ...run(1, 0, 40, "lobby"), ...run(2, 0, 11, "floor") } });
+    const { app, raw } = makeApp(buildTool("floor"), {
+      structure: { ...run(1, 0, 40, "lobby"), ...run(2, 0, 11, "floor") },
+    });
     updateBuildPreview(app, 12, 2);
-    expect(raw.engine.preview).toMatchObject({ x: tiles[0], span: tiles[tiles.length - 1] - tiles[0] + 1, valid: true });
+    expect(raw.engine.preview).toMatchObject({
+      x: tiles[0],
+      span: tiles[tiles.length - 1] - tiles[0] + 1,
+      valid: true,
+    });
   });
 
   it("floor brush out over open air: the red ghost keeps the whole brush", () => {
     const tiles = brushTiles(30);
     const { app, raw } = makeApp(buildTool("floor"), { structure: run(1, 0, 11, "lobby") });
     updateBuildPreview(app, 30, 2);
-    expect(raw.engine.preview).toMatchObject({ x: tiles[0], span: tiles[tiles.length - 1] - tiles[0] + 1, valid: false });
+    expect(raw.engine.preview).toMatchObject({
+      x: tiles[0],
+      span: tiles[tiles.length - 1] - tiles[0] + 1,
+      valid: false,
+    });
   });
 
   it("the ground-floor ghost is a lobby, green only when the money covers every tile the brush lays", () => {
     // Lobby on 10..29; the brush at 30 lays 30..33, four bare tiles.
     const tower = { structure: run(1, 10, 29, "lobby") };
     const validWith = (money: number) => {
-      const { app, raw, enginePort } = makeApp(buildTool("floor"), { ...tower, money }, { quote: () => ({ ok: true, cost: BARE_LOBBY }) });
+      const { app, raw, enginePort } = makeApp(
+        buildTool("floor"),
+        { ...tower, money },
+        { quote: () => ({ ok: true, cost: BARE_LOBBY }) },
+      );
       updateBuildPreview(app, 30, 1);
       expect(enginePort.quoteBuild).toHaveBeenCalledExactlyOnceWith(code("kinds", "lobby"), 1, 30);
       return raw.engine.preview as { kind: string; valid: boolean };
@@ -332,7 +381,11 @@ describe("updateBuildPreview", () => {
     const tower = { structure: run(1, 10, 29, "lobby") };
     const tall = BARE_LOBBY + price("lobby");
     const ghostWith = (money: number) => {
-      const { app, raw, enginePort } = makeApp(buildTool("lobby"), { ...tower, money }, { quote: () => ({ ok: true, cost: tall }), height: 2, rise: 2 });
+      const { app, raw, enginePort } = makeApp(
+        buildTool("lobby"),
+        { ...tower, money },
+        { quote: () => ({ ok: true, cost: tall }), height: 2, rise: 2 },
+      );
       updateBuildPreview(app, 30, 1);
       expect(enginePort.setLobbyHeight).toHaveBeenCalledExactlyOnceWith(2);
       const order = (fn: unknown) => vi.mocked(fn as () => void).mock.invocationCallOrder[0];
@@ -353,7 +406,10 @@ describe("updateBuildPreview", () => {
     const ghostAt = (tile: number) => {
       const { app, raw, enginePort } = makeApp(buildTool("floor"), tower, { tallLobbies: [1, 10, 29, 3] });
       updateBuildPreview(app, tile, 4);
-      return { preview: raw.engine.preview as { valid: boolean; x: number; span: number } | null, quotes: vi.mocked(enginePort.quoteBuild).mock.calls.length };
+      return {
+        preview: raw.engine.preview as { valid: boolean; x: number; span: number } | null,
+        quotes: vi.mocked(enginePort.quoteBuild).mock.calls.length,
+      };
     };
     const over = ghostAt(20);
     expect(over.preview).toMatchObject({ valid: true });
@@ -370,9 +426,16 @@ describe("updateBuildPreview", () => {
     const rise = (x: number) => (x >= 32 ? 3 : 2);
     const strip = 2 * bare(2) + 2 * bare(3);
     const ghostWith = (money: number) => {
-      const { app, raw, enginePort } = makeApp(buildTool("lobby"), { ...tower, money }, { quote: (x) => ({ ok: true, cost: bare(rise(x)) }), rise });
+      const { app, raw, enginePort } = makeApp(
+        buildTool("lobby"),
+        { ...tower, money },
+        { quote: (x) => ({ ok: true, cost: bare(rise(x)) }), rise },
+      );
       updateBuildPreview(app, 30, 1);
-      expect(vi.mocked(enginePort.lobbyRise).mock.calls).toEqual([[1, 28], [1, 32]]);
+      expect(vi.mocked(enginePort.lobbyRise).mock.calls).toEqual([
+        [1, 28],
+        [1, 32],
+      ]);
       return raw.engine.preview as { valid: boolean; stories: number };
     };
     expect(ghostWith(strip)).toMatchObject({ valid: true, stories: 2 });
@@ -406,9 +469,14 @@ describe("updateBuildPreview", () => {
     for (const previewNamesRefusal of [true, false]) {
       const short = makeApp(buildTool("floor"), tower, { quote: () => ({ ok: true, cost: BARE_LOBBY }) });
       withRefusalRule(short.app, previewNamesRefusal, () => updateBuildPreview(short.app, 30, 1));
-      expect((short.raw.engine.preview as { reason?: string }).reason).toBe(previewNamesRefusal ? "Not enough money." : undefined);
+      expect((short.raw.engine.preview as { reason?: string }).reason).toBe(
+        previewNamesRefusal ? "Not enough money." : undefined,
+      );
       // A structural refusal wins over money short: the engine's reason.
-      const refused = makeApp(buildTool("floor"), tower, { quote: () => ({ ok: false, cost: 0 }), reason: "Build floors below first." });
+      const refused = makeApp(buildTool("floor"), tower, {
+        quote: () => ({ ok: false, cost: 0 }),
+        reason: "Build floors below first.",
+      });
       withRefusalRule(refused.app, previewNamesRefusal, () => updateBuildPreview(refused.app, 21, 6));
       expect(refused.raw.engine.preview).toMatchObject({
         kind: "floor",

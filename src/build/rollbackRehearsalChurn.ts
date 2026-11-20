@@ -32,7 +32,11 @@ export const lossCount = (d: DiffEntry): number => (d.kind === "dropped" ? d.cou
 export function churnOf(before: unknown, after: unknown): ChurnCounts {
   const out: ChurnCounts = {};
   for (const d of diffSaves(before, after).filter(isLoss)) out[lossKey(d)] = lossCount(d);
-  return Object.fromEntries(Object.keys(out).sort().map((k) => [k, out[k] as number]));
+  return Object.fromEntries(
+    Object.keys(out)
+      .sort()
+      .map((k) => [k, out[k] as number]),
+  );
 }
 
 /**
@@ -46,11 +50,16 @@ export function playChurn(candidate: EnginePackage, saveText: string, hours: num
     const seeded: unknown = JSON.parse(saveText);
     const mostLost: ChurnCounts = {};
     const ticks = Math.ceil((hours * MINUTES_PER_HOUR) / STEP_MINUTES);
-    for (let done = 0; done < ticks; ) {
+    for (let done = 0; done < ticks;) {
       for (let i = 0; i < TICKS_PER_CHECK && done < ticks; i++, done++) engine.tick(STEP_MINUTES);
-      for (const [key, n] of Object.entries(churnOf(seeded, JSON.parse(engine.serialize())))) mostLost[key] = Math.max(mostLost[key] ?? 0, n);
+      for (const [key, n] of Object.entries(churnOf(seeded, JSON.parse(engine.serialize()))))
+        mostLost[key] = Math.max(mostLost[key] ?? 0, n);
     }
-    return Object.fromEntries(Object.keys(mostLost).sort().map((k) => [k, mostLost[k] as number]));
+    return Object.fromEntries(
+      Object.keys(mostLost)
+        .sort()
+        .map((k) => [k, mostLost[k] as number]),
+    );
   } finally {
     engine.free();
   }
@@ -63,7 +72,8 @@ export function parseChurn(json: unknown): ChurnMap {
   if (!isObject(json)) throw new Error("the churn file is not an object of fixture name to loss counts");
   const out: ChurnMap = {};
   for (const [name, counts] of Object.entries(json)) {
-    if (!isObject(counts) || Object.values(counts).some((n) => typeof n !== "number" || !Number.isInteger(n) || n < 1)) throw new Error(`the churn entry for ${name} is not an object of loss key to a count of one or more`);
+    if (!isObject(counts) || Object.values(counts).some((n) => typeof n !== "number" || !Number.isInteger(n) || n < 1))
+      throw new Error(`the churn entry for ${name} is not an object of loss key to a count of one or more`);
     out[name] = counts as ChurnCounts;
   }
   return out;

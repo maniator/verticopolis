@@ -14,7 +14,10 @@ import { trackAppAction } from "../../analytics";
 const standalone = vi.hoisted(() => ({ isInstalledStandalone: vi.fn(() => false) }));
 vi.mock("../../ui/standalone", () => standalone);
 // The app actions the dialogs report, as a spy (the rest of analytics is real).
-vi.mock("../../analytics", async (importOriginal) => ({ ...(await importOriginal<object>()), trackAppAction: vi.fn() }));
+vi.mock("../../analytics", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  trackAppAction: vi.fn(),
+}));
 
 const dialog = (): HTMLDialogElement => document.getElementById("modal") as HTMLDialogElement;
 const inDialog = <T extends Element>(sel: string): T => {
@@ -318,7 +321,17 @@ describe("About… (About this game)", () => {
   it("ends the pause when another dialog takes the screen", () => {
     const { ui, speed } = openAbout(2);
     ui.showImportReport(
-      { towerName: "GRAND", star: 3, money: 1, day: 1, floors: 1, basements: 0, unitsImported: 1, broughtOver: [], couldNotBring: [] },
+      {
+        towerName: "GRAND",
+        star: 3,
+        money: 1,
+        day: 1,
+        floors: 1,
+        basements: 0,
+        unitsImported: 1,
+        broughtOver: [],
+        couldNotBring: [],
+      },
       { onOpen: vi.fn() },
     );
     expect(dialog().textContent).toContain("GRAND");

@@ -26,14 +26,18 @@ const SCENE = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "scri
 function stripComments(src: string): string {
   // Block comments, whole-line comments, and trailing ones after code (a
   // `//` preceded by whitespace; the scene has no such text inside strings).
-  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/\s\/\/.*$/gm, "");
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/\s\/\/.*$/gm, "");
 }
 
 /** indexOf that fails loudly: a missing anchor means the scene changed shape,
  *  and slicing on -1 would quietly widen what the checks read. */
 function find(src: string, needle: string, from = 0): number {
   const at = src.indexOf(needle, from);
-  if (at < 0) throw new Error(`the 27c guard lost its anchor ${JSON.stringify(needle)}; update the guard with the scene`);
+  if (at < 0)
+    throw new Error(`the 27c guard lost its anchor ${JSON.stringify(needle)}; update the guard with the scene`);
   return at;
 }
 
@@ -138,7 +142,10 @@ async function openScheduleDialog(page, kind) {
   });
 
   it("rejects a staging callback that waits for a frame between the steps", () => {
-    const yielding = scene.replace(/(\n\s*preset\.click\(\);)/, "\n      await new Promise((r) => requestAnimationFrame(r));$1");
+    const yielding = scene.replace(
+      /(\n\s*preset\.click\(\);)/,
+      "\n      await new Promise((r) => requestAnimationFrame(r));$1",
+    );
     expect(yielding).not.toBe(scene);
     expect(stagingProblems(yielding).join(" ")).toMatch(/yields/);
   });

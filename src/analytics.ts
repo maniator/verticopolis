@@ -42,7 +42,13 @@ export {
   refusalCode,
   type FileFailureCode,
 } from "./analyticsActions";
-export { headerNow, trackFileImported, trackFileExported, trackTdtImportRead, type SaveFileFormat } from "./analyticsFiles";
+export {
+  headerNow,
+  trackFileImported,
+  trackFileExported,
+  trackTdtImportRead,
+  type SaveFileFormat,
+} from "./analyticsFiles";
 
 /**
  * Start the gameplay session at boot and keep its foreground clock in step with

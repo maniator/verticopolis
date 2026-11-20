@@ -8,7 +8,14 @@ import { groupDigits } from "@verticopolis/components/windows/format";
 import { BuildActions, type BuildActionsDeps } from "./buildActions";
 import { pickSkyBridgeLook } from "../ui/skyBridgeLookStrip";
 import type { SkyBridgeView } from "@verticopolis/components/port/view";
-import { finishesHalfBridge, quoteSkyBridge, quotedTiles, skyBridgeLabel, tapLays, type SkyBridgeQuote } from "./skyBridgeTool";
+import {
+  finishesHalfBridge,
+  quoteSkyBridge,
+  quotedTiles,
+  skyBridgeLabel,
+  tapLays,
+  type SkyBridgeQuote,
+} from "./skyBridgeTool";
 
 /**
  * The Sky Bridge tool over a mock port: how the shell reads the engine's quote,
@@ -27,7 +34,10 @@ const quote = (q: Partial<SkyBridgeQuote>): SkyBridgeQuote => ({ ok: true, cost:
 
 describe("quoteSkyBridge", () => {
   it("asks the engine for the floor and column and reads the span and price", () => {
-    const port = mockPort({ quoteSkyBridge: () => rec("quoteSkyBridge", { ok: 1, cost: 44_000, from: 120, to: 124 }), lastReason: () => "unused" });
+    const port = mockPort({
+      quoteSkyBridge: () => rec("quoteSkyBridge", { ok: 1, cost: 44_000, from: 120, to: 124 }),
+      lastReason: () => "unused",
+    });
     const q = quoteSkyBridge(port, new PortCodes(port), 30, 121);
     expect(port.quoteSkyBridge).toHaveBeenCalledExactlyOnceWith(30, 121);
     expect(q).toEqual({ ok: true, cost: 44_000, from: 120, to: 124, reason: undefined });
@@ -35,7 +45,10 @@ describe("quoteSkyBridge", () => {
   });
 
   it("carries the engine's reason only on a refusal", () => {
-    const port = mockPort({ quoteSkyBridge: () => rec("quoteSkyBridge", { ok: 0 }), lastReason: () => "Point at the gap." });
+    const port = mockPort({
+      quoteSkyBridge: () => rec("quoteSkyBridge", { ok: 0 }),
+      lastReason: () => "Point at the gap.",
+    });
     const q = quoteSkyBridge(port, new PortCodes(port), 30, 5);
     expect(q.ok).toBe(false);
     expect(q.reason).toBe("Point at the gap.");
@@ -84,10 +97,17 @@ describe("BuildActions.buildSkyBridge", () => {
 
   beforeEach(() => pickSkyBridgeLook(1, null));
 
-  function setup(answers: Parameters<typeof mockPort>[0], kinds: Record<string, string> = {}, bridges: SkyBridgeView[] = []) {
+  function setup(
+    answers: Parameters<typeof mockPort>[0],
+    kinds: Record<string, string> = {},
+    bridges: SkyBridgeView[] = [],
+  ) {
     const port = mockPort({ lastReason: () => "Not enough money.", ...answers });
     const codes = new PortCodes(port);
-    const tower = { structureKindAt: vi.fn((floor: number, x: number) => kinds[`${floor}:${x}`]), skyBridges: () => bridges };
+    const tower = {
+      structureKindAt: vi.fn((floor: number, x: number) => kinds[`${floor}:${x}`]),
+      skyBridges: () => bridges,
+    };
     const deps = {
       enginePort: () => port,
       portCodes: () => codes,
@@ -121,7 +141,10 @@ describe("BuildActions.buildSkyBridge", () => {
 
   it("dresses a finished bridge in the picked look, free, instead of building", () => {
     const { build, port, deps } = setup(
-      { restyleSkyBridge: () => rec("restyleSkyBridge", { status: 1 }), buildSkyBridge: () => rec("buildSkyBridge", { status: 1 }) },
+      {
+        restyleSkyBridge: () => rec("restyleSkyBridge", { status: 1 }),
+        buildSkyBridge: () => rec("buildSkyBridge", { status: 1 }),
+      },
       { "30:119": "lobby", "30:124": "lobby" },
       [{ floor: 30, from: 120, to: 124, look: 1 }],
     );
@@ -137,11 +160,18 @@ describe("BuildActions.buildSkyBridge", () => {
   });
 
   it("says so when the bridge already wears the picked look, and asks the engine nothing", () => {
-    const { build, port, deps } = setup({ restyleSkyBridge: () => rec("restyleSkyBridge", { status: 1 }) }, { "30:119": "lobby", "30:124": "lobby" }, [{ floor: 30, from: 120, to: 124, look: 1 }]);
+    const { build, port, deps } = setup(
+      { restyleSkyBridge: () => rec("restyleSkyBridge", { status: 1 }) },
+      { "30:119": "lobby", "30:124": "lobby" },
+      [{ floor: 30, from: 120, to: 124, look: 1 }],
+    );
     const r = build.buildSkyBridge(122, 30);
     expect(r.ok).toBe(false);
     expect(port.restyleSkyBridge).not.toHaveBeenCalled();
-    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("This sky bridge already has that look. Pick another look on the strip.", "info");
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
+      "This sky bridge already has that look. Pick another look on the strip.",
+      "info",
+    );
     expect(trackAppAction).not.toHaveBeenCalled();
   });
 
@@ -162,7 +192,12 @@ describe("BuildActions.buildSkyBridge", () => {
       quoteSkyBridge: () => rec("quoteSkyBridge", { ok: 1, cost: 44_000, from: 120, to: 124 }),
       buildSkyBridge: () => rec("buildSkyBridge", { status: 0 }),
     });
-    expect(build.buildSkyBridge(121, 30)).toEqual({ ok: false, reason: "Not enough money.", tiles: 0, restyled: false });
+    expect(build.buildSkyBridge(121, 30)).toEqual({
+      ok: false,
+      reason: "Not enough money.",
+      tiles: 0,
+      restyled: false,
+    });
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
     expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("Not enough money.", "bad");
     expect(trackAppAction).not.toHaveBeenCalled();

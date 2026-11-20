@@ -30,7 +30,8 @@ function setup() {
   return { map, out, down, up, done };
 }
 
-const key = (type: string, code: string, k: string, repeat = false) => new KeyboardEvent(type, { code, key: k, repeat, bubbles: true, cancelable: true });
+const key = (type: string, code: string, k: string, repeat = false) =>
+  new KeyboardEvent(type, { code, key: k, repeat, bubbles: true, cancelable: true });
 
 describe("keeping the map's keys from the game (CAP-5)", () => {
   it("names a key by its code, so a modifier changing the name still matches", () => {

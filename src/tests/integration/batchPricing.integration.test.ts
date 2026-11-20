@@ -20,7 +20,8 @@ function rentOf(u: Pick<Unit, "kind" | "rent" | "noRate">, mode?: GameMode): num
   if (u.rent !== undefined) return u.rent;
   const defaultIn = (m: GameMode) => catalogFacility(catalogFor(m), u.kind).rent?.default ?? 0;
   if (mode) return defaultIn(mode);
-  if (defaultIn("classic") !== defaultIn("modern")) throw new Error(`${u.kind}'s default price differs by mode; pass the mode`);
+  if (defaultIn("classic") !== defaultIn("modern"))
+    throw new Error(`${u.kind}'s default price differs by mode; pass the mode`);
   return defaultIn("modern");
 }
 
@@ -111,7 +112,11 @@ describeEngines("Batch pricing", (leg) => {
     expect(res.skippedSold).toBe(1);
     expect(res.matched).toBe(2);
     expect(res.eligible).toBe(1);
-    const rent = (id: number) => rentOf(rooms().find((u) => u.id === id)!, "modern");
+    const rent = (id: number) =>
+      rentOf(
+        rooms().find((u) => u.id === id)!,
+        "modern",
+      );
     expect(rent(soldId)).toBe(160_000); // sold one untouched (still the canon 2×-cost default)
     expect(rent(openId)).toBe(200_000);
   });

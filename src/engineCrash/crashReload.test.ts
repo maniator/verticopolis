@@ -16,7 +16,10 @@ beforeEach(() => sessionStorage.clear());
 /** Whether the tab's stored crashes on `sha` have spent its reloads. */
 function spent(sha: string): boolean {
   try {
-    const record = JSON.parse(sessionStorage.getItem(RUST_CRASHES_KEY) ?? "null") as { sha?: string; count?: number } | null;
+    const record = JSON.parse(sessionStorage.getItem(RUST_CRASHES_KEY) ?? "null") as {
+      sha?: string;
+      count?: number;
+    } | null;
     return record?.sha === sha && crashReloadsSpent(record.count ?? 0);
   } catch {
     return false;
@@ -43,7 +46,16 @@ describe("the tab's Rust crash count", () => {
   });
 
   it("counts on from a record an older build wrote with crash facts and a shown mark", () => {
-    sessionStorage.setItem(RUST_CRASHES_KEY, JSON.stringify({ v: 1, sha: "a", count: 1, last: { reason: "trap-tick", stage: "start", rust: { version: null, sourceHash: null } }, reportShown: true }));
+    sessionStorage.setItem(
+      RUST_CRASHES_KEY,
+      JSON.stringify({
+        v: 1,
+        sha: "a",
+        count: 1,
+        last: { reason: "trap-tick", stage: "start", rust: { version: null, sourceHash: null } },
+        reportShown: true,
+      }),
+    );
     expect(countRustCrash(sessionStorage, "a")).toBe(CRASH_LOOP_PAGES);
     expect(JSON.parse(sessionStorage.getItem(RUST_CRASHES_KEY)!)).toEqual({ v: 1, sha: "a", count: CRASH_LOOP_PAGES });
   });
@@ -96,8 +108,18 @@ describe("the boot after a crash reload (#2209)", () => {
   });
 
   it("drops the people and the cars' timers from a save and keeps the rest", () => {
-    const save = { version: 10, money: 5, crowd: { people: [{ id: 1 }] }, dispatch: { cars: [] }, housekeeping: { cleanedToday: 3 } };
-    expect(JSON.parse(withoutSavedPeople(JSON.stringify(save)))).toEqual({ version: 10, money: 5, housekeeping: { cleanedToday: 3 } });
+    const save = {
+      version: 10,
+      money: 5,
+      crowd: { people: [{ id: 1 }] },
+      dispatch: { cars: [] },
+      housekeeping: { cleanedToday: 3 },
+    };
+    expect(JSON.parse(withoutSavedPeople(JSON.stringify(save)))).toEqual({
+      version: 10,
+      money: 5,
+      housekeeping: { cleanedToday: 3 },
+    });
   });
 
   it("leaves text that is not a save object, or has no people, as it was", () => {

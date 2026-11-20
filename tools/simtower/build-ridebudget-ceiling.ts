@@ -31,7 +31,9 @@ const BANDS = Array.from({ length: ZONES }, (_, i) => {
   return { name: `band${k}`, floor: 3 * k, rides: k, seed: k <= 2 }; // seed the first two for population
 });
 
-function must(ok: boolean, m: string): void { if (!ok) throw new Error(m); }
+function must(ok: boolean, m: string): void {
+  if (!ok) throw new Error(m);
+}
 
 const sim = draftTower(777, "classic");
 const t = sim.tower;
@@ -42,14 +44,25 @@ for (let k = 0; k < ZONES; k++) {
   must(t.placeTransport("elevatorStandard", 6 * k, bottom, bottom + 3).ok, `zone ${k + 1}`);
 }
 const officeFloors = new Set<number>();
-for (const b of BANDS) { must(t.place("office", b.floor, OFFICE_X).ok, `office ${b.name}`); officeFloors.add(b.floor); }
+for (const b of BANDS) {
+  must(t.place("office", b.floor, OFFICE_X).ok, `office ${b.name}`);
+  officeFloors.add(b.floor);
+}
 
 const save: SerializedGame = sim.serialize();
 const seedFloors = new Set(BANDS.filter((b) => b.seed).map((b) => b.floor));
 for (const u of save.units) {
   if (u.kind !== "office" || !officeFloors.has(u.floor)) continue;
-  if (seedFloors.has(u.floor)) { u.state = "occupied"; u.occupants = 6; u.everOccupied = true; u.satisfaction = 1; }
-  else { u.state = "empty"; u.occupants = 0; u.everOccupied = false; }
+  if (seedFloors.has(u.floor)) {
+    u.state = "occupied";
+    u.occupants = 6;
+    u.everOccupied = true;
+    u.satisfaction = 1;
+  } else {
+    u.state = "empty";
+    u.occupants = 0;
+    u.everOccupied = false;
+  }
 }
 save.star = 3;
 // Center on the TOP band (the ceiling test) so the tallest probe is in frame.

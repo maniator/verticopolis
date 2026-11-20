@@ -32,7 +32,15 @@ test.describe("WebGL context loss: in-place recovery", () => {
 
     // Pin a recognizable camera and remember the pre-crash identities.
     const before = await page.evaluate(() => {
-      const w = window as unknown as { game: { engine: { setCamera(t: number, f: number, z: number): void; viewState(): { tile: number; floor: number; zoom?: number } } }; __old?: unknown };
+      const w = window as unknown as {
+        game: {
+          engine: {
+            setCamera(t: number, f: number, z: number): void;
+            viewState(): { tile: number; floor: number; zoom?: number };
+          };
+        };
+        __old?: unknown;
+      };
       w.game.engine.setCamera(120, 8, 1.4);
       (window as unknown as Record<string, unknown>).__oldEngine = w.game.engine;
       (window as unknown as Record<string, unknown>).__oldCanvas = document.getElementById("view");
@@ -49,7 +57,9 @@ test.describe("WebGL context loss: in-place recovery", () => {
     // The wait holds the page (#321): a modal card is up, so a game key does
     // not reach the frozen tower.
     await expect(page.locator("#graphics-recovery")).toBeVisible();
-    await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ext as WEBGL_lose_context).restoreContext());
+    await page.evaluate(() =>
+      ((window as unknown as Record<string, unknown>).__ext as WEBGL_lose_context).restoreContext(),
+    );
 
     // The rebuild swaps in a fresh engine on a fresh canvas.
     await page.waitForFunction(() => {
@@ -58,7 +68,10 @@ test.describe("WebGL context loss: in-place recovery", () => {
     });
     const after = await page.evaluate(() => {
       const w = window as unknown as {
-        game: { engine: { viewState(): { tile: number; floor: number; zoom?: number } }; sim: { clock: { minutes: number }; log: { text: string }[] } };
+        game: {
+          engine: { viewState(): { tile: number; floor: number; zoom?: number } };
+          sim: { clock: { minutes: number }; log: { text: string }[] };
+        };
       };
       return {
         crashScreen: Boolean(document.getElementById("crash-screen")),
@@ -80,11 +93,16 @@ test.describe("WebGL context loss: in-place recovery", () => {
 
     // The new engine is alive: the sim keeps advancing and input is rewired
     // (a wheel zoom on the fresh canvas moves the camera).
-    await page.waitForFunction((m0) => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes > m0, after.minutes);
+    await page.waitForFunction(
+      (m0) => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes > m0,
+      after.minutes,
+    );
     await page.mouse.move(200, 300);
     await page.mouse.wheel(0, -400);
     await page.waitForFunction(
-      (z0) => ((window as unknown as { game: { engine: { viewState(): { zoom?: number } } } }).game.engine.viewState().zoom ?? 0) > z0,
+      (z0) =>
+        ((window as unknown as { game: { engine: { viewState(): { zoom?: number } } } }).game.engine.viewState().zoom ??
+          0) > z0,
       after.view.zoom ?? 0,
     );
 
@@ -104,9 +122,13 @@ test.describe("WebGL context loss: in-place recovery", () => {
       const g = (window as unknown as { game?: { sim?: unknown } }).game;
       return Boolean(g?.sim) && Boolean(document.getElementById("splash"));
     });
-    const minutesBefore = await page.evaluate(() => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes);
+    const minutesBefore = await page.evaluate(
+      () => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes,
+    );
     await page.evaluate(() => {
-      (window as unknown as Record<string, unknown>).__oldEngine = (window as unknown as { game: { engine: unknown } }).game.engine;
+      (window as unknown as Record<string, unknown>).__oldEngine = (
+        window as unknown as { game: { engine: unknown } }
+      ).game.engine;
       const gl = (document.getElementById("view") as HTMLCanvasElement).getContext("webgl2")!;
       (window as unknown as Record<string, unknown>).__ext = gl.getExtension("WEBGL_lose_context");
       (gl.getExtension("WEBGL_lose_context") as WEBGL_lose_context).loseContext();
@@ -114,7 +136,9 @@ test.describe("WebGL context loss: in-place recovery", () => {
     // A phone drops a backgrounded app's graphics on the title screen too: no crash card.
     await expect(page.locator("#crash-screen")).toHaveCount(0);
     await expect(page.locator("#graphics-recovery")).toContainText("Your saved towers are untouched.");
-    await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ext as WEBGL_lose_context).restoreContext());
+    await page.evaluate(() =>
+      ((window as unknown as Record<string, unknown>).__ext as WEBGL_lose_context).restoreContext(),
+    );
     await page.waitForFunction(() => {
       const w = window as unknown as { game: { engine: unknown } };
       return w.game.engine !== (window as unknown as Record<string, unknown>).__oldEngine;
@@ -124,12 +148,16 @@ test.describe("WebGL context loss: in-place recovery", () => {
     // The DOM title screen survives the renderer swap, and nothing was written behind it.
     await expect(page.locator("#splash")).toBeVisible();
     const logged = await page.evaluate(() =>
-      (window as unknown as { game: { sim: { log: { text: string }[] } } }).game.sim.log.some((e) => e.text.includes("recovered on the spot")),
+      (window as unknown as { game: { sim: { log: { text: string }[] } } }).game.sim.log.some((e) =>
+        e.text.includes("recovered on the spot"),
+      ),
     );
     expect(logged).toBe(false);
     // The fresh engine starts paused behind the title screen: the clock has not moved.
     await page.waitForTimeout(500);
-    const minutesAfter = await page.evaluate(() => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes);
+    const minutesAfter = await page.evaluate(
+      () => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes,
+    );
     expect(minutesAfter).toBe(minutesBefore);
   });
 });

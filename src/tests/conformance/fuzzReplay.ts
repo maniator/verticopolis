@@ -85,15 +85,29 @@ export function replayCompare(file: string, rustDir: string = dirname(file), eng
   } catch (e) {
     if (e instanceof DetailError) return harness(e.message);
     if (isWasmTrap(e)) {
-      return { status: "diverged", signature: "trap", trap: true, message: `TRAPPED, the WASM build trapped instead of finishing the scenario: ${(e as Error).message}` };
+      return {
+        status: "diverged",
+        signature: "trap",
+        trap: true,
+        message: `TRAPPED, the WASM build trapped instead of finishing the scenario: ${(e as Error).message}`,
+      };
     }
     // The WASM build refused a command the native engine accepted (or an
     // expectFail it did not meet): the divergence the fuzzer exists to find.
-    return { status: "diverged", signature: throwSignature((e as Error).message), message: `DIVERGED before any hash compare, ${leg} runner threw: ${(e as Error).message}` };
+    return {
+      status: "diverged",
+      signature: throwSignature((e as Error).message),
+      message: `DIVERGED before any hash compare, ${leg} runner threw: ${(e as Error).message}`,
+    };
   }
   try {
     const d = compareRuns({ checkpoints, details }, { checkpoints: rustCheckpoints, details: rustDetails }, leg);
-    if (d) return { status: "diverged", signature: d.field ? `${d.kind}:${d.field}` : d.kind, message: describeDivergence(d, leg) };
+    if (d)
+      return {
+        status: "diverged",
+        signature: d.field ? `${d.kind}:${d.field}` : d.kind,
+        message: describeDivergence(d, leg),
+      };
   } catch (e) {
     return harness((e as Error).message);
   }
@@ -120,7 +134,12 @@ export function goldenCompare(file: string, goldenDir: string, freshDir: string)
   if (typeof fresh === "string") return harness(fresh);
   try {
     const d = compareRuns(golden, fresh, "golden");
-    if (d) return { status: "diverged", signature: d.field ? `${d.kind}:${d.field}` : d.kind, message: describeDivergence(d, "golden") };
+    if (d)
+      return {
+        status: "diverged",
+        signature: d.field ? `${d.kind}:${d.field}` : d.kind,
+        message: describeDivergence(d, "golden"),
+      };
   } catch (e) {
     return harness((e as Error).message);
   }

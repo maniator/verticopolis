@@ -45,7 +45,10 @@ export default defineConfig({
     // The specs drive the ordinary layout; the 1994 desk a computer gets by
     // default is turned off here (Options > Desktop's own key) and has its own
     // spec, e2e/desk.spec.ts, which turns it back on.
-    storageState: { cookies: [], origins: [{ origin: "http://127.0.0.1:4173", localStorage: [{ name: "vc-desk", value: "off" }] }] },
+    storageState: {
+      cookies: [],
+      origins: [{ origin: "http://127.0.0.1:4173", localStorage: [{ name: "vc-desk", value: "off" }] }],
+    },
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     // Sandboxes that can't download browsers can point at a preinstalled

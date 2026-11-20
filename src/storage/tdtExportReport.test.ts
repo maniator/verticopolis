@@ -29,10 +29,7 @@ const STATS: EncodeStats = {
   expressLen: 1,
 };
 
-function facts(
-  counts: Partial<ExportCounts> = {},
-  stats: Partial<EncodeStats> = {},
-): ExportReportFacts {
+function facts(counts: Partial<ExportCounts> = {}, stats: Partial<EncodeStats> = {}): ExportReportFacts {
   return {
     towerName: "My Tower!",
     filename: "ENGINE.TDT",
@@ -69,23 +66,16 @@ describe("exportReport", () => {
   });
 
   it("reads one room, one shaft and one flight, a debt, and caps shafts at the table size", () => {
-    const one = exportReport(
-      facts({ rooms: 1 }, { elevatorsLen: 1, walkwaysLen: 1, balance: -3 }),
-    );
+    const one = exportReport(facts({ rooms: 1 }, { elevatorsLen: 1, walkwaysLen: 1, balance: -3 }));
     expect(said(one.comesAlong)).toContain("1 room with");
     expect(said(one.comesAlong)).toContain(
       "1 elevator shaft with per-floor stop settings, and 1 stairway/escalator flight.",
     );
     expect(said(one.comesAlong)).toContain("-$300");
-    expect(
-      said(exportReport(facts({}, { elevatorsLen: 30 })).comesAlong),
-    ).toContain("24 elevator shafts");
-    expect(
-      said(
-        exportReport(facts({}, { walkwaysLen: 10, flightsDropped: 4 }))
-          .comesAlong,
-      ),
-    ).toContain("6 stairway/escalator flights");
+    expect(said(exportReport(facts({}, { elevatorsLen: 30 })).comesAlong)).toContain("24 elevator shafts");
+    expect(said(exportReport(facts({}, { walkwaysLen: 10, flightsDropped: 4 })).comesAlong)).toContain(
+      "6 stairway/escalator flights",
+    );
   });
 
   it("reports every loss, plural and singular", () => {

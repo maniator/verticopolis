@@ -17,21 +17,31 @@ type RetailFacts = ServiceDiagnosticFacts["retail"];
 
 /** A low-tier shop with every optional line present. */
 const FULL: RetailFacts = {
-  active: true, today: 38, barWidth: 38, tier: "low",
-  localDemandPct: 30, advice: "overBuilt", profitYest: 500, rainy: true,
+  active: true,
+  today: 38,
+  barWidth: 38,
+  tier: "low",
+  localDemandPct: 30,
+  advice: "overBuilt",
+  profitYest: 500,
+  rainy: true,
 };
 
 const render = (facts: RetailFacts): DocumentFragment => renderToFragment(html`${retailDisplayLines(facts)}`);
 const VERDICTS = /^(Business is booming\.|Business is average\.|Very few customers\.|Just opened, no data yet\.)$/;
-const verdictOf = (frag: DocumentFragment) => [...frag.querySelectorAll("div")].find((d) => VERDICTS.test(d.textContent ?? ""));
+const verdictOf = (frag: DocumentFragment) =>
+  [...frag.querySelectorAll("div")].find((d) => VERDICTS.test(d.textContent ?? ""));
 
 describe("retailDisplayLines (commercial-venue inspector card)", () => {
   it("writes each line once, with one progress bar", () => {
     const frag = render(FULL);
     expect(frag.querySelectorAll(".evalbar")).toHaveLength(1);
     for (const phrase of [
-      "Today's patronage:", "Local demand:", "Very few customers.",
-      "Yesterday's profit:", "Rain might cause fewer customers.",
+      "Today's patronage:",
+      "Local demand:",
+      "Very few customers.",
+      "Yesterday's profit:",
+      "Rain might cause fewer customers.",
       "hold off on new venues",
     ]) {
       expect(frag.textContent!.split(phrase), phrase).toHaveLength(2);
@@ -63,7 +73,9 @@ describe("retailDisplayLines (commercial-venue inspector card)", () => {
     const dry = render({ ...FULL, profitYest: 3210, rainy: false });
     expect(dry.textContent).toContain(profit);
     expect(dry.textContent).not.toContain("Rain might cause fewer customers.");
-    expect(render({ ...FULL, profitYest: 3210, rainy: true }).textContent).toContain("Rain might cause fewer customers.");
+    expect(render({ ...FULL, profitYest: 3210, rainy: true }).textContent).toContain(
+      "Rain might cause fewer customers.",
+    );
   });
 
   it("pluralizes the customer count", () => {
@@ -77,12 +89,16 @@ describe("retailDisplayLines (commercial-venue inspector card)", () => {
   });
 
   it("states the local demand as given, and the advice only when the engine gives one", () => {
-    expect(render({ ...FULL, localDemandPct: 100, advice: "none" }).textContent).toContain("Local demand: 100% of capacity.");
+    expect(render({ ...FULL, localDemandPct: 100, advice: "none" }).textContent).toContain(
+      "Local demand: 100% of capacity.",
+    );
     const quiet = render({ ...FULL, localDemandPct: 0, advice: "none" });
     expect(quiet.textContent).toContain("Local demand: 0% of capacity.");
     expect(quiet.textContent).not.toContain("hold off on new venues");
     expect(quiet.textContent).not.toContain("another venue would still sell");
-    expect(render({ ...FULL, tier: "average", advice: "underServed" }).textContent).toContain("another venue would still sell");
+    expect(render({ ...FULL, tier: "average", advice: "underServed" }).textContent).toContain(
+      "another venue would still sell",
+    );
     const lowUnderServed = render({ ...FULL, advice: "underServed" }).textContent;
     expect(lowUnderServed).toContain("few of them reach this venue");
     expect(lowUnderServed).not.toContain("another venue would still sell");

@@ -19,9 +19,13 @@ import { draftTower } from "../portKit/portSim";
  * string, so it is always passed well formed here.
  */
 
-
 type Raw = (...args: unknown[]) => unknown;
-type Engine = Record<string, Raw> & { stateDigest(): string; drainGameplayEvents(): string; serialize(): string; free(): void };
+type Engine = Record<string, Raw> & {
+  stateDigest(): string;
+  drainGameplayEvents(): string;
+  serialize(): string;
+  free(): void;
+};
 type Call = { name: string; rust: (engine: Engine) => unknown };
 
 const loose = <T>(v: unknown) => v as T;
@@ -116,22 +120,47 @@ function cases(lift: number, office: number): Call[] {
   }
   // Missing arguments: the glue reads them as undefined.
   const missing: [string, unknown[]][] = [
-    ["sellAt", []], ["sellAt", [2]],
-    ["setCars", []], ["setCars", [lift]],
-    ["resizeTransport", []], ["resizeTransport", [lift]], ["resizeTransport", [lift, 1]],
-    ["setStop", []], ["setStop", [lift]], ["setStop", [lift, 2]],
-    ["adjustRent", []], ["adjustRent", [office]],
+    ["sellAt", []],
+    ["sellAt", [2]],
+    ["setCars", []],
+    ["setCars", [lift]],
+    ["resizeTransport", []],
+    ["resizeTransport", [lift]],
+    ["resizeTransport", [lift, 1]],
+    ["setStop", []],
+    ["setStop", [lift]],
+    ["setStop", [lift, 2]],
+    ["adjustRent", []],
+    ["adjustRent", [office]],
     ["setNoRate", []],
   ];
   for (const [name, args] of missing) list.push(both(name, `${args.length} of its arguments`, args));
   // A stop must be a real boolean.
   const stops: [string, unknown][] = [
-    ["null", null], ["undefined", undefined], ["0", 0], ["1", 1], ["the string false", "false"], ["the string true", "true"],
-    ["empty", ""], ["an object", {}], ["an array", []], ["a boxed Boolean", new Boolean(false)], ["NaN", Number.NaN], ["a Symbol", Symbol("stop")],
+    ["null", null],
+    ["undefined", undefined],
+    ["0", 0],
+    ["1", 1],
+    ["the string false", "false"],
+    ["the string true", "true"],
+    ["empty", ""],
+    ["an object", {}],
+    ["an array", []],
+    ["a boxed Boolean", new Boolean(false)],
+    ["NaN", Number.NaN],
+    ["a Symbol", Symbol("stop")],
   ];
   for (const [what, stop] of stops) list.push(both("setStop", `stop ${what}`, [lift, 2, stop]));
   // A dir must be exactly 1 or -1, the only values any caller or scenario sends.
-  const dirs: [string, unknown][] = [["0", 0], ["-0", -0], ["2", 2], ["-2", -2], ["0.5", 0.5], ["-1.5", -1.5], ["Number.MAX_SAFE_INTEGER", Number.MAX_SAFE_INTEGER]];
+  const dirs: [string, unknown][] = [
+    ["0", 0],
+    ["-0", -0],
+    ["2", 2],
+    ["-2", -2],
+    ["0.5", 0.5],
+    ["-1.5", -1.5],
+    ["Number.MAX_SAFE_INTEGER", Number.MAX_SAFE_INTEGER],
+  ];
   for (const [what, dir] of dirs) list.push(both("adjustRent", `dir ${what}`, [office, dir]));
   return list;
 }
@@ -157,7 +186,15 @@ function acceptedEdges(lift: number, office: number): Call[] {
   ];
   // An id plus or minus 2^32 named the same facility when the binding
   // truncated to i32; now each names nothing.
-  const ids = (base: number) => [["-0", -0], ["-1", -1], ["2^53 - 1", max], ["-(2^53 - 1)", -max], ["the id + 2^32", base + far], ["the id - 2^32", base - far]] as const;
+  const ids = (base: number) =>
+    [
+      ["-0", -0],
+      ["-1", -1],
+      ["2^53 - 1", max],
+      ["-(2^53 - 1)", -max],
+      ["the id + 2^32", base + far],
+      ["the id - 2^32", base - far],
+    ] as const;
   for (const [what, id] of ids(lift)) {
     list.push(both("setCars", `id ${what}`, [id, 2]));
     list.push(both("resizeTransport", `id ${what}`, [id, 1, 2]));
@@ -183,7 +220,9 @@ describe.skipIf(!hasWasmPackage())("relayed commands called raw through the bind
       const run = (list: Call[], malformedRun: boolean) => {
         for (const c of list) {
           let rust: unknown;
-          expect(() => { rust = c.rust(engine); }, `${c.name}: the binding threw`).not.toThrow();
+          expect(() => {
+            rust = c.rust(engine);
+          }, `${c.name}: the binding threw`).not.toThrow();
           const name = command0(c.name);
           if (!malformedRun && name === "resizeTransport") {
             const r = rust as { ok: boolean; reason?: string };
@@ -220,10 +259,14 @@ describe.skipIf(!hasWasmPackage())("relayed commands called raw through the bind
       for (const c of good) {
         const before = engine.stateDigest();
         expect(c.rust(engine), c.name).not.toEqual(refusal(command0(c.name)));
-        if (c.name !== "setSchedule(lift, null)") expect(engine.stateDigest(), `${c.name}: the tower did not move`).not.toBe(before);
+        if (c.name !== "setSchedule(lift, null)")
+          expect(engine.stateDigest(), `${c.name}: the tower did not move`).not.toBe(before);
       }
       const save = JSON.parse(engine.serialize()) as { units: { id: number }[] };
-      expect(save.units.map((u) => u.id), "the office sold").not.toContain(office);
+      expect(
+        save.units.map((u) => u.id),
+        "the office sold",
+      ).not.toContain(office);
       expect(events(engine), "the landed edits reported nothing").not.toEqual([]);
     } finally {
       engine.free();

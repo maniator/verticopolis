@@ -44,7 +44,9 @@ function appUnderContextLoss() {
     inspector: { hide: vi.fn(() => void order.push("hide the card")) },
     commitUndo: vi.fn(() => void order.push("close the gesture")),
     keyboard: {
-      followTower: vi.fn((tower: string) => void order.push(`follow on the fresh renderer: ${built.includes(app.engine)}, ${tower}`)),
+      followTower: vi.fn(
+        (tower: string) => void order.push(`follow on the fresh renderer: ${built.includes(app.engine)}, ${tower}`),
+      ),
       pointerDrew: vi.fn(),
     },
     prefs: {},

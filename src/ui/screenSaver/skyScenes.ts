@@ -12,7 +12,12 @@ export function skylineStarfield(w: number, h: number, rng: Rng = Math.random): 
   const cx = w / 2;
   const cy = h / 2;
   const count = Math.max(40, Math.floor((w * h) / 40));
-  const make = (far: boolean) => ({ x: rng() * 2 - 1, y: rng() * 2 - 1, z: far ? 0.6 + rng() * 0.4 : 0.05 + rng() * 0.95, color: oneOf(rng, WINDOW_MIX) });
+  const make = (far: boolean) => ({
+    x: rng() * 2 - 1,
+    y: rng() * 2 - 1,
+    z: far ? 0.6 + rng() * 0.4 : 0.05 + rng() * 0.95,
+    color: oneOf(rng, WINDOW_MIX),
+  });
   const windows = Array.from({ length: count }, () => make(false));
   return {
     step(dt) {
@@ -70,7 +75,10 @@ export function expressElevators(w: number, h: number, rng: Rng = Math.random): 
   };
   // Small (far) cars first, so near cars draw over them.
   const cars = Array.from({ length: count }, () => make(true)).sort((a, b) => a.scale - b.scale);
-  const stars = Array.from({ length: Math.floor((w * h) / 120) }, () => ({ x: intIn(rng, 0, w - 1), y: intIn(rng, 0, h - 1) }));
+  const stars = Array.from({ length: Math.floor((w * h) / 120) }, () => ({
+    x: intIn(rng, 0, w - 1),
+    y: intIn(rng, 0, h - 1),
+  }));
   return {
     step(dt) {
       for (let i = 0; i < cars.length; i++) {
@@ -108,7 +116,10 @@ export function expressElevators(w: number, h: number, rng: Rng = Math.random): 
   };
 }
 
-function drawCar(c: CanvasRenderingContext2D, k: { x: number; y: number; scale: number; door: number; rider: string }): void {
+function drawCar(
+  c: CanvasRenderingContext2D,
+  k: { x: number; y: number; scale: number; door: number; rider: string },
+): void {
   const u = k.scale;
   const x = Math.round(k.x);
   const y = Math.round(k.y);

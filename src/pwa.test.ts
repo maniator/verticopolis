@@ -133,7 +133,10 @@ describe("registerPWA: offline", () => {
   });
 
   /** Run `scenario` with `fetch` replaced, in a reachable browser branch, and put everything back. */
-  async function withFetch(impl: typeof fetch, scenario: (fetchSpy: MockInstance<typeof fetch>) => Promise<void>): Promise<void> {
+  async function withFetch(
+    impl: typeof fetch,
+    scenario: (fetchSpy: MockInstance<typeof fetch>) => Promise<void>,
+  ): Promise<void> {
     const restore = makeBrowserBranchReachable();
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(impl);
     try {
@@ -145,7 +148,8 @@ describe("registerPWA: offline", () => {
   }
 
   /** The URL of a version.json request among the fetch calls, or undefined. */
-  const versionJsonCall = (fetchSpy: MockInstance<typeof fetch>) => fetchSpy.mock.calls.find(([url]) => String(url).includes("version.json"));
+  const versionJsonCall = (fetchSpy: MockInstance<typeof fetch>) =>
+    fetchSpy.mock.calls.find(([url]) => String(url).includes("version.json"));
 
   /** Register, let the worker report a waiting update, and return the prompt handler. */
   async function needRefresh(): Promise<ReturnType<typeof vi.fn>> {
@@ -177,17 +181,26 @@ describe("registerPWA: offline", () => {
 
   // A 200 whose body parses to something with no usable fields leaves nothing to
   // show; the update is still on offer, with info that names no build.
-  it.each([["{}", "{}"], ["an array", "[1, 2]"], ["fields of the wrong type", '{"version":5,"sha":[],"notes":"x"}']])(
-    "still offers a waiting update when version.json is %s",
-    async (_name, body) => {
-      await withFetch(async () => new Response(body, { status: 200 }), async (fetchSpy) => {
+  it.each([
+    ["{}", "{}"],
+    ["an array", "[1, 2]"],
+    ["fields of the wrong type", '{"version":5,"sha":[],"notes":"x"}'],
+  ])("still offers a waiting update when version.json is %s", async (_name, body) => {
+    await withFetch(
+      async () => new Response(body, { status: 200 }),
+      async (fetchSpy) => {
         const onUpdateAvailable = await needRefresh();
         await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
         expect(versionJsonCall(fetchSpy), "version.json was requested").toBeDefined();
-        expect(onUpdateAvailable.mock.calls[0][1]).toEqual({ version: undefined, sha: undefined, notes: [], releases: [] });
-      });
-    },
-  );
+        expect(onUpdateAvailable.mock.calls[0][1]).toEqual({
+          version: undefined,
+          sha: undefined,
+          notes: [],
+          releases: [],
+        });
+      },
+    );
+  });
 
   it("gives up on a version.json that never answers after four seconds and still offers the update", async () => {
     vi.useFakeTimers();
@@ -216,24 +229,27 @@ describe("registerPWA: offline", () => {
 
   it("hands the incoming build's identity to the prompt when version.json arrives", async () => {
     const body = JSON.stringify({ version: "9.9.9", sha: "abc1234", notes: ["A new thing."] });
-    await withFetch(async () => new Response(body, { status: 200 }), async (fetchSpy) => {
-      const onUpdateAvailable = await needRefresh();
-      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
-      // A payload without `releases` (an older server) still shows its own notes,
-      // as the one version newer than the running build (#1897).
-      expect(onUpdateAvailable.mock.calls[0][1]).toEqual({
-        version: "9.9.9",
-        sha: "abc1234",
-        notes: ["A new thing."],
-        releases: [{ version: "9.9.9", notes: ["A new thing."] }],
-        since: __APP_VERSION__,
-      });
-      // It is fetched fresh: never from a cache, never precached.
-      const call = versionJsonCall(fetchSpy);
-      expect(call, "version.json was requested").toBeDefined();
-      expect((call![1] as RequestInit).cache).toBe("no-store");
-      expect(new URL(String(call![0])).searchParams.has("t"), "with a cache-busting query").toBe(true);
-    });
+    await withFetch(
+      async () => new Response(body, { status: 200 }),
+      async (fetchSpy) => {
+        const onUpdateAvailable = await needRefresh();
+        await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+        // A payload without `releases` (an older server) still shows its own notes,
+        // as the one version newer than the running build (#1897).
+        expect(onUpdateAvailable.mock.calls[0][1]).toEqual({
+          version: "9.9.9",
+          sha: "abc1234",
+          notes: ["A new thing."],
+          releases: [{ version: "9.9.9", notes: ["A new thing."] }],
+          since: __APP_VERSION__,
+        });
+        // It is fetched fresh: never from a cache, never precached.
+        const call = versionJsonCall(fetchSpy);
+        expect(call, "version.json was requested").toBeDefined();
+        expect((call![1] as RequestInit).cache).toBe("no-store");
+        expect(new URL(String(call![0])).searchParams.has("t"), "with a cache-busting query").toBe(true);
+      },
+    );
   });
 
   // The hourly and on-focus backstop asks for a waiting worker, then confirms
@@ -242,19 +258,22 @@ describe("registerPWA: offline", () => {
   // worker's own onNeedRefresh still does. Whether a missing version.json
   // should offer it here is open (the #985 backlog row records the choice).
   it("does not offer a waiting worker from the backstop check when version.json is missing", async () => {
-    await withFetch(async () => new Response("not found", { status: 404 }), async (fetchSpy) => {
-      const { registerPWA } = await importPwa();
-      const onUpdateAvailable = vi.fn();
-      registerPWA({ onUpdateAvailable });
-      const opts = registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void };
-      opts.onRegisteredSW("sw.js", { update: async () => undefined, waiting: {} });
-      // The tab returning to the foreground runs the same check as the poll.
-      document.dispatchEvent(new Event("visibilitychange"));
-      await vi.waitFor(() => expect(versionJsonCall(fetchSpy), "the check asked for version.json").toBeDefined());
-      // Let the answer settle: the check has no promise to await from here.
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(onUpdateAvailable).not.toHaveBeenCalled();
-    });
+    await withFetch(
+      async () => new Response("not found", { status: 404 }),
+      async (fetchSpy) => {
+        const { registerPWA } = await importPwa();
+        const onUpdateAvailable = vi.fn();
+        registerPWA({ onUpdateAvailable });
+        const opts = registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void };
+        opts.onRegisteredSW("sw.js", { update: async () => undefined, waiting: {} });
+        // The tab returning to the foreground runs the same check as the poll.
+        document.dispatchEvent(new Event("visibilitychange"));
+        await vi.waitFor(() => expect(versionJsonCall(fetchSpy), "the check asked for version.json").toBeDefined());
+        // Let the answer settle: the check has no promise to await from here.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(onUpdateAvailable).not.toHaveBeenCalled();
+      },
+    );
   });
 });
 
@@ -289,14 +308,19 @@ describe("registerPWA: a newer build whose worker never installed", () => {
     return onUpdateAvailable;
   }
 
-  const live = (version: string) => async () => new Response(JSON.stringify({ version, sha: "f00dcafe" }), { status: 200 });
+  const live = (version: string) => async () =>
+    new Response(JSON.stringify({ version, sha: "f00dcafe" }), { status: 200 });
 
   it("offers the update when the live build differs and no worker is waiting, and Update reloads from the network", async () => {
     const restore = makeBrowserBranchReachable();
     vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
     const cacheDelete = vi.fn(async () => true);
     vi.stubGlobal("caches", {
-      keys: vi.fn(async () => ["workbox-precache-v2-https://example.test/", "workbox-precache-v2-https://example.test/other-app/", "posthog-other"]),
+      keys: vi.fn(async () => [
+        "workbox-precache-v2-https://example.test/",
+        "workbox-precache-v2-https://example.test/other-app/",
+        "posthog-other",
+      ]),
       delete: cacheDelete,
     });
     const reload = vi.fn();
@@ -324,7 +348,10 @@ describe("registerPWA: a newer build whose worker never installed", () => {
     const restore = makeBrowserBranchReachable();
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(live("99.0.0"));
     const cacheDelete = vi.fn(async () => true);
-    vi.stubGlobal("caches", { keys: vi.fn(async () => ["workbox-precache-v2-https://example.test/"]), delete: cacheDelete });
+    vi.stubGlobal("caches", {
+      keys: vi.fn(async () => ["workbox-precache-v2-https://example.test/"]),
+      delete: cacheDelete,
+    });
     try {
       const registration = fakeRegistration({});
       const onUpdateAvailable = await runFocusCheck(registration);
@@ -395,7 +422,10 @@ describe("registerPWA: a newer build whose worker never installed", () => {
       const onUpdateAvailable = vi.fn();
       registerPWA({ onUpdateAvailable });
       const registration = fakeRegistration({ installing: installingWorker().worker });
-      (registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void }).onRegisteredSW("sw.js", registration);
+      (registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void }).onRegisteredSW(
+        "sw.js",
+        registration,
+      );
       await vi.advanceTimersByTimeAsync(15_000 + 60_000 + 1);
       expect(registration.update).toHaveBeenCalledTimes(1);
       expect(onUpdateAvailable).not.toHaveBeenCalled();
@@ -406,7 +436,11 @@ describe("registerPWA: a newer build whose worker never installed", () => {
 
   it("does not offer anything when the live build is the one running", async () => {
     const restore = makeBrowserBranchReachable();
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({ version: __APP_VERSION__, sha: __APP_SHA__ }), { status: 200 }));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ version: __APP_VERSION__, sha: __APP_SHA__ }), { status: 200 }),
+      );
     try {
       const onUpdateAvailable = await runFocusCheck(fakeRegistration({}));
       await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalled());
@@ -425,7 +459,10 @@ describe("registerPWA: a newer build whose worker never installed", () => {
       const { registerPWA } = await importPwa();
       registerPWA({ onUpdateAvailable: vi.fn() });
       const registration = fakeRegistration({});
-      (registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void }).onRegisteredSW("sw.js", registration);
+      (registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void }).onRegisteredSW(
+        "sw.js",
+        registration,
+      );
       await vi.advanceTimersByTimeAsync(14_999);
       expect(registration.update).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(2);

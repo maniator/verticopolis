@@ -42,8 +42,12 @@ describe("viewSentence", () => {
   });
 
   it("says when the view is past the map's edge", () => {
-    expect(viewSentence({ outside: "above", centerFloor: 87 }, TOWER)).toBe("The view is above the top floor, 40, past the top of the map.");
-    expect(viewSentence({ outside: "below", centerFloor: -9 }, TOWER)).toBe("The view is at floor B10, past the bottom of the map.");
+    expect(viewSentence({ outside: "above", centerFloor: 87 }, TOWER)).toBe(
+      "The view is above the top floor, 40, past the top of the map.",
+    );
+    expect(viewSentence({ outside: "below", centerFloor: -9 }, TOWER)).toBe(
+      "The view is at floor B10, past the bottom of the map.",
+    );
   });
 
   it("says nothing for a camera whose position is unknown", () => {
@@ -56,18 +60,34 @@ describe("mapSummary", () => {
     expect(mapSummary({ lowestFloor: -2, highestFloor: 42 }, on(12))).toBe(
       "Tower map: 42 floors above ground and 3 basements. The view is at floor 12.",
     );
-    expect(mapSummary({ lowestFloor: 1, highestFloor: 1 }, on(1))).toBe("Tower map: 1 floor above ground. The view is at floor 1.");
+    expect(mapSummary({ lowestFloor: 1, highestFloor: 1 }, on(1))).toBe(
+      "Tower map: 1 floor above ground. The view is at floor 1.",
+    );
     expect(mapSummary({ lowestFloor: 0, highestFloor: 5 }, on(3))).toBe(
       "Tower map: 5 floors above ground and 1 basement. The view is at floor 3.",
     );
-    expect(mapSummary({ lowestFloor: 1, highestFloor: 5 }, { outside: "none", centerFloor: null })).toBe("Tower map: 5 floors above ground.");
+    expect(mapSummary({ lowestFloor: 1, highestFloor: 5 }, { outside: "none", centerFloor: null })).toBe(
+      "Tower map: 5 floors above ground.",
+    );
   });
 
   it("reports the camera's floor from a real placement above the crop", () => {
     const built = { lowestFloor: 1, highestFloor: 30 };
-    const layout = fitLayout(bandedExtent({ lotWidth: 375, minFloor: -9, maxFloor: 100 }, built, SKY_HEADROOM_FLOORS), 150, 300);
-    const p = viewPlacement(layout, { posX: 187 * TILE, posY: -95.5 * FLOOR, zoom: 1, viewWidth: 1000, viewHeight: 14 * FLOOR });
+    const layout = fitLayout(
+      bandedExtent({ lotWidth: 375, minFloor: -9, maxFloor: 100 }, built, SKY_HEADROOM_FLOORS),
+      150,
+      300,
+    );
+    const p = viewPlacement(layout, {
+      posX: 187 * TILE,
+      posY: -95.5 * FLOOR,
+      zoom: 1,
+      viewWidth: 1000,
+      viewHeight: 14 * FLOOR,
+    });
     expect(p.outside).toBe("above");
-    expect(mapSummary(built, p)).toBe("Tower map: 30 floors above ground. The view is above the top floor, 30, past the top of the map.");
+    expect(mapSummary(built, p)).toBe(
+      "Tower map: 30 floors above ground. The view is above the top floor, 30, past the top of the map.",
+    );
   });
 });

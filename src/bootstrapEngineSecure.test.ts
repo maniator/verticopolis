@@ -6,7 +6,24 @@ vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 vi.mock("./engineCrash/failureArchive", () => ({ downloadEngineFailureArchive: vi.fn(() => "saved") }));
 
-const unverifiable = { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "unverifiable", message: "m", package: { kind: "unverifiable", file: null, expected: null, found: null, expectedPackage: null, servedPackage: null, controlled: false } } } as never;
+const unverifiable = {
+  build: "wasm-only",
+  engine: "none",
+  failure: {
+    stage: "load",
+    reason: "unverifiable",
+    message: "m",
+    package: {
+      kind: "unverifiable",
+      file: null,
+      expected: null,
+      found: null,
+      expectedPackage: null,
+      servedPackage: null,
+      controlled: false,
+    },
+  },
+} as never;
 
 describe("showEngineFailure, the secure-context wiring (#985)", () => {
   const original = Object.getOwnPropertyDescriptor(window, "isSecureContext");

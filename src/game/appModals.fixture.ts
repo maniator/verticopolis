@@ -103,10 +103,15 @@ export function makeApp(sim: SimShape) {
      *  fake tower's infested rooms and booking. */
     statsSheet: vi.fn(() => {
       const head = portCodes.fields("statsSheet");
-      const width = head.length + portCodes.fields("statsStrip").length + portCodes.fields("crewCoverage").length + portCodes.names("ledgerCats").length;
+      const width =
+        head.length +
+        portCodes.fields("statsStrip").length +
+        portCodes.fields("crewCoverage").length +
+        portCodes.names("ledgerCats").length;
       const rec = new Float64Array(width);
       rec[head.indexOf("exterminationDueDay")] = current().exterminationDueDay ?? NaN;
-      const infested = head.length + portCodes.fields("statsStrip").length + portCodes.fields("crewCoverage").indexOf("infested");
+      const infested =
+        head.length + portCodes.fields("statsStrip").length + portCodes.fields("crewCoverage").indexOf("infested");
       rec[infested] = coverage().infested;
       return rec;
     }),
@@ -134,7 +139,18 @@ export function makeApp(sim: SimShape) {
   };
   const reader = {
     update: vi.fn(),
-    header: { minutes: 420, mode: "modern", modernCalendar: "realWorld", day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2 },
+    header: {
+      minutes: 420,
+      mode: "modern",
+      modernCalendar: "realWorld",
+      day: 0,
+      dayOfWeek: 0,
+      isWeekend: false,
+      quarter: 0,
+      year: 0,
+      weekDays: 7,
+      weekendDays: 2,
+    },
     tower: { towerName: "Fake" },
   };
   let tower = sim;
@@ -169,5 +185,14 @@ export function makeApp(sim: SimShape) {
     saveLoad,
   };
   loadInto(enginePort, sim);
-  return { app: app as unknown as GameApp, ui, engine, reader, enginePort, followSwap: app.followSwap, scheduleReview: app.scheduleReview, saveWarning };
+  return {
+    app: app as unknown as GameApp,
+    ui,
+    engine,
+    reader,
+    enginePort,
+    followSwap: app.followSwap,
+    scheduleReview: app.scheduleReview,
+    saveWarning,
+  };
 }

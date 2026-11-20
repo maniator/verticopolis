@@ -12,7 +12,12 @@ import {
   markOnboarded,
   clearOnboarded,
 } from "../../ui/Onboarding";
-import { PALETTE_COLLAPSED_CLASS, PALETTE_COLLAPSED_STORAGE_KEY, PALETTE_COLLAPSED_VALUE, wirePaletteCollapse } from "../../ui/paletteCollapse";
+import {
+  PALETTE_COLLAPSED_CLASS,
+  PALETTE_COLLAPSED_STORAGE_KEY,
+  PALETTE_COLLAPSED_VALUE,
+  wirePaletteCollapse,
+} from "../../ui/paletteCollapse";
 import { PALETTE_FIT_MQ } from "../../ui/paletteFit";
 
 const C = Math.floor(LOT_WIDTH / 2);
@@ -110,7 +115,9 @@ describeEngines("Onboarding — steps advance on real progress", (leg: Leg) => {
 describe("Onboarding: step copy", () => {
   it("lists the steps in the order of the layout's onboarding bits", () => {
     expect(ONBOARD_STEPS.map((s) => s.id)).toEqual(LAYOUT_ONBOARDING);
-    expect(LAYOUT_ONBOARDING.map((id) => ONBOARDING_FLAG[id as keyof typeof ONBOARDING_FLAG])).toEqual([1, 2, 4, 8, 16]);
+    expect(LAYOUT_ONBOARDING.map((id) => ONBOARDING_FLAG[id as keyof typeof ONBOARDING_FLAG])).toEqual([
+      1, 2, 4, 8, 16,
+    ]);
   });
 
   it("each step has distinct desktop and mobile hint copy and a pulse target", () => {
@@ -482,7 +489,10 @@ describeEngines("Onboarding — tick advances and finishes on real progress", (l
       '<div class="pal-item" data-kind="floor"></div></div></aside><div id="speed"></div>';
     const win = document.getElementById("palette")!;
     const stored: Record<string, string> = { [PALETTE_COLLAPSED_STORAGE_KEY]: PALETTE_COLLAPSED_VALUE.collapsed };
-    const store = { getItem: (k: string) => stored[k] ?? null, setItem: (k: string, v: string) => void (stored[k] = v) };
+    const store = {
+      getItem: (k: string) => stored[k] ?? null,
+      setItem: (k: string, v: string) => void (stored[k] = v),
+    };
     wirePaletteCollapse(win, store, () => {});
     expect(win.classList.contains(PALETTE_COLLAPSED_CLASS)).toBe(true);
     // The page is on the desktop layout, where the fold shows.

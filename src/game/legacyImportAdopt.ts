@@ -20,7 +20,10 @@ import type { SaveLoadDeps } from "./saveLoad";
  * `SaveLoad` where its tests live.
  */
 export function adoptConfirmedLegacyImport(
-  deps: Pick<SaveLoadDeps, "enginePort" | "portCodes" | "reader" | "towerSwapped" | "beforeSwap" | "swapRefused" | "ui">,
+  deps: Pick<
+    SaveLoadDeps,
+    "enginePort" | "portCodes" | "reader" | "towerSwapped" | "beforeSwap" | "swapRefused" | "ui"
+  >,
   towerName: string,
   flushCurrent: () => void,
   file: { readonly bytes: Uint8Array; readonly filename: string },
@@ -58,13 +61,18 @@ export function adoptConfirmedLegacyImport(
   // the imported tower from the swap on (`towerSwapped`).
   // "info" keeps this bulletin log-only: renderLog also toasts "good" entries,
   // and the explicit success toast below already covers that.
-  port.logLine(`Imported from SimTower (1994): welcome back to ${towerName}.`, deps.portCodes().code("logKinds", "info"));
+  port.logLine(
+    `Imported from SimTower (1994): welcome back to ${towerName}.`,
+    deps.portCodes().code("logKinds", "info"),
+  );
   // The tower's own file comes once the 1994 file is in (`towerDocument.ts`),
   // so the 1994 file keeps its name.
   void claimTower(() =>
     keepOpenedFile(file.filename, file.bytes, "tdt").then((kept) =>
       deps.ui.toast(
-        kept ? `Tower imported. The 1994 file is in My Towers as "${kept.name}".` : "Tower imported. Use File > Save As… to keep it.",
+        kept
+          ? `Tower imported. The 1994 file is in My Towers as "${kept.name}".`
+          : "Tower imported. Use File > Save As… to keep it.",
         "good",
       ),
     ),

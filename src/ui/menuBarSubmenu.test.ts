@@ -25,12 +25,14 @@ function setup() {
   const bar = new MenuBar(document.getElementById("menubar")!);
   bars.push(bar);
   const $ = (id: string) => document.getElementById(id) as HTMLElement;
-  const key = (el: Element, k: string) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+  const key = (el: Element, k: string) =>
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
   const press = (el: Element, pointerType: string) => {
     el.dispatchEvent(new PointerEvent("pointerdown", { pointerType, bubbles: true }));
     el.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
   };
-  const point = (el: Element) => el.dispatchEvent(new PointerEvent("pointerover", { pointerType: "mouse", bubbles: true }));
+  const point = (el: Element) =>
+    el.dispatchEvent(new PointerEvent("pointerover", { pointerType: "mouse", bubbles: true }));
   bar.open($("t-file") as HTMLButtonElement, false);
   return { bar, $, key, press, point };
 }
@@ -149,7 +151,9 @@ describe("a menu's submenu", () => {
     $("i-open").dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true, cancelable: true }));
     $("i-load").focus();
     $("i-load").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
-    $("i-auto").dispatchEvent(new KeyboardEvent("keydown", { key: "1", ctrlKey: true, bubbles: true, cancelable: true }));
+    $("i-auto").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "1", ctrlKey: true, bubbles: true, cancelable: true }),
+    );
     expect(picked).not.toHaveBeenCalled();
     expect(bar.current()).toBe($("t-file"));
   });

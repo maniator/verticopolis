@@ -9,7 +9,13 @@ const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), k
 /** The kinds whose census is the count the room carries from the day before:
  *  the daily-visitor venues and the set-audience halls. Mirrors
  *  `census_follows_the_day` in engine-rs/src/economy/visitors.rs. */
-const CENSUS_FOLLOWS_THE_DAY: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["shop", "fastFood", "restaurant", "partyHall", "cinema"]);
+const CENSUS_FOLLOWS_THE_DAY: ReadonlySet<FacilityKind> = new Set<FacilityKind>([
+  "shop",
+  "fastFood",
+  "restaurant",
+  "partyHall",
+  "cinema",
+]);
 
 /** The people a unit counts in the census: yesterday's count for a venue that
  *  keeps one, the live customer tally for any other trading venue with a
@@ -26,7 +32,21 @@ function censusCount(u: Unit): number {
  *  every unit as well, so no memoized list or kept count stands behind it.
  *  Any holder of the units will do, such as an engine's save. */
 export function walkedStats(sim: { tower: { units: readonly Unit[] } }) {
-  const c = { offices: 0, occupiedOffices: 0, condos: 0, soldCondos: 0, hotelRooms: 0, occupiedHotel: 0, dirty: 0, shops: 0, restaurants: 0, vacant: 0, vacantNoRate: 0, parkingSpaces: 0, population: 0 };
+  const c = {
+    offices: 0,
+    occupiedOffices: 0,
+    condos: 0,
+    soldCondos: 0,
+    hotelRooms: 0,
+    occupiedHotel: 0,
+    dirty: 0,
+    shops: 0,
+    restaurants: 0,
+    vacant: 0,
+    vacantNoRate: 0,
+    parkingSpaces: 0,
+    population: 0,
+  };
   for (const u of sim.tower.units) {
     if (isPresent(u)) c.population += censusCount(u);
     if (u.kind === "office") {

@@ -9,7 +9,15 @@ import { catalogCalendar, priceOptionsFor, priceOptionsFromRent, rentPerCollecti
  * `catalogPricing.integration.test.ts`, on the Rust engine.
  */
 
-const BAND: CatalogRent = { shape: "band", cadence: "quarterly", default: 10_000, min: 2_000, max: 20_000, step: 500, noRate: false };
+const BAND: CatalogRent = {
+  shape: "band",
+  cadence: "quarterly",
+  default: 10_000,
+  min: 2_000,
+  max: 20_000,
+  step: 500,
+  noRate: false,
+};
 const LADDER: CatalogRent = {
   shape: "ladder",
   cadence: "quarterly",
@@ -25,7 +33,10 @@ const LADDER: CatalogRent = {
 
 describe("price options from the catalog (#921)", () => {
   it("offer a band as its default, limits and step", () => {
-    expect(priceOptionsFromRent(BAND)).toEqual({ shape: "band", band: { default: 10_000, min: 2_000, max: 20_000, step: 500 } });
+    expect(priceOptionsFromRent(BAND)).toEqual({
+      shape: "band",
+      band: { default: 10_000, min: 2_000, max: 20_000, step: 500 },
+    });
   });
 
   it("offer a ladder's rungs with No Rate", () => {
@@ -49,7 +60,10 @@ describe("price options from the catalog (#921)", () => {
   it("read the kind's own catalog entry: Classic prices on a ladder, Modern on a band", () => {
     const classic = catalogFor("classic");
     const modern = catalogFor("modern");
-    for (const [catalog, shape] of [[classic, "ladder"], [modern, "band"]] as const) {
+    for (const [catalog, shape] of [
+      [classic, "ladder"],
+      [modern, "band"],
+    ] as const) {
       const priced = catalog.facilities.filter((f) => f.rent);
       expect(priced.length, `${catalog.mode} prices some kinds`).toBeGreaterThan(3);
       for (const f of priced) {
@@ -60,7 +74,13 @@ describe("price options from the catalog (#921)", () => {
   });
 
   it("refuses a ladder rung that is not one of the four canon rungs", () => {
-    const rung = (level: number, label: string) => ({ shape: "ladder" as const, cadence: "quarterly" as const, default: 1, noRate: true as const, rungs: [{ level, label, value: 1 }] });
+    const rung = (level: number, label: string) => ({
+      shape: "ladder" as const,
+      cadence: "quarterly" as const,
+      default: 1,
+      noRate: true as const,
+      rungs: [{ level, label, value: 1 }],
+    });
     expect(() => priceOptionsFromRent(rung(4, "Very High"))).toThrow(/unknown rung/);
     expect(() => priceOptionsFromRent(rung(0, "Low"))).toThrow(/unknown rung/);
   });
@@ -92,8 +112,23 @@ describe("the tower's calendar and one collection's rent (#2107)", () => {
     expect(catalogCalendar(catalogFor("classic"), "realWorld").key).toBe("canon");
   });
 
-  const SHORT: CatalogCalendar = { key: "canon", quarterDays: 3, leasePeriodDays: 3, maintenancePeriodDays: 3, maintenanceScale: 0.1, quarterlyRentScale: 1 / 30 };
-  const FULL: CatalogCalendar = { ...SHORT, key: "realWorld", quarterDays: 90, leasePeriodDays: 30, maintenancePeriodDays: 30, maintenanceScale: 1, quarterlyRentScale: 1 / 3 };
+  const SHORT: CatalogCalendar = {
+    key: "canon",
+    quarterDays: 3,
+    leasePeriodDays: 3,
+    maintenancePeriodDays: 3,
+    maintenanceScale: 0.1,
+    quarterlyRentScale: 1 / 30,
+  };
+  const FULL: CatalogCalendar = {
+    ...SHORT,
+    key: "realWorld",
+    quarterDays: 90,
+    leasePeriodDays: 30,
+    maintenancePeriodDays: 30,
+    maintenanceScale: 1,
+    quarterlyRentScale: 1 / 3,
+  };
 
   it("scales a quarterly rent by the calendar's quarterly scale, rounded to whole dollars", () => {
     expect(rentPerCollection("quarterly", 10_000, SHORT)).toBe(333);

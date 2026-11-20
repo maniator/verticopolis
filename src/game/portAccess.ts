@@ -25,7 +25,13 @@ export interface BuildQuote {
 
 /** `quoteBuild` as the callers read it. Call it before the next
  *  status-producing member, which replaces `lastReason()`. */
-export function quoteBuild(port: EnginePort, codes: PortCodes, kind: FacilityKind, floor: number, x: number): BuildQuote {
+export function quoteBuild(
+  port: EnginePort,
+  codes: PortCodes,
+  kind: FacilityKind,
+  floor: number,
+  x: number,
+): BuildQuote {
   const rec = port.quoteBuild(codes.kind(kind), floor, x);
   const ok = codes.slot(rec, "quoteBuild", "ok") === 1;
   return { ok, cost: codes.slot(rec, "quoteBuild", "cost"), reason: ok ? undefined : port.lastReason() };

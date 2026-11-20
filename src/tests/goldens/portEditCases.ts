@@ -42,7 +42,8 @@ const isFree = (answer: Record<string, number | string>, top: number) => answer.
 
 /** Whether a drag's answer moved the shaft's top to `top` and paid for what
  *  it added. */
-const isBilled = (answer: Record<string, number | string>, top: number) => answer.top === top && typeof answer.delta === "number" && answer.delta < 0;
+const isBilled = (answer: Record<string, number | string>, top: number) =>
+  answer.top === top && typeof answer.delta === "number" && answer.delta < 0;
 
 /** A save's text as the game stores it, with the two stamp keys every
  *  write adds (`stampText` in `src/storage/saveStamp.ts`), so `loadSave`
@@ -50,7 +51,13 @@ const isBilled = (answer: Record<string, number | string>, top: number) => answe
  *  time 0), so every run loads the same text. */
 const storedText = (text: string) => JSON.stringify({ ...(JSON.parse(text) as object), savedAt: 0, appVersion: "dev" });
 
-const found = (seed: number, mode: "classic" | "modern"): FrameDayStart => ({ kind: "found", seed, mode, calendar: "realWorld", unbridged: false });
+const found = (seed: number, mode: "classic" | "modern"): FrameDayStart => ({
+  kind: "found",
+  seed,
+  mode,
+  calendar: "realWorld",
+  unbridged: false,
+});
 
 /** Lay one tile of `kind` at each x of a floor, one command per tile, as a
  *  player's clicks do; every tile must land. */
@@ -94,7 +101,9 @@ function fourStarEdits(s: PortEditSession): void {
   const skipped = (): string => [...(s.shaftAt(30, 196).skipFloors ?? [])].sort((a, b) => a - b).join(" ");
   s.done("skip floor 35", "markStop", shaft, 35, SKIP_FLOOR);
   s.require("the shaft skips floor 35 alone", skipped() === "35");
-  const schedule = scheduleSlots({ activeCars: { weekday: Array<number>(24).fill(2), weekend: Array<number>(24).fill(1) } });
+  const schedule = scheduleSlots({
+    activeCars: { weekday: Array<number>(24).fill(2), weekend: Array<number>(24).fill(1) },
+  });
   s.done("run 2 cars on weekdays and 1 on weekends", "scheduleShaft", shaft, schedule);
   s.done("raise the bottom to floor 31", "extendShaft", shaft, BOTTOM, 31);
   s.done("lower the bottom back to floor 30", "extendShaft", shaft, BOTTOM, 30);
@@ -108,9 +117,15 @@ function fourStarEdits(s: PortEditSession): void {
   const { bottom, top: shaftTop } = s.shaftAt(30, 196);
   const lobbies = s.lobbyFloors();
   const between = span(bottom + 1, shaftTop);
-  s.require("the shaft's top is no lobby, and a lobby lies between its ends", !lobbies.has(shaftTop) && between.some((f) => lobbies.has(f)));
+  s.require(
+    "the shaft's top is no lobby, and a lobby lies between its ends",
+    !lobbies.has(shaftTop) && between.some((f) => lobbies.has(f)),
+  );
   s.done("set express stops on the elevator", "expressStops", shaft);
-  s.require("the express stops skip every floor between the shaft's ends but its lobbies", skipped() === between.filter((f) => !lobbies.has(f)).join(" "));
+  s.require(
+    "the express stops skip every floor between the shaft's ends but its lobbies",
+    skipped() === between.filter((f) => !lobbies.has(f)).join(" "),
+  );
   s.done("clear the stops", "dropStops", shaft);
   s.require("the clear skips no floor", skipped() === "");
   s.setMoney(s.money() - 5000);
@@ -119,9 +134,15 @@ function fourStarEdits(s: PortEditSession): void {
   // engine-held mark (#990).
   const top = s.shaftAt(30, 196).top;
   s.done("start a drag", "startExtend", shaft);
-  s.require("the drag out is billed", isBilled(s.done("drag the top up two floors", "extendShaft", shaft, TOP, top + 2), top + 2));
+  s.require(
+    "the drag out is billed",
+    isBilled(s.done("drag the top up two floors", "extendShaft", shaft, TOP, top + 2), top + 2),
+  );
   s.require("the drag back is free", isFree(s.done("drag it back one", "extendShaft", shaft, TOP, top + 1), top + 1));
-  s.require("the drag out again inside the mark is free", isFree(s.done("drag it up again", "extendShaft", shaft, TOP, top + 2), top + 2));
+  s.require(
+    "the drag out again inside the mark is free",
+    isFree(s.done("drag it up again", "extendShaft", shaft, TOP, top + 2), top + 2),
+  );
   s.done("end the drag", "stopExtend");
 
   const money = s.money();
@@ -146,7 +167,11 @@ function fourStarEdits(s: PortEditSession): void {
   // to it and someone is midway on a route that never takes it, as the
   // checks below need.
   const escalator = s.shaftAt(1, 234).id;
-  for (let wait = 0; wait < ESCALATOR_WAIT_STEPS && !(s.walkingTo(escalator).length > 0 && s.midRouteAvoiding(escalator).length > 0); wait++) {
+  for (
+    let wait = 0;
+    wait < ESCALATOR_WAIT_STEPS && !(s.walkingTo(escalator).length > 0 && s.midRouteAvoiding(escalator).length > 0);
+    wait++
+  ) {
     s.play(5);
   }
 
@@ -184,15 +209,29 @@ function fourStarEdits(s: PortEditSession): void {
   s.require("the bulldoze takes the escalator out", s.findShaft(1, 234) === undefined);
   const since = s.markPeople();
   const afterBulldoze = s.personIds();
-  s.require("the bulldoze leaves the people walking to it to the frame loop", walking.every((id) => afterBulldoze.has(id)));
+  s.require(
+    "the bulldoze leaves the people walking to it to the frame loop",
+    walking.every((id) => afterBulldoze.has(id)),
+  );
   const firstMoveCrowd = s.playReadingFirstMoveCrowd(60);
   const firstMove = new Set(firstMoveCrowd.people.map((p) => p.id));
-  const stillHeadedFor = firstMoveCrowd.people.filter((p) => walking.includes(p.id) && p.shafts.slice(p.leg).includes(link.id));
-  s.require("the first frame that moves the clock leaves none of the people walking to the escalator still headed for it", stillHeadedFor.length === 0);
-  s.require("the first frame that moves the clock keeps the people midway on a route that never takes the escalator", midway.every((id) => firstMove.has(id)));
+  const stillHeadedFor = firstMoveCrowd.people.filter(
+    (p) => walking.includes(p.id) && p.shafts.slice(p.leg).includes(link.id),
+  );
+  s.require(
+    "the first frame that moves the clock leaves none of the people walking to the escalator still headed for it",
+    stillHeadedFor.length === 0,
+  );
+  s.require(
+    "the first frame that moves the clock keeps the people midway on a route that never takes the escalator",
+    midway.every((id) => firstMove.has(id)),
+  );
   const riders = s.ridersSince(since);
   s.require("someone who set out after the bulldoze rides", riders.length > 0);
-  s.require("nobody who set out after the bulldoze takes the escalator", riders.every((shafts) => !shafts.includes(link.id)));
+  s.require(
+    "nobody who set out after the bulldoze takes the escalator",
+    riders.every((shafts) => !shafts.includes(link.id)),
+  );
 
   // A sale and a bulldoze as the tools send them, each its own undo step;
   // the lobby is refused and keeps no step.
@@ -226,10 +265,16 @@ function fourStarEdits(s: PortEditSession): void {
   // and the live camera stays.
   s.done("move the camera again", "setCamera", 200, 20, 1);
   s.restore("restore the save from before the sale", saved);
-  s.require("the restore puts the office and the stairs back", s.hasUnitAt(58, 120) && s.findShaft(58, 130) !== undefined);
+  s.require(
+    "the restore puts the office and the stairs back",
+    s.hasUnitAt(58, 120) && s.findShaft(58, 130) !== undefined,
+  );
   s.require("the restore brings its clock back", s.minute() === savedAt);
   const camera = s.readJson("the camera after the restore", (p) => p.view());
-  s.require("the restore keeps the live camera", canonicalJson(camera) === canonicalJson({ tile: 200, floor: 20, zoom: 1 }));
+  s.require(
+    "the restore keeps the live camera",
+    canonicalJson(camera) === canonicalJson({ tile: 200, floor: 20, zoom: 1 }),
+  );
   s.history("undo after the restore", "undo", "nothingToStep");
   s.play(120);
 }
@@ -263,7 +308,14 @@ function liftTower(s: PortEditSession, top: number): number {
   s.setMoney(1e9);
   buildRow(s, "lobby", 1, span(170, 200));
   for (let floor = 2; floor <= top; floor++) buildRow(s, "floor", floor, span(170, 200));
-  s.done(`build a standard elevator at x 172 from floor 1 to ${top}`, "buildShaft", s.kind("elevatorStandard"), 172, 1, top);
+  s.done(
+    `build a standard elevator at x 172 from floor 1 to ${top}`,
+    "buildShaft",
+    s.kind("elevatorStandard"),
+    172,
+    1,
+    top,
+  );
   return s.shaftAt(1, 172).id;
 }
 
@@ -285,19 +337,31 @@ function malformedCharges(s: PortEditSession): void {
   ] as const) {
     s.refused(`start a drag on ${what}`, "startExtend", bad);
     s.done("shrink to floor 3", "extendShaft", lift, TOP, 3);
-    s.require("a regrow with no drag open is billed", isBilled(s.done("regrow to floor 4, billed", "extendShaft", lift, TOP, 4), 4));
+    s.require(
+      "a regrow with no drag open is billed",
+      isBilled(s.done("regrow to floor 4, billed", "extendShaft", lift, TOP, 4), 4),
+    );
   }
   s.done("start a drag", "startExtend", lift);
   s.require("the drag out is billed", isBilled(s.done("drag to floor 6", "extendShaft", lift, TOP, 6), 6));
   s.require("the drag back is free", isFree(s.done("drag back to floor 5", "extendShaft", lift, TOP, 5), 5));
-  s.require("the regrow inside the mark is free", isFree(s.done("drag to floor 6 again, free", "extendShaft", lift, TOP, 6), 6));
+  s.require(
+    "the regrow inside the mark is free",
+    isFree(s.done("drag to floor 6 again, free", "extendShaft", lift, TOP, 6), 6),
+  );
   s.refused("start a drag on a NaN id with one open", "startExtend", NaN);
   s.done("shrink to floor 5", "extendShaft", lift, TOP, 5);
-  s.require("a refused start drops the drag, so the regrow is billed", isBilled(s.done("regrow to floor 6, billed", "extendShaft", lift, TOP, 6), 6));
+  s.require(
+    "a refused start drops the drag, so the regrow is billed",
+    isBilled(s.done("regrow to floor 6, billed", "extendShaft", lift, TOP, 6), 6),
+  );
   s.done("start a drag", "startExtend", lift);
   s.done("end the drag", "stopExtend");
   s.done("shrink to floor 5", "extendShaft", lift, TOP, 5);
-  s.require("a regrow after the drag closed is billed", isBilled(s.done("regrow to floor 6, billed", "extendShaft", lift, TOP, 6), 6));
+  s.require(
+    "a regrow after the drag closed is billed",
+    isBilled(s.done("regrow to floor 6, billed", "extendShaft", lift, TOP, 6), 6),
+  );
   s.play(60);
 }
 
@@ -319,7 +383,8 @@ function malformedEdits(s: PortEditSession): void {
   s.done("build an office at floor 2, x 180", "buildAt", s.kind("office"), 2, 180);
   const office = s.unitAt(2, 180);
   const schedule = scheduleSlots({ activeCars: { weekday: Array<number>(24).fill(1) } });
-  for (const [what, bad] of badValues(3)) s.refused(`sell the tile at floor ${what}, x 180`, "demolishTile", bad, 180, SELL);
+  for (const [what, bad] of badValues(3))
+    s.refused(`sell the tile at floor ${what}, x 180`, "demolishTile", bad, 180, SELL);
   for (const [what, bad] of badValues(lift)) {
     s.refused(`add a car to id ${what}`, "changeCars", bad, ADD_CAR);
     s.refused(`extend id ${what}`, "extendShaft", bad, TOP, 2);
@@ -354,16 +419,25 @@ function brush(s: PortEditSession): void {
   s.setMoney(1e9);
   const floor = s.kind("floor");
   const paint = (want: "done" | "refused", step: string, kind: number, fl: number, tiles: readonly number[]) =>
-    want === "done" ? s.done(step, "paintTiles", kind, fl, Float64Array.from(tiles)) : s.refused(step, "paintTiles", kind, fl, Float64Array.from(tiles));
+    want === "done"
+      ? s.done(step, "paintTiles", kind, fl, Float64Array.from(tiles))
+      : s.refused(step, "paintTiles", kind, fl, Float64Array.from(tiles));
   // A brush that lays only some of its tiles is still done, so each run
   // checks that it laid them all.
-  const run = (step: string, fl: number, tiles: readonly number[]) => s.require(`${step} lays all ${tiles.length} tiles`, paint("done", step, floor, fl, tiles).placed === tiles.length);
+  const run = (step: string, fl: number, tiles: readonly number[]) =>
+    s.require(`${step} lays all ${tiles.length} tiles`, paint("done", step, floor, fl, tiles).placed === tiles.length);
   for (let fl = 1; fl <= 14; fl++) {
     run(`brush floor ${fl} from x 170 to 201`, fl, span(170, 202));
     run(`brush floor ${fl} from x 202 to 205`, fl, span(202, 206));
   }
   run("brush floor 15 from x 170 to 199", 15, span(170, 200));
-  const lobby = paint("done", "brush a lobby on floor 15", s.kind("lobby"), 15, [199, 203, 198, 175, 200, 198, 210, 180]);
+  const lobby = paint(
+    "done",
+    "brush a lobby on floor 15",
+    s.kind("lobby"),
+    15,
+    [199, 203, 198, 175, 200, 198, 210, 180],
+  );
   s.require("the lobby brush lays 5 of its tiles", lobby.placed === 5);
   paint("refused", "brush an office", s.kind("office"), 15, [180]);
   paint("refused", "brush a NaN kind", NaN, 16, [180]);
@@ -390,7 +464,13 @@ function brushOnLoadedTower(s: PortEditSession): void {
   // that truncated the floor (as an integer cast does) would land it.
   s.refused("brush floor -0.5", "paintTiles", s.kind("floor"), -0.5, Float64Array.from([150]));
   s.done("brush a tile under the lobby", "paintTiles", s.kind("floor"), 0, Float64Array.from([150]));
-  const lobby = s.done("brush a lobby on floor 15", "paintTiles", s.kind("lobby"), 15, Float64Array.from([151, 150, 170]));
+  const lobby = s.done(
+    "brush a lobby on floor 15",
+    "paintTiles",
+    s.kind("lobby"),
+    15,
+    Float64Array.from([151, 150, 170]),
+  );
   s.require("the lobby brush lays 2 of its tiles", lobby.placed === 2);
   s.play(60);
 }
@@ -408,14 +488,20 @@ export const PORT_EDIT_CASES: readonly PortEditCase[] = [
 const dumpDir = dumpRoot(process.env.VC_PORT_EDITS_DUMP);
 const dumpCase = process.env.VC_PORT_EDITS_CASE;
 if (dumpDir && !PORT_EDIT_CASES.some((c) => c.id === dumpCase)) {
-  throw new Error(`VC_PORT_EDITS_DUMP needs VC_PORT_EDITS_CASE set to a case id; ${JSON.stringify(dumpCase)} names none`);
+  throw new Error(
+    `VC_PORT_EDITS_DUMP needs VC_PORT_EDITS_CASE set to a case id; ${JSON.stringify(dumpCase)} names none`,
+  );
 }
 
 /** Run one case on one engine and return its lines. `afterStart` runs once,
  *  right after the start line, outside any step: the teeth test changes the
  *  tower there to show the next line catches it (such a run writes no
  *  dump). */
-export function runPortEditCase(leg: PortEditLeg, c: PortEditCase, afterStart?: (port: EnginePort) => void): PortEditLine[] {
+export function runPortEditCase(
+  leg: PortEditLeg,
+  c: PortEditCase,
+  afterStart?: (port: EnginePort) => void,
+): PortEditLine[] {
   const dump = dumpDir !== undefined && dumpCase === c.id && afterStart === undefined ? resolve(dumpDir) : undefined;
   const s = new PortEditSession(leg, c.id, c.start, dump);
   afterStart?.(s.port);

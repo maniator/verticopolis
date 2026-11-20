@@ -248,7 +248,11 @@ describe("selectedScreenRect", () => {
 
 describe("positionPanels with a facility card the player moved", () => {
   afterEach(() => vi.restoreAllMocks());
-  const office = { selected: { type: "unit", id: 1 } as GameApp["selected"], isEditorOpen: true, unit: { x: 10, width: 9, floor: 4, kind: "office" } };
+  const office = {
+    selected: { type: "unit", id: 1 } as GameApp["selected"],
+    isEditorOpen: true,
+    unit: { x: 10, width: 9, floor: 4, kind: "office" },
+  };
 
   it("keeps a moved card where the player put it: no anchor, no release", () => {
     vi.spyOn(moves, "editorPlacedByPlayer").mockReturnValue(true);

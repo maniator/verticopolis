@@ -107,7 +107,9 @@ async function openFolderTower(app: GameApp, t: RecentTower): Promise<void> {
   const folder = linkedFolder.state()?.name ?? "the linked folder";
   if (linkedFolder.linkId() !== t.link) {
     gone(t);
-    app.ui.sayVisibly(`"${t.id}" was in a folder that isn't linked any more. Link it again in File > Open… to open its towers.`);
+    app.ui.sayVisibly(
+      `"${t.id}" was in a folder that isn't linked any more. Link it again in File > Open… to open its towers.`,
+    );
     return;
   }
   if (linkedFolder.state()?.access !== "granted") {
@@ -138,9 +140,13 @@ export async function openRecent(app: GameApp, t: RecentTower): Promise<void> {
   const opened = await openTowersFile(app, t.id);
   if (opened === "gone") {
     gone(t);
-    app.ui.sayVisibly(`"${t.name}" isn't in My Towers any more. It may have been deleted, so it's off the Open Recent list.`);
+    app.ui.sayVisibly(
+      `"${t.name}" isn't in My Towers any more. It may have been deleted, so it's off the Open Recent list.`,
+    );
   } else if (opened === "closed") {
-    app.ui.sayVisibly("My Towers can't be opened in this window, so its towers can't open from here. File > Open… can open a tower file from your computer.");
+    app.ui.sayVisibly(
+      "My Towers can't be opened in this window, so its towers can't open from here. File > Open… can open a tower file from your computer.",
+    );
   }
 }
 

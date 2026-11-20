@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { nothing } from "lit-html";
-import { gateLabel, incomeSection, milestonesSection, nextStarSection, statsModalTemplate, statsTemplate, STAR_GATE_LABELS } from "./stats";
+import {
+  gateLabel,
+  incomeSection,
+  milestonesSection,
+  nextStarSection,
+  statsModalTemplate,
+  statsTemplate,
+  STAR_GATE_LABELS,
+} from "./stats";
 import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
 import type { StarGateId } from "@verticopolis/components/port/panels";
@@ -79,17 +87,35 @@ describe("statsTemplate structure", () => {
   });
 
   it("names the homes in the parking demand only when Modern homes need spaces (#1973)", () => {
-    const offices = { officePop: 6, offices: 1, suites: 2, homes: 0, total: 3, coverage: null as number | null, short: false };
+    const offices = {
+      officePop: 6,
+      offices: 1,
+      suites: 2,
+      homes: 0,
+      total: 3,
+      coverage: null as number | null,
+      short: false,
+    };
     const cell = (demand: typeof offices) =>
-      cellAfter(body({ mode: "modern", stats: { star: 3 }, report: { parkingDemand: demand } }), "Parking demand")!.textContent;
+      cellAfter(body({ mode: "modern", stats: { star: 3 }, report: { parkingDemand: demand } }), "Parking demand")!
+        .textContent;
     expect(cell(offices)).toBe("3 needed (1 offices + 2 suites)");
     expect(cell({ ...offices, homes: 4, total: 7 })).toBe("7 needed (1 offices + 2 suites + 4 homes)");
   });
 
   it("shows how much of the parking need is covered only while it falls short (#1973)", () => {
-    const demand = { officePop: 6, offices: 1, suites: 2, homes: 4, total: 7, coverage: null as number | null, short: false };
+    const demand = {
+      officePop: 6,
+      offices: 1,
+      suites: 2,
+      homes: 4,
+      total: 7,
+      coverage: null as number | null,
+      short: false,
+    };
     const cell = (d: typeof demand) =>
-      cellAfter(body({ mode: "modern", stats: { star: 3 }, report: { parkingDemand: d } }), "Parking demand")!.textContent;
+      cellAfter(body({ mode: "modern", stats: { star: 3 }, report: { parkingDemand: d } }), "Parking demand")!
+        .textContent;
     expect(cell(demand)).toBe("7 needed (1 offices + 2 suites + 4 homes)");
     expect(cell({ ...demand, coverage: 0.6449 })).toBe("7 needed (1 offices + 2 suites + 4 homes) · 64% covered");
   });
@@ -97,7 +123,15 @@ describe("statsTemplate structure", () => {
   it("words the Classic count as the offices' one space plus a space per suite (#2024)", () => {
     // The engine counts the Classic need by the rule: one space serves every
     // office, so 48 workers' cars still need one, plus one per suite.
-    const demand = { officePop: 48, offices: 1, suites: 1, homes: 0, total: 2, coverage: null as number | null, short: false };
+    const demand = {
+      officePop: 48,
+      offices: 1,
+      suites: 1,
+      homes: 0,
+      total: 2,
+      coverage: null as number | null,
+      short: false,
+    };
     const cell = (d: typeof demand, mode: "classic" | "modern") =>
       cellAfter(body({ mode, stats: { star: 3 }, report: { parkingDemand: d } }), "Parking demand")!.textContent;
     expect(cell(demand, "classic")).toBe("2 needed (offices 1 + 1 suite)");
@@ -109,9 +143,20 @@ describe("statsTemplate structure", () => {
   it("colors the parking demand by the engine's shortage answer alone", () => {
     // Classic: 48 office workers' cars want 2 spaces and 1 works, yet one
     // free space serves every office, so the engine says not short (green).
-    const demand = { officePop: 48, offices: 2, suites: 0, homes: 0, total: 2, coverage: null as number | null, short: false };
+    const demand = {
+      officePop: 48,
+      offices: 2,
+      suites: 0,
+      homes: 0,
+      total: 2,
+      coverage: null as number | null,
+      short: false,
+    };
     const cell = (d: typeof demand, working: number) =>
-      cellAfter(body({ stats: { star: 3, parkingSpaces: 1 }, report: { functionalParking: working, parkingDemand: d } }), "Parking demand")!;
+      cellAfter(
+        body({ stats: { star: 3, parkingSpaces: 1 }, report: { functionalParking: working, parkingDemand: d } }),
+        "Parking demand",
+      )!;
     expect(cell(demand, 1).getAttribute("style")).toContain("var(--good)");
     // The engine's answer alone turns it red, even with the spaces to cover the count.
     expect(cell({ ...demand, short: true }, 5).getAttribute("style")).toContain("var(--bad)");
@@ -169,14 +214,29 @@ describe("statsTemplate sections", () => {
   it("a sold Modern household renders the multi-size mix", () => {
     // Scope to the Size mix VALUE cell: the elevator and VIP rows also join
     // with the same separator, so a whole-dialog probe could pass vacuously.
-    const households = { households: 2, residents: 6, mix: [[2, 1], [4, 1]] as const };
+    const households = {
+      households: 2,
+      residents: 6,
+      mix: [
+        [2, 1],
+        [4, 1],
+      ] as const,
+    };
     const cell = cellAfter(body({ mode: "modern", report: { households } }), "Size mix")!;
     expect(cell).toBeTruthy();
     expect(cell.textContent).toMatch(/×.+·.+×/); // two buckets joined
   });
 
   it("a multi-shaft tower renders EVERY shaft's utilization row; income history renders rows and Net", () => {
-    const shaft = (id: number, bottom: number, top: number) => ({ id, kind: "elevatorStandard" as const, bottom, top, cars: 1, capacity: 21, utilization: 0.1 * id });
+    const shaft = (id: number, bottom: number, top: number) => ({
+      id,
+      kind: "elevatorStandard" as const,
+      bottom,
+      top,
+      cars: 1,
+      capacity: 21,
+      utilization: 0.1 * id,
+    });
     const elevators = [shaft(4, 1, 5), shaft(3, 2, 5), shaft(2, 1, 4), shaft(1, 1, 3)];
     const frag = body({ stats: { elevators: 4, transports: 4 }, report: { elevators } });
     // All four shafts render a "% full" value cell (the two-column split holds
@@ -191,12 +251,18 @@ describe("statsTemplate sections", () => {
     expect(frag.textContent).toContain("Counts toward stars");
     expect(frag.textContent).toContain("Hotel guests count toward your star rating");
     // At 3★, or with no divergence, the row stays out.
-    expect(body({ stats: { star: 3, population: 7 }, report: { ratingPopulation: 6 } }).textContent).not.toContain("Counts toward stars");
-    expect(body({ stats: { star: 4, population: 7 }, report: { ratingPopulation: 7 } }).textContent).not.toContain("Counts toward stars");
+    expect(body({ stats: { star: 3, population: 7 }, report: { ratingPopulation: 6 } }).textContent).not.toContain(
+      "Counts toward stars",
+    );
+    expect(body({ stats: { star: 4, population: 7 }, report: { ratingPopulation: 7 } }).textContent).not.toContain(
+      "Counts toward stars",
+    );
   });
 
   it("an express shaft reads its Express label in the elevator list", () => {
-    const elevators = [{ id: 2, kind: "elevatorExpress" as const, bottom: 1, top: 2, cars: 1, capacity: 42, utilization: 0 }];
+    const elevators = [
+      { id: 2, kind: "elevatorExpress" as const, bottom: 1, top: 2, cars: 1, capacity: 42, utilization: 0 },
+    ];
     expect(body({ report: { elevators } }).textContent).toContain("Express");
   });
 });
@@ -206,7 +272,9 @@ describe("incomeSection (income breakdown)", () => {
     // One clearly-shown line and two sub-$0.50/day lines that the row filter
     // hides (a realistic case: a small annual-ish charge amortized over 90 days).
     const income = { averages: ledger({ offices: 1000, food: 0.3, retail: 0.3 }), hasData: true };
-    const text = renderToFragment(incomeSection(income) as Exclude<ReturnType<typeof incomeSection>, typeof nothing>).textContent!;
+    const text = renderToFragment(
+      incomeSection(income) as Exclude<ReturnType<typeof incomeSection>, typeof nothing>,
+    ).textContent!;
 
     // The big line shows; the sub-dollar lines are omitted from the list.
     expect(text).toContain("Offices");
@@ -237,7 +305,8 @@ describe("incomeSection (income breakdown)", () => {
 
 describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
   it("plain vacancies read the bare number; off-market vacancies add the parenthetical", () => {
-    const vacancies = (vacant: number, vacantNoRate: number) => cellAfter(body({ stats: { vacant, vacantNoRate } }), "Vacancies")!.textContent;
+    const vacancies = (vacant: number, vacantNoRate: number) =>
+      cellAfter(body({ stats: { vacant, vacantNoRate } }), "Vacancies")!.textContent;
     expect(vacancies(2, 0)).toBe("2"); // two vacant, none off-market: unchanged
     expect(vacancies(2, 1)).toBe("2 (1 off-market)"); // the honest split
   });
@@ -282,8 +351,18 @@ describe("star gate copy", () => {
   });
 
   it("names the wedding hall's floor from the tower's top floor (#1987)", () => {
-    const req = { star: 6, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "weddingHall" as StarGateId, met: false }], allMet: false };
-    const text = (topFloor: number) => renderToFragment(nextStarSection(req, topFloor) as Exclude<ReturnType<typeof nextStarSection>, typeof nothing>).textContent ?? "";
+    const req = {
+      star: 6,
+      isTower: false,
+      popHave: 1,
+      popNeed: 2,
+      popMet: false,
+      gates: [{ id: "weddingHall" as StarGateId, met: false }],
+      allMet: false,
+    };
+    const text = (topFloor: number) =>
+      renderToFragment(nextStarSection(req, topFloor) as Exclude<ReturnType<typeof nextStarSection>, typeof nothing>)
+        .textContent ?? "";
     const top = catalogFor("modern").world.maxFloor;
     expect(text(top), "the catalog's top floor").toContain(`Wedding Hall (floor ${top})`);
     expect(text(120), "a taller tower's top floor").toContain("Wedding Hall (floor 120)");
@@ -292,20 +371,46 @@ describe("star gate copy", () => {
   it("shows the hall's floor from the catalog on the stats screen", () => {
     const catalog = catalogFor("modern");
     const taller = { ...catalog, world: { ...catalog.world, maxFloor: catalog.world.maxFloor + 20 } };
-    const hallGate = { star: 6, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "weddingHall" as StarGateId, met: false }], allMet: false };
+    const hallGate = {
+      star: 6,
+      isTower: false,
+      popHave: 1,
+      popNeed: 2,
+      popMet: false,
+      gates: [{ id: "weddingHall" as StarGateId, met: false }],
+      allMet: false,
+    };
     const screen = { ...statsScreenFor({ mode: "modern", report: { nextStar: hallGate } }), catalog: taller };
-    expect(renderToFragment(statsTemplate(screen)).textContent ?? "").toContain(`Wedding Hall (floor ${catalog.world.maxFloor + 20})`);
+    expect(renderToFragment(statsTemplate(screen)).textContent ?? "").toContain(
+      `Wedding Hall (floor ${catalog.world.maxFloor + 20})`,
+    );
   });
 
   it("shows a gate id the table does not know as the id itself", () => {
-    const req = { star: 4, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "observatory" as StarGateId, met: false }], allMet: false };
+    const req = {
+      star: 4,
+      isTower: false,
+      popHave: 1,
+      popNeed: 2,
+      popMet: false,
+      gates: [{ id: "observatory" as StarGateId, met: false }],
+      allMet: false,
+    };
     const section = nextStarSection(req, 100);
     expect(section).not.toBe(nothing);
     expect(renderToFragment(section as Exclude<typeof section, typeof nothing>).textContent).toContain("observatory");
   });
 
   it("shows an id that names an Object prototype member as the id itself", () => {
-    const req = { star: 4, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "constructor" as StarGateId, met: false }], allMet: false };
+    const req = {
+      star: 4,
+      isTower: false,
+      popHave: 1,
+      popNeed: 2,
+      popMet: false,
+      gates: [{ id: "constructor" as StarGateId, met: false }],
+      allMet: false,
+    };
     const section = nextStarSection(req, 100) as Exclude<ReturnType<typeof nextStarSection>, typeof nothing>;
     const text = renderToFragment(section).textContent ?? "";
     expect([text.includes("constructor"), text.includes("function")]).toEqual([true, false]);
@@ -314,7 +419,9 @@ describe("star gate copy", () => {
 
 describe("milestone copy", () => {
   it("shows a milestone id the table does not know as the id itself, with no description", () => {
-    const fragment = renderToFragment(milestonesSection({ achieved: 1, total: 1, list: [{ id: "moonBase", done: true }] }));
+    const fragment = renderToFragment(
+      milestonesSection({ achieved: 1, total: 1, list: [{ id: "moonBase", done: true }] }),
+    );
     const [label, desc] = [...fragment.querySelectorAll(".ms .k, .ms .v")].map((el) => el.textContent ?? "");
     expect([label.includes("moonBase"), desc]).toEqual([true, ""]);
   });
@@ -324,13 +431,27 @@ describe("the problem rows' Help links (#2036)", () => {
   /** The topic of the Help link in the value cell after `key`, if any. */
   const topicAfter = (frag: DocumentFragment, key: string) =>
     cellAfter(frag, key)?.querySelector<HTMLAnchorElement>("a.help-topic")?.dataset.helpTopic;
-  const demand = { officePop: 48, offices: 2, suites: 0, homes: 0, total: 2, coverage: null as number | null, short: false };
+  const demand = {
+    officePop: 48,
+    offices: 2,
+    suites: 0,
+    homes: 0,
+    total: 2,
+    coverage: null as number | null,
+    short: false,
+  };
 
   it("links parking only while it falls short", () => {
-    const fine = body({ stats: { star: 3, parkingSpaces: 2 }, report: { functionalParking: 2, parkingDemand: demand } });
+    const fine = body({
+      stats: { star: 3, parkingSpaces: 2 },
+      report: { functionalParking: 2, parkingDemand: demand },
+    });
     expect(topicAfter(fine, "Parking spaces")).toBeUndefined();
     expect(topicAfter(fine, "Parking demand")).toBeUndefined();
-    const short = body({ stats: { star: 3, parkingSpaces: 2 }, report: { functionalParking: 1, parkingDemand: { ...demand, short: true } } });
+    const short = body({
+      stats: { star: 3, parkingSpaces: 2 },
+      report: { functionalParking: 1, parkingDemand: { ...demand, short: true } },
+    });
     expect(topicAfter(short, "Parking spaces")).toBe("parking");
     expect(topicAfter(short, "Parking demand")).toBe("parking");
   });
@@ -339,14 +460,18 @@ describe("the problem rows' Help links (#2036)", () => {
     const fine = body({ stats: { star: 3 }, report: { recycling: { capacity: 2500, demandMet: true } } });
     expect(topicAfter(fine, "Recycling")).toBeUndefined();
     expect(topicAfter(fine, "Stranded floors")).toBeUndefined();
-    const bad = body({ stats: { star: 3 }, report: { recycling: { capacity: 0, demandMet: false }, strandedFloors: [5] } });
+    const bad = body({
+      stats: { star: 3 },
+      report: { recycling: { capacity: 0, demandMet: false }, strandedFloors: [5] },
+    });
     expect(topicAfter(bad, "Recycling")).toBe("recycling");
     expect(topicAfter(bad, "Stranded floors")).toBe("access");
   });
 
   it("names the fix for a recycling shortfall or a stranded floor in Modern only (#549)", () => {
     const text = (mode: "classic" | "modern", capacity: number) =>
-      body({ mode, stats: { star: 3 }, report: { recycling: { capacity, demandMet: false }, strandedFloors: [5] } }).textContent ?? "";
+      body({ mode, stats: { star: 3 }, report: { recycling: { capacity, demandMet: false }, strandedFloors: [5] } })
+        .textContent ?? "";
     const classic = text("classic", 1000);
     expect(classic, "the stranded floors' cause").toContain("they earn rating but draw no visitors.");
     expect(classic).not.toContain("Add an elevator that reaches them.");
@@ -360,7 +485,13 @@ describe("the problem rows' Help links (#2036)", () => {
 
   it("links the elevators heading only when a shaft runs full", () => {
     const heading = (utilization: number) =>
-      [...body({ report: { elevators: [{ id: 1, kind: "elevatorStandard", bottom: 1, top: 2, cars: 1, capacity: 21, utilization }] } }).querySelectorAll(".stats-section")]
+      [
+        ...body({
+          report: {
+            elevators: [{ id: 1, kind: "elevatorStandard", bottom: 1, top: 2, cars: 1, capacity: 21, utilization }],
+          },
+        }).querySelectorAll(".stats-section"),
+      ]
         .find((h) => h.textContent?.startsWith("Elevators"))!
         .querySelector<HTMLAnchorElement>("a.help-topic")?.dataset.helpTopic;
     expect(heading(0.5)).toBeUndefined();
@@ -371,12 +502,19 @@ describe("the problem rows' Help links (#2036)", () => {
     const heading = (frag: DocumentFragment) =>
       [...frag.querySelectorAll(".stats-section")].find((h) => h.textContent?.startsWith("Next:"));
     const gates = { star: 3, isTower: false, popHave: 100, popNeed: 300, popMet: false, gates: [], allMet: false };
-    expect(heading(body({ report: { nextStar: gates } }))?.querySelector<HTMLAnchorElement>("a.help-topic")?.dataset.helpTopic).toBe("nextStar");
-    expect(heading(body({ report: { nextStar: { ...gates, popMet: true, allMet: true } } }))?.querySelector("a.help-topic")).toBeNull();
+    expect(
+      heading(body({ report: { nextStar: gates } }))?.querySelector<HTMLAnchorElement>("a.help-topic")?.dataset
+        .helpTopic,
+    ).toBe("nextStar");
+    expect(
+      heading(body({ report: { nextStar: { ...gates, popMet: true, allMet: true } } }))?.querySelector("a.help-topic"),
+    ).toBeNull();
   });
 
   it("points every link at the manual, marked as opened by the game", () => {
-    const link = cellAfter(body({ stats: { parkingSpaces: 2 } }), "Parking spaces")!.querySelector<HTMLAnchorElement>("a.help-topic")!;
+    const link = cellAfter(body({ stats: { parkingSpaces: 2 } }), "Parking spaces")!.querySelector<HTMLAnchorElement>(
+      "a.help-topic",
+    )!;
     expect(link.getAttribute("href")).toBe("/help/rooms/services/?from=game&via=stats#parking");
     expect(link.getAttribute("aria-label")).toBe("Help on parking");
   });

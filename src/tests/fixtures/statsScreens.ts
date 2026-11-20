@@ -62,7 +62,15 @@ export function statsScreenFor(parts: ScreenParts = {}): StatsScreen {
     recycling: { capacity: 0, demandMet: true },
     strandedFloors: [],
     nextStarThreshold: 300,
-    nextStar: { star: 2, isTower: false, popHave: stats.population, popNeed: 300, popMet: false, gates: [], allMet: false },
+    nextStar: {
+      star: 2,
+      isTower: false,
+      popHave: stats.population,
+      popNeed: 300,
+      popMet: false,
+      gates: [],
+      allMet: false,
+    },
     milestones: milestoneList(),
     income: { averages: LEDGER, hasData: false },
     elevators: [{ id: 1, kind: "elevatorStandard", bottom: 1, top: 2, cars: 1, capacity: 21, utilization: 0 }],
@@ -72,7 +80,17 @@ export function statsScreenFor(parts: ScreenParts = {}): StatsScreen {
     households: { households: 0, residents: 0, mix: [] },
     ...parts.report,
   };
-  const header = { minutes: 420, day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2, mode: parts.mode ?? "classic" } as StatsScreen["header"];
+  const header = {
+    minutes: 420,
+    day: 0,
+    dayOfWeek: 0,
+    isWeekend: false,
+    quarter: 0,
+    year: 0,
+    weekDays: 7,
+    weekendDays: 2,
+    mode: parts.mode ?? "classic",
+  } as StatsScreen["header"];
   return { report, header, towerName: parts.towerName ?? "Tower One", catalog: catalogFor(parts.mode ?? "classic") };
 }
 

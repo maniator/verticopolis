@@ -13,7 +13,9 @@ import type { ModeRun } from "./runner";
 /** `perf:worker --aa ts|wasm` (#1111): the same mode in both slots, recorded under the slots' labels. */
 const aaConfig = (aa: "ts" | "wasm") => makeConfig(parseArgs(["--aa", aa, "--reps", "6"]), ["small"]);
 const slotRuns = (aa: "ts" | "wasm"): ModeRun[] =>
-  Array.from({ length: 6 }, (_, rep) => AA_SLOTS.map((slot) => ({ ...run(rep, aa, 1 + rep / 100), mode: slot, ranMode: aa }))).flat();
+  Array.from({ length: 6 }, (_, rep) =>
+    AA_SLOTS.map((slot) => ({ ...run(rep, aa, 1 + rep / 100), mode: slot, ranMode: aa })),
+  ).flat();
 
 describe("the arguments and the configuration", () => {
   it("takes --aa ts or --aa wasm and nothing else", () => {
@@ -73,12 +75,15 @@ describe("the run records and validation", () => {
     expect(asked(wrong)).toEqual(["rep 1 wasm: the run was asked for wasm but recorded ts"]);
     // A comparison needs each run to have run its own slot.
     const mixed = [{ ...run(0, "wasm", 1), ranMode: "ts" as const }];
-    expect(validate({ ...comparisonConfig, reps: 1 }, mixed).errors.join()).toMatch(/rep 0 wasm: the run was asked for wasm but recorded ts/);
+    expect(validate({ ...comparisonConfig, reps: 1 }, mixed).errors.join()).toMatch(
+      /rep 0 wasm: the run was asked for wasm but recorded ts/,
+    );
   });
 
   it("samples a slot by the mode it ran: a WASM run in the ts slot still has its linear memory", () => {
     const c = aaConfig("wasm");
-    const combined = (slot: "ts" | "wasm") => aggregate(c, slotRuns("wasm")).find((m) => m.metric.startsWith("JS heaps + WASM") && m.mode === slot)!.values;
+    const combined = (slot: "ts" | "wasm") =>
+      aggregate(c, slotRuns("wasm")).find((m) => m.metric.startsWith("JS heaps + WASM") && m.mode === slot)!.values;
     expect(combined("ts")).toEqual(Array(6).fill(17));
     expect(combined("wasm")).toEqual(Array(6).fill(17));
   });
@@ -90,7 +95,13 @@ describe("the output", () => {
 
   it("adds an aa column to both CSVs, and says A/A where the verdict would be", () => {
     expect(metricsCsv(metrics, "wasm").split("\n")[0]).toMatch(/,unthrottled,values,aa$/);
-    expect(metricsCsv(metrics, "wasm").trim().split("\n").slice(1).every((l) => l.endsWith(",wasm"))).toBe(true);
+    expect(
+      metricsCsv(metrics, "wasm")
+        .trim()
+        .split("\n")
+        .slice(1)
+        .every((l) => l.endsWith(",wasm")),
+    ).toBe(true);
     const header = ratiosCsv(rr, "wasm").split("\n")[0];
     expect(header).toMatch(/,verdict,unthrottled,aa$/);
     const rows = ratiosCsv(rr, "wasm").trim().split("\n").slice(1);
@@ -103,17 +114,45 @@ describe("the output", () => {
 
   it("leads the report with the A/A title and banner, names the slots and prints no verdict words", () => {
     const result = {
-      schema: 1 as const, startedAt: "2026-10-21T10:00:00Z", generatedAt: "2026-10-21T14:00:00Z", config: aaConfig("wasm"), browser: { version: "141", executable: null },
-      environment: { commitShort: "abc1234", appVersion: "2.40.0", dirty: false, enginePackage: {}, engineBuildHash: "h", cpuModel: "cpu", logicalCpus: 4, totalMemoryBytes: 2 ** 34, os: "linux", node: "22", playwright: "1.61" } as never,
+      schema: 1 as const,
+      startedAt: "2026-10-21T10:00:00Z",
+      generatedAt: "2026-10-21T14:00:00Z",
+      config: aaConfig("wasm"),
+      browser: { version: "141", executable: null },
+      environment: {
+        commitShort: "abc1234",
+        appVersion: "2.40.0",
+        dirty: false,
+        enginePackage: {},
+        engineBuildHash: "h",
+        cpuModel: "cpu",
+        logicalCpus: 4,
+        totalMemoryBytes: 2 ** 34,
+        os: "linux",
+        node: "22",
+        playwright: "1.61",
+      } as never,
       scenarios: [{ name: "small", sha256: "a".repeat(64), population: 10, units: 2, transports: 1, saveBytes: 5 }],
-      scripts: { worker: { raw: 8000, brotli: 2600 }, otherJs: { raw: 1, brotli: 1 }, enginePackage: { raw: 900_000, brotli: 330_000 } }, runs: slotRuns("wasm"), metrics, ratios: rr, validation: { ok: true, errors: [], warnings: [] }, limitations: limitations(aaConfig("wasm")),
+      scripts: {
+        worker: { raw: 8000, brotli: 2600 },
+        otherJs: { raw: 1, brotli: 1 },
+        enginePackage: { raw: 900_000, brotli: 330_000 },
+      },
+      runs: slotRuns("wasm"),
+      metrics,
+      ratios: rr,
+      validation: { ok: true, errors: [], warnings: [] },
+      limitations: limitations(aaConfig("wasm")),
     };
     const md = markdown(result);
     expect(md.split("\n")[0]).toBe("# Worker host A/A pass (npm run perf:worker -- --aa wasm)");
     expect(md).toContain(aaBanner("wasm"));
     expect(md).toContain("| slot ts | slot wasm |");
     expect(md).toContain("slot wasm / slot ts (rates: ts / wasm)");
-    const cells = md.split("\n").filter((l) => l.startsWith("| small |")).join("\n");
+    const cells = md
+      .split("\n")
+      .filter((l) => l.startsWith("| small |"))
+      .join("\n");
     expect(cells).toMatch(/\d\.\d\dx \[/);
     expect(cells).not.toMatch(/x(?: \[[^\]]+\])? (higher|lower|equivalent|inconclusive)/);
     // A comparison keeps its verdict words.
@@ -122,7 +161,9 @@ describe("the output", () => {
     expect(cmp).not.toContain("A/A pass.");
     // The pinned TypeScript baseline is named in the environment list, and only when one ran.
     expect(cmp).not.toContain("TypeScript baseline:");
-    expect(markdown({ ...result, config: comparisonConfig, tsBaseline: TS_BASELINE })).toContain(`- TypeScript baseline: ${TS_BASELINE.commit} (app ${TS_BASELINE.appVersion}, pinned pre-cutover build; the ts mode ran it`);
+    expect(markdown({ ...result, config: comparisonConfig, tsBaseline: TS_BASELINE })).toContain(
+      `- TypeScript baseline: ${TS_BASELINE.commit} (app ${TS_BASELINE.appVersion}, pinned pre-cutover build; the ts mode ran it`,
+    );
     expect(markdown({ ...result, tsBaseline: TS_BASELINE })).toMatch(/both slots ran it\)/);
   });
 });
@@ -130,7 +171,9 @@ describe("the output", () => {
 describe("before and after", () => {
   it("refuses an A/A pass as either side", () => {
     const aa = (r: ReturnType<typeof before>) => ({ ...r, config: { ...r.config, aa: "wasm" as const } });
-    expect(comparability(aa(before()), after(), 10).join(" ")).toMatch(/BEFORE is an A\/A pass \(wasm in both slots\), not a run of a build/);
+    expect(comparability(aa(before()), after(), 10).join(" ")).toMatch(
+      /BEFORE is an A\/A pass \(wasm in both slots\), not a run of a build/,
+    );
     expect(comparability(before(), aa(after()), 10).join(" ")).toMatch(/AFTER is an A\/A pass/);
     expect(comparability(before(), after(), 10).join(" ")).not.toMatch(/A\/A/);
   });

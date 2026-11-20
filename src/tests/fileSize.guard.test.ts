@@ -81,7 +81,10 @@ describe("file-size guard", () => {
     const offenders = files
       .filter((f) => f.lines > MAX_LINES && !LEGACY_OVERSIZED.has(f.rel))
       .map((f) => `${f.rel} (${f.lines} lines)`);
-    expect(offenders, `Files over ${MAX_LINES} lines must be split or added to the ratchet:\n${offenders.join("\n")}`).toEqual([]);
+    expect(
+      offenders,
+      `Files over ${MAX_LINES} lines must be split or added to the ratchet:\n${offenders.join("\n")}`,
+    ).toEqual([]);
   });
 
   it("the ratchet has no stale entries", () => {

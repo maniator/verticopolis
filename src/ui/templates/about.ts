@@ -43,9 +43,11 @@ export function aboutTemplate(
     <h2>About this game</h2>
     ${helpAboutBody(version, engine)}
     ${diagnostics ? diagnosticsBlock(diagnostics) : nothing}
-    ${reportHref
-      ? html`<p class="help-report"><a data-act="report" href=${reportHref} target="_blank" rel="noopener noreferrer">Report a problem<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>: GitHub's bug form, with this version, the diagnostics, your browser and the tower's mode filled in.</p>`
-      : nothing}
+    ${
+      reportHref
+        ? html`<p class="help-report"><a data-act="report" href=${reportHref} target="_blank" rel="noopener noreferrer">Report a problem<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>: GitHub's bug form, with this version, the diagnostics, your browser and the tower's mode filled in.</p>`
+        : nothing
+    }
     <p class="help-privacy"><a data-act="privacy" href=${PRIVACY_HREF} target="_blank" rel="noopener noreferrer">Privacy<span class="visually-hidden"> (opens in a new tab)</span></a>: what the game counts, what it never collects, and where your saves live.</p>
     <p class="help-links-status" role="status"></p>
     <div class="modal-actions modal-footer"><button class="btn" data-act="replay-onboard" ?disabled=${onSplash} title=${onSplash ? "Start a tower first, then you can replay the intro." : nothing} @click=${actions.onReplay}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>

@@ -88,7 +88,8 @@ describe("the Classic and Modern summary", () => {
   it("names every mapped divergence", () => {
     const summary = text();
     for (const [member, phrase] of Object.entries(RULE_TO_HELP)) {
-      if (phrase !== null) expect(summary, `the summary is missing the phrase for ${member}: "${phrase}"`).toContain(phrase);
+      if (phrase !== null)
+        expect(summary, `the summary is missing the phrase for ${member}: "${phrase}"`).toContain(phrase);
     }
     expect(summary).toContain("SimTower as it was in 1994");
   });
@@ -134,6 +135,8 @@ describe("This Tower's Rules", () => {
     const frag = renderToFragment(towerRulesModalTemplate("<b>x</b>", "modern"));
     expect(frag.querySelector(".tower-rules-lead b")!.textContent).toBe("Modern");
     expect(frag.querySelector(".tower-rules-lead")!.textContent).toContain("<b>x</b> plays by");
-    expect(renderToFragment(towerRulesModalTemplate("", "classic")).querySelector(".tower-rules-lead")!.textContent).toContain("Your tower plays by");
+    expect(
+      renderToFragment(towerRulesModalTemplate("", "classic")).querySelector(".tower-rules-lead")!.textContent,
+    ).toContain("Your tower plays by");
   });
 });

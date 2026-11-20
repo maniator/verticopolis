@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { recyclingLinesOf } from "./recyclingDiagnostics";
 
 /** A `recyclingCard` answer: population, capacity, fill, demand met (1 or 0). */
-const card = (pop: number, cap: number, fill: number, met: boolean): Float64Array => Float64Array.of(pop, cap, fill, met ? 1 : 0);
-const text = (lines: ReturnType<typeof recyclingLinesOf>): string => lines.map((l) => l.strings.join("|") + l.values.join("|")).join("\n");
+const card = (pop: number, cap: number, fill: number, met: boolean): Float64Array =>
+  Float64Array.of(pop, cap, fill, met ? 1 : 0);
+const text = (lines: ReturnType<typeof recyclingLinesOf>): string =>
+  lines.map((l) => l.strings.join("|") + l.values.join("|")).join("\n");
 
 describe("the recycling card lines", () => {
   it("say demand is met at or under capacity", () => {

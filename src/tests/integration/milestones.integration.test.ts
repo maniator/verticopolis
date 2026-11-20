@@ -6,7 +6,6 @@ import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../portKit/portSim";
 
-
 const W = LOT_WIDTH;
 const C = Math.floor(W / 2);
 

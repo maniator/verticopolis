@@ -80,7 +80,11 @@ export const ACTIONS = ["import_save", "import_tdt", "import_failed", "load_slot
 
 /** The `detail` values the game sends for each action that carries one. A row
  *  with another detail is left out, so a forged value is never counted. */
-export const DETAILS = { import_failed: ["save", "tdt"], autosave_failed: ["timer", "swap", "manual", "file"], export_failed: ["save", "tdt"] };
+export const DETAILS = {
+  import_failed: ["save", "tdt"],
+  autosave_failed: ["timer", "swap", "manual", "file"],
+  export_failed: ["save", "tdt"],
+};
 
 /** Every `app_action` this report reads from builds at or above
  *  `EXPORT_FAILURE_SINCE`: the export failure code and the export attempts. */
@@ -96,7 +100,8 @@ export const ROW_LIMIT = 500;
  *  left out). */
 function versionExpr(since) {
   const parts = since.split(".").map(Number);
-  if (parts.length !== 3 || parts.some((n) => !Number.isSafeInteger(n) || n < 0)) throw new Error(`bad version ${since}`);
+  if (parts.length !== 3 || parts.some((n) => !Number.isSafeInteger(n) || n < 0))
+    throw new Error(`bad version ${since}`);
   return `(match(properties.version, '^[0-9]+\\\\.[0-9]+\\\\.[0-9]+$') AND arrayMap(x -> toInt(x), splitByChar('.', properties.version)) >= [${parts.join(", ")}])`;
 }
 
@@ -175,7 +180,11 @@ export function tallyRows(rows) {
 /** The presence row as numbers; a missing or malformed row reads as no presence. */
 export function presenceFromRows(rows) {
   const r = rows[0] ?? {};
-  return { liveEvents: num(r.live_events), exportLiveEvents: num(r.export_live_events), autosaveSessions: num(r.autosave_sessions) };
+  return {
+    liveEvents: num(r.live_events),
+    exportLiveEvents: num(r.export_live_events),
+    autosaveSessions: num(r.autosave_sessions),
+  };
 }
 
 const at = (tally, key) => tally.get(key) ?? { events: 0, sessions: 0 };
@@ -183,12 +192,16 @@ const at = (tally, key) => tally.get(key) ?? { events: 0, sessions: 0 };
 /** One rate: failures over attempts, or why it is unavailable. */
 export function rateOf(failures, attempts) {
   if (!(attempts > 0)) return { status: "insufficient", text: "Insufficient evidence: no attempts in the window" };
-  if (failures > attempts) return { status: "unavailable", text: "Unavailable: more failures than attempts, so attempt rows were lost" };
+  if (failures > attempts)
+    return { status: "unavailable", text: "Unavailable: more failures than attempts, so attempt rows were lost" };
   const bound = upperBound(failures, attempts);
   const pct = (x) => `${(x * 100).toFixed(2)}%`;
   return failures === 0
     ? { status: "bound", text: `0 of ${attempts} attempts; 95% upper bound ${pct(bound)}` }
-    : { status: "rate", text: `${failures} of ${attempts} attempts (${pct(failures / attempts)}); 95% upper bound ${pct(bound)}` };
+    : {
+        status: "rate",
+        text: `${failures} of ${attempts} attempts (${pct(failures / attempts)}); 95% upper bound ${pct(bound)}`,
+      };
 }
 
 const EXPORT_RATE_UNAVAILABLE = {
@@ -196,7 +209,10 @@ const EXPORT_RATE_UNAVAILABLE = {
   text: "Unavailable: the attempts are sent at the click, so they include a cancelled report and a dropped click; a ratio would understate the failure rate",
 };
 
-const NOT_MEASURABLE = { status: "not-measurable", text: "Not measurable: no build that sends these codes ran in the window" };
+const NOT_MEASURABLE = {
+  status: "not-measurable",
+  text: "Not measurable: no build that sends these codes ran in the window",
+};
 
 /** The measures, each with its count and its rate or the reason there is none.
  *  `presence.liveEvents` of zero means no build that sends the codes ran, so nothing
@@ -204,7 +220,9 @@ const NOT_MEASURABLE = { status: "not-measurable", text: "Not measurable: no bui
  *  follow `presence.exportLiveEvents` the same way, since their builds are later. */
 export function summarizePersistence(tally, presence) {
   const measure = (name, failures, sessions, attempts, rate, live = presence.liveEvents) =>
-    live > 0 ? { measure: name, failures, sessions, attempts, rate } : { measure: name, failures: null, sessions: null, attempts: null, rate: NOT_MEASURABLE };
+    live > 0
+      ? { measure: name, failures, sessions, attempts, rate }
+      : { measure: name, failures: null, sessions: null, attempts: null, rate: NOT_MEASURABLE };
   const exportMeasure = (name, failure, attempts) =>
     measure(name, failure.events, failure.sessions, attempts, EXPORT_RATE_UNAVAILABLE, presence.exportLiveEvents);
   const importSave = at(tally, "import_save").events;
@@ -216,14 +234,36 @@ export function summarizePersistence(tally, presence) {
   const exportSaveFail = at(tally, "export_failed:save");
   const exportTdtFail = at(tally, "export_failed:tdt");
   return [
-    measure("Import of a .vctower", saveFail.events, saveFail.sessions, importSave, rateOf(saveFail.events, importSave)),
-    measure("Import of a .TDT (refusal at the file read)", tdtFail.events, tdtFail.sessions, importTdt, rateOf(tdtFail.events, importTdt)),
-    measure("Slot load (manager and title screen)", loadBad.events, loadBad.sessions, loadOk + loadBad.events, rateOf(loadBad.events, loadOk + loadBad.events)),
+    measure(
+      "Import of a .vctower",
+      saveFail.events,
+      saveFail.sessions,
+      importSave,
+      rateOf(saveFail.events, importSave),
+    ),
+    measure(
+      "Import of a .TDT (refusal at the file read)",
+      tdtFail.events,
+      tdtFail.sessions,
+      importTdt,
+      rateOf(tdtFail.events, importTdt),
+    ),
+    measure(
+      "Slot load (manager and title screen)",
+      loadBad.events,
+      loadBad.sessions,
+      loadOk + loadBad.events,
+      rateOf(loadBad.events, loadOk + loadBad.events),
+    ),
     measure("Autosave, Quick Save and slot save", null, presence.autosaveSessions, null, {
       status: "unavailable",
       text: "Unavailable: the game sends no autosave attempt or success, and a failure is latched once per page life",
     }),
-    exportMeasure("Export of a .vctower (an export that wrote no file)", exportSaveFail, at(tally, "export_save").events),
+    exportMeasure(
+      "Export of a .vctower (an export that wrote no file)",
+      exportSaveFail,
+      at(tally, "export_save").events,
+    ),
     exportMeasure("Export of a .TDT (an export that wrote no file)", exportTdtFail, at(tally, "export_tdt").events),
   ];
 }
@@ -240,7 +280,8 @@ export function renderPersistenceMarkdown(measures, meta) {
     "| Measure | Failures (count) | Sessions with a failure | Attempts | Rate |",
     "| --- | --- | --- | --- | --- |",
   ];
-  for (const m of measures) lines.push(`| ${m.measure} | ${cell(m.failures)} | ${cell(m.sessions)} | ${cell(m.attempts)} | ${m.rate.text} |`);
+  for (const m of measures)
+    lines.push(`| ${m.measure} | ${cell(m.failures)} | ${cell(m.sessions)} | ${cell(m.attempts)} | ${m.rate.text} |`);
   if (meta.truncated) lines.push("", "> **Truncated:** the query returned a full page; read these as incomplete.");
   return lines.join("\n");
 }
@@ -249,18 +290,25 @@ export function renderPersistenceMarkdown(measures, meta) {
 export async function persistenceSection(hours, windowLabel) {
   const [counts, probe] = [await runQuery(buildPersistenceQuery(hours)), await runQuery(buildPresenceQuery(hours))];
   for (const res of [counts, probe]) {
-    if (!res.ok) return `## Persistence failures\n\n> **Unavailable:** the query failed (${res.hint}). Nothing here is a zero.`;
-    if (!Array.isArray(res.json?.results) || !Array.isArray(res.json?.columns)) return "## Persistence failures\n\n> **Unavailable:** the query returned no results table.";
+    if (!res.ok)
+      return `## Persistence failures\n\n> **Unavailable:** the query failed (${res.hint}). Nothing here is a zero.`;
+    if (!Array.isArray(res.json?.results) || !Array.isArray(res.json?.columns))
+      return "## Persistence failures\n\n> **Unavailable:** the query returned no results table.";
   }
   const rows = rowsToObjects(counts.json);
   const truncated = rows.length >= ROW_LIMIT || counts.json.hasMore === true;
-  return renderPersistenceMarkdown(summarizePersistence(tallyRows(rows), presenceFromRows(rowsToObjects(probe.json))), { windowLabel, truncated });
+  return renderPersistenceMarkdown(summarizePersistence(tallyRows(rows), presenceFromRows(rowsToObjects(probe.json))), {
+    windowLabel,
+    truncated,
+  });
 }
 
 async function main() {
   const i = process.argv.indexOf("--window");
   if (!process.env.POSTHOG_PERSONAL_API_KEY) {
-    console.error("POSTHOG_PERSONAL_API_KEY is not set (a phx_... personal key with query:read; see scripts/posthog-report.mjs).");
+    console.error(
+      "POSTHOG_PERSONAL_API_KEY is not set (a phx_... personal key with query:read; see scripts/posthog-report.mjs).",
+    );
     process.exit(1);
   }
   const span = parseWindow(i >= 0 ? process.argv[i + 1] : "30");

@@ -17,7 +17,11 @@ function stubUI(): { ui: UI; palette: HTMLElement; tabs: HTMLElement; selectTool
   const palette = document.createElement("div");
   const tabs = document.createElement("div");
   const selectTool = vi.fn();
-  const ui = { el: { palette, paletteTabs: tabs }, selectTool, cb: { getCatalog: () => catalogFor("classic") } } as unknown as UI;
+  const ui = {
+    el: { palette, paletteTabs: tabs },
+    selectTool,
+    cb: { getCatalog: () => catalogFor("classic") },
+  } as unknown as UI;
   return { ui, palette, tabs, selectTool };
 }
 
@@ -45,7 +49,9 @@ describe("buildPalette", () => {
   it("renders a facility item with swatch, name, cost, and its group tag, inside its section", () => {
     const { ui, palette } = stubUI();
     buildPalette(ui);
-    const office = palette.querySelector<HTMLElement>('.pal-group[data-group="Commercial"] .pal-item[data-kind="office"]')!;
+    const office = palette.querySelector<HTMLElement>(
+      '.pal-group[data-group="Commercial"] .pal-item[data-kind="office"]',
+    )!;
     expect(office).not.toBeNull();
     expect(office.dataset.group).toBe("Commercial");
     expect(office.querySelector<HTMLElement>(".pal-swatch")!.getAttribute("style")).toContain("background:");
@@ -56,7 +62,10 @@ describe("buildPalette", () => {
   it("reads names and prices from the tower's catalog (#921)", () => {
     const { ui, palette } = stubUI();
     const base = catalogFor("classic");
-    const marked = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)) };
+    const marked = {
+      ...base,
+      facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)),
+    };
     (ui as unknown as { cb: { getCatalog: () => typeof marked } }).cb.getCatalog = () => marked;
     buildPalette(ui);
     const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
@@ -161,7 +170,11 @@ describe("buildPalette", () => {
     const key = (type: string, init: KeyboardEventInit): void => {
       office.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init }));
     };
-    for (const [mod, name] of [["ctrlKey", "Control"], ["metaKey", "Meta"], ["altKey", "Alt"]] as const) {
+    for (const [mod, name] of [
+      ["ctrlKey", "Control"],
+      ["metaKey", "Meta"],
+      ["altKey", "Alt"],
+    ] as const) {
       key("keydown", { key: " " });
       key("keydown", { key: name, [mod]: true });
       key("keyup", { key: name });
@@ -201,16 +214,22 @@ describe("buildPalette", () => {
     buildPalette(ui);
     expect(palette.querySelector('.pal-group[data-group="Structure"]')).not.toBeNull();
     expect(palette.querySelector('.pal-group[data-group="Special"]')).not.toBeNull();
-    expect(palette.querySelector('.pal-group[data-group="Structure"] .pal-group-title[data-group="Structure"]')).not.toBeNull();
+    expect(
+      palette.querySelector('.pal-group[data-group="Structure"] .pal-group-title[data-group="Structure"]'),
+    ).not.toBeNull();
   });
 
   it("gives Commercial and Leisure a Modern sub-band with the modernOnly venues under it", () => {
     const { ui, palette } = stubUI();
     buildPalette(ui);
-    const leisureSub = palette.querySelector<HTMLElement>('.pal-group[data-group="Leisure"] .pal-sub[data-sub-group="Leisure"]');
+    const leisureSub = palette.querySelector<HTMLElement>(
+      '.pal-group[data-group="Leisure"] .pal-sub[data-sub-group="Leisure"]',
+    );
     expect(leisureSub?.textContent).toBe("Modern");
     // A Modern venue is tagged .pal-mod and sits in the Leisure section.
-    const nightclub = palette.querySelector<HTMLElement>('.pal-group[data-group="Leisure"] .pal-item[data-kind="nightclub"]');
+    const nightclub = palette.querySelector<HTMLElement>(
+      '.pal-group[data-group="Leisure"] .pal-item[data-kind="nightclub"]',
+    );
     expect(nightclub?.classList.contains("pal-mod")).toBe(true);
     // Structure has no Modern venues, so no sub-band.
     expect(palette.querySelector('.pal-group[data-group="Structure"] .pal-sub')).toBeNull();
@@ -261,7 +280,8 @@ describe("category tabs", () => {
     // Getting Started steps) must not leave its tab off the strip's edge.
     const { ui, tabs } = stubUI();
     buildPalette(ui);
-    const rect = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 20, width, height: 20 }) as DOMRect;
+    const rect = (left: number, width: number) =>
+      ({ left, right: left + width, top: 0, bottom: 20, width, height: 20 }) as DOMRect;
     vi.spyOn(tabs, "getBoundingClientRect").mockReturnValue(rect(0, 200));
     const tab = (group: string) => tabs.querySelector<HTMLElement>(`.pal-tab[data-group="${group}"]`)!;
     vi.spyOn(tab("Leisure"), "getBoundingClientRect").mockReturnValue(rect(260, 60));
@@ -305,12 +325,11 @@ describe("category tabs", () => {
       addEventListener: (_: string, fn: () => void) => (onChange = fn),
       removeEventListener: vi.fn(),
     };
-    const matchMedia = vi
-      .spyOn(window, "matchMedia")
-      .mockImplementation(() => mq as unknown as MediaQueryList);
+    const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(() => mq as unknown as MediaQueryList);
     const { ui, tabs } = stubUI();
     buildPalette(ui);
-    const rect = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 20, width, height: 20 }) as DOMRect;
+    const rect = (left: number, width: number) =>
+      ({ left, right: left + width, top: 0, bottom: 20, width, height: 20 }) as DOMRect;
     vi.spyOn(tabs, "getBoundingClientRect").mockReturnValue(rect(0, 200));
     const leisure = tabs.querySelector<HTMLElement>('.pal-tab[data-group="Leisure"]')!;
     vi.spyOn(leisure, "getBoundingClientRect").mockReturnValue(rect(260, 60));
@@ -331,7 +350,8 @@ describe("category tabs", () => {
     const panel = palette.querySelector<HTMLElement>('.pal-group[data-group="Leisure"]')!;
     expect(leisure.getAttribute("aria-controls")).toBe(panel.id);
     expect(panel.id).toBe("pal-panel-leisure");
-    const stops = () => [...tabs.querySelectorAll<HTMLElement>(".pal-tab")].filter((t) => t.tabIndex === 0).map((t) => t.dataset.group);
+    const stops = () =>
+      [...tabs.querySelectorAll<HTMLElement>(".pal-tab")].filter((t) => t.tabIndex === 0).map((t) => t.dataset.group);
     expect(stops()).toEqual(["Structure"]);
     selectGroup(ui, "Leisure");
     expect(stops()).toEqual(["Leisure"]);
@@ -368,7 +388,12 @@ describe("category tabs", () => {
     expect(gameKey).not.toHaveBeenCalled();
     // Any other key, and a modified arrow, still reach the game.
     press("ArrowDown");
-    const shifted = new KeyboardEvent("keydown", { key: "ArrowRight", shiftKey: true, bubbles: true, cancelable: true });
+    const shifted = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
     document.activeElement!.dispatchEvent(shifted);
     expect(open()).toBe("Services");
     expect(gameKey).toHaveBeenCalledTimes(2);
@@ -407,7 +432,9 @@ describe("category tabs", () => {
     const { ui, palette, tabs } = stubUI();
     buildPalette(ui);
     // Onboarding opens the category holding a pulsed tool by clicking its tab.
-    tabs.querySelector<HTMLElement>('.pal-tab[data-group="Commercial"]')!.dispatchEvent(new Event("click", { bubbles: true }));
+    tabs
+      .querySelector<HTMLElement>('.pal-tab[data-group="Commercial"]')!
+      .dispatchEvent(new Event("click", { bubbles: true }));
     expect(palette.querySelector(".pal-group.tab-active")?.getAttribute("data-group")).toBe("Commercial");
   });
 
@@ -466,14 +493,20 @@ describe("relabelPalette (#921)", () => {
     // Same layout, new prices: the same nodes are relabeled, and the lock scan
     // runs again, since a new catalog may state `available` or `minStar`
     // differently.
-    relabelPalette(ui, { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, cost: 12_345 } : f)) });
+    relabelPalette(ui, {
+      ...base,
+      facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, cost: 12_345 } : f)),
+    });
     expect(palette.querySelector('.pal-item[data-kind="office"]')).toBe(office);
     expect(office?.querySelector(".pal-cost")?.textContent).toContain("12");
     expect((ui as unknown as { paletteScanKey: string | null }).paletteScanKey).toBeNull();
     // A catalog that moves the office to another group lays the palette out
     // differently: the buttons are rebuilt, the open tab and the active tool
     // survive, and the lock scan is asked to run again.
-    const moved = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, category: "service" as const } : f)) };
+    const moved = {
+      ...base,
+      facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, category: "service" as const } : f)),
+    };
     // Onboarding has pulsed the office, and the keyboard sits on it.
     document.body.appendChild(palette);
     office!.classList.add("tt-pulse");

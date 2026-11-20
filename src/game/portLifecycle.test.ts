@@ -2,7 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { SaveGame } from "../storage/SaveGame";
 import { SMALL_TOWER_SAVE } from "../tests/fixtures/handSaves";
 import { mockPort } from "../tests/portKit/mockPort";
-import { ExportRefused, SWAP_REFUSED, TRAPPED_SAVE_REFUSED, exportFile, loadStored, saveText, swapDone } from "./portLifecycle";
+import {
+  ExportRefused,
+  SWAP_REFUSED,
+  TRAPPED_SAVE_REFUSED,
+  exportFile,
+  loadStored,
+  saveText,
+  swapDone,
+} from "./portLifecycle";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 
 /**
@@ -16,7 +24,8 @@ const DONE = Float64Array.of(1, 2);
 const REFUSED = Float64Array.of(0, 1);
 
 /** A port whose load answers `answer`, with `reason` for a refusal. */
-const loader = (answer: Float64Array = DONE, reason?: string) => mockPort({ loadSave: () => answer, lastReason: () => reason });
+const loader = (answer: Float64Array = DONE, reason?: string) =>
+  mockPort({ loadSave: () => answer, lastReason: () => reason });
 
 describe("swapDone", () => {
   it("returns on a done swap and throws the engine's refusal otherwise", () => {
@@ -59,7 +68,10 @@ describe("saveText", () => {
   });
 
   it("stamps nothing without a camera, keeping the view the tower carries", () => {
-    const carried = JSON.stringify({ ...(JSON.parse(SMALL_TOWER_SAVE) as object), view: { tile: 33, floor: 4, zoom: 1 } });
+    const carried = JSON.stringify({
+      ...(JSON.parse(SMALL_TOWER_SAVE) as object),
+      view: { tile: 33, floor: 4, zoom: 1 },
+    });
     const setCamera = vi.fn();
     expect(saveText({ setCamera, serialize: () => carried }, null)).toBe(carried);
     expect(setCamera).not.toHaveBeenCalled();
@@ -156,7 +168,10 @@ describe("loadStored", () => {
     // SaveGame stamps what it writes, so a stored save keeps its own status.
     SaveGame.saveSlot(2, SMALL_TOWER_SAVE);
     expect(SaveGame.loadSlot(2, loadStored(engine))).toBe(true);
-    const handed = JSON.parse(vi.mocked(engine.loadSave).mock.lastCall![0]) as { appVersion?: string; towerName: string };
+    const handed = JSON.parse(vi.mocked(engine.loadSave).mock.lastCall![0]) as {
+      appVersion?: string;
+      towerName: string;
+    };
     expect([typeof handed.appVersion, handed.towerName]).toEqual(["string", "Tower One"]);
   });
 

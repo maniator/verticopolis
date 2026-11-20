@@ -36,7 +36,10 @@ export function storedPaletteCollapsed(storage: Pick<Storage, "getItem"> | null)
 
 function storePaletteCollapsed(storage: Pick<Storage, "setItem"> | null, collapsed: boolean): void {
   try {
-    storage?.setItem(PALETTE_COLLAPSED_STORAGE_KEY, collapsed ? PALETTE_COLLAPSED_VALUE.collapsed : PALETTE_COLLAPSED_VALUE.open);
+    storage?.setItem(
+      PALETTE_COLLAPSED_STORAGE_KEY,
+      collapsed ? PALETTE_COLLAPSED_VALUE.collapsed : PALETTE_COLLAPSED_VALUE.open,
+    );
   } catch {
     // A full quota or a blocked origin: the fold still works for this visit.
   }
@@ -57,7 +60,11 @@ export function setPaletteCollapsed(win: HTMLElement, button: HTMLButtonElement,
  * the player last left it. `onToggle` runs after each fold or open, so the fit
  * can measure what the window now shows. Returns the button.
  */
-export function wirePaletteCollapse(win: HTMLElement, storage: Store | null, onToggle: () => void): HTMLButtonElement | null {
+export function wirePaletteCollapse(
+  win: HTMLElement,
+  storage: Store | null,
+  onToggle: () => void,
+): HTMLButtonElement | null {
   const bar = win.querySelector<HTMLElement>(":scope > .win-title");
   if (!bar) return null;
   const button = document.createElement("button");

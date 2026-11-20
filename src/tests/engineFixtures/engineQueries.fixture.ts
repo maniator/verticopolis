@@ -38,17 +38,34 @@ export function describeEngineQueries(name: string, make: MakeEngine): void {
       for (const u of reader.rooms) {
         const card = cards.unit(u.id);
         expect(card, `unit ${u.id}`).toBeDefined();
-        expect([card!.id, card!.kind, card!.floor, card!.x, card!.width, card!.state, card!.label]).toEqual([u.id, u.kind, u.floor, u.x, u.width, u.state, u.label]);
+        expect([card!.id, card!.kind, card!.floor, card!.x, card!.width, card!.state, card!.label]).toEqual([
+          u.id,
+          u.kind,
+          u.floor,
+          u.x,
+          u.width,
+          u.state,
+          u.label,
+        ]);
         expect(card!.blockbuster === null).toBe(u.kind !== "cinema");
       }
       for (const t of reader.tower.transports) {
         const card = cards.shaft(t.id);
         expect(card, `shaft ${t.id}`).toBeDefined();
-        expect([card!.id, card!.kind, card!.x, card!.bottom, card!.top, card!.cars]).toEqual([t.id, t.kind, t.x, t.bottom, t.top, t.cars]);
+        expect([card!.id, card!.kind, card!.x, card!.bottom, card!.top, card!.cars]).toEqual([
+          t.id,
+          t.kind,
+          t.x,
+          t.bottom,
+          t.top,
+          t.cars,
+        ]);
         if (!t.kind.startsWith("elevator")) expect(card!.stops).toEqual([]);
         else {
           // An elevator lists every floor it spans, top first, with its ends marked.
-          expect(card!.stops.map((r) => r.floor)).toEqual(Array.from({ length: t.top - t.bottom + 1 }, (_, i) => t.top - i));
+          expect(card!.stops.map((r) => r.floor)).toEqual(
+            Array.from({ length: t.top - t.bottom + 1 }, (_, i) => t.top - i),
+          );
           expect(card!.stops.filter((r) => r.endpoint).map((r) => r.floor)).toEqual([t.top, t.bottom]);
         }
       }

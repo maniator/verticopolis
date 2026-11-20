@@ -45,7 +45,10 @@ function makeApp() {
   return app as unknown as GameApp & typeof app;
 }
 
-type Deps = Record<string, (...a: unknown[]) => unknown> & { ui: Record<string, (...a: unknown[]) => unknown>; audio: unknown };
+type Deps = Record<string, (...a: unknown[]) => unknown> & {
+  ui: Record<string, (...a: unknown[]) => unknown>;
+  audio: unknown;
+};
 
 describe("wireControllers: the schedule review", () => {
   beforeEach(() => {

@@ -47,12 +47,47 @@ export function workerPass(i: number, s: WorkerSpec = {}): { folder: string; res
     folder: `aa-worker-${i}`,
     results: {
       startedAt: s.startedAt ?? new Date(Date.UTC(2026, 9, 21, 1, i)).toISOString(),
-      config: { aa: "aa" in s ? s.aa : alternate(i), modes: ["ts", "wasm"], reps, scenarios: s.scenarios ?? ["small", "medium", "large"], throttles: [1, 4], quick: s.quick ?? false, ...(s.mapAb ? { mapAb: true } : {}), steps: 720, dt: 2 },
-      browser: { version: "149.0.7827.55", executable: "chrome.exe", channel: null, args: [], rendererException: null, gpuVerified: "gpuVerified" in s ? s.gpuVerified : true },
-      runs: [{ ok: true, page: { webgl: { renderer } }, rendererEnd: renderer, rendererEndCold: renderer, ...(lost === null ? {} : { contextLost: lost }) }],
-      metrics: [row("ts", "1", reps, 0), row("wasm", "1", reps, s.diff1 ?? 0), row("ts", "4", s.reps4 ?? reps, 0), row("wasm", "4", s.reps4 ?? reps, s.diff4 ?? 0)],
+      config: {
+        aa: "aa" in s ? s.aa : alternate(i),
+        modes: ["ts", "wasm"],
+        reps,
+        scenarios: s.scenarios ?? ["small", "medium", "large"],
+        throttles: [1, 4],
+        quick: s.quick ?? false,
+        ...(s.mapAb ? { mapAb: true } : {}),
+        steps: 720,
+        dt: 2,
+      },
+      browser: {
+        version: "149.0.7827.55",
+        executable: "chrome.exe",
+        channel: null,
+        args: [],
+        rendererException: null,
+        gpuVerified: "gpuVerified" in s ? s.gpuVerified : true,
+      },
+      runs: [
+        {
+          ok: true,
+          page: { webgl: { renderer } },
+          rendererEnd: renderer,
+          rendererEndCold: renderer,
+          ...(lost === null ? {} : { contextLost: lost }),
+        },
+      ],
+      metrics: [
+        row("ts", "1", reps, 0),
+        row("wasm", "1", reps, s.diff1 ?? 0),
+        row("ts", "4", s.reps4 ?? reps, 0),
+        row("wasm", "4", s.reps4 ?? reps, s.diff4 ?? 0),
+      ],
       validation: { ok: s.ok ?? true },
-      environment: { commit: s.commit ?? "abc1234def", dirty: s.dirty ?? false, cpuModel: s.cpu ?? "cpu-a", tree: { porcelain: [], diffSha256: null, untracked: [], hidden: [], complete: true } },
+      environment: {
+        commit: s.commit ?? "abc1234def",
+        dirty: s.dirty ?? false,
+        cpuModel: s.cpu ?? "cpu-a",
+        tree: { porcelain: [], diffSha256: null, untracked: [], hidden: [], complete: true },
+      },
     },
   } as unknown as { folder: string; results: WorkerPass };
 }

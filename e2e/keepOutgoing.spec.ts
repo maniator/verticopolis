@@ -15,9 +15,14 @@ import { test, expect, type Page } from "@playwright/test";
 test.setTimeout(120_000);
 test.use({ storageState: { cookies: [], origins: [] }, serviceWorkers: "block" });
 
-const OLD: Record<string, string> = JSON.parse(readFileSync(new URL("./fixtures/storage-4.2.json", import.meta.url), "utf8"));
+const OLD: Record<string, string> = JSON.parse(
+  readFileSync(new URL("./fixtures/storage-4.2.json", import.meta.url), "utf8"),
+);
 /** A player's tower, as a `.vctower` file. */
-const SPLIT_TOWER = readFileSync(new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower.vctower", import.meta.url), "utf8");
+const SPLIT_TOWER = readFileSync(
+  new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower.vctower", import.meta.url),
+  "utf8",
+);
 
 async function seed(page: Page): Promise<void> {
   await page.addInitScript((seeded) => {
@@ -29,7 +34,9 @@ async function seed(page: Page): Promise<void> {
 
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+    timeout: 30_000,
+  });
   await expect(page.locator('[data-splash="continue"]'), "the title screen offers Continue").toBeVisible();
 }
 
@@ -46,7 +53,11 @@ async function openRow(page: Page, name: string): Promise<void> {
   const before = await page.evaluate(() => (window as any).game.enginePort.generation());
   await openWindow(page);
   await expect.poll(() => rowNames(page), { timeout: 15_000 }).toContain(name);
-  await page.locator(".fd-row", { has: page.locator(".fd-name-cell", { hasText: new RegExp(`^${name.replace(/[()]/g, "\\$&")}$`) }) }).dblclick();
+  await page
+    .locator(".fd-row", {
+      has: page.locator(".fd-name-cell", { hasText: new RegExp(`^${name.replace(/[()]/g, "\\$&")}$`) }),
+    })
+    .dblclick();
   await expect(page.locator(".fd")).toBeHidden();
   await page.waitForFunction((g) => (window as any).game.enginePort.generation() !== g, before, { timeout: 15_000 });
 }
@@ -74,11 +85,15 @@ async function play(page: Page): Promise<void> {
   await page.evaluate(() => (window as any).game.setSpeed(0));
 }
 
-test("opening a file keeps the tower being played, unsaved minutes and all, and it opens back the same", async ({ page }) => {
+test("opening a file keeps the tower being played, unsaved minutes and all, and it opens back the same", async ({
+  page,
+}) => {
   await seed(page);
   await boot(page);
   await page.locator('[data-splash="continue"]').click();
-  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, { timeout: 15_000 });
+  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+    timeout: 15_000,
+  });
   // Minutes no save holds: before the fix they were lost with the Auto-save.
   await play(page);
   const left = await towerState(page);
@@ -96,7 +111,9 @@ test("starting a new tower keeps a player's opened tower in its own file, played
   await seed(page);
   await boot(page);
   await page.locator('[data-splash="continue"]').click();
-  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, { timeout: 15_000 });
+  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+    timeout: 15_000,
+  });
   // Bring in a player's tower from a file, as From a file on your computer… does; it is kept in My Towers.
   await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), SPLIT_TOWER);
   const name = await page.evaluate(() => (window as any).game.enginePort.towerName() as string);
@@ -111,14 +128,18 @@ test("starting a new tower keeps a player's opened tower in its own file, played
   expect(await towerState(page), "its own file now holds the minutes played since it was saved").toEqual(left);
 });
 
-test("opening a file from the title screen keeps the Auto-save's tower, the one Continue brings back", async ({ browser }) => {
+test("opening a file from the title screen keeps the Auto-save's tower, the one Continue brings back", async ({
+  browser,
+}) => {
   // What Continue loads, read in a page of its own.
   const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] }, serviceWorkers: "block" });
   const first = await ctx.newPage();
   await seed(first);
   await boot(first);
   await first.locator('[data-splash="continue"]').click();
-  await first.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, { timeout: 15_000 });
+  await first.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+    timeout: 15_000,
+  });
   const continued = await towerState(first);
   await ctx.close();
 

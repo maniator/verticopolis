@@ -35,7 +35,10 @@ function production(dir: string): string[] {
   return files;
 }
 
-const FILES = production(resolve(root, "src")).map((path) => ({ rel: relative(root, path).replace(/\\/g, "/"), text: readFileSync(path, "utf8") }));
+const FILES = production(resolve(root, "src")).map((path) => ({
+  rel: relative(root, path).replace(/\\/g, "/"),
+  text: readFileSync(path, "utf8"),
+}));
 
 /**
  * The code of a file without its comments, so a rule reads code, not prose.
@@ -76,7 +79,8 @@ interface Rule {
 const RULES: Rule[] = [
   {
     name: "the TypeScript .vctower reader runs only in tests",
-    banned: /\b(?:SaveGame\s*\??\.\s*import(?:Text)?|SaveGame\s*\[\s*["'`]import(?:Text)?|importObjection|looksLikeTowerSave|readVctower|decodeVctower)\b/,
+    banned:
+      /\b(?:SaveGame\s*\??\.\s*import(?:Text)?|SaveGame\s*\[\s*["'`]import(?:Text)?|importObjection|looksLikeTowerSave|readVctower|decodeVctower)\b/,
     allowed: {
       "src/storage/SaveGame.ts": "defines the test referee (`import`, `importText`) and its checks",
       "src/storage/saveTextRead.ts": "defines `importObjection` and `looksLikeTowerSave` for that referee",
@@ -87,7 +91,8 @@ const RULES: Rule[] = [
     name: "the TypeScript .vctower writer is not the player's export",
     banned: /\b(?:SaveGame\s*\??\.\s*export|SaveGame\s*\[\s*["'`]export|writeVctower)\b/,
     allowed: {
-      "src/game/crashReport.ts": "the crash report packs the last good save text without the engine, which may be the thing that failed",
+      "src/game/crashReport.ts":
+        "the crash report packs the last good save text without the engine, which may be the thing that failed",
     },
   },
 ];
@@ -99,24 +104,39 @@ describe("the Rust codec pin (#1522 item 1)", () => {
   });
 
   it("no production file renames SaveGame or loads it lazily, which would dodge the name rules", () => {
-    const dodgers = FILES.filter((f) => /\bSaveGame\s+as\b|\bimport\s*\(\s*["'`][^"'`]*SaveGame/.test(code(f.text))).map((f) => f.rel);
+    const dodgers = FILES.filter((f) =>
+      /\bSaveGame\s+as\b|\bimport\s*\(\s*["'`][^"'`]*SaveGame/.test(code(f.text)),
+    ).map((f) => f.rel);
     expect(dodgers).toEqual([]);
   });
 
   for (const rule of RULES) {
     it(rule.name, () => {
-      const offenders = FILES.filter((f) => rule.banned.test(code(f.text)) && !(f.rel in rule.allowed)).map((f) => f.rel);
-      expect(offenders, "production code calls a TypeScript parser or writer; route it through the engine port").toEqual([]);
+      const offenders = FILES.filter((f) => rule.banned.test(code(f.text)) && !(f.rel in rule.allowed)).map(
+        (f) => f.rel,
+      );
+      expect(
+        offenders,
+        "production code calls a TypeScript parser or writer; route it through the engine port",
+      ).toEqual([]);
     });
     it(`${rule.name}: every allowance still names a file that uses it`, () => {
-      const stale = Object.keys(rule.allowed).filter((rel) => !FILES.some((f) => f.rel === rel && rule.banned.test(code(f.text))));
+      const stale = Object.keys(rule.allowed).filter(
+        (rel) => !FILES.some((f) => f.rel === rel && rule.banned.test(code(f.text))),
+      );
       expect(stale, "an allowance that no longer applies hides a future call; remove it").toEqual([]);
     });
   }
 
   it("the player's import and export reach the engine's four codec members", () => {
     const saveLoad = code(FILES.find((f) => f.rel === "src/game/saveLoad.ts")!.text);
-    for (const call of ["port.loadVctower(", "port.loadVctowerBytes(", "exportFile(port", "port.loadTdt(", "port.tdtExport("]) {
+    for (const call of [
+      "port.loadVctower(",
+      "port.loadVctowerBytes(",
+      "exportFile(port",
+      "port.loadTdt(",
+      "port.tdtExport(",
+    ]) {
       expect(saveLoad, call).toContain(call);
     }
     const lifecycle = code(FILES.find((f) => f.rel === "src/game/portLifecycle.ts")!.text);
@@ -125,7 +145,10 @@ describe("the Rust codec pin (#1522 item 1)", () => {
 
   it("nothing in src/storage parses or writes a 1994 file", () => {
     // `src/storage/tdt*.ts` holds the report wording only; a parser or writer there would be a second codec.
-    const codecs = FILES.filter((f) => /^src\/storage\/tdt/.test(f.rel) && /\b(?:DataView|readUint\w*|getUint\w*|setUint\w*)\b/.test(code(f.text))).map((f) => f.rel);
+    const codecs = FILES.filter(
+      (f) =>
+        /^src\/storage\/tdt/.test(f.rel) && /\b(?:DataView|readUint\w*|getUint\w*|setUint\w*)\b/.test(code(f.text)),
+    ).map((f) => f.rel);
     expect(codecs).toEqual([]);
   });
 });

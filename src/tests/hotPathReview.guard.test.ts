@@ -45,8 +45,7 @@ import {
  * is the review's job. For the other summaries it checks the link only.
  */
 
-const read = (rel: string) =>
-  readFileSync(join(repoRoot, rel), "utf8").replace(/\r\n/g, "\n");
+const read = (rel: string) => readFileSync(join(repoRoot, rel), "utf8").replace(/\r\n/g, "\n");
 /** A TOML file without its comment lines, so a cite or a step name in a comment counts for nothing. */
 const readToml = (rel: string) =>
   read(rel)
@@ -65,30 +64,20 @@ function sectionOf(text: string, heading: string): string | undefined {
 }
 
 /** The code spans in a piece of Markdown, in order. */
-const spans = (text: string) =>
-  [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+const spans = (text: string) => [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
 
 /** Whether a repo path exists; `*` may stand for part of any segment. */
 function pathExists(rel: string): boolean {
   const walk = (dir: string, parts: string[]): boolean => {
-    if (parts.length === 0 || (parts.length === 1 && parts[0] === ""))
-      return true;
+    if (parts.length === 0 || (parts.length === 1 && parts[0] === "")) return true;
     const [head, ...rest] = parts;
     if (!head.includes("*")) {
       const next = join(dir, head);
-      return (
-        existsSync(next) &&
-        (rest.length === 0 || statSync(next).isDirectory()) &&
-        walk(next, rest)
-      );
+      return existsSync(next) && (rest.length === 0 || statSync(next).isDirectory()) && walk(next, rest);
     }
-    const pattern = new RegExp(
-      `^${head.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`,
-    );
+    const pattern = new RegExp(`^${head.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) return false;
-    return readdirSync(dir).some(
-      (name) => pattern.test(name) && walk(join(dir, name), rest),
-    );
+    return readdirSync(dir).some((name) => pattern.test(name) && walk(join(dir, name), rest));
   };
   return walk(repoRoot, rel.split("/"));
 }
@@ -99,9 +88,7 @@ function tomlArray(toml: string, key: string): string[] {
   const start = lines.findIndex((line) => line.trim() === `${key} = [`);
   if (start < 0) return [];
   const end = lines.findIndex((line, i) => i > start && line.trim() === "]");
-  return lines
-    .slice(start + 1, end < 0 ? undefined : end)
-    .map((line) => line.trim());
+  return lines.slice(start + 1, end < 0 ? undefined : end).map((line) => line.trim());
 }
 
 describe("hot-path review guard", () => {
@@ -138,19 +125,11 @@ describe("hot-path review guard", () => {
     const section = sectionOf(page, "## 1. When it applies") ?? "";
     const rows = section
       .split("\n")
-      .filter(
-        (line) =>
-          line.startsWith("| ") &&
-          !line.startsWith("| Surface") &&
-          !line.startsWith("| ---"),
-      )
+      .filter((line) => line.startsWith("| ") && !line.startsWith("| Surface") && !line.startsWith("| ---"))
       .map((line) => line.split("|").map((cell) => cell.trim()));
     // A path is a span with a slash or a file extension; `GameApp` and the like are names.
-    const isPath = (span: string) =>
-      span.includes("/") || /\.(rs|ts|sh|toml|lock|json|nvmrc)$/.test(span);
-    const table = Object.fromEntries(
-      rows.map((cells) => [cells[1], spans(cells[2]).filter(isPath)]),
-    );
+    const isPath = (span: string) => span.includes("/") || /\.(rs|ts|sh|toml|lock|json|nvmrc)$/.test(span);
+    const table = Object.fromEntries(rows.map((cells) => [cells[1], spans(cells[2]).filter(isPath)]));
     expect(table).toEqual(SURFACES);
 
     // The list runs from its lead-in to the paragraph on build files; both are pinned clauses.
@@ -172,9 +151,7 @@ describe("hot-path review guard", () => {
   });
 
   it("keeps the Hot-Path Auditor prompt as one blockquote in section 9", () => {
-    const section = (
-      sectionOf(page, "## 9. How the review tools apply it") ?? ""
-    ).split("\n");
+    const section = (sectionOf(page, "## 9. How the review tools apply it") ?? "").split("\n");
     const quoted = section.map((line) => line.startsWith(">"));
     const blocks = quoted.filter((q, i) => q && !quoted[i - 1]).length;
     expect(blocks, "blockquotes in section 9").toBe(1);
@@ -192,40 +169,26 @@ describe("hot-path review guard", () => {
       const toml = readToml(`_bmad/custom/${skill.name}.toml`);
       const facts = tomlArray(toml, "persistent_facts");
       for (const [fact, words] of Object.entries(skill.facts)) {
-        expect(toml.split(`"${fact}`).length - 1, `${fact} appears once`).toBe(
-          1,
-        );
+        expect(toml.split(`"${fact}`).length - 1, `${fact} appears once`).toBe(1);
         const line = facts.find((l) => l.startsWith(`"${fact}`));
         expect(line, `${fact} inside persistent_facts`).toBeDefined();
-        for (const word of words)
-          expect(line, `${fact} ${word}`).toContain(word);
+        for (const word of words) expect(line, `${fact} ${word}`).toContain(word);
       }
-      if (skill.stepDir)
-        expect(facts).toContain(`"file:{project-root}/${PAGE}",`);
+      if (skill.stepDir) expect(facts).toContain(`"file:{project-root}/${PAGE}",`);
 
-      expect(tomlArray(toml, "activation_steps_prepend"), "prepend").toEqual(
-        [],
-      );
+      expect(tomlArray(toml, "activation_steps_prepend"), "prepend").toEqual([]);
       // on_complete replaces the base value, so the base must stay empty.
       for (const root of SKILL_ROOTS)
-        expect(read(join(root, skill.name, "customize.toml"))).toContain(
-          'on_complete = ""',
-        );
-      const onComplete = toml
-        .split("\n")
-        .filter((l) => l.startsWith("on_complete = "));
+        expect(read(join(root, skill.name, "customize.toml"))).toContain('on_complete = ""');
+      const onComplete = toml.split("\n").filter((l) => l.startsWith("on_complete = "));
       expect(onComplete.length, "on_complete").toBe(1);
-      for (const word of skill.onComplete)
-        expect(onComplete[0], `on_complete ${word}`).toContain(word);
+      for (const word of skill.onComplete) expect(onComplete[0], `on_complete ${word}`).toContain(word);
       const activation = tomlArray(toml, "activation_steps_append").join(" ");
-      for (const word of skill.activation)
-        expect(activation, `activation ${word}`).toContain(word);
+      for (const word of skill.activation) expect(activation, `activation ${word}`).toContain(word);
 
       // The gds and bmad copies differ only in the skill's name.
       const twin = readToml(`_bmad/custom/${skill.twin}.toml`);
-      expect(toml.split(skill.name).join("SKILL")).toBe(
-        twin.split(skill.twin).join("SKILL"),
-      );
+      expect(toml.split(skill.name).join("SKILL")).toBe(twin.split(skill.twin).join("SKILL"));
 
       // Every "section N (Name)" the override cites matches a heading on the page.
       const cites = [...toml.matchAll(/section (\d+) \(([^)]+)\)/g)];
@@ -234,22 +197,16 @@ describe("hot-path review guard", () => {
         expect(lines, `section ${n} (${name})`).toContain(`## ${n}. ${name}`);
       }
 
-      const steps = [
-        ...new Set([...toml.matchAll(/(step-[\w-]+\.md)/g)].map((m) => m[1])),
-      ];
+      const steps = [...new Set([...toml.matchAll(/(step-[\w-]+\.md)/g)].map((m) => m[1]))];
       expect(steps.sort()).toEqual(Object.keys(skill.anchors).sort());
       for (const root of SKILL_ROOTS) {
         const hooks = read(join(root, skill.name, "SKILL.md"));
-        for (const hook of SKILL_HOOKS)
-          expect(hooks, `${root}/${skill.name}/SKILL.md: ${hook}`).toContain(
-            hook,
-          );
+        for (const hook of SKILL_HOOKS) expect(hooks, `${root}/${skill.name}/SKILL.md: ${hook}`).toContain(hook);
         for (const step of steps) {
           const path = join(root, skill.name, skill.stepDir, step);
           expect(existsSync(join(repoRoot, path)), path).toBe(true);
           const text = read(path);
-          for (const anchor of skill.anchors[step])
-            expect(text, `${path}: ${anchor}`).toContain(anchor);
+          for (const anchor of skill.anchors[step]) expect(text, `${path}: ${anchor}`).toContain(anchor);
         }
       }
     });
@@ -259,54 +216,37 @@ describe("hot-path review guard", () => {
   const python = spawnSync("python3", ["-c", "import tomllib"], {
     encoding: "utf8",
   });
-  it.skipIf(python.status !== 0 && !process.env.CI)(
-    "the resolver merges every override over the base facts",
-    () => {
-      for (const skill of SKILLS) {
-        for (const root of SKILL_ROOTS) {
-          const out = spawnSync(
-            "python3",
-            [
-              "_bmad/scripts/resolve_customization.py",
-              "--skill",
-              join(root, skill.name),
-              "--key",
-              "workflow",
-            ],
-            { cwd: repoRoot, encoding: "utf8" },
-          );
-          expect(out.status, out.stderr).toBe(0);
-          const workflow = JSON.parse(out.stdout).workflow as {
-            persistent_facts: string[];
-            activation_steps_prepend?: string[];
-            activation_steps_append: string[];
-            on_complete: string;
-          };
-          // Catches a prepend step in any TOML form, which tomlArray cannot.
-          expect(workflow.activation_steps_prepend ?? [], "prepend").toEqual(
-            [],
-          );
-          expect(workflow.persistent_facts).toContain(
-            "file:{project-root}/**/project-context.md",
-          );
-          for (const fact of Object.keys(skill.facts)) {
-            expect(
-              workflow.persistent_facts.filter((f) => f.startsWith(fact)),
-              `${root}/${skill.name}: ${fact}`,
-            ).toHaveLength(1);
-          }
-          expect(workflow.on_complete).toContain(PAGE);
-          if (!skill.stepDir) continue;
-          expect(workflow.persistent_facts).toContain(
-            `file:{project-root}/${PAGE}`,
-          );
+  it.skipIf(python.status !== 0 && !process.env.CI)("the resolver merges every override over the base facts", () => {
+    for (const skill of SKILLS) {
+      for (const root of SKILL_ROOTS) {
+        const out = spawnSync(
+          "python3",
+          ["_bmad/scripts/resolve_customization.py", "--skill", join(root, skill.name), "--key", "workflow"],
+          { cwd: repoRoot, encoding: "utf8" },
+        );
+        expect(out.status, out.stderr).toBe(0);
+        const workflow = JSON.parse(out.stdout).workflow as {
+          persistent_facts: string[];
+          activation_steps_prepend?: string[];
+          activation_steps_append: string[];
+          on_complete: string;
+        };
+        // Catches a prepend step in any TOML form, which tomlArray cannot.
+        expect(workflow.activation_steps_prepend ?? [], "prepend").toEqual([]);
+        expect(workflow.persistent_facts).toContain("file:{project-root}/**/project-context.md");
+        for (const fact of Object.keys(skill.facts)) {
           expect(
-            workflow.activation_steps_append.some((s) => s.includes(PAGE)),
-          ).toBe(true);
+            workflow.persistent_facts.filter((f) => f.startsWith(fact)),
+            `${root}/${skill.name}: ${fact}`,
+          ).toHaveLength(1);
         }
+        expect(workflow.on_complete).toContain(PAGE);
+        if (!skill.stepDir) continue;
+        expect(workflow.persistent_facts).toContain(`file:{project-root}/${PAGE}`);
+        expect(workflow.activation_steps_append.some((s) => s.includes(PAGE))).toBe(true);
       }
-    },
-  );
+    }
+  });
 
   it("every summary points to the page", () => {
     expect(SUMMARIES.filter((rel) => !read(rel).includes(PAGE))).toEqual([]);
@@ -329,9 +269,7 @@ describe("hot-path review guard", () => {
 
   it("keeps closed exemptions and escape hatches closed", () => {
     for (const [where, phrases] of Object.entries(FORBIDDEN)) {
-      const text = flat(
-        where.startsWith("## ") ? (sectionOf(page, where) ?? "") : read(where),
-      ).toLowerCase();
+      const text = flat(where.startsWith("## ") ? (sectionOf(page, where) ?? "") : read(where)).toLowerCase();
       expect(text.length, where).toBeGreaterThan(0);
       expect(
         phrases.filter((phrase) => text.includes(phrase)),
@@ -341,13 +279,9 @@ describe("hot-path review guard", () => {
   });
 
   it("keeps the link inside AGENTS.md's Review guidelines and the template's Complexity section", () => {
-    expect(
-      sectionOf(read("AGENTS.md"), "## Review guidelines"),
-      "AGENTS.md ## Review guidelines",
-    ).toContain(PAGE);
-    expect(
-      sectionOf(read(".github/PULL_REQUEST_TEMPLATE.md"), "## Complexity"),
-      "template ## Complexity",
-    ).toContain(PAGE);
+    expect(sectionOf(read("AGENTS.md"), "## Review guidelines"), "AGENTS.md ## Review guidelines").toContain(PAGE);
+    expect(sectionOf(read(".github/PULL_REQUEST_TEMPLATE.md"), "## Complexity"), "template ## Complexity").toContain(
+      PAGE,
+    );
   });
 });

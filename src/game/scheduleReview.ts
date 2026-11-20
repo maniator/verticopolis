@@ -121,7 +121,8 @@ export class ScheduleReview {
   open(focus?: string): void {
     this.deps.reader().update();
     const found = this.findings();
-    for (const f of found) if (f.flatAt !== null && this.acks.get(this.keyOf(f)) === undefined) this.acks.set(this.keyOf(f), "told");
+    for (const f of found)
+      if (f.flatAt !== null && this.acks.get(this.keyOf(f)) === undefined) this.acks.set(this.keyOf(f), "told");
     const handlers: Record<string, () => void> = {};
     for (const f of found) {
       const id = f.shaft.id;
@@ -149,7 +150,8 @@ export class ScheduleReview {
       this.shown = null;
       return;
     }
-    if (shown.generation === this.deps.engine().generation() && shown.revision === this.deps.reader().tower.revision) return;
+    if (shown.generation === this.deps.engine().generation() && shown.revision === this.deps.reader().tower.revision)
+      return;
     const focused = document.activeElement;
     this.open(focused instanceof HTMLElement && shown.box.contains(focused) ? focused.dataset.act : undefined);
   }

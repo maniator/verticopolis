@@ -140,7 +140,11 @@ export interface AudioStatus {
 export function audioStatus(): AudioStatus {
   const w = window as any;
   const a = w.game.audio;
-  return { started: Boolean(a.started), muted: Boolean(a.muted), contexts: (w.__perfAudioContexts ?? []).map((c: { state: string }) => c.state) };
+  return {
+    started: Boolean(a.started),
+    muted: Boolean(a.muted),
+    contexts: (w.__perfAudioContexts ?? []).map((c: { state: string }) => c.state),
+  };
 }
 
 /**
@@ -156,5 +160,9 @@ export async function startAudio(timeoutMs: number): Promise<AudioStatus> {
   a.start();
   const until = performance.now() + timeoutMs;
   while (!a.started && performance.now() < until) await new Promise((r) => setTimeout(r, 50));
-  return { started: Boolean(a.started), muted: Boolean(a.muted), contexts: (w.__perfAudioContexts ?? []).map((c: { state: string }) => c.state) };
+  return {
+    started: Boolean(a.started),
+    muted: Boolean(a.muted),
+    contexts: (w.__perfAudioContexts ?? []).map((c: { state: string }) => c.state),
+  };
 }

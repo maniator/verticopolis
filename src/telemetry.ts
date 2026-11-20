@@ -52,11 +52,7 @@ export function telemetryHostAllowed(): boolean {
   // Strip a trailing dot so the canonical absolute FQDN (`verticopolis.com.`) is
   // matched like the usual form. Mirror this in `originAllowed`.
   const host = window.location.hostname.replace(/\.$/, "");
-  return (
-    host === "verticopolis.com" ||
-    host.endsWith(".verticopolis.com") ||
-    host.endsWith(".vercel.app")
-  );
+  return host === "verticopolis.com" || host.endsWith(".verticopolis.com") || host.endsWith(".vercel.app");
 }
 
 export function injectPageTelemetry(): void {

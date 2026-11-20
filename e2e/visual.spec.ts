@@ -4,7 +4,9 @@ import { buildToStar, hideMapBeforeLoad, expectEngineHosted } from "./helpers";
 import { DETERMINISTIC_RASTER_ARGS } from "../scripts/chromium-raster-flags.ts";
 
 /** Release 3.2.0's player notes, for the long-release update prompt baselines. */
-const longReleaseNotes = JSON.parse(readFileSync(new URL("./longReleaseNotes.json", import.meta.url), "utf8")) as string[];
+const longReleaseNotes = JSON.parse(
+  readFileSync(new URL("./longReleaseNotes.json", import.meta.url), "utf8"),
+) as string[];
 
 // The baselines render with the gallery's raster flags (#797), so two
 // browsers in one container settle every raster the same way. This replaces
@@ -190,12 +192,12 @@ test.describe("dialog chrome", () => {
     // While the prompt is open the sim is FROZEN — even at full speed the clock
     // must not advance, so a player reading it can't lose game-hours. (Restore
     // speed 0 afterward so the shot stays deterministic like the sibling tests.)
-    await page.evaluate(() => ((window as any).game.setSpeed(3)));
+    await page.evaluate(() => (window as any).game.setSpeed(3));
     const before = await page.evaluate(() => (window as any).game.sim.clock.minutes);
     await page.waitForTimeout(400);
     const after = await page.evaluate(() => (window as any).game.sim.clock.minutes);
     expect(after).toBe(before);
-    await page.evaluate(() => ((window as any).game.setSpeed(0)));
+    await page.evaluate(() => (window as any).game.setSpeed(0));
 
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt.png");
   });
@@ -218,7 +220,7 @@ test.describe("dialog chrome", () => {
     );
     await page.waitForSelector("#modal[open]");
     await expect(page.locator("#modal .whatsnew li")).toHaveCount(3);
-    await page.evaluate(() => ((window as any).game.setSpeed(0)));
+    await page.evaluate(() => (window as any).game.setSpeed(0));
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-notes.png");
   });
 
@@ -235,7 +237,13 @@ test.describe("dialog chrome", () => {
         since: "1.0.0",
         releases: [
           { version: "1.4.0", notes: ["Offices pay rent on time more often."] },
-          { version: "1.3.0", notes: ["Elevators pick up waiting riders more reliably.", "Condos sell for more as your tower's rating climbs."] },
+          {
+            version: "1.3.0",
+            notes: [
+              "Elevators pick up waiting riders more reliably.",
+              "Condos sell for more as your tower's rating climbs.",
+            ],
+          },
           { version: "1.2.0", notes: ["Modern towers now draw families of two to five."] },
           { version: "1.1.0", notes: ["The Map opens on the view you used last."] },
         ],
@@ -243,7 +251,7 @@ test.describe("dialog chrome", () => {
     );
     await page.waitForSelector("#modal[open]");
     await expect(page.locator("#modal .whatsnew-ver")).toHaveCount(4);
-    await page.evaluate(() => ((window as any).game.setSpeed(0)));
+    await page.evaluate(() => (window as any).game.setSpeed(0));
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-skipped-versions.png");
   });
 
@@ -258,15 +266,22 @@ test.describe("dialog chrome", () => {
       // and scrolls in place, so Later and Update now stay on screen. The phone
       // is 700 tall, a phone showing browser chrome, as the dialog-chrome pin.
       if (viewport) await page.setViewportSize(viewport);
-      await page.evaluate((notes) => (window as any).game.onUpdateAvailable(async () => {}, { version: "3.2.0", sha: "abc1234", notes }), longReleaseNotes);
+      await page.evaluate(
+        (notes) => (window as any).game.onUpdateAvailable(async () => {}, { version: "3.2.0", sha: "abc1234", notes }),
+        longReleaseNotes,
+      );
       await page.waitForSelector("#modal[open]");
       await expect(page.locator("#modal .whatsnew-log li")).toHaveCount(longReleaseNotes.length);
-      await expect(page.locator("#modal .whatsnew-log li").last()).toHaveText(longReleaseNotes[longReleaseNotes.length - 1]);
-      const log = await page.locator("#modal .whatsnew-log").evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
+      await expect(page.locator("#modal .whatsnew-log li").last()).toHaveText(
+        longReleaseNotes[longReleaseNotes.length - 1],
+      );
+      const log = await page
+        .locator("#modal .whatsnew-log")
+        .evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
       expect(log.scroll).toBeGreaterThan(log.client);
       await expect(page.locator('#modal [data-act="later"]')).toBeInViewport();
       await expect(page.locator('#modal [data-act="update"]')).toBeInViewport();
-      await page.evaluate(() => ((window as any).game.setSpeed(0)));
+      await page.evaluate(() => (window as any).game.setSpeed(0));
       await expect(page.locator("#modal .modal-box")).toHaveScreenshot(`update-prompt-long-release-${name}.png`);
     });
   }
@@ -384,7 +399,9 @@ test.describe("overview map", () => {
     await page.waitForFunction(() => Boolean((window as any).game));
     await page.evaluate(() => document.getElementById("splash")?.remove());
     expect(await page.evaluate(buildToStar, 3)).toBe(3);
-    await page.evaluate(() => (window as any).game.engine.setCamera(Math.floor((window as any).game.grid.width / 2), 6, 1));
+    await page.evaluate(() =>
+      (window as any).game.engine.setCamera(Math.floor((window as any).game.grid.width / 2), 6, 1),
+    );
     await hideTransientChrome(page);
   }
 
@@ -434,7 +451,7 @@ test.describe("overview map", () => {
         if (!shaft.ok) throw new Error(`elevator refused: ${shaft.reason ?? "unknown"}`);
         for (let f = 2; f <= 8; f++) {
           const kind = f <= 5 ? "office" : "condo";
-          for (let x = left + 8; x + 1 <= right; ) {
+          for (let x = left + 8; x + 1 <= right;) {
             const r = s.tower.place(kind, f, x);
             x += r.ok ? s.tower.getUnit(r.unitId).width : 1;
           }

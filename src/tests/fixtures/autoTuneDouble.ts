@@ -10,7 +10,10 @@ type DoubleCtx = Pick<ScheduleDialogCtx, "cars" | "bottom" | "top" | "stops" | "
 };
 
 /** The binding calls the double makes. */
-type ScheduleEngine = Pick<ReturnType<typeof wasm>["Engine"]["prototype"], "autoTuneProposal" | "scheduleFacts" | "schedulePreset"> & {
+type ScheduleEngine = Pick<
+  ReturnType<typeof wasm>["Engine"]["prototype"],
+  "autoTuneProposal" | "scheduleFacts" | "schedulePreset"
+> & {
   setMoney(amount: number): void;
   placeBare(kind: string, floor: number, x: number): string;
   placeTransportBare(kind: string, x: number, bottom: number, top: number): string;
@@ -46,7 +49,10 @@ const curve = (row: readonly number[] | undefined): number[] => Array.from({ len
  *  telemetry. */
 function shaftEngine(ctx: DoubleCtx, modern: boolean): { engine: ScheduleEngine; id: number } {
   const rows = ctx.stops.read();
-  const hourly: HourlyByDay | undefined = ctx.hourly && { weekday: curve(ctx.hourly.weekday), weekend: curve(ctx.hourly.weekend) };
+  const hourly: HourlyByDay | undefined = ctx.hourly && {
+    weekday: curve(ctx.hourly.weekday),
+    weekend: curve(ctx.hourly.weekend),
+  };
   const key = JSON.stringify({
     modern,
     cars: ctx.cars,
@@ -55,7 +61,10 @@ function shaftEngine(ctx: DoubleCtx, modern: boolean): { engine: ScheduleEngine;
     express: ctx.isExpress,
     rows,
     hourly,
-    origins: ctx.origins && { weekday: ctx.origins.weekday.map((m) => [...m]), weekend: ctx.origins.weekend.map((m) => [...m]) },
+    origins: ctx.origins && {
+      weekday: ctx.origins.weekday.map((m) => [...m]),
+      weekend: ctx.origins.weekend.map((m) => [...m]),
+    },
   });
   const hit = built.get(key);
   if (hit) return hit;
@@ -64,11 +73,13 @@ function shaftEngine(ctx: DoubleCtx, modern: boolean): { engine: ScheduleEngine;
   const lobbies = new Set(rows.filter((r) => r.lobby).map((r) => r.floor));
   for (let floor = ctx.bottom; floor <= ctx.top; floor++) {
     const lobby = floor === GROUND_FLOOR || (lobbies.has(floor) && floor % LOBBY_INTERVAL === 0);
-    for (let x = 0; x < TOWER_WIDTH; x++) placed(engine.placeBare(lobby ? "lobby" : "floor", floor, x), `floor ${floor}`);
+    for (let x = 0; x < TOWER_WIDTH; x++)
+      placed(engine.placeBare(lobby ? "lobby" : "floor", floor, x), `floor ${floor}`);
   }
   const kind = ctx.isExpress ? "elevatorExpress" : "elevatorStandard";
   const id = placed(engine.placeTransportBare(kind, SHAFT_X, ctx.bottom, ctx.top), kind);
-  if (!engine.setCars(id, ctx.cars)) throw new Error(`the schedule double could not set ${ctx.cars} cars: ${engine.lastReason()}`);
+  if (!engine.setCars(id, ctx.cars))
+    throw new Error(`the schedule double could not set ${ctx.cars} cars: ${engine.lastReason()}`);
   for (const r of rows) engine.markStop(id, r.floor, r.served);
   const stores = {
     elevatorUtil: new Map<number, number>(),
@@ -91,7 +102,10 @@ function shaftEngine(ctx: DoubleCtx, modern: boolean): { engine: ScheduleEngine;
  * (`schedule_authoring_tests`, `schedule_facts_tests`, `schedule_presets_tests`);
  * here the dialog is shown to use them.
  */
-export function rustScheduleEngine(ctx: DoubleCtx, modern = true): Pick<ScheduleDialogCtx, "autoTune" | "facts" | "preset"> {
+export function rustScheduleEngine(
+  ctx: DoubleCtx,
+  modern = true,
+): Pick<ScheduleDialogCtx, "autoTune" | "facts" | "preset"> {
   return {
     autoTune: (draft, weekendView) => {
       const { engine, id } = shaftEngine(ctx, modern);

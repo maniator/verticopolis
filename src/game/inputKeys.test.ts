@@ -213,7 +213,10 @@ describe("commit / bulldoze", () => {
     const undo = document.body.appendChild(document.createElement("button"));
     undo.focus();
     setHistoryButtons({ el: { undo, redo: null } } as never, { undoDepths: () => Float64Array.of(0, 0) });
-    expect([document.activeElement, undo.getAttribute("aria-disabled")], "gray and still focused").toEqual([undo, "true"]);
+    expect([document.activeElement, undo.getAttribute("aria-disabled")], "gray and still focused").toEqual([
+      undo,
+      "true",
+    ]);
     press("Enter");
     tap(" ");
     expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
@@ -424,8 +427,20 @@ describe("the modified-key surface the game takes from the browser", () => {
     ...Array.from({ length: 10 }, (_, i) => String(i)), // 0-9
     ...Array.from({ length: 12 }, (_, i) => `F${i + 1}`), // F1-F12
     ...",.;'[]\\/`-=".split(""),
-    "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-    "Enter", " ", "Tab", "Delete", "Backspace", "Escape", "Home", "End", "PageUp", "PageDown",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "Enter",
+    " ",
+    "Tab",
+    "Delete",
+    "Backspace",
+    "Escape",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
     "+",
   ];
 

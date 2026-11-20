@@ -62,24 +62,14 @@ const said = (list: string[]) => list.join("\n");
 
 describe("importReport", () => {
   it("states funds, rating, structure and the clock", () => {
-    const r = importReport(
-      facts({ minutes: 1440 + 13 * 60 + 5, basements: 2 }),
-    );
+    const r = importReport(facts({ minutes: 1440 + 13 * 60 + 5, basements: 2 }));
     expect(r.day).toBe(2);
-    expect(said(r.broughtOver)).toContain(
-      "$1,500,000 in funds and your 3-star rating.",
-    );
-    expect(said(r.broughtOver)).toContain(
-      "12 floors of structure and 2 basement levels.",
-    );
+    expect(said(r.broughtOver)).toContain("$1,500,000 in funds and your 3-star rating.");
+    expect(said(r.broughtOver)).toContain("12 floors of structure and 2 basement levels.");
     expect(said(r.broughtOver)).toContain("The clock: day 2, 1:05 PM.");
-    expect(said(r.broughtOver)).toContain(
-      "2 elevator shafts and 3 stairway/escalator flights",
-    );
+    expect(said(r.broughtOver)).toContain("2 elevator shafts and 3 stairway/escalator flights");
     expect(said(r.broughtOver)).toContain("1994 Elevator window settings, kept for a save back to SimTower");
-    expect(r.couldNotBring[r.couldNotBring.length - 1]).toBe(
-      "Tenant names and finance history aren't imported yet.",
-    );
+    expect(r.couldNotBring[r.couldNotBring.length - 1]).toBe("Tenant names and finance history aren't imported yet.");
   });
 
   it("reads the singular forms, the TOWER rating, debt and midnight", () => {
@@ -102,24 +92,18 @@ describe("importReport", () => {
   });
 
   it("says so when the save had no transport", () => {
-    expect(
-      said(importReport(facts({ shafts: 0, flights: 0 })).broughtOver),
-    ).toContain("no elevators or stairways built yet");
-    expect(
-      said(importReport(facts({ shafts: 0, flights: 2 })).broughtOver),
-    ).not.toContain("Elevator window settings");
+    expect(said(importReport(facts({ shafts: 0, flights: 0 })).broughtOver)).toContain(
+      "no elevators or stairways built yet",
+    );
+    expect(said(importReport(facts({ shafts: 0, flights: 2 })).broughtOver)).not.toContain("Elevator window settings");
   });
 
   it("leaves the transport line out when the elevator data was not decoded", () => {
     const r = importReport(facts({ decoded: false }));
     expect(said(r.broughtOver)).not.toContain("straight from the save");
     expect(said(r.broughtOver)).not.toContain("Elevator window settings");
-    expect(said(r.couldNotBring)).toContain(
-      "rebuilt from your floors (2 shafts)",
-    );
-    expect(
-      said(importReport(facts({ decoded: false, shafts: 1 })).couldNotBring),
-    ).toContain("(1 shaft)");
+    expect(said(r.couldNotBring)).toContain("rebuilt from your floors (2 shafts)");
+    expect(said(importReport(facts({ decoded: false, shafts: 1 })).couldNotBring)).toContain("(1 shaft)");
   });
 
   it("counts offices, condos, hotel rooms, venues, services and rents", () => {
@@ -148,21 +132,13 @@ describe("importReport", () => {
     expect(r.unitsImported).toBe(40);
     expect(text).toContain("5 offices (3 with tenants).");
     expect(text).toContain("2 condos (1 sold).");
-    expect(text).toContain(
-      "4 hotel rooms (1 with sleeping guests, 2 awaiting housekeeping).",
-    );
-    expect(text).toContain(
-      "Of those, 2 are Twin Rooms.",
-    );
+    expect(text).toContain("4 hotel rooms (1 with sleeping guests, 2 awaiting housekeeping).");
+    expect(text).toContain("Of those, 2 are Twin Rooms.");
     expect(text).toContain("3 food, retail, and entertainment venues.");
     expect(text).toContain("1 service and special facility.");
     expect(text).toContain("Rent levels for 6 units");
-    expect(text).toContain(
-      "9 parking stalls (the save counted 7 connected to a ramp).",
-    );
-    expect(text).toContain(
-      "2 rooms still under construction; work resumes now.",
-    );
+    expect(text).toContain("9 parking stalls (the save counted 7 connected to a ramp).");
+    expect(text).toContain("2 rooms still under construction; work resumes now.");
   });
 
   it("uses the singular forms of the same lines", () => {
@@ -188,9 +164,7 @@ describe("importReport", () => {
     expect(text).toContain("1 office (1 with tenants).");
     expect(text).toContain("1 condo (0 sold).");
     expect(text).toContain("1 hotel room, ready for guests.");
-    expect(text).toContain(
-      "Of those, 1 is a Twin Room.",
-    );
+    expect(text).toContain("Of those, 1 is a Twin Room.");
     expect(text).toContain("1 food, retail, and entertainment venue.");
     expect(text).toContain("2 service and special facilities.");
     expect(text).toContain("Rent levels for 1 unit,");
@@ -200,18 +174,10 @@ describe("importReport", () => {
 
   it("does not echo a corrupt connected-stall count", () => {
     expect(
-      said(
-        importReport(
-          facts({ counts: { parkingStalls: 3 }, parkingConnected: 513 }),
-        ).broughtOver,
-      ),
+      said(importReport(facts({ counts: { parkingStalls: 3 }, parkingConnected: 513 })).broughtOver),
     ).not.toContain("parking stall");
     expect(
-      said(
-        importReport(
-          facts({ counts: { parkingStalls: 3 }, parkingConnected: null }),
-        ).broughtOver,
-      ),
+      said(importReport(facts({ counts: { parkingStalls: 3 }, parkingConnected: null })).broughtOver),
     ).not.toContain("parking stall");
   });
 
@@ -314,22 +280,12 @@ describe("importReport", () => {
   });
 
   it("says who is here now when the load seeded people, and falls back to the approximate line", () => {
-    const seeded = importReport(
-      facts({ counts: { occupiedOffices: 2, residentsSeeded: 1234 } }),
-    );
-    expect(said(seeded.couldNotBring)).toContain(
-      "1,234 office workers and condo residents are here now",
-    );
-    expect(said(seeded.couldNotBring)).not.toContain(
-      "Occupancy is approximate",
-    );
+    const seeded = importReport(facts({ counts: { occupiedOffices: 2, residentsSeeded: 1234 } }));
+    expect(said(seeded.couldNotBring)).toContain("1,234 office workers and condo residents are here now");
+    expect(said(seeded.couldNotBring)).not.toContain("Occupancy is approximate");
     const approximate = importReport(facts({ counts: { soldCondos: 1 } }));
-    expect(said(approximate.couldNotBring)).toContain(
-      "Occupancy is approximate",
-    );
-    expect(said(importReport(facts()).couldNotBring)).not.toContain(
-      "Occupancy is approximate",
-    );
+    expect(said(approximate.couldNotBring)).toContain("Occupancy is approximate");
+    expect(said(importReport(facts()).couldNotBring)).not.toContain("Occupancy is approximate");
   });
 
   it("passes the header's notes through after its own lines", () => {

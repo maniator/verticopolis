@@ -3,7 +3,17 @@ import type { CalendarKind } from "@verticopolis/components/shared/engineTypes";
 import { SaveGame } from "../storage/SaveGame";
 import { isStorageWriteError } from "../storage/saveFailureCopy";
 import { SaveFailureNotice, type SaveWarningSurface } from "./saveFailureNotice";
-import { headerNow, refusalCode, trackAppAction, trackAppActionOnce, trackFileExported, trackFileFailure, trackFileImported, trackTdtImportRead, type FileFailureCode } from "../analytics";
+import {
+  headerNow,
+  refusalCode,
+  trackAppAction,
+  trackAppActionOnce,
+  trackFileExported,
+  trackFileFailure,
+  trackFileImported,
+  trackTdtImportRead,
+  type FileFailureCode,
+} from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";
 import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow } from "./exportFlow";
@@ -12,7 +22,17 @@ import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
 import type { PortCodes } from "@verticopolis/components/port/portCodes";
 import type { ViewReader } from "@verticopolis/components/port/viewReader";
-import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, exportFile, loadStored, newerSaveRefused, saveBytes, saveText, stampCamera, swapDone } from "./portLifecycle";
+import {
+  NEWER_SAVE_REFUSAL,
+  SWAP_REFUSED,
+  exportFile,
+  loadStored,
+  newerSaveRefused,
+  saveBytes,
+  saveText,
+  stampCamera,
+  swapDone,
+} from "./portLifecycle";
 import { currentStamp } from "../storage/saveStamp";
 import { exportFacts, importFacts } from "@verticopolis/components/port/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
@@ -480,7 +500,15 @@ export class SaveLoad {
     const port = this.deps.enginePort();
     const codes = this.deps.portCodes();
     this.deps.beforeSwap?.("new");
-    swapDone(port, port.foundTower(Date.now() & 0x7fffffff, codes.code("modes", mode), codes.code("calendars", modernCalendar), startUnbridged));
+    swapDone(
+      port,
+      port.foundTower(
+        Date.now() & 0x7fffffff,
+        codes.code("modes", mode),
+        codes.code("calendars", modernCalendar),
+        startUnbridged,
+      ),
+    );
     this.deps.towerSwapped();
     // The toast is the first-lobby cue, keyed on tower state, never the mode.
     const founded = this.deps.reader();

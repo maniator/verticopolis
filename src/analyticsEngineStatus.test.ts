@@ -79,21 +79,38 @@ describe("engine_status rows", () => {
     // The reset cleared the common props (the platform buckets), so the row
     // holds the event's own fields and nothing else.
     // `engaged_by` rides on `engaged` rows only, `trap_kind` only after a trap.
-    expect(Object.keys(rows()[0]).sort()).toEqual(ENGINE_STATUS_FIELDS.filter((f) => f !== "engaged_by" && f !== "trap_kind").sort());
+    expect(Object.keys(rows()[0]).sort()).toEqual(
+      ENGINE_STATUS_FIELDS.filter((f) => f !== "engaged_by" && f !== "trap_kind").sort(),
+    );
   });
 
   it("reads a boot failure from the settle snapshot, as one fallback", () => {
     noteEngineSettled({ build: "switchable", requested: "wasm", failure: { stage: "load", reason: "boot-timeout" } });
-    expect(rows()[0]).toMatchObject({ engine: "ts-fallback", fallback_reason: "boot-timeout", fallback_stage: "load", fallbacks: 1 });
+    expect(rows()[0]).toMatchObject({
+      engine: "ts-fallback",
+      fallback_reason: "boot-timeout",
+      fallback_stage: "load",
+      fallbacks: 1,
+    });
     gameplaySession.reset();
     noteEngineSettled({ build: "wasm-only", requested: "wasm", failure: { stage: "start", reason: "attach-refused" } });
-    expect(rows()[1]).toMatchObject({ engine: "none", fallback_reason: "attach-refused", fallback_stage: "start", fallbacks: 1, build: "wasm-only" });
+    expect(rows()[1]).toMatchObject({
+      engine: "none",
+      fallback_reason: "attach-refused",
+      fallback_stage: "start",
+      fallbacks: 1,
+      build: "wasm-only",
+    });
   });
 
   it("does not send or count a fallback that comes before the settle row, which already holds it", () => {
     noteEngineFallback({ reason: "attach-refused", stage: "start" });
     expect(rows()).toHaveLength(0);
-    noteEngineSettled({ build: "switchable", requested: "wasm", failure: { stage: "start", reason: "attach-refused" } });
+    noteEngineSettled({
+      build: "switchable",
+      requested: "wasm",
+      failure: { stage: "start", reason: "attach-refused" },
+    });
     expect(rows()).toEqual([expect.objectContaining({ trigger: "settle", fallbacks: 1 })]);
   });
 
@@ -102,8 +119,20 @@ describe("engine_status rows", () => {
     noteEngineFallback({ reason: "attach-refused", stage: "adopt" });
     noteEngineFallback({ reason: "attach-refused", stage: "undo" });
     expect(rows().slice(1)).toEqual([
-      expect.objectContaining({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "attach-refused", fallback_stage: "adopt", fallbacks: 1 }),
-      expect.objectContaining({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "attach-refused", fallback_stage: "undo", fallbacks: 2 }),
+      expect.objectContaining({
+        trigger: "fallback",
+        engine: "ts-fallback",
+        fallback_reason: "attach-refused",
+        fallback_stage: "adopt",
+        fallbacks: 1,
+      }),
+      expect.objectContaining({
+        trigger: "fallback",
+        engine: "ts-fallback",
+        fallback_reason: "attach-refused",
+        fallback_stage: "undo",
+        fallbacks: 2,
+      }),
     ]);
     // One page life: every row shares its id.
     expect(new Set(rows().map((r) => r.page_life)).size).toBe(1);
@@ -139,7 +168,9 @@ describe("engine_status rows", () => {
     ]);
     // Every reason the page life hit reached a row, and the repeat dropped
     // after them is reported at the hide.
-    expect(new Set(rows().map((r) => r.fallback_reason))).toEqual(new Set(["none", "attach-refused", "package-mismatch"]));
+    expect(new Set(rows().map((r) => r.fallback_reason))).toEqual(
+      new Set(["none", "attach-refused", "package-mismatch"]),
+    );
     flushEngineStatus();
     expect(last(rows())).toMatchObject({ trigger: "summary", fallbacks: 22, fallback_stage: "undo" });
   });
@@ -156,14 +187,17 @@ describe("engine_status rows", () => {
     const added: Array<[EventTarget, string, EventListenerOrEventListenerObject]> = [];
     const spies = [window, document].map((t: EventTarget) => {
       const add = t.addEventListener.bind(t);
-      return vi.spyOn(t, "addEventListener").mockImplementation((type: string, listener: EventListenerOrEventListenerObject | null) => {
-        if (listener) added.push([t, type, listener]);
-        add(type, listener);
-      });
+      return vi
+        .spyOn(t, "addEventListener")
+        .mockImplementation((type: string, listener: EventListenerOrEventListenerObject | null) => {
+          if (listener) added.push([t, type, listener]);
+          add(type, listener);
+        });
     });
     startGameplaySession();
     noteEngineSettled(wasmSettle);
-    for (let i = 0; i < MAX_ENGINE_STATUS_ROWS + 3; i++) noteEngineFallback({ reason: "attach-refused", stage: "adopt" });
+    for (let i = 0; i < MAX_ENGINE_STATUS_ROWS + 3; i++)
+      noteEngineFallback({ reason: "attach-refused", stage: "adopt" });
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
     try {
       document.dispatchEvent(new Event("visibilitychange"));
@@ -182,7 +216,9 @@ describe("engine_status rows", () => {
     noteEngineSettled(wasmSettle);
     noteEngineWriterLatched();
     noteEngineWriterLatched();
-    expect(rows().slice(1)).toEqual([expect.objectContaining({ trigger: "writer-latch", writer_latched: true, fallbacks: 0 })]);
+    expect(rows().slice(1)).toEqual([
+      expect.objectContaining({ trigger: "writer-latch", writer_latched: true, fallbacks: 0 }),
+    ]);
     gameplaySession.reset();
     noteEngineWriterLatched();
     expect(rows()).toHaveLength(2);
@@ -213,13 +249,22 @@ describe("engine_status rows", () => {
     const [settle, refused, crash, latch] = rows();
     expect(settle).not.toHaveProperty("trap_kind");
     expect(refused).not.toHaveProperty("trap_kind");
-    expect(crash).toMatchObject({ trigger: "crash-reload", fallback_reason: "trap-save", fallback_stage: "adopt", trap_kind: "unreachable" });
+    expect(crash).toMatchObject({
+      trigger: "crash-reload",
+      fallback_reason: "trap-save",
+      fallback_stage: "adopt",
+      trap_kind: "unreachable",
+    });
     // Later rows in the page life keep it, as they keep the reason.
     expect(latch).toMatchObject({ trigger: "writer-latch", trap_kind: "unreachable" });
   });
 
   it("sends only codes from the closed lists", () => {
-    noteEngineSettled({ build: "switchable", requested: "wasm-worker", failure: { stage: "load", reason: "package-mismatch" } });
+    noteEngineSettled({
+      build: "switchable",
+      requested: "wasm-worker",
+      failure: { stage: "load", reason: "package-mismatch" },
+    });
     noteEngineFallback({ reason: "attach-refused", stage: "adopt" });
     noteEngineWriterLatched();
     for (const row of rows()) {

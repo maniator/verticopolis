@@ -3,9 +3,33 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "@verticopolis/components/host/enginePackageNames";
+import {
+  DEV_SKIP_MARKER,
+  ENGINE_BUILD_RECORD,
+  ENGINE_DIR,
+  ENGINE_GLUE,
+  ENGINE_WASM,
+} from "@verticopolis/components/host/enginePackageNames";
 import { engineBuildRecord } from "@verticopolis/components/host/enginePackageRecord";
-import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, entryWithIntegrity, PAGE_FILE_ATTRIBUTE, pageAssetsMissing, pageLastTransform, precacheIntegrityTransform, integrityOf, manifestIntegrity, manifestIntegrityProblems, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
+import {
+  ENGINE_REVISION_SUFFIX,
+  INTEGRITY_FILES,
+  engineDistProblems,
+  engineRevision,
+  entryWithIntegrity,
+  PAGE_FILE_ATTRIBUTE,
+  pageAssetsMissing,
+  pageLastTransform,
+  precacheIntegrityTransform,
+  integrityOf,
+  manifestIntegrity,
+  manifestIntegrityProblems,
+  manifestRevisions,
+  readExpectedPackage,
+  revisionsOf,
+  shellProblems,
+  shellRevisionProblems,
+} from "./enginePackageBuild";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
 const md5 = (d: Uint8Array | string) => createHash("md5").update(d).digest("hex");
@@ -26,13 +50,19 @@ function pkg(over: { record?: string | null; glue?: Uint8Array; wasm?: Uint8Arra
   mkdirSync(join(dir, ENGINE_DIR), { recursive: true });
   writeFileSync(join(dir, ENGINE_DIR, ENGINE_GLUE), over.glue ?? glue);
   writeFileSync(join(dir, ENGINE_DIR, ENGINE_WASM), over.wasm ?? wasm);
-  if (over.record !== null) writeFileSync(join(dir, ENGINE_DIR, ENGINE_BUILD_RECORD), over.record ?? JSON.stringify(record));
+  if (over.record !== null)
+    writeFileSync(join(dir, ENGINE_DIR, ENGINE_BUILD_RECORD), over.record ?? JSON.stringify(record));
   return dir;
 }
 
 describe("readExpectedPackage", () => {
   it("reads the package id and the file digests of a good record", () => {
-    expect(readExpectedPackage(pkg(), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources, revisions: revisionsOf(join(dir, ENGINE_DIR)) });
+    expect(readExpectedPackage(pkg(), "build")).toEqual({
+      package: record.package,
+      files: record.files,
+      sources: record.sources,
+      revisions: revisionsOf(join(dir, ENGINE_DIR)),
+    });
   });
 
   it("is null when there is no package folder, in a build or not", () => {
@@ -61,7 +91,12 @@ describe("readExpectedPackage", () => {
     mkdirSync(join(dir, ENGINE_DIR));
     expect(readExpectedPackage(dir, "build")).toBeNull();
     const withBom = `\uFEFF${JSON.stringify(record)}`;
-    expect(readExpectedPackage(pkg({ record: withBom }), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources, revisions: revisionsOf(join(dir, ENGINE_DIR)) });
+    expect(readExpectedPackage(pkg({ record: withBom }), "build")).toEqual({
+      package: record.package,
+      files: record.files,
+      sources: record.sources,
+      revisions: revisionsOf(join(dir, ENGINE_DIR)),
+    });
   });
 
   it("gives a dev serve or a test null even for a good record", () => {
@@ -72,9 +107,17 @@ describe("readExpectedPackage", () => {
 
 describe("pageLastTransform (#1949)", () => {
   it("moves the page after every other file and keeps their order", () => {
-    const entries = ["splash.svg", "./index.html", "assets/main-1.js", "engine/BUILD.json", "assets/vendor-1.js"].map((url) => ({ url, revision: null, size: 1 }));
+    const entries = ["splash.svg", "./index.html", "assets/main-1.js", "engine/BUILD.json", "assets/vendor-1.js"].map(
+      (url) => ({ url, revision: null, size: 1 }),
+    );
     const { manifest, warnings } = pageLastTransform(entries);
-    expect(manifest.map((e) => e.url)).toEqual(["splash.svg", "assets/main-1.js", "engine/BUILD.json", "assets/vendor-1.js", "./index.html"]);
+    expect(manifest.map((e) => e.url)).toEqual([
+      "splash.svg",
+      "assets/main-1.js",
+      "engine/BUILD.json",
+      "assets/vendor-1.js",
+      "./index.html",
+    ]);
     expect(manifest[4], "the entry itself is kept").toBe(entries[1]);
     expect(warnings).toEqual([]);
   });
@@ -86,16 +129,22 @@ describe("pageLastTransform (#1949)", () => {
 });
 
 describe("pageAssetsMissing (#1949)", () => {
-  const page = '<script type="module" src="./assets/main-1.js"></script><link rel="modulepreload" href="/assets/vendor-1.js"><link rel="preload" as="font" href="assets/x.ttf"><link rel="icon" href="splash.svg"><script src="https://cdn.example/assets/lib.js"></script><a href="http://">';
+  const page =
+    '<script type="module" src="./assets/main-1.js"></script><link rel="modulepreload" href="/assets/vendor-1.js"><link rel="preload" as="font" href="assets/x.ttf"><link rel="icon" href="splash.svg"><script src="https://cdn.example/assets/lib.js"></script><a href="http://">';
 
   it("names the page's own assets/ files as manifest URLs and the ones the manifest leaves out", () => {
-    const { named, missing } = pageAssetsMissing(page, new Set(["assets/main-1.js", "assets/vendor-1.js", "splash.svg"]));
+    const { named, missing } = pageAssetsMissing(
+      page,
+      new Set(["assets/main-1.js", "assets/vendor-1.js", "splash.svg"]),
+    );
     expect(named).toEqual(["assets/main-1.js", "assets/vendor-1.js", "assets/x.ttf"]);
     expect(missing).toEqual(["assets/x.ttf"]);
   });
 
   it("finds nothing missing when the manifest has every file, and nothing named on a page without them", () => {
-    expect(pageAssetsMissing(page, new Set(["assets/main-1.js", "assets/vendor-1.js", "assets/x.ttf"])).missing).toEqual([]);
+    expect(
+      pageAssetsMissing(page, new Set(["assets/main-1.js", "assets/vendor-1.js", "assets/x.ttf"])).missing,
+    ).toEqual([]);
     expect(pageAssetsMissing("<html><body></body></html>", new Set()).named).toEqual([]);
   });
 
@@ -140,15 +189,26 @@ describe("precacheIntegrityTransform", () => {
     mkdirSync(join(d, "assets"));
     writeFileSync(join(d, "assets", "main-abc123.js"), "export {};\n");
     const { manifest } = precacheIntegrityTransform(d)([{ url: "assets/main-abc123.js", revision: null, size: 11 }]);
-    expect(manifest[0]).toEqual({ url: "assets/main-abc123.js", revision: null, size: 11, integrity: integrityOf(new TextEncoder().encode("export {};\n")) });
+    expect(manifest[0]).toEqual({
+      url: "assets/main-abc123.js",
+      revision: null,
+      size: 11,
+      integrity: integrityOf(new TextEncoder().encode("export {};\n")),
+    });
   });
 
   it("gives each engine entry a revision no worker before the integrity attribute used, and leaves the rest alone", () => {
     const d = withShell();
     const { manifest } = precacheIntegrityTransform(d)(entries());
-    expect(manifest.slice(0, 3).map((e) => e.revision)).toEqual([engineRevision(glue), engineRevision(wasm), engineRevision(new TextEncoder().encode(JSON.stringify(record)))]);
+    expect(manifest.slice(0, 3).map((e) => e.revision)).toEqual([
+      engineRevision(glue),
+      engineRevision(wasm),
+      engineRevision(new TextEncoder().encode(JSON.stringify(record))),
+    ]);
     for (const e of manifest.slice(0, 3)) {
-      expect(e.revision, "not the plain MD5 an earlier worker keyed the file by").toMatch(new RegExp(`^[0-9a-f]{32}${ENGINE_REVISION_SUFFIX}$`));
+      expect(e.revision, "not the plain MD5 an earlier worker keyed the file by").toMatch(
+        new RegExp(`^[0-9a-f]{32}${ENGINE_REVISION_SUFFIX}$`),
+      );
       expect(e.revision).not.toMatch(/^[0-9a-f]{32}$/);
     }
     expect(engineRevision(glue)).toBe(`${md5(glue)}${ENGINE_REVISION_SUFFIX}`);
@@ -157,9 +217,13 @@ describe("precacheIntegrityTransform", () => {
 
   it("matches an entry whatever its prefix or query string", () => {
     const d = pkg();
-    const { manifest } = precacheIntegrityTransform(d)([{ url: `./${ENGINE_DIR}${ENGINE_GLUE}?v=1`, revision: null, size: 1 }]);
+    const { manifest } = precacheIntegrityTransform(d)([
+      { url: `./${ENGINE_DIR}${ENGINE_GLUE}?v=1`, revision: null, size: 1 },
+    ]);
     expect(manifest[0].integrity).toBe(integrityOf(glue));
-    expect(manifest[0].revision, "an entry that arrived with no revision gets the rotated one").toBe(engineRevision(glue));
+    expect(manifest[0].revision, "an entry that arrived with no revision gets the rotated one").toBe(
+      engineRevision(glue),
+    );
   });
 
   it("asks for the output folder when it is given a function, so a changed outDir is followed", () => {
@@ -180,11 +244,15 @@ describe("precacheIntegrityTransform", () => {
   });
 
   it("refuses an entry that climbs out of the output folder", () => {
-    expect(() => precacheIntegrityTransform(withShell())([{ url: "../secret.txt", revision: null, size: 1 }])).toThrow(/climbs out of dist/);
+    expect(() => precacheIntegrityTransform(withShell())([{ url: "../secret.txt", revision: null, size: 1 }])).toThrow(
+      /climbs out of dist/,
+    );
   });
 
   it("covers exactly the glue, the binary and BUILD.json with a rotated revision", () => {
-    expect([...INTEGRITY_FILES].sort()).toEqual([ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_WASM].map((f) => ENGINE_DIR + f).sort());
+    expect([...INTEGRITY_FILES].sort()).toEqual(
+      [ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_WASM].map((f) => ENGINE_DIR + f).sort(),
+    );
   });
 });
 
@@ -193,7 +261,11 @@ describe("entryWithIntegrity", () => {
     const d = pkg();
     const text = '{"name":"Verticopolis"}\n';
     writeFileSync(join(d, "manifest.webmanifest"), text);
-    expect(entryWithIntegrity({ url: "manifest.webmanifest", revision: "m1" }, d)).toEqual({ url: "manifest.webmanifest", revision: "m1", integrity: integrityOf(new TextEncoder().encode(text)) });
+    expect(entryWithIntegrity({ url: "manifest.webmanifest", revision: "m1" }, d)).toEqual({
+      url: "manifest.webmanifest",
+      revision: "m1",
+      integrity: integrityOf(new TextEncoder().encode(text)),
+    });
   });
 });
 
@@ -205,25 +277,36 @@ describe("manifestIntegrityProblems", () => {
     for (const [name, text] of Object.entries(files)) writeFileSync(join(d, name), text);
     return d;
   }
-  const entry = (url: keyof typeof files, integrity: string | null = integrityOf(new TextEncoder().encode(files[url]))) =>
-    `{url:"${url}",revision:null${integrity === null ? "" : `,integrity:"${integrity}"`}}`;
+  const entry = (
+    url: keyof typeof files,
+    integrity: string | null = integrityOf(new TextEncoder().encode(files[url])),
+  ) => `{url:"${url}",revision:null${integrity === null ? "" : `,integrity:"${integrity}"`}}`;
 
   it("is empty when every entry carries the digest of its file", () => {
     expect(manifestIntegrityProblems(dist(), `[${entry("index.html")},${entry("assets/main-1.js")}]`)).toEqual([]);
   });
 
   it("names an entry with no integrity, so a miss would not refill the precache", () => {
-    expect(manifestIntegrityProblems(dist(), `[${entry("index.html", null)}]`).join("\n")).toMatch(/index\.html carries no integrity/);
+    expect(manifestIntegrityProblems(dist(), `[${entry("index.html", null)}]`).join("\n")).toMatch(
+      /index\.html carries no integrity/,
+    );
   });
 
   it("names an entry whose integrity is not its file's digest, such as a file changed after the worker was built", () => {
-    expect(manifestIntegrityProblems(dist(), `[${entry("assets/main-1.js", integrityOf(new TextEncoder().encode("other")))}]`).join("\n")).toMatch(/main-1\.js carries an integrity that is not the digest/);
+    expect(
+      manifestIntegrityProblems(
+        dist(),
+        `[${entry("assets/main-1.js", integrityOf(new TextEncoder().encode("other")))}]`,
+      ).join("\n"),
+    ).toMatch(/main-1\.js carries an integrity that is not the digest/);
   });
 
   it("names an entry whose file is gone", () => {
     const d = dist();
     rmSync(join(d, "index.html"));
-    expect(manifestIntegrityProblems(d, `[${entry("index.html")}]`).join("\n")).toMatch(/index\.html has no file in dist/);
+    expect(manifestIntegrityProblems(d, `[${entry("index.html")}]`).join("\n")).toMatch(
+      /index\.html has no file in dist/,
+    );
   });
 });
 
@@ -246,7 +329,11 @@ describe("manifestIntegrity", () => {
 
 describe("engineDistProblems", () => {
   /** A manifest with the three engine entries carrying the right integrity. */
-  function manifestFor(_d: string, over: Record<string, string | null> = {}, revisionOver: Record<string, string> = {}): string {
+  function manifestFor(
+    _d: string,
+    over: Record<string, string | null> = {},
+    revisionOver: Record<string, string> = {},
+  ): string {
     const entry = (name: string, bytes: Uint8Array) => {
       const url = ENGINE_DIR + name;
       const integrity = url in over ? over[url] : integrityOf(bytes);
@@ -272,7 +359,9 @@ describe("engineDistProblems", () => {
     const other = new Uint8Array(glue);
     other[0] ^= 1;
     const d = pkg({ glue: other });
-    expect(engineDistProblems(d, manifestFor(d)).join("\n")).toContain(`${ENGINE_GLUE} does not match the digest in BUILD.json`);
+    expect(engineDistProblems(d, manifestFor(d)).join("\n")).toContain(
+      `${ENGINE_GLUE} does not match the digest in BUILD.json`,
+    );
   });
 
   it("reports a package id that is not the hash of its files block", () => {
@@ -288,14 +377,18 @@ describe("engineDistProblems", () => {
   it("reports an engine entry that is not in the manifest at all", () => {
     const d = pkg();
     const only = manifestFor(d).replace(/\{url:"engine\/BUILD\.json"[^}]*\}/, "");
-    expect(engineDistProblems(d, only).join("\n")).toContain(`precache entry ${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from the manifest`);
+    expect(engineDistProblems(d, only).join("\n")).toContain(
+      `precache entry ${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from the manifest`,
+    );
     expect(engineDistProblems(d, "[]")).toHaveLength(3);
   });
 
   it("reports an engine entry whose revision is not the one of its file, which would send Repair to another cache key", () => {
     const d = pkg();
     const bad = manifestFor(d, {}, { [`${ENGINE_DIR}${ENGINE_WASM}`]: "0".repeat(32) });
-    expect(engineDistProblems(d, bad).join("\n")).toContain(`precache entry ${ENGINE_DIR}${ENGINE_WASM} has revision ${"0".repeat(32)}; the file in dist/ has ${engineRevision(wasm)}`);
+    expect(engineDistProblems(d, bad).join("\n")).toContain(
+      `precache entry ${ENGINE_DIR}${ENGINE_WASM} has revision ${"0".repeat(32)}; the file in dist/ has ${engineRevision(wasm)}`,
+    );
     expect(manifestRevisions(manifestFor(d)).get(`${ENGINE_DIR}${ENGINE_GLUE}`)).toBe(engineRevision(glue));
   });
 
@@ -307,8 +400,12 @@ describe("engineDistProblems", () => {
 
   it("reports an engine entry with no integrity, and one with the wrong integrity", () => {
     const d = pkg();
-    expect(engineDistProblems(d, manifestFor(d, { [`${ENGINE_DIR}${ENGINE_WASM}`]: null })).join("\n")).toContain("carries no integrity");
-    expect(engineDistProblems(d, manifestFor(d, { [`${ENGINE_DIR}${ENGINE_GLUE}`]: "sha256-AAAA" })).join("\n")).toContain("not the digest of the file in dist/");
+    expect(engineDistProblems(d, manifestFor(d, { [`${ENGINE_DIR}${ENGINE_WASM}`]: null })).join("\n")).toContain(
+      "carries no integrity",
+    );
+    expect(
+      engineDistProblems(d, manifestFor(d, { [`${ENGINE_DIR}${ENGINE_GLUE}`]: "sha256-AAAA" })).join("\n"),
+    ).toContain("not the digest of the file in dist/");
   });
 });
 
@@ -322,10 +419,15 @@ describe("shellProblems", () => {
     return d;
   }
   /** A chunk shaped as the define leaves it: the expected record inlined. */
-  const chunkWith = (id: string) => `const e={package:"${id}",files:{"${ENGINE_GLUE}":{sha256:"${"d".repeat(64)}",bytes:3}}};export{e};`;
+  const chunkWith = (id: string) =>
+    `const e={package:"${id}",files:{"${ENGINE_GLUE}":{sha256:"${"d".repeat(64)}",bytes:3}}};export{e};`;
 
   it("finds nothing wrong when a chunk carries the engine's id and none carries another", () => {
-    const d = distWith({ "assets/index-1.js": chunkWith(record.package), "assets/engineWorker-2.js": chunkWith(record.package), "assets/other-3.js": "export const x=1;" });
+    const d = distWith({
+      "assets/index-1.js": chunkWith(record.package),
+      "assets/engineWorker-2.js": chunkWith(record.package),
+      "assets/other-3.js": "export const x=1;",
+    });
     expect(shellProblems(d, true)).toEqual([]);
   });
 
@@ -339,7 +441,9 @@ describe("shellProblems", () => {
     ["a JSON string with escaped quotes", (id: string) => `x=JSON.parse("{\\"package\\":\\"${id}\\"}")`],
   ])("reads %s", (_name, make) => {
     expect(shellProblems(distWith({ "assets/index-1.js": make(record.package) }), true)).toEqual([]);
-    expect(shellProblems(distWith({ "assets/index-1.js": make(OTHER) }), true).join("\n")).toContain(`carries engine package id ${OTHER.slice(0, 12)}`);
+    expect(shellProblems(distWith({ "assets/index-1.js": make(OTHER) }), true).join("\n")).toContain(
+      `carries engine package id ${OTHER.slice(0, 12)}`,
+    );
   });
 
   it("reports a shell built for another package, and names both ids", () => {
@@ -350,19 +454,28 @@ describe("shellProblems", () => {
   });
 
   it("reports a second chunk left on another id", () => {
-    const d = distWith({ "assets/index-1.js": chunkWith(record.package), "assets/engineWorker-2.js": chunkWith(OTHER) });
+    const d = distWith({
+      "assets/index-1.js": chunkWith(record.package),
+      "assets/engineWorker-2.js": chunkWith(OTHER),
+    });
     const problems = shellProblems(d, true);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain("engineWorker-2.js");
   });
 
   it("reports a shell that carries no id at all", () => {
-    expect(shellProblems(distWith({ "assets/index-1.js": "export{};" }), true).join("\n")).toContain("carries the engine package id");
+    expect(shellProblems(distWith({ "assets/index-1.js": "export{};" }), true).join("\n")).toContain(
+      "carries the engine package id",
+    );
   });
 
   it("reports a missing or unusable record rather than guessing", () => {
-    expect(shellProblems(distWith({ "assets/index-1.js": chunkWith(record.package) }, { record: null }), true).join("\n")).toContain("missing or unusable");
-    expect(shellProblems(distWith({ "assets/index-1.js": chunkWith(record.package) }, { record: "{}" }), true).join("\n")).toContain("missing or unusable");
+    expect(
+      shellProblems(distWith({ "assets/index-1.js": chunkWith(record.package) }, { record: null }), true).join("\n"),
+    ).toContain("missing or unusable");
+    expect(
+      shellProblems(distWith({ "assets/index-1.js": chunkWith(record.package) }, { record: "{}" }), true).join("\n"),
+    ).toContain("missing or unusable");
   });
 
   it("fails a bundle that still holds the development-only skip, in any script", () => {
@@ -384,15 +497,14 @@ describe("the other readers of BUILD.json", () => {
   // reader that starts depending on another field should be added to the
   // design's list (section 8) and to this one.
   const root = join(import.meta.dirname, "../..");
-  it.each([
-    "scripts/gen-third-party-notices.ts",
-    "src/build/rustNotices.ts",
-    "src/tests/perfCompare/env.ts",
-  ])("%s reads only `sources`", (file) => {
-    const text = readFileSync(join(root, file), "utf8");
-    expect(text).toContain("BUILD.json");
-    expect(text).toContain("sources");
-  });
+  it.each(["scripts/gen-third-party-notices.ts", "src/build/rustNotices.ts", "src/tests/perfCompare/env.ts"])(
+    "%s reads only `sources`",
+    (file) => {
+      const text = readFileSync(join(root, file), "utf8");
+      expect(text).toContain("BUILD.json");
+      expect(text).toContain("sources");
+    },
+  );
 
   it("a schema 2 record still carries the sources hash they read", () => {
     expect(record.sources).toBe("a".repeat(64));
@@ -413,7 +525,9 @@ describe("shellRevisionProblems", () => {
   it("does not count the worker's own manifest as the shell carrying the revisions", () => {
     const d = pkg();
     mkdirSync(join(d, "assets"), { recursive: true });
-    const manifest = Object.values(revisionsOf(join(d, ENGINE_DIR))).map((revision) => `{url:"x",revision:"${revision}"}`);
+    const manifest = Object.values(revisionsOf(join(d, ENGINE_DIR))).map(
+      (revision) => `{url:"x",revision:"${revision}"}`,
+    );
     writeFileSync(join(d, "sw.js"), `precacheAndRoute([${manifest.join(",")}])`);
     writeFileSync(join(d, "workbox-abc123.js"), manifest.join(","));
     writeFileSync(join(d, "assets/index-1.js"), "x={}");
