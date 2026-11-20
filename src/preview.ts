@@ -5,7 +5,7 @@ import { drawRoom, type RoomCtx } from "@verticopolis/components/render/pixelSpr
 import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
 import { bindViewKinds, findViewKind } from "@verticopolis/components/presentation/viewKinds";
 import { readCatalog } from "@verticopolis/components/binding/catalog";
-import { loadWasmEngine } from "@verticopolis/components/host/rustEngine";
+import { loadGameEngine } from "./engineLoad";
 
 interface Entry {
   label: string;
@@ -146,7 +146,7 @@ function frame() {
  *  readiness: there is no second source for the sizes. */
 async function start(): Promise<void> {
   try {
-    const catalog = readCatalog(await loadWasmEngine(), "modern");
+    const catalog = readCatalog(await loadGameEngine(), "modern");
     bindViewWorld(catalog.world);
     bindViewKinds(catalog);
   } catch (e) {

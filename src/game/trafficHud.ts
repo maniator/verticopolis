@@ -59,7 +59,7 @@ const worstOf = new WeakMap<LandingLines, WaitingLine | null>();
 /** The tower's worst waiting line now, from the renderer's queue projection. */
 function currentWorstLine(app: GameApp): WaitingLine | null {
   const sim = app.engine.sim;
-  const { landings } = sim.crowd.queueView(sim.tower);
+  const { landings } = sim.crowd.queueView();
   let line = worstOf.get(landings);
   if (line === undefined) {
     line = worstLine(landings);

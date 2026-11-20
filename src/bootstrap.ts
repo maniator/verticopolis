@@ -14,7 +14,10 @@ import {
   reloadSoon,
   tabStore,
 } from "./engineCrash/crashReload";
-import { loadWasmEngine, publishRustEngine, rustBootTower } from "@verticopolis/components/host/rustEngine";
+import { publishRustEngine, rustBootTower } from "@verticopolis/engine/host/rustEngine";
+import { loadGameEngine } from "./engineLoad";
+import { useEngineCatalogs } from "./engineRender";
+import { refuseForeignCatalogs } from "@verticopolis/components/presentation/catalogCheck";
 import { openSaves } from "./storage/SaveGame";
 import { BOOT_SEED, bootTower, type BootTower } from "./game/bootTower";
 import { setSlotPopulationReader } from "./storage/slotCensus";
@@ -329,7 +332,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     // The saves open beside the package (`saveStore`), and both are ready
     // before the first save is read.
     const savesOpened = openSaves();
-    const booted = await loadBootEngine({ load: (signal, onBuild) => loadWasmEngine(undefined, signal, { onBuild }) });
+    const booted = await loadBootEngine({ load: (signal, onBuild) => loadGameEngine(signal, { onBuild }) });
     await savesOpened;
     let bootState: EngineBootState = booted.state;
     stopLoadingLine();
@@ -378,7 +381,12 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // installed before the first screen that lists saves can draw.
       setSlotPopulationReader(populationReaderFromModule(wasmModule, (error) => void noteEngineThrow(error, "census")));
       try {
-        tower = rustBootTower(wasmModule, { seed: BOOT_SEED, boot: bootTower });
+        tower = rustBootTower(wasmModule, {
+          seed: BOOT_SEED,
+          boot: bootTower,
+          checkCatalogs: refuseForeignCatalogs,
+          useCatalogs: useEngineCatalogs,
+        });
       } catch (e) {
         tower = null;
         bootState = failBoot(bootState, "start", bootFailureReason(e), e instanceof Error ? e.message : String(e));

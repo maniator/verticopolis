@@ -16,8 +16,8 @@ const wasmStub = vi.hoisted(() => ({
   loadError: null as Error | null,
   module: { Engine: class {}, encodeVctower: () => "" } as unknown,
 }));
-vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
-  const real = await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>();
+vi.mock("@verticopolis/engine/host/rustEngine", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@verticopolis/engine/host/rustEngine")>();
   return {
     ...real,
     loadWasmEngine: vi.fn(async () => {

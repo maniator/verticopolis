@@ -106,7 +106,11 @@ export default defineConfig({
         "./src/styles/help.css",
         "./src/styles/help-schemes.css",
       ],
+      // The components put their CSS in the `vc` layer; Starlight's goes in `starlight`.
+      // This order statement comes first, before any components sheet (a window
+      // module's import lands ahead of customCss), so the components win over Starlight.
       head: [
+        { tag: "style", content: "@layer starlight, vc;" },
         ...sharedHead,
         { tag: "script", content: schemeBootScript() },
         { tag: "script", content: oldAnchorRedirects(OLD_ANCHORS) },

@@ -38,11 +38,11 @@ vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
 // The gallery reads the Rust engine's catalog before it draws. This run has no
 // engine package, so the engine's stand-in answers with the Rust catalog's
 // checked-in fixture; what the page does with it is what these guards watch.
-vi.mock("@verticopolis/components/host/rustEngine", async () => {
+vi.mock("../engineLoad", async () => {
   const { readFileSync } = await import("node:fs");
   const { catalogFixturePath } = await import("./catalogFixture");
   return {
-    loadWasmEngine: async () => ({
+    loadGameEngine: async () => ({
       catalog: (mode: "classic" | "modern") => readFileSync(catalogFixturePath(mode), "utf8"),
     }),
   };

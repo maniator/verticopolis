@@ -41,10 +41,10 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("updateTraffic on the queue projection", () => {
-  it("reads the projection once per refresh with the renderer's tower", () => {
+  it("reads the projection once per refresh", () => {
     const app = fakeApp(() => new Map());
     updateTraffic(app as unknown as GameApp);
-    expect(app.engine.sim.crowd.queueView).toHaveBeenCalledExactlyOnceWith(app.engine.sim.tower);
+    expect(app.engine.sim.crowd.queueView).toHaveBeenCalledExactlyOnceWith();
     expect(label()).toBe("Smooth");
   });
 
