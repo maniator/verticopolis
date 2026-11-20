@@ -76,6 +76,7 @@ describe("importReport", () => {
     expect(said(r.broughtOver)).toContain(
       "2 elevator shafts and 3 stairway/escalator flights",
     );
+    expect(said(r.broughtOver)).toContain("1994 Elevator window settings, kept for a save back to SimTower");
     expect(r.couldNotBring[r.couldNotBring.length - 1]).toBe(
       "Tenant names and finance history aren't imported yet.",
     );
@@ -104,11 +105,15 @@ describe("importReport", () => {
     expect(
       said(importReport(facts({ shafts: 0, flights: 0 })).broughtOver),
     ).toContain("no elevators or stairways built yet");
+    expect(
+      said(importReport(facts({ shafts: 0, flights: 2 })).broughtOver),
+    ).not.toContain("Elevator window settings");
   });
 
   it("leaves the transport line out when the elevator data was not decoded", () => {
     const r = importReport(facts({ decoded: false }));
     expect(said(r.broughtOver)).not.toContain("straight from the save");
+    expect(said(r.broughtOver)).not.toContain("Elevator window settings");
     expect(said(r.couldNotBring)).toContain(
       "rebuilt from your floors (2 shafts)",
     );

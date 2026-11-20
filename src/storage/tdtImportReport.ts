@@ -47,6 +47,10 @@ export function importReport(facts: ImportReportFacts): ImportReport {
         ? `${shafts} elevator shaft${shafts === 1 ? "" : "s"} and ${flights} stairway/escalator flight${flights === 1 ? "" : "s"}, with their stop settings, straight from the save.`
         : "The save had no elevators or stairways built yet.",
     );
+    // The engine keeps each shaft's 1994 settings block for an export (#305).
+    if (shafts > 0) {
+      broughtOver.push("Each elevator's 1994 Elevator window settings, kept for a save back to SimTower (1994); the elevators here run on this game's own schedule.");
+    }
   }
   if (counts.offices > 0) {
     broughtOver.push(`${counts.offices} office${counts.offices === 1 ? "" : "s"} (${counts.occupiedOffices} with tenants).`);
