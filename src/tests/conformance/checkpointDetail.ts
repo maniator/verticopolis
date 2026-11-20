@@ -1,6 +1,6 @@
 /** What the seeded differential compares at a checkpoint beyond the hashes:
  *  the money, the log, and a digest of each top-level field of the full save.
- *  The Rust fuzzer writes the same record (`engine-rs/src/scenario_detail.rs`).
+ *  The Rust fuzzer writes the same record (`src/scenario_detail.rs`).
  *  Not part of the conformance lock. */
 export interface CheckpointDetail {
   label: string;
@@ -18,7 +18,7 @@ export interface CheckpointDetail {
 }
 
 /** The fx slots, in the order every runner writes them. The names are part of
- *  the record: the Rust writer (`engine-rs/src/scenario_detail.rs`) and the
+ *  the record: the Rust writer (`src/scenario_detail.rs`) and the
  *  WASM adapter (`wasmEngine.ts`, which reads the frame header) use the same. */
 export const FX_SLOTS = [
   "santaFxSeq",

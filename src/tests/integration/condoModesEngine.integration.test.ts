@@ -13,7 +13,7 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 const C = Math.floor(LOT_WIDTH / 2);
 /** The price an unpriced condo reads: the engine's band default
- *  (`rent_config` in engine-rs/src/econ.rs), which the Modern catalog
+ *  (`rent_config` in src/econ.rs), which the Modern catalog
  *  publishes as its condo band. */
 function bandDefaultCondoPrice(): number {
   const rent = catalogFacility(catalogFor("modern"), "condo").rent;

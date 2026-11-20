@@ -21,7 +21,7 @@ export function fakeEnginePort(sim: SpiedSim) {
   return {
     generation: vi.fn(() => 0),
     // How the engine cuts owed minutes into steps is its own
-    // (`engine-rs/tests/fixed_step.rs`): this one steps nothing and hands back
+    // (`tests/fixed_step.rs`): this one steps nothing and hands back
     // the carry it was given, unless a test answers otherwise.
     advance: vi.fn((owed: number, _dtMs: number, _minutesPerSecond: number, _steadyClock: boolean, _step: boolean) =>
       Float64Array.of(0, owed),

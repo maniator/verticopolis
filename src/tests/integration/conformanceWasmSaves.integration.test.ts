@@ -160,7 +160,7 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
 
   // The loader table's cases (forged and hand-edited saves) are replayed
   // against their recorded state hashes by the Rust test
-  // `forged_saves_load_to_their_recorded_digests` (engine-rs/src/load/loader_cases.rs).
+  // `forged_saves_load_to_their_recorded_digests` (src/load/loader_cases.rs).
   it("has no loader case still marked as a known divergence", () => {
     expect(cases.filter((c) => c.knownDivergence !== undefined).map((c) => c.id)).toEqual([]);
   });

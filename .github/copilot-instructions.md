@@ -73,6 +73,6 @@ fixes for its findings.
   code bound to one, and names the window and filters it ran over: that
   source's own, or the readout says where they differ and why (`CLAUDE.md`
   non-negotiables, #977).
-- A new facility starts in the Rust engine (`engine-rs/src/facilities.rs` and
+- A new facility starts in the Rust engine (`src/facilities.rs` and
   its catalog, in Verticopolis/engine), never as a render-layer special case. The Rust engine is the
   source of truth for gameplay rules, caps and tuning.

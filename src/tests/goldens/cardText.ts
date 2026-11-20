@@ -107,7 +107,7 @@ export const CARD_TEXT_TICK_MINUTES = 10;
 
 /** The least load the crowded lift must read, in percent, by mode. A Modern
  *  car moves twice as fast (`MODERN_CAR_SPEED` in
- *  `engine-rs/src/rules/elevators.rs`), so the same riders fill it for about
+ *  `src/rules/elevators.rs`), so the same riders fill it for about
  *  half as long, and a full Modern car passes the floors it has no room for
  *  instead of standing there full (`full_cars_pass_hall_calls`), so its
  *  average load reads well under half. Modern residents ride as people, so
@@ -115,7 +115,7 @@ export const CARD_TEXT_TICK_MINUTES = 10;
  *  nobody draws, and it reads lower still (21% today). */
 const CROWDED_LIFT_LEAST_LOAD: Readonly<Record<CardTextMode, number>> = { classic: 80, modern: 15 };
 /** The engine's near-capacity line, in percent (`NEAR_CAPACITY_UTILIZATION`
- *  in `engine-rs/src/panels/elevators.rs`). */
+ *  in `src/panels/elevators.rs`). */
 const NEAR_CAPACITY_PERCENT = 85;
 
 /** Play a case's minutes on an engine that has just loaded its tower. */

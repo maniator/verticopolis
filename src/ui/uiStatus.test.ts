@@ -268,7 +268,7 @@ describe("update", () => {
 
   it("grays out Undo and Redo from the engine's steps on every pump", () => {
     // What the engine holds after an edit, an undo, a redo and a load is its
-    // own (engine-rs/src/sim_undo_tests.rs); the HUD shows whatever it answers.
+    // own (src/sim_undo_tests.rs); the HUD shows whatever it answers.
     const { ui, el } = hud();
     const grayed = () => [el.undo, el.redo].map((b) => b.getAttribute("aria-disabled") === "true");
     const pumped: boolean[][] = [];

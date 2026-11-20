@@ -11,7 +11,7 @@ import { PortSim, describeEngines, type Leg, draftTower, type Draft } from "../p
  */
 
 /** The reading where a floor's tenants start to leave (the Map's Jammed
- *  line, `CONGESTION_CHURN` in `engine-rs/src/panels/heatmap.rs`). */
+ *  line, `CONGESTION_CHURN` in `src/panels/heatmap.rs`). */
 const CHURN = 1.0;
 /** A healthy tower's peak stays under this. */
 const HEALTHY_PEAK = 0.4;

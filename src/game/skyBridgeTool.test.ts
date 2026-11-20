@@ -22,7 +22,7 @@ import {
  * what the ghost's tag says, when a phone's second tap lays the bridge, and the
  * feedback and analytics of `BuildActions.buildSkyBridge`. Whether a gap is a
  * bridge, its price and the laying itself are the engine's
- * (`engine-rs/src/tower/skybridge_tests.rs`, `wasm_port_skybridge_tests.rs`).
+ * (`src/tower/skybridge_tests.rs`, `wasm_port_skybridge_tests.rs`).
  */
 
 /** A port record for `op`, its slots in the engine's layout order. */

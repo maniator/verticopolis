@@ -81,7 +81,7 @@ flowchart LR
 
 - **Time.** `runFrame` (`src/game/frameLoop.ts`) hands the engine the real
   milliseconds, the speed and the carry; the engine paces and steps the owed
-  minutes itself (`engine-rs/src/fixed_step.rs`).
+  minutes itself (`src/fixed_step.rs` in Verticopolis/engine).
 - **The view.** `src/simport/viewReader.ts` decodes the engine's
   `Float64Array`s using the slots and code tables of `viewLayout()`. The
   structure is decoded only when the tower revision moves; the frame patches
@@ -115,7 +115,7 @@ The engine writes and reads every save; the host only keeps the bytes. See
 | `src/engineBinding/` | The binding's declaration (`engine.d.ts`), the method lists and their tiers |
 | `src/simport/` | `EnginePort`, the view reader, typed reads (cards, panels, schedules) |
 | `src/catalog/` | The catalog handle the UI reads prices, sizes and rules from |
-| `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/wasm_port*.rs` in Verticopolis/engine | The Rust side of the binding |
+| `src/wasm.rs`, `src/wasm/`, `src/wasm_port*.rs` in Verticopolis/engine | The Rust side of the binding |
 
 A worker host was tried and not adopted; its record is
 [wasm-worker-host.md](./wasm-worker-host.md).

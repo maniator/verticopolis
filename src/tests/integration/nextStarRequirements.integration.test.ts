@@ -15,10 +15,10 @@ const C = Math.floor(W / 2);
  *  engine's Modern catalog; both modes state the same sizes. */
 const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), kind);
 
-/** The population each star asks for, by star (engine-rs/src/star.rs
+/** The population each star asks for, by star (src/star.rs
  *  `STAR_THRESHOLDS`). */
 const STAR_THRESHOLDS = [0, 0, 300, 1000, 5000, 10000] as const;
-/** The population a 5-star tower needs to become a TOWER (engine-rs/src/star.rs
+/** The population a 5-star tower needs to become a TOWER (src/star.rs
  *  `TOWER_POPULATION`). */
 const TOWER_POPULATION = 15000;
 

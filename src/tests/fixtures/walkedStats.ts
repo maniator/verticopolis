@@ -9,7 +9,7 @@ const facility = (kind: FacilityKind) => catalogFacility(catalogFor("modern"), k
 
 /** The kinds whose census is the count the room carries from the day before:
  *  the daily-visitor venues and the set-audience halls. Mirrors
- *  `census_follows_the_day` in engine-rs/src/economy/visitors.rs. */
+ *  `census_follows_the_day` in src/economy/visitors.rs. */
 const CENSUS_FOLLOWS_THE_DAY: ReadonlySet<FacilityKind> = new Set<FacilityKind>([
   "shop",
   "fastFood",

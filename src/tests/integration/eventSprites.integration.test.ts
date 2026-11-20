@@ -12,7 +12,7 @@ import {
  * canvas draws (no Excalibur actors), so the meaningful checks are (a) they issue
  * draw calls without throwing on a bare 2D context, and (b) the engine-facing
  * signals the renderer polls are transients that never leak into the save (a
- * Rust test since #1875: engine-rs/src/rule_tests/event_fx.rs).
+ * Rust test since #1875: src/rule_tests/event_fx.rs).
  */
 
 /** A recording stand-in for CanvasRenderingContext2D (mirrors renderTransport.test.ts). */

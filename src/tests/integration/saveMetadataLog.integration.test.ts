@@ -145,7 +145,7 @@ describe.skipIf(noEngine)("write-time provenance stamps (savedAt + appVersion)",
 describe.skipIf(noEngine)("bulletin-log persistence through the storage paths", () => {
   // The log's own rules (the tail and its cap, the round trip, the load's
   // hardening, the pre-log fixture) are Rust tests since #1875:
-  // engine-rs/src/rule_tests/save_log.rs.
+  // src/rule_tests/save_log.rs.
   it("the bulletin survives the REAL storage paths: slot save/load and .vctower export/import", async () => {
     localStorage.clear();
     const log = [

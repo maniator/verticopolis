@@ -4,8 +4,8 @@ import { look, must, newEngine, noEngine } from "../portKit/rustEngine";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 
 // The app's undo history on the Rust engine. The stack rules the TypeScript
-// reference's copy checked until #1875 are `engine-rs/src/undo_tests.rs`, and
-// what the undo signature reads is `engine-rs/src/rule_tests/undo_signature.rs`.
+// reference's copy checked until #1875 are `src/undo_tests.rs`, and
+// what the undo signature reads is `src/rule_tests/undo_signature.rs`.
 
 describe.skipIf(noEngine)("the app's history through the port", () => {
   // A refused step's reason is the unit suite's (`appHistory.test.ts`, "shows

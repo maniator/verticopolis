@@ -58,7 +58,7 @@ sound, ask whether it thickens that soundscape or merely announces an event.
 - Every sound is original to Verticopolis, UI effects included: synthesized in
   code, rendered from the project's code, or recorded by the owner. No
   third-party sample or sound pack ships, free or paid (audio plan, principle 9).
-- The engine (`engine-rs/` in Verticopolis/engine) owns gameplay
+- The engine (Verticopolis/engine) owns gameplay
   outcomes and emits gameplay events. It never plays, schedules, or mixes
   sound. Everything audible lives in `src/audio/`, with the call sites in
   `src/game/`.
@@ -189,7 +189,7 @@ ambience.
 
 The engine also emits gameplay events (`star_reached`, `fire_started`,
 `bomb_detonated`, `milestone_reached`, and the rest of
-`engine-rs/src/gameplay/catalog.json`), but audio does not read them yet. The
+`src/gameplay/catalog.json` in Verticopolis/engine), but audio does not read them yet. The
 drain, `Simulation.drainGameplayEvents()`, empties the buffer, and the
 analytics bridge (`src/analyticsEngineBridge.ts`) is its only caller. **Never
 call it from audio code**: a second caller would steal the batch from
@@ -423,7 +423,7 @@ hardware or in a replay.
 - **Celebrations ring the ping bell.** `promote` and `notify` play on the
   ping bell (`strikeBell`); the bloops are for build, sell, click, and error.
 - **The engine stays free of audio.** No playback code or audio dependency
-  enters `engine-rs/`. The engine says what happened and
+  enters Verticopolis/engine. The engine says what happened and
   never what it should sound like.
 - **Audio only reads.** It never calls `drainGameplayEvents()`, never writes
   to the simulation, and never parses log or bulletin text for a cue.

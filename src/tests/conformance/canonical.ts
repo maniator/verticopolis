@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 /**
  * Canonical JSON for the engine conformance suite (conformance/README.md),
- * the text the Rust engine writes in `engine-rs/src/canonical.rs`.
+ * the text the Rust engine writes in `src/canonical.rs`.
  *
  * Every engine that claims parity must reproduce these bytes exactly, so this
  * writes the text itself instead of trusting a JSON library's defaults (a

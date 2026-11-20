@@ -36,7 +36,7 @@ const files = readdirSync(SCENARIO_DIR)
   .sort();
 
 /** The parts of `diagnosticFacts(id)` this run tallies (the full shape is
- *  `DiagnosticFacts` in engine-rs/src/diagnostics/mod.rs). */
+ *  `DiagnosticFacts` in src/diagnostics/mod.rs). */
 interface DiagnosticFacts {
   id: number;
   kind: string;

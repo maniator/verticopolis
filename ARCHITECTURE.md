@@ -18,7 +18,7 @@ Verticopolis is three repositories. The game (this one) installs the other two
 as npm packages and pins their versions in `package.json`:
 
 - **[Verticopolis/engine](https://github.com/Verticopolis/engine)**: the
-  simulation, a deterministic Rust engine (`engine-rs/`) compiled to
+  simulation, a deterministic Rust engine (a crate at its root) compiled to
   WebAssembly and published as `@verticopolis/engine`, with the conformance
   suite (`conformance/`) it is held to and the engine docs site
   (`docs/engine-site/`, served at docs.verticopolis.com). Its README maps every
@@ -52,18 +52,19 @@ scripts/       # build, release, screenshot and perf tooling
 ```
 
 CONTRIBUTING.md → **Where things live** is the full index of every `src/`
-directory. Paths below under `engine-rs/` are in Verticopolis/engine, and
+directory. Rust paths below (the `.rs` files, `src/rules/` and `tests/`) are in
+Verticopolis/engine, and
 `src/render/`, `src/audio/`, `src/simport/`, `src/wasmhost/`,
 `src/engineBinding/` and `src/catalog/` are in Verticopolis/components.
 
 ## The big picture: layers
 
 Verticopolis is a browser game with a **pure, deterministic simulation core**,
-the Rust engine (`engine-rs/` in Verticopolis/engine), compiled to WebAssembly. Everything that talks
+the Rust engine (Verticopolis/engine), compiled to WebAssembly. Everything that talks
 to the browser (rendering, DOM UI, audio, input and storage) is TypeScript and
 reaches the engine only through `EnginePort`. The cardinal rule: **dependencies
 point inward toward the engine, never out.** The engine has no access to the
-DOM, files, network or clock (`engine-rs/tests/independence.rs` enforces it),
+DOM, files, network or clock (`tests/independence.rs` enforces it),
 which is what keeps it headless, deterministic and testable on its own.
 
 ```mermaid
@@ -100,7 +101,7 @@ flowchart TD
         Reader["viewReader<br/>decodes the frame arrays"]
     end
 
-    subgraph engine["Simulation core: engine-rs/ (WASM, no host access)"]
+    subgraph engine["Simulation core: Verticopolis/engine (WASM, no host access)"]
         Sim["Simulation + subsystems"]
     end
 
@@ -141,7 +142,7 @@ loop and pointer input, and calls *back* into `GameApp` through hooks; see
 Excalibur drives a per-frame `onUpdate`. `runFrame` (`src/game/frameLoop.ts`)
 hands the engine the real elapsed milliseconds, the speed's minutes per second
 and the carry owed from the last frame. The engine paces and steps those
-minutes itself (`engine-rs/src/fixed_step.rs`), capping the carry so a slow
+minutes itself (`src/fixed_step.rs`), capping the carry so a slow
 frame never snowballs. The view reader then decodes the new frame, and,
 **throttled to about 6 Hz**, the comparatively expensive DOM and audio surfaces
 refresh so panning stays smooth on a busy tower. Rendering reads the frame
@@ -176,8 +177,8 @@ throw, so steps that already ran are never owed again.
 
 ## Inside the engine: the simulation core
 
-`Simulation` (`engine-rs/src/sim.rs`) owns the tower and its subsystems, each in
-its own module. `Simulation::tick` (`engine-rs/src/sim_loop.rs`) breaks time
+`Simulation` (`src/sim.rs`) owns the tower and its subsystems, each in
+its own module. `Simulation::tick` (`src/sim_loop.rs`) breaks time
 into sub-steps that never skip an hour boundary and fans out to the subsystems.
 State that is never saved (car dispatch, telemetry, housekeeping crews, the
 weather, the renderer's effect counters) is rebuilt from the saved state on
@@ -203,7 +204,7 @@ flowchart LR
     class Sim core
 ```
 
-The engine also publishes the **catalog** (`engine-rs/src/catalog.rs`): every
+The engine also publishes the **catalog** (`src/catalog.rs`): every
 price, size, cap and mode rule a frontend shows. The web UI reads that catalog
 and keeps no table of its own.
 
@@ -211,7 +212,7 @@ and keeps no table of its own.
 
 A tower is founded under an **immutable `GameMode`** (`classic` | `modern`) and
 behavior the two modes disagree on belongs behind the mode's rule methods in
-the Rust engine (`impl GameMode` in `engine-rs/src/rules/`, one file per domain). A subsystem
+the Rust engine (`impl GameMode` in `src/rules/`, one file per domain). A subsystem
 calls `self.mode.<x>()` rather than testing the mode in its own logic, which is
 what stops mode-specific `if` branches from smearing through the simulation.
 The few older subsystems that still test the mode inline are listed, with
@@ -224,9 +225,9 @@ the mode's name are tracked on #1621.
 
 ```mermaid
 flowchart TD
-    Found["Tower founded with GameMode"] --> Rules["impl GameMode<br/>engine-rs/src/rules/"]
+    Found["Tower founded with GameMode"] --> Rules["impl GameMode<br/>src/rules/"]
     Rules --> Sim["subsystems call self.mode.x()"]
-    Rules --> Catalog["catalog rules block<br/>engine-rs/src/catalog.rs"]
+    Rules --> Catalog["catalog rules block<br/>src/catalog.rs"]
     Catalog --> UI["web UI shows what the engine states"]
 ```
 
@@ -240,7 +241,7 @@ engine as an `EnginePort` command. A command answers a result record: whether it
 was done or refused, the money it moved, and the engine's reason for a refusal.
 The engine decides every rule; the host only shows the answer.
 
-Undo and redo live in the engine too (`engine-rs/src/undo.rs`). A gesture opens
+Undo and redo live in the engine too (`src/undo.rs`). A gesture opens
 a journal on its first change, and the step it commits holds only what that
 edit changed (the before-image of each unit and shaft it touched and the cash
 it moved), so a step is as big as its edit, whatever the size of the tower.
@@ -264,8 +265,8 @@ flowchart LR
 
 ## Persistence: saving a tower
 
-The engine writes a tower as save text (`engine-rs/src/sim_save.rs`) and reads
-it back through its loader (`engine-rs/src/load.rs`), which bounds the inflate,
+The engine writes a tower as save text (`src/sim_save.rs`) and reads
+it back through its loader (`src/load.rs`), which bounds the inflate,
 coerces bad values, migrates older saves to the current version and refuses a
 save from a newer build with an "update the game" message. The tower is the
 document: every tower has its own file in **My Towers** (IndexedDB,
@@ -335,12 +336,12 @@ measures what a build ships.
 
 `EnginePort` (`src/simport/enginePort.ts`) is the one synchronous, numeric
 interface the game holds, and the Rust engine implements it directly
-(`engine-rs/src/wasm_port.rs` and its `wasm_port_*` modules):
+(`src/wasm_port.rs` and its `wasm_port_*` modules):
 
 ```mermaid
 flowchart LR
     UI["src/game · src/ui · src/render"] --> Port["EnginePort<br/>(synchronous, numeric)"]
-    Port --> Rust["Engine (Rust → WASM)<br/>engine-rs/src/wasm_port.rs"]
+    Port --> Rust["Engine (Rust → WASM)<br/>src/wasm_port.rs"]
     Render["renderer records"] --> Reader["shared view reader<br/>src/simport/viewReader.ts"]
     Reader --> Port
 ```
@@ -370,10 +371,10 @@ The full contract (every member, the input rules, the exceptions) is
   quality gates, testing & coverage, the architecture conventions in prose,
   versioning, and code review. Its **Where things live** table is the quick
   index of every `src/` directory.
-- **`engine-rs/src/facilities.rs`** (Verticopolis/engine): the source of truth for build caps,
+- **`src/facilities.rs`** (Verticopolis/engine): the source of truth for build caps,
   facility sizes and transport pooling. The Rust engine owns gameplay rules,
   caps and tuning.
-- **`engine-rs/src/sim_loop.rs`**: `Simulation::tick`, the loop the game runs;
+- **`src/sim_loop.rs`**: `Simulation::tick`, the loop the game runs;
   start here to follow a tick.
 - **[Verticopolis/engine](https://github.com/Verticopolis/engine)**: building
   the engine and its toolchain.

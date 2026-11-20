@@ -273,8 +273,8 @@ body it sends, so write it from the form:
   rather than inventing one. Put code detail (files, functions, the backlog
   story id) in the fields; the forms' intro text stays in plain language for
   players. A parity issue names where the canon value lives, such as
-  `engine-rs/src/facilities.rs` (build caps), `engine-rs/src/econ.rs`
-  (economy) or `engine-rs/src/rules/` (mode rules) in Verticopolis/engine,
+  `src/facilities.rs` (build caps), `src/econ.rs` (economy) or
+  `src/rules/` (mode rules) in Verticopolis/engine,
   and whether `PARITY.md`
   lists it.
 - Apply the form's own labels except `needs-triage` when a backlog row gives
@@ -378,7 +378,7 @@ layers, and build cache. Left unattended it balloons the WSL data disk
 
 ## Gameplay model notes
 
-- Facilities are defined in the Rust engine (`engine-rs/src/facilities.rs` in
+- Facilities are defined in the Rust engine (`src/facilities.rs` in
   Verticopolis/engine, published to the frontend through its catalog), the source of
   truth for gameplay rules, caps and tuning. Each has a `width` (in
   tiles) and optional `floors` (height in stories; e.g. the cinema is 2).

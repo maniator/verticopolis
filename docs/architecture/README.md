@@ -9,7 +9,7 @@ diagrams. The pages here go deeper into one system each.
 ```mermaid
 flowchart LR
     subgraph engine["Verticopolis/engine"]
-        Engine["engine-rs/<br/>Rust simulation"]
+        Engine["src/<br/>Rust simulation"]
         Conf["conformance/<br/>the lock the engine is held to"]
         DocsSite["docs/engine-site/<br/>engine docs"]
     end

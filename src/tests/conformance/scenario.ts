@@ -16,7 +16,7 @@ import { CONFORMANCE_ROOT } from "../packagePaths";
 /**
  * The scenario runner for the engine conformance suite. The format and the
  * hash definition are documented in conformance/README.md. The Rust engine
- * runs scenarios natively (`engine-rs/src/scenario.rs`) and through its WASM
+ * runs scenarios natively (`src/scenario.rs`) and through its WASM
  * binding here (`wasmEngine.ts`), and both must produce the locked checkpoints.
  */
 

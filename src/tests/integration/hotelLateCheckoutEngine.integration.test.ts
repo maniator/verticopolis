@@ -6,7 +6,7 @@ import { catalogFacts } from "../portKit/draftFixtures";
  * #304 understaffed housekeeping (AC8) on the Rust engine: a Modern
  * late-checkout room with no maid stays dirty for the rest of the day and is
  * never re-let, like a morning-dirtied room. The other late-checkout cases are
- * Rust tests in `engine-rs/src/rule_tests/hotel_late_checkout.rs`, whose
+ * Rust tests in `src/rule_tests/hotel_late_checkout.rs`, whose
  * `hotel_tower` builds the same tower. This one, with the mode fixed to
  * Modern, hands back a `PortSim` built from the draft, and reads the room
  * width from the engine's catalog.
@@ -20,7 +20,7 @@ import { catalogFacts } from "../portKit/draftFixtures";
 const HOTEL_KIND = "hotelSingle";
 const ROOMS = 10;
 /** The hour of the morning checkout (`Simulation::on_hour`,
- *  `engine-rs/src/sim_loop.rs`). */
+ *  `src/sim_loop.rs`). */
 const HK_CHECKOUT_HOUR = 8;
 /** The first hour of Modern's late-checkout window, 14:00 to 16:59
  *  (`Simulation::on_hour`). */

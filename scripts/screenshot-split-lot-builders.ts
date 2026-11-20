@@ -8,7 +8,7 @@
  * Two Modern towers side by side on one lot, each on its own ground lobby with
  * open ground between them, for the Help site's "How people get around"
  * section (`scripts/scenes/splitLot.ts`): people walk the street from one
- * lobby to the other (`engine-rs/src/crowd/street.rs`).
+ * lobby to the other (`src/crowd/street.rs`).
  *
  * Keep this file ERASABLE (no enums / namespaces / parameter properties).
  */

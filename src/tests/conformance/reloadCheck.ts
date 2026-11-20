@@ -2,7 +2,7 @@ import { digest } from "./canonical";
 
 /**
  * What the `reload` command holds a save round trip to (the Rust runner has
- * the same rule in `engine-rs/src/scenario/reload.rs`).
+ * the same rule in `src/scenario/reload.rs`).
  *
  * The state view must come back unchanged, with one allowed difference: a
  * load adopts every milestone already met, silently, and milestones are only

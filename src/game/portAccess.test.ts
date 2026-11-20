@@ -15,7 +15,7 @@ import { code, frame, mockPort, record, structure } from "../tests/portKit/mockP
  * they make of the answers. The engine's own answers (a build quote and its
  * refusal text, a shaft check, the unlocked mask) are its tests:
  * `lobbyFloorCharge.integration.test.ts` quotes builds on the Rust engine, and
- * `the_unlocked_mask_follows_the_star` (engine-rs/src/view/frame_tests.rs)
+ * `the_unlocked_mask_follows_the_star` (src/view/frame_tests.rs)
  * pins the mask the reader decodes.
  */
 

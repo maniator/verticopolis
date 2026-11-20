@@ -1,7 +1,7 @@
 # Save, load, import and export paths
 
 How a tower is kept, opened and written, as `main` has it. The Rust engine
-(`engine-rs/`) owns what a save means; the web game owns where the bytes are
+(Verticopolis/engine) owns what a save means; the web game owns where the bytes are
 kept. The folder linked on the player's computer has its own page,
 [linked-folder.md](./linked-folder.md).
 
@@ -80,7 +80,7 @@ TypeScript `.vctower` reader or writer outside the named allowances.
 
 ## `.TDT` files
 
-The engine owns the 1994 `.TDT` format: its codec is `engine-rs/src/tdt/`, and
+The engine owns the 1994 `.TDT` format: its codec is `src/tdt/`, and
 the format is written up beside it in Verticopolis/engine,
 [tdt-format.md](https://github.com/Verticopolis/engine/blob/main/docs/tdt/tdt-format.md) for what the values mean and
 [tdt-byte-map.md](https://github.com/Verticopolis/engine/blob/main/docs/tdt/tdt-byte-map.md) for every byte. The game decodes

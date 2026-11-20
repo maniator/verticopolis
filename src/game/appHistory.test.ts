@@ -6,8 +6,8 @@ import { createAppHistory, NO_GESTURE } from "./appHistory";
 /**
  * The app's history over a mock port: the calls it forwards and what it does
  * with the engine's answers. The steps themselves (depths, discard, clear,
- * refusals) are the Rust engine's, checked in `engine-rs/src/sim_undo_tests.rs`
- * and `engine-rs/src/wasm_port_undo_refusal_tests.rs`.
+ * refusals) are the Rust engine's, checked in `src/sim_undo_tests.rs`
+ * and `src/wasm_port_undo_refusal_tests.rs`.
  */
 
 const GENERATION = 4;

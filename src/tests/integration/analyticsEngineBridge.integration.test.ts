@@ -12,7 +12,7 @@ import { look, newEngine, noEngine } from "../portKit/rustEngine";
  * engine still owes after an Undo or a load, and that the bridge folds each
  * event once. The bridge's folding on canned events is unit-tested in
  * `src/analyticsEngineBridge.test.ts`; the queue's hand-off is the engine's
- * (`engine-rs/src/wasm_port_life_tests.rs`).
+ * (`src/wasm_port_life_tests.rs`).
  */
 
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
