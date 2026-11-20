@@ -2,29 +2,21 @@ import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
 import { browserStorage } from "../overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../paletteCollapse";
 import {
-  defaultLayout,
-  fitRect,
-  parseLayout,
+  HELP_LIMITS,
   TOOLS_LIMITS,
   TOWER_LIMITS,
-  type DeskRect,
   type DeskWindowId,
 } from "@verticopolis/components/windows/desk/deskGeometry";
 import { read, write, type Store } from "./deskStore";
 import { DeskTitle } from "./deskTitle";
+import { clearTowerChrome, restoreSteppedDown, towerTitleText, type SteppedDown } from "./deskTower";
 import { buildControlPanel } from "./deskControlPanel";
-import {
-  deskTaskResult,
-  trackDeskClose,
-  trackDeskStartOpen,
-  trackDeskTask,
-  trackDeskTray,
-  trackDeskWindow,
-  trackWindowMenuOpen,
-  trackWindowMenuPick,
-} from "./deskAnalytics";
-import { DeskTaskbar, type TaskEntry } from "./deskTaskbar";
-import { runWindowCommand, windowMenuState } from "@verticopolis/components/windows/desk/deskWindowMenu";
+import { MANUAL_TITLE, ManualWindow, setDeskManual } from "./deskHelpWindow";
+import { watchDeskWindows } from "./deskWatch";
+import { startDeskTaskbar } from "./deskTaskbarWiring";
+import { DESK_LAYOUT_KEY, placeWindows, pullOntoDesk, saveLayout } from "./deskLayout";
+import { deskTaskResult, trackDeskClose, trackDeskTask, trackDeskWindow } from "./deskAnalytics";
+import type { DeskTaskbar, TaskEntry } from "./deskTaskbar";
 import {
   buildFrame,
   DESK_ACTIVE_CLASS,
@@ -65,7 +57,7 @@ export const DESK_CLASS = "desk";
 /** The event the desk sends on the document when it comes up or goes away. */
 export const DESK_CHANGE_EVENT = "vc-desk-change";
 /** Storage keys: the testing switch, the windows' places, the maximized tower. */
-export const DESK_KEY = { enabled: "vc-desk", layout: "vc-desk-places", max: "vc-desk-max" } as const;
+export const DESK_KEY = { enabled: "vc-desk", layout: DESK_LAYOUT_KEY, max: "vc-desk-max" } as const;
 
 /** The stored value `?desk=on` writes: the desk on any screen. */
 export const DESK_ANY_SCREEN = "any";
@@ -78,7 +70,7 @@ export function deskActive(doc: Document = document): boolean {
 }
 
 /** The taskbar order: the tower first, then the small windows. */
-const ORDER: readonly DeskWindowId[] = ["tower", "info", "tools", "map", "bulletin", "towerInfo", "control"];
+const ORDER: readonly DeskWindowId[] = ["tower", "info", "tools", "map", "bulletin", "towerInfo", "control", "help"];
 
 /** One element the desk moved, and where it came from. */
 interface Moved {
@@ -98,11 +90,12 @@ export class DeskController {
   private readonly title: DeskTitle;
   /** Renames the tower window (lit touches its title only when it changed). */
   private setTowerTitle: ((title: string) => void) | null = null;
+  private manual: ManualWindow | null = null;
   private infoFrame: HTMLElement | null = null;
   /** True while the saved maximize comes back at start, which is not a click. */
   private restoring = false;
   /** Small windows the maximized tower pushed below its menu bar. */
-  private readonly steppedDown = new Map<DeskWindowId, { from: DeskRect; to: DeskRect }>();
+  private readonly steppedDown = new Map<DeskWindowId, SteppedDown>();
   private watcher: MutationObserver | null = null;
   private syncControl: (() => void) | null = null;
   private active: DeskWindow | null = null;
@@ -193,7 +186,7 @@ export class DeskController {
     this.desk = desk;
 
     // The tower window: the menu bar, the tower and the status bar.
-    const tower = buildFrame(doc, "desk-win-tower", this.towerTitleText(), {
+    const tower = buildFrame(doc, "desk-win-tower", towerTitleText(this.doc), {
       label: "Close the tower",
       onClick: () => {
         trackDeskClose("tower");
@@ -246,7 +239,7 @@ export class DeskController {
     });
     const add = (s: DeskWindowSpec) => this.wins.set(s.id, new DeskWindow(s));
     add(
-      spec("tower", tower.root, () => this.towerTitleText(), {
+      spec("tower", tower.root, () => towerTitleText(this.doc), {
         layer: "app",
         limits: TOWER_LIMITS,
         canMax: true,
@@ -297,46 +290,54 @@ export class DeskController {
       }),
     );
     this.syncControl = control.sync;
+
+    // The Player's Manual: closed until Help opens a page in it.
+    const manual = new ManualWindow(doc, {
+      closed: () => trackDeskClose("help"),
+      shown: () => this.bringUp("help"),
+    });
+    desk.appendChild(manual.frame.root);
+    add(
+      spec("help", manual.frame.root, () => MANUAL_TITLE, {
+        limits: HELP_LIMITS,
+        canMax: true,
+        isOpen: () => manual.isOpen(),
+        open: () => manual.show("/help/", "game_menu"),
+        close: () => manual.close(),
+      }),
+    );
+    this.manual = manual;
+    setDeskManual(manual);
     const openControl = () => {
       control.open();
       this.bringUp("control");
     };
 
-    this.taskbar = new DeskTaskbar(doc, {
-      task: (id) => this.taskPressed(id as DeskWindowId),
-      start: (itemId) => {
-        trackAppAction("desk_start", itemId);
-        doc.getElementById(itemId)?.click();
-      },
+    this.taskbar = startDeskTaskbar(doc, app, desk, this.wins, {
+      taskPressed: (id) => this.taskPressed(id),
       controlPanel: openControl,
-      opened: () => trackDeskStartOpen("tower"),
-      tray: trackDeskTray,
-      windowMenu: {
-        state: (id) => windowMenuState(this.wins.get(id as DeskWindowId), this.active),
-        run: (id, command) => {
-          trackWindowMenuPick(id, command);
-          runWindowCommand(this.wins.get(id as DeskWindowId), command, (w) =>
-            w.minimized ? this.bringUp(w.spec.id) : this.focus(w),
-          );
-        },
-        opened: (_id, from) => trackWindowMenuOpen(from),
-      },
+      bringUp: (id) => this.bringUp(id),
+      focus: (w) => this.focus(w),
+      active: () => this.active,
     });
-    app.appendChild(this.taskbar.root);
-    // A right-click on a window's title bar opens its window menu, as 1995's did.
-    desk.addEventListener("contextmenu", (e) => {
-      const el = (e.target as Element | null)?.closest?.(".win-title")?.parentElement;
-      const id = el ? [...this.wins].find(([, w]) => w.spec.el === el)?.[0] : undefined;
-      if (id && this.taskbar?.openWindowMenu(id, e.clientX, e.clientY)) e.preventDefault();
-    });
-    this.taskbar.start();
 
     // The small windows start stacked above the tower, in their own order.
     for (const w of this.wins.values()) if (w.spec.layer === "tool") w.spec.el.style.zIndex = String(++this.z);
     this.wins.get("tower")!.spec.el.style.zIndex = "1";
     this.layOut();
     doc.defaultView?.addEventListener("resize", this.onResize);
-    this.watch([palette, map, bulletin, towerInfo, control.root]);
+    this.watcher = watchDeskWindows(
+      doc,
+      [palette, map, bulletin, towerInfo, control.root, manual.frame.root],
+      this.wins,
+      {
+        opened: (id) => this.bringUp(id),
+        closed: (w) => {
+          if (w === this.active) this.focusNext();
+        },
+        refresh: () => this.refresh(),
+      },
+    );
     this.focus(this.wins.get("tower") ?? null, false);
     trackAppActionOnce("desk_shown");
     doc.dispatchEvent(new CustomEvent(DESK_CHANGE_EVENT));
@@ -349,6 +350,9 @@ export class DeskController {
     this.steppedDown.clear();
     this.watcher?.disconnect();
     this.watcher = null;
+    setDeskManual(null);
+    this.manual?.dispose();
+    this.manual = null;
     for (const w of this.wins.values()) w.dispose();
     this.wins.clear();
     this.doc.querySelectorAll(".desk-added").forEach((e) => e.remove());
@@ -372,23 +376,8 @@ export class DeskController {
   // ---------- layout ----------
 
   private layOut(): void {
-    const desk = this.desk;
-    if (!desk) return;
-    const w = desk.clientWidth;
-    const h = desk.clientHeight;
-    const saved = parseLayout(read(this.store, DESK_KEY.layout));
-    // Info's strip takes the width between Tools and the column first, so the
-    // tower opens under it at the height the strip really has.
-    if (this.infoFrame) this.infoFrame.style.width = `${defaultLayout(w, h).info.w}px`;
-    const first = defaultLayout(
-      w,
-      h,
-      this.infoFrame?.offsetHeight || undefined,
-      this.wins.get("map")?.spec.el.offsetHeight || undefined,
-    );
-    for (const [id, win] of this.wins) {
-      win.place(fitRect(saved[id] ?? first[id], w, h, win.spec.limits));
-    }
+    if (!this.desk) return;
+    placeWindows(this.desk, this.store, this.wins, this.infoFrame);
     if (read(this.store, DESK_KEY.max) === "tower") {
       this.restoring = true;
       this.wins.get("tower")?.toggleMax();
@@ -397,56 +386,18 @@ export class DeskController {
   }
 
   /** The browser window changed size: pull every window back onto the desk,
-   *  once per frame at most. A maximized tower already fills it. */
+   *  once per frame at most. */
   private readonly onResize = (): void => {
     const view = this.doc.defaultView;
     if (!view || this.resizeFrame !== null) return;
     this.resizeFrame = view.requestAnimationFrame(() => {
       this.resizeFrame = null;
-      const desk = this.desk;
-      if (!desk) return;
-      for (const win of this.wins.values()) {
-        if (win.maximized || !win.spec.isOpen()) continue;
-        const now = win.rect();
-        const fit = fitRect(now, desk.clientWidth, desk.clientHeight, win.spec.limits);
-        if (fit.x !== now.x || fit.y !== now.y || fit.w !== now.w || fit.h !== now.h) win.place(fit);
-      }
+      if (this.desk) pullOntoDesk(this.desk, this.wins);
     });
   };
 
   private save(): void {
-    const out: Partial<Record<DeskWindowId, DeskRect>> = {};
-    for (const [id, win] of this.wins) if (win.spec.isOpen() && !win.minimized) out[id] = win.rect();
-    const old = parseLayout(read(this.store, DESK_KEY.layout));
-    write(this.store, DESK_KEY.layout, JSON.stringify({ ...old, ...out }));
-  }
-
-  /** A maximized tower keeps its title bar and menus in reach: a small window
-   *  over them steps down below the menu bar while the tower is maximized, and
-   *  steps back up on restore unless the player has moved it since. */
-  private clearTowerChrome(): void {
-    const desk = this.desk;
-    const bar = this.doc.getElementById("menubar");
-    if (!desk || !bar) return;
-    const top = bar.getBoundingClientRect().bottom - desk.getBoundingClientRect().top + 2;
-    for (const [id, win] of this.wins) {
-      if (win.spec.layer !== "tool" || !win.spec.isOpen() || win.minimized) continue;
-      const r = win.rect();
-      if (r.y >= top) continue;
-      const next = fitRect({ ...r, y: top }, desk.clientWidth, desk.clientHeight, win.spec.limits);
-      win.place(next);
-      this.steppedDown.set(id, { from: r, to: win.rect() });
-    }
-  }
-
-  /** The tower is back to its size: the small windows it pushed go back up. */
-  private restoreSteppedDown(): void {
-    for (const [id, { from, to }] of this.steppedDown) {
-      const win = this.wins.get(id);
-      const now = win?.rect();
-      if (win && now && now.x === to.x && now.y === to.y) win.place(from);
-    }
-    this.steppedDown.clear();
+    saveLayout(this.store, this.wins);
   }
 
   // ---------- focus and the taskbar ----------
@@ -497,9 +448,10 @@ export class DeskController {
     if (what === "move" || what === "resize") this.save();
     if (what === "max" || what === "unmax")
       write(this.store, DESK_KEY.max, what === "max" && id === "tower" ? "tower" : "");
-    if (what === "max" && id === "tower") this.clearTowerChrome();
+    if (what === "max" && id === "tower")
+      if (this.desk) clearTowerChrome(this.doc, this.desk, this.wins, this.steppedDown);
     if (what === "unmax" && id === "tower" && this.steppedDown.size) {
-      this.restoreSteppedDown();
+      restoreSteppedDown(this.wins, this.steppedDown);
       this.save();
     }
     if (this.restoring) return;
@@ -512,7 +464,7 @@ export class DeskController {
 
   /** Rebuild the taskbar and the tower's title from the windows' state. */
   private refresh(): void {
-    this.setTowerTitle?.(this.towerTitleText());
+    this.setTowerTitle?.(towerTitleText(this.doc));
     const entries: TaskEntry[] = [];
     for (const id of ORDER) {
       const w = this.wins.get(id);
@@ -526,50 +478,6 @@ export class DeskController {
     }
     this.taskbar?.syncSound();
     this.syncControl?.();
-  }
-
-  /** Hear the game open and close its windows, rename the tower and switch
-   *  the sound, and keep the taskbar in step. */
-  private watch(els: ReadonlyArray<HTMLElement | null>): void {
-    const watcher = new MutationObserver((records) => {
-      for (const r of records) {
-        const target = r.target as HTMLElement;
-        if (r.type !== "attributes") continue;
-        const id = [...this.wins].find(([, w]) => w.spec.el === target)?.[0];
-        if (!id) continue;
-        const w = this.wins.get(id);
-        if (!w) continue;
-        // A window the game just opened comes up in front, unminimized.
-        if (
-          w.spec.isOpen() &&
-          (r.oldValue?.includes(PALETTE_COLLAPSED_CLASS) || (r.attributeName === "hidden" && r.oldValue !== null))
-        )
-          this.bringUp(id);
-        else if (!w.spec.isOpen() && w === this.active) this.focusNext();
-      }
-      this.refresh();
-    });
-    for (const el of els)
-      if (el) watcher.observe(el, { attributes: true, attributeFilter: ["hidden", "class"], attributeOldValue: true });
-    const name = this.doc.getElementById("sb-tower");
-    if (name) watcher.observe(name, { childList: true, characterData: true, subtree: true });
-    const sound = this.doc.getElementById("mb-sound");
-    if (sound) watcher.observe(sound, { attributes: true, attributeFilter: ["aria-checked"] });
-    this.watcher = watcher;
-  }
-
-  // ---------- the tower's name ----------
-
-  /** The tower's name from the status bar ("Tower One · Classic"). */
-  private towerName(): string {
-    const text = this.doc.getElementById("sb-tower")?.textContent ?? "";
-    return text.split(" · ")[0]?.trim() || "Verticopolis";
-  }
-
-  /** The tower window's title, in the period's "Document - Program" form. */
-  private towerTitleText(): string {
-    const name = this.towerName();
-    return name === "Verticopolis" ? name : `${name} - Verticopolis`;
   }
 }
 

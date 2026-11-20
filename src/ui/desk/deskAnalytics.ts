@@ -20,6 +20,7 @@ export const DESK_WINDOW_NAME: Readonly<Record<DeskWindowId, string>> = {
   bulletin: "bulletin",
   towerInfo: "tower_info",
   control: "control_panel",
+  help: "help",
 };
 
 /** The title screen's one window, on its taskbar. */
