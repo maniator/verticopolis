@@ -23,7 +23,7 @@ flowchart TD
     Lane -->|full| E2E["e2e-serial: visual baselines, perf gate"]
     Lane -->|full| E2EG["e2e-general shards<br/>(split by measured time)"]
     Drift --> Shoot["shoot jobs: shards packed by render time,<br/>each shard rendered twice and byte-compared"]
-    Shoot --> Verify["verify-drift: the gallery must match"]
+    Shoot --> Verify["drift-gate: the gallery must match"]
 ```
 
 **Required checks** (branch rules on `main`): `test`, `test-engine (unit)`,
@@ -88,8 +88,10 @@ committed `docs/screenshots/`. The scenes are grouped into shards
 into a few `shoot` jobs by their measured render time (`node
 scripts/screenshot-shards.ts jobs`, longest first, as the browser suite is
 split); each shard keeps its own scenes, its own two-build check and its own
-output folder, and the drift check merges the jobs' uploads before it
-compares. Drift fails `drift-gate`; approving the `commit-on-approval` job
+output folder, and `drift-gate` merges the jobs' uploads, compares them with
+the committed gallery and reports the result in the same job, so the run
+waits for a runner once after the captures instead of twice. Drift fails
+`drift-gate`; approving the `commit-on-approval` job
 commits the regenerated gallery to the branch. See
 [docs/screenshots.md](../screenshots.md).
 
