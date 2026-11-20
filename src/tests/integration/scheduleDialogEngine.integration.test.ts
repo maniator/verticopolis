@@ -9,9 +9,8 @@ import { noEngine } from "../portKit/rustEngine";
 
 /**
  * What the schedule dialog does with the engine's advice, staging and preset
- * answers (#1552). The answers themselves are pinned in
- * `scheduleAuthoring.integration.test.ts` against the Rust engine; here the
- * engine is a stub that answers whatever each test needs, so the dialog is
+ * answers (#1552). The answers themselves, and the binding's refusals, are
+ * pinned in the engine's own tests; here the engine is a stub that answers whatever each test needs, so the dialog is
  * shown to read the answer and nothing else: no hour math, no preset
  * building, no recommendation of its own.
  */
