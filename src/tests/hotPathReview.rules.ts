@@ -34,7 +34,7 @@ export const SURFACES: Record<string, string[]> = {
     "src/render/",
     "src/presentation/",
     "src/catalog/",
-    "src/shared/",
+    "src/model/",
     "src/events/",
     "src/audio/",
   ],

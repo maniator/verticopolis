@@ -48,6 +48,7 @@ const SOURCE = resolve(ROOT, "src/tests/goldens/card-text/classic-winning-tower.
 const TARGET = resolve(CONFORMANCE_ROOT, "fixtures/late-game-classic.vctower");
 
 const { Engine, catalog } = wasm();
+if (!catalog) throw new Error("the tooling engine has no catalog()");
 type Facility = { key: string; width: number; maxCars: number | null };
 const facilities = (JSON.parse(catalog("classic")) as { facilities: Facility[] }).facilities;
 const facility = (key: string) => facilities.find((f) => f.key === key)!;
@@ -93,7 +94,7 @@ type Save = {
   units: SavedUnit[];
   transports: { id: number; kind: string }[];
 };
-const read = (engine: InstanceType<typeof Engine>) => JSON.parse(engine.serialize()) as Save;
+const read = (engine: ReturnType<typeof Engine.newGame>) => JSON.parse(engine.serialize()) as Save;
 const ok = (what: string, json: string) => {
   const r = JSON.parse(json) as { ok: boolean; reason?: string };
   if (!r.ok) throw new Error(`${what}: ${r.reason}`);

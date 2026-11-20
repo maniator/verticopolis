@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "types": ["node", "vitest/globals"],
+    "noEmit": true
+  },
+  "include": ["**/*.ts", "../tools/**/*.ts", "../src/vite-env.d.ts", "../*.d.ts"]
+}

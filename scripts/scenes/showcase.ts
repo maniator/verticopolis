@@ -91,7 +91,7 @@ export const SHOWCASE_SCENES: Scene[] = [
           // Guard on a Settings-only element: a bare #modal wait would be
           // satisfied by the Help dialog the previous shot leaves open.
           await page.waitForSelector("#modal #vol-music", { timeout: 4000 });
-          await page.evaluate(pgAssertSettingsContentVisible, "require-all");
+          await page.evaluate(pgAssertSettingsContentVisible, "require-all" as const);
         },
         wait: 300,
       },
@@ -133,7 +133,7 @@ export const SHOWCASE_SCENES: Scene[] = [
           // Wait on the Modern-only Building toggle, not a bare #modal: it
           // proves the Modern Settings variant (with its extra section) mounted.
           await page.waitForSelector("#modal #set-auto-bridge", { timeout: 4000 });
-          await page.evaluate(pgAssertSettingsContentVisible, "require-all");
+          await page.evaluate(pgAssertSettingsContentVisible, "require-all" as const);
         },
         wait: 300,
       },

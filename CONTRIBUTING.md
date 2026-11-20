@@ -56,7 +56,7 @@ always run everything. Every required check still reports a result on a
 skipped lane.
 
 ```bash
-npm run typecheck   # tsc --noEmit, then the api/ project
+npm run typecheck   # tsc --noEmit, then the api/ project, then scripts/ and tools/
 npm run lint        # eslint src api
 npm test            # vitest run (Tier-1 unit tests)
 npm run build       # production build must succeed
@@ -815,6 +815,7 @@ alone.
 | `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. The `UI` shell delegates to friend-modules: `templates/` (lit-html bodies), `uiDialogs`, `uiPanels`, `uiStatus`, `uiPalette`. |
 | `src/storage/` | Save/load, the `VCZ1:` storage container, `.vctower` file handling. Who owns what, and every path: [`docs/architecture/save-paths.md`](./docs/architecture/save-paths.md). |
 | `api/` | Vercel serverless functions, with their own `tsconfig.json` (typecheck and lint cover them). |
+| `scripts/`, `tools/` | Build, release, screenshot and perf scripts, and the SimTower harness in `tools/simtower/`. `scripts/tsconfig.json` type-checks both under `npm run typecheck`; lint does not cover them yet. |
 | `help-site/` | The player manual (Astro + Starlight), served at help.verticopolis.com. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures, integration suites (`*.integration.test.ts`) and the repository-wide guard tests; unit tests colocate next to their source. |

@@ -12,12 +12,13 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { basename, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { SerializedGame } from "../../src/shared/types";
+import type { SerializedGame } from "@verticopolis/components/shared/types";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
 import { decodeVctowerFile } from "../../src/storage/vctowerContainer";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SAVES = resolve(HERE, "saves");
+// SIMTOWER_SAVES moves the output (the smoke test writes to a scratch folder).
+const SAVES = resolve(process.env.SIMTOWER_SAVES ?? resolve(HERE, "saves"));
 
 function main() {
   const inputs = process.argv.slice(2);
@@ -53,6 +54,7 @@ function main() {
         console.log(`    stays behind: ${behind.length} (${behind.slice(0, 3).join("; ")}${behind.length > 3 ? "; ..." : ""})`);
     } catch (e) {
       console.error(`SKIP ${basename(input)}\n    ${e instanceof Error ? e.message : String(e)}`);
+      process.exitCode = 1;
     }
   }
 }

@@ -21,10 +21,11 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { draftTower } from "../../src/tests/portKit/drafts";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
-import type { FacilityKind, SerializedGame } from "../../src/shared/types";
+import type { FacilityKind, SerializedGame } from "@verticopolis/components/shared/types";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SAVES = resolve(HERE, "saves");
+// SIMTOWER_SAVES moves the output (the smoke test writes to a scratch folder).
+const SAVES = resolve(process.env.SIMTOWER_SAVES ?? resolve(HERE, "saves"));
 
 const TOWER_W = 132;
 const TOP = 11;
