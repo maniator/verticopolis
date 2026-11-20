@@ -14,7 +14,10 @@ flowchart TD
     PR --> Other["Windows smoke · Help site<br/>PR template · Milestone"]
 
     Test --> Lane{"changes job:<br/>which lane?"}
-    Lane -->|full| Fast["test: lint, typecheck, unit + coverage, build,<br/>versions and change notes"]
+    Lane -->|full| Lint["lint and build: lint, typecheck, build,<br/>versions and change notes"]
+    Lane -->|full| Shards["test shards: unit + integration<br/>under coverage, four runners"]
+    Lint --> Fast["test: merges the shard reports,<br/>applies the coverage floors"]
+    Shards --> Fast
     Lane -->|full| EngineLegs["test-engine (unit) · (port-kit)<br/>test-engine (host) shards"]
     Lane -->|full| Tooling["tooling-app: the tooling build"]
     Tooling --> E2E["e2e-serial: visual baselines, perf gate"]
@@ -39,6 +42,12 @@ branch rules.
   the engine and components) and `test.yml` always take the full lane, and so
   does a release branch. A
   skipped job still reports success, so every required check has a status.
+- **Unit tests.** Vitest splits the suites across four `test (shard N of 4)`
+  runners, each writing a blob report with its coverage. The required `test`
+  job merges them, applies the coverage floors from `vite.config.ts` to the
+  whole run, and fails when `lint and build` failed, so lint, typecheck, the
+  build and the change-note check run beside the shards instead of before
+  them.
 - **The engine package.** `npm ci` installs it with the rest of the
   dependencies, at the versions `package.json` pins. `tooling-app` builds the
   tooling app once and hands it to the browser jobs as an artifact.
