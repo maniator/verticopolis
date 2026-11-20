@@ -6,7 +6,8 @@
   "scripts": {
     "sync": "node scripts/sync-assets.mjs",
     "dev": "node scripts/sync-assets.mjs && astro dev",
-    "build": "node scripts/sync-assets.mjs && astro build"
+    "build": "node scripts/sync-assets.mjs && astro build",
+    "typecheck": "astro sync && tsc --noEmit"
   },
   "dependencies": {
     "@astrojs/markdown-satteri": "0.4.9",
