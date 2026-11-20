@@ -122,5 +122,5 @@ Enter does not reopen from its opener (#1842). See `e2e/spacePan.spec.ts`,
 `src/game/inputKeys.test.ts`, `src/game/inputKeysSpace.test.ts`,
 `src/game/inputKeysSpaceHold.test.ts`, `src/game/inputKeysSpaceFocus.test.ts`,
 `src/game/inputKeysPointers.test.ts`, `src/game/engineWiring.test.ts`,
-`src/render/excalibur/towerInputCameraInput.test.ts` and
-`src/ui/uiPalette.test.ts`.
+`src/ui/uiPalette.test.ts`, and
+`src/render/excalibur/towerInputCameraInput.test.ts` in Verticopolis/components.

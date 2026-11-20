@@ -275,8 +275,8 @@ body it sends, so write it from the form:
   players. A parity issue names where the canon value lives, such as
   `src/facilities.rs` (build caps), `src/econ.rs` (economy) or
   `src/rules/` (mode rules) in Verticopolis/engine,
-  and whether `PARITY.md`
-  lists it.
+  and whether its parity checklist
+  (`docs/parity.md` there) lists it.
 - Apply the form's own labels except `needs-triage` when a backlog row gives
   the priority (the P label replaces it), plus the area labels. Use a plain
   title with no `[Bug]:` style prefix.
