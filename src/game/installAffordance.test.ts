@@ -11,6 +11,9 @@ import { __resetPwaInstallForTest, canPromptInstall } from "../pwaInstall";
 import * as analytics from "../analytics";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import type { TemplateResult } from "lit-html";
+import { html } from "lit-html";
+import { drawMenuBar } from "./menuBarHost";
+import { mountPage } from "../ui/testing/litTestUtils";
 
 /** The text of the how-to modal the controller opened, for asserting WHICH
  *  variant (iOS Safari steps vs the generic browser-menu steps) it selected. */
@@ -32,10 +35,12 @@ function openedModalText(app: GameApp): string {
 const CHIP_FLAG = "vc-install-chip-shown";
 
 function mountDom(): void {
-  document.body.innerHTML = `
+  mountPage(html`
+    <div id="menubar-host"></div>
     <button id="btn-install" hidden></button>
-    <button id="btn-install-menu" hidden></button>
-    <dialog id="modal"></dialog>`;
+    <dialog id="modal"></dialog>
+  `);
+  drawMenuBar();
 }
 
 const chip = () => document.getElementById("btn-install") as HTMLButtonElement;
@@ -77,7 +82,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   __resetPwaInstallForTest();
   __resetInstallAffordanceForTest();
-  document.body.innerHTML = "";
+  document.body.replaceChildren();
 });
 
 describe("passive menu entry (CAP-1)", () => {

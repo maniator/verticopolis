@@ -1,6 +1,9 @@
 import { vi } from "vitest";
 import { catalogFor } from "./catalogFixture";
 import { UI, type UICallbacks } from "../ui/UI";
+import { html } from "lit-html";
+import { drawMenuBar } from "../game/menuBarHost";
+import { mountPage } from "../ui/testing/litTestUtils";
 
 /**
  * A real `UI` over a hand-written DOM fixture that lists the ids the `UI`
@@ -40,7 +43,7 @@ if (typeof window.matchMedia !== "function") {
 
 /** Minimal fixture with every id the UI constructor looks up (non-null!). */
 export function mountAppDom(): void {
-  document.body.innerHTML = `
+  mountPage(html`
     <span id="stat-money"></span><span id="stat-pop"></span><span id="stat-star"></span>
     <span id="stat-time"></span><span id="stat-date"></span>
     <div id="speed">
@@ -60,16 +63,16 @@ export function mountAppDom(): void {
     <input id="tower-name" />
     <button id="btn-mode" class="mode-badge is-classic btn">This tower: Classic</button>
     <div id="tower-stats"></div>
-    <button id="btn-stats"></button>
     <div id="log"></div>
     <button id="btn-save-top"></button>
-    <button id="btn-settings"></button>
-    <button id="btn-new"></button><button id="btn-help"></button><button id="btn-about"></button>
+    <div id="menubar-host"></div>
     <div id="inspector" class="win hidden"></div>
     <div id="editor" class="win hidden"></div>
     <div id="toast-wrap"></div>
     <input id="import-file" type="file" hidden />
-    <dialog id="modal"></dialog>`;
+    <dialog id="modal"></dialog>
+  `);
+  drawMenuBar(); // the real bar: Settings, Statistics, New, Help and About are its items
 }
 
 export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks } {

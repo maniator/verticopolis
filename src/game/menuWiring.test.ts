@@ -54,9 +54,9 @@ import {
   TOWER_ONLY_ITEMS,
   TOWER_ONLY_MENUS,
   toggleFullScreen,
-  drawMenuBar,
   wireMenus,
 } from "./menuWiring";
+import { drawMenuBar } from "./menuBarHost";
 
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */

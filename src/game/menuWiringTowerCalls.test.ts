@@ -43,7 +43,8 @@ vi.mock("../ui/overviewMapPrefs", () => ({
   }),
 }));
 
-import { wireMenus, drawMenuBar } from "./menuWiring";
+import { wireMenus } from "./menuWiring";
+import { drawMenuBar } from "./menuBarHost";
 
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */

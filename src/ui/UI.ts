@@ -25,6 +25,7 @@ import { wireBulletinReadBack } from "./bulletinReadBack";
 import type { ModalOpts, ModalPrecedence, NoticeKind } from "@verticopolis/components/windows/modalPrecedence";
 import { ModalShell, type ModalView } from "@verticopolis/components/windows/uiModal";
 import { isEngineStopped } from "../game/interactionState";
+import { onMenuItem } from "../game/menuBarHost";
 
 export type Tool =
   { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" } | { type: "skyBridge" };
@@ -207,14 +208,14 @@ export class UI {
 
     // Quick Save is the top-bar 💾 (index.html); null-safe so a trimmed DOM that omits it does not throw.
     document.getElementById("btn-save-top")?.addEventListener("click", () => this.cb.onSave());
-    document.getElementById("btn-new")!.addEventListener("click", () => this.promptNewTower());
-    document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
-    document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp("game_menu"));
-    document.getElementById("btn-about")!.addEventListener("click", () => this.showAbout());
+    onMenuItem("btn-new", () => this.promptNewTower());
+    onMenuItem("btn-settings", () => this.showSettings());
+    onMenuItem("btn-help", () => this.showHelp("game_menu"));
+    onMenuItem("btn-about", () => this.showAbout());
     this.el.modeBadge.addEventListener("click", (e) => help.showModeHelp(this, e)); // "tell me more"
     help.wireHelpTopics(this); // the problem lines' Help links and F1
     help.wireHelpBar(this); // a game-opened Help page's bar (#2035)
-    document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
+    onMenuItem("btn-stats", () => this.cb.onShowStats());
 
     this.el.towerName.addEventListener("change", () => {
       this.cb.onRenameTower(this.el.towerName.value.trim() || "Tower One");

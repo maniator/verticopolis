@@ -15,7 +15,12 @@
  * items' check marks, grayed and hidden states on the drawn elements by id,
  * as a menu opens.
  */
-import type { MenuBarModel, MenuItemModel, MenuSeparatorModel } from "@verticopolis/components/windows/menuBar";
+import type {
+  MenuBarModel,
+  MenuEntryModel,
+  MenuItemModel,
+  MenuSeparatorModel,
+} from "@verticopolis/components/windows/menuBar";
 
 const sep = (id?: string, className?: string, hidden?: boolean): MenuSeparatorModel => ({
   kind: "separator",
@@ -46,10 +51,29 @@ export interface GameMenuOptions {
   /** GitHub Sponsors, or null where Sponsor is left out (the Android app). */
   readonly sponsorUrl: string | null;
   readonly onSponsor: () => void;
+  /** The pick handler for item `id`: menuBarHost.ts runs the actions the
+   *  game registered for it. */
+  readonly pick: (id: string) => (event: MouseEvent) => void;
+}
+
+/** Give every item with an id and no pick or link of its own the page's
+ *  pick handler, submenus included. */
+function withPicks<E extends MenuEntryModel>(entries: readonly E[], pick: GameMenuOptions["pick"]): E[] {
+  return entries.map((entry) => {
+    if (entry.kind === "separator") return entry;
+    if (entry.kind === "submenu") return { ...entry, items: withPicks(entry.items, pick) };
+    if (!entry.id || entry.onPick || entry.href) return entry;
+    return { ...entry, onPick: pick(entry.id) };
+  });
 }
 
 /** The bar as the page first draws it. */
-export function gameMenuModel({ sponsorUrl, onSponsor }: GameMenuOptions): MenuBarModel {
+export function gameMenuModel({ sponsorUrl, onSponsor, pick }: GameMenuOptions): MenuBarModel {
+  const model = gameMenus({ sponsorUrl, onSponsor });
+  return { ...model, menus: model.menus.map((menu) => ({ ...menu, items: withPicks(menu.items, pick) })) };
+}
+
+function gameMenus({ sponsorUrl, onSponsor }: Omit<GameMenuOptions, "pick">): MenuBarModel {
   return {
     id: "menubar",
     label: "Game menu",

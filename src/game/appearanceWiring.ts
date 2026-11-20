@@ -10,6 +10,7 @@ import {
   shareScheme,
   type SchemeId,
 } from "../ui/appearance/appearancePrefs";
+import { onMenuItem } from "./menuBarHost";
 
 /**
  * The appearance scheme in the game (owner, 2026-11-17): Options >
@@ -65,7 +66,7 @@ export function wireAppearance(
   let scheme = current;
   document.addEventListener("pointerdown", freshenHelpLink, true);
   document.addEventListener("focusin", freshenHelpLink, true);
-  document.getElementById(APPEARANCE_ITEM_ID)?.addEventListener("click", () =>
+  onMenuItem(APPEARANCE_ITEM_ID, () =>
     openAppearanceDialog(app.ui, scheme, (picked) => {
       if (picked === scheme) return;
       scheme = picked;

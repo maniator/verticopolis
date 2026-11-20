@@ -16,6 +16,9 @@ import { trackAppAction, setCommonProps } from "../analytics";
 import { openAppearanceDialog } from "../ui/appearance/appearanceDialog";
 import { shareScheme } from "../ui/appearance/appearancePrefs";
 import { APPEARANCE_ITEM_ID, applyKeptScheme, freshenHelpLink, wireAppearance } from "./appearanceWiring";
+import { html } from "lit-html";
+import { drawMenuBar } from "./menuBarHost";
+import { drawElement, mountPage } from "../ui/testing/litTestUtils";
 
 /** The dialog's OK, as the mocked dialog hands it to the wiring. */
 function okWith(id: string) {
@@ -31,9 +34,8 @@ describe("the appearance wiring", () => {
     vi.clearAllMocks();
     localStorage.clear();
     root = document.createElement("html");
-    const item = document.createElement("button");
-    item.id = APPEARANCE_ITEM_ID;
-    document.body.append(item);
+    mountPage(html`<div id="menubar-host"></div>`);
+    drawMenuBar();
   });
   afterEach(() => document.body.replaceChildren());
 
@@ -85,9 +87,8 @@ describe("the appearance wiring", () => {
   });
 
   it("brings a help link up to date with the worn scheme as it is pressed", () => {
-    const link = document.createElement("a");
-    link.setAttribute("href", "https://help.verticopolis.com/rooms/?from=game&via=stats");
-    link.innerHTML = "<span>Help</span>";
+    const url = "https://help.verticopolis.com/rooms/?from=game&via=stats";
+    const link = drawElement(html`<a href=${url}><span>Help</span></a>`);
     document.body.append(link);
     document.documentElement.setAttribute("data-scheme", "skyline");
     try {

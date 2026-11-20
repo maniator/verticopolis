@@ -33,6 +33,9 @@ vi.mock("../analytics", () => ({ trackAppAction: fake.track }));
 import type { GameApp } from "../main";
 import { RECENT_KEY } from "../storage/recentTowers";
 import { fillRecentMenu, openRecent, recentLabel, wireRecentMenu } from "./recentMenu";
+import { html } from "lit-html";
+import { drawMenuBar } from "./menuBarHost";
+import { mountPage } from "../ui/testing/litTestUtils";
 
 const towers = (n: number, kind: RecentTower["kind"] = "tower"): RecentTower => ({
   place: "towers",
@@ -76,12 +79,12 @@ beforeEach(() => {
   for (const f of [fake.allow, fake.openTowersFile, fake.openLinkedRow, fake.track]) f.mockReset();
   fake.openTowersFile.mockResolvedValue("opened");
   fake.openLinkedRow.mockResolvedValue(true);
-  root = document.createElement("div");
-  root.innerHTML =
-    [1, 2, 3, 4, 5].map((n) => `<button id="mb-recent-${n}" hidden></button>`).join("") +
-    `<button id="mb-recent-none" aria-disabled="true">No recent towers</button>`;
+  // The real bar, drawn from the game's model; root is Open Recent's submenu.
+  mountPage(html`<div id="menubar-host"></div>`);
+  drawMenuBar();
+  root = document.getElementById("mb-recent-menu")!;
   app = { ui: { sayVisibly: vi.fn() } };
-  wireRecentMenu(app as unknown as GameApp, root);
+  wireRecentMenu(app as unknown as GameApp);
 });
 
 describe("File > Open Recent", () => {

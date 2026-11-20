@@ -27,7 +27,7 @@ import { createUICallbacks, type GameAppPorts } from "./game/uiCallbacks";
 import type { UpdateInfo } from "./pwa";
 import type { FrameErrorEntry } from "./game/crashReport";
 import { wireControllers, runBootFlow } from "./game/appBoot";
-import { drawMenuBar } from "./game/menuWiring";
+import { drawMenuBar } from "./game/menuBarHost";
 import { wireEngine } from "./game/engineWiring";
 import { bindKeys } from "./game/inputKeys";
 import { watchLostRelease } from "./game/lostRelease";

@@ -28,6 +28,9 @@ import {
   windowColor,
   wireScreenSaver,
 } from "./screenSaverWiring";
+import { html } from "lit-html";
+import { drawMenuBar } from "./menuBarHost";
+import { mountPage } from "../ui/testing/litTestUtils";
 
 function view() {
   return {
@@ -117,13 +120,12 @@ describe("what the savers read from the tower", () => {
 
 describe("wireScreenSaver", () => {
   beforeEach(() => {
-    const item = document.createElement("button");
-    item.id = SCREEN_SAVER_ITEM_ID;
-    document.body.append(item);
+    mountPage(html`<div id="menubar-host"></div>`);
+    drawMenuBar();
     localStorage.clear();
   });
   afterEach(() => {
-    document.getElementById(SCREEN_SAVER_ITEM_ID)?.remove();
+    document.body.replaceChildren();
     vi.clearAllMocks();
   });
 
@@ -159,10 +161,8 @@ describe("wireScreenSaver", () => {
     (show.mock.calls[0][0] as ScreenSaverOpts).onEnd(1);
     expect(paused.setSpeed).not.toHaveBeenCalled();
     vi.clearAllMocks();
-    document.getElementById(SCREEN_SAVER_ITEM_ID)!.remove();
-    const item = document.createElement("button");
-    item.id = SCREEN_SAVER_ITEM_ID;
-    document.body.append(item);
+    mountPage(html`<div id="menubar-host"></div>`);
+    drawMenuBar();
     const app = appDouble(1);
     dialogPorts(app).preview("stars", vi.fn());
     app.setSpeed(3);
