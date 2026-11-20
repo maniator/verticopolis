@@ -194,4 +194,4 @@ the zeroed-header-count export bug was found).
   shell, not the game). It renders through the disc's WinG runtime.
 - Runs in a Wine **virtual desktop** so WSLg routes mouse input to the window.
 - First launch is slow: it builds a fresh Wine prefix and unpacks the game.
-- Uses current **WineHQ staging** (Debian's Wine 8.0 is too old). See the Dockerfile.
+- Uses current **WineHQ staging** (Debian 12's Wine 8.0 was too old). See the Dockerfile.
