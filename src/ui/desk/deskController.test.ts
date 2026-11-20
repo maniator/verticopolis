@@ -386,10 +386,11 @@ describe("DeskController", () => {
     // The tower maximizing again leaves a maximized Help alone.
     doc.querySelector<HTMLElement>("#desk-win-tower .desk-btn-max")!.click();
     helpMax.click();
-    const top = help.style.top;
+    const size = [help.style.width, help.style.height];
     doc.querySelector<HTMLElement>("#desk-win-tower .desk-btn-max")!.click();
     expect(help.classList.contains("desk-maximized")).toBe(true);
-    expect(help.style.top).toBe(top);
+    expect([help.style.width, help.style.height]).toEqual(size);
+    expect(size).toEqual(["100%", "100%"]);
   });
 
   it("shows a sound toggled from the Control Panel on the tray and the Sounds icon, with no menu opened", async () => {
