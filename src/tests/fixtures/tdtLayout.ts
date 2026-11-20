@@ -7,15 +7,12 @@
 export const TDT_MAGIC = 0x2400;
 export const TDT_HEADER_SIZE = 0x230;
 export const TDT_FLOOR_COUNT = 120;
-export const TDT_TENANT_RECORD_SIZE = 18;
 /** TDT floor index to our floor: `ours = tdt - 9`. */
-export const TDT_FLOOR_OFFSET = 9;
+const TDT_FLOOR_OFFSET = 9;
 /** The New Tower default view-scroll words (header 0x26 and 0x28). */
 export const TDT_DEFAULT_VIEW_X = 1105;
 export const TDT_DEFAULT_VIEW_Y = 3491;
-/** Bytes the writer appends after the stairs table for the game's routing region. */
-export const TDT_ROUTING_TAIL_SIZE = 0x6400;
-export const TDT_ELEVATOR_PER_FLOOR_SIZE = 324;
+const TDT_ELEVATOR_PER_FLOOR_SIZE = 324;
 export const TDT_FLOOR_INDEX_ENTRIES = 94;
 export const TDT_MAX_FILE_BYTES = 4 * 1024 * 1024;
 export const TDT_PERSON_RECORD_SIZE = 16;
@@ -35,7 +32,6 @@ export const TDT_STAIR_SLOTS = 64;
 export const TDT_STAIR_RECORD_SIZE = 10;
 /** The trailer our writer stamps: magic plus a u16 generation. */
 export const TDT_STAMP_MAGIC = "VCTDT";
-export const TDT_STAMP_GENERATION = 3;
 /** The first generation: every shaft sized by its span, express included. */
 export const TDT_STAMP_SPANNED_GENERATION = 1;
 export const TDT_STAMP_SIZE = TDT_STAMP_MAGIC.length + 2;
@@ -57,7 +53,7 @@ export function builtShaftPayloadSize(bottomFloor: number, topFloor: number): nu
 /** The floors an express shaft has an entry for: from its bottom to its top,
  *  the ones at or below the first floor and every multiple of 15 (the sky
  *  lobbies). The 1994 game sizes an express record by this count. */
-export function expressEligibleFloors(bottomFloor: number, topFloor: number): number {
+function expressEligibleFloors(bottomFloor: number, topFloor: number): number {
   let count = 0;
   for (let raw = bottomFloor; raw <= topFloor; raw++) {
     const floor = raw - TDT_FLOOR_OFFSET;
@@ -84,104 +80,4 @@ export function builtShaftPayloadSizeFor(
 ): number {
   const spanned = builtShaftPayloadSize(bottomFloor, topFloor);
   return type === EXPRESS ? builtShaftPayloadSize(1, Math.max(1, servicedCount)) : spanned;
-}
-
-/** The 56-byte per-shaft schedule block every built shaft carries: 14 bytes
- *  0x01, 14 bytes 0x05, 28 bytes 0x00. */
-export const TDT_ELEVATOR_SCHEDULE_DEFAULT: readonly number[] = [
-  ...(Array(14).fill(0x01) as number[]),
-  ...(Array(14).fill(0x05) as number[]),
-  ...(Array(28).fill(0x00) as number[]),
-];
-
-/** One tenant record as it sits in the file (doc section 5). */
-export interface WireTenant {
-  left: number;
-  right: number;
-  type: number;
-  status: number;
-  variant: number;
-  rentRate: number;
-  subtype: number;
-}
-
-/** One filled retail row: its place in the table, floor index, the room's
- *  logical unit id (byte 1), its style (byte 11) and the game's constant
- *  (byte 13, 255 in every row the game writes) (#2044). */
-export interface WireRetailRow {
-  row: number;
-  floor: number;
-  unit: number;
-  style: number;
-  constant: number;
-}
-
-/** One built elevator slot's header fields. */
-export interface WireElevator {
-  type: number;
-  cars: number;
-  x: number;
-  topFloor: number;
-  bottomFloor: number;
-}
-
-/** Byte 0 of an empty retail row. */
-const EMPTY_RETAIL_ROW = 0xff;
-const u16 = (b: Uint8Array, o: number): number => b[o] | (b[o + 1] << 8);
-const u32 = (b: Uint8Array, o: number): number => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
-
-/**
- * A file the exporter wrote, read straight off the wire by fixed offsets: every
- * floor's tenant records, and the built elevator slots (the writer sizes a standard or
- * service shaft by its spanned floors, an express by its eligible floors). It is a ground truth that does not go through
- * the importer.
- */
-export function wireModel(bytes: Uint8Array): {
-  floors: { tenants: WireTenant[] }[];
-  retail: WireRetailRow[];
-  elevators: WireElevator[];
-} {
-  let o = TDT_HEADER_SIZE;
-  const floors: { tenants: WireTenant[] }[] = [];
-  for (let index = 0; index < TDT_FLOOR_COUNT; index++) {
-    const count = u16(bytes, o);
-    const tenants: WireTenant[] = [];
-    for (let k = 0; k < count; k++) {
-      const r = o + 6 + k * TDT_TENANT_RECORD_SIZE;
-      tenants.push({
-        left: u16(bytes, r),
-        right: u16(bytes, r + 2),
-        type: (bytes[r + 4] << 24) >> 24,
-        status: bytes[r + 5],
-        variant: bytes[r + 6],
-        rentRate: bytes[r + 16],
-        subtype: bytes[r + 17],
-      });
-    }
-    floors.push({ tenants });
-    o += 6 + count * TDT_TENANT_RECORD_SIZE + TDT_FLOOR_INDEX_ENTRIES * 2;
-  }
-  o += 4 + u32(bytes, o) * TDT_PERSON_RECORD_SIZE; // people
-  const retail: WireRetailRow[] = [];
-  for (let row = 0; row < TDT_RETAIL_SLOTS; row++, o += TDT_RETAIL_RECORD_SIZE) {
-    if (bytes[o] === EMPTY_RETAIL_ROW) continue;
-    retail.push({ row, floor: bytes[o], unit: bytes[o + 1], style: bytes[o + 11], constant: bytes[o + 13] });
-  }
-  const elevators: WireElevator[] = [];
-  for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
-    const used = bytes[o];
-    const top = bytes[o + 64];
-    const bottom = bytes[o + 65];
-    if (used !== 0)
-      elevators.push({
-        type: bytes[o + 1],
-        cars: bytes[o + 3],
-        x: u16(bytes, o + 62),
-        topFloor: top,
-        bottomFloor: bottom,
-      });
-    const payload = bytes[o + 1] === EXPRESS ? expressPayloadSize(bottom, top) : builtShaftPayloadSize(bottom, top);
-    o += TDT_ELEVATOR_HEADER_SIZE + (used !== 0 ? payload : 0);
-  }
-  return { floors, retail, elevators };
 }

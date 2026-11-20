@@ -97,8 +97,9 @@ none of a `.TDT` itself. Its part is the UI around the engine's calls:
 - **The download.** Export names the file and downloads the bytes
   `port.tdtExport` and `port.tdtFile` give it.
 
-The integration tests (`tdtImport`, `tdtExport`, `tdtRealSaves`) run these
-paths against the real engine package. The engine tests its catalog against
+The `tdtImport` integration test runs these paths against the real engine
+package. The engine tests its export and the real 1997 saves in its own
+Rust suite (`tests/tdt_*.rs` in Verticopolis/engine). The engine tests its catalog against
 the format notes itself.
 
 ## Where the saves are kept
