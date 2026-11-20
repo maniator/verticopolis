@@ -4,7 +4,8 @@
     ".astro/types.d.ts",
     "src/**/*.ts",
     "src/**/*.astro",
-    "astro.config.mjs"
+    "*.mjs",
+    "scripts/*.mjs"
   ],
   "exclude": ["dist"]
 }
