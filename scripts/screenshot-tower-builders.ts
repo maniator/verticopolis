@@ -327,7 +327,12 @@ export function buildScheduleTowerModern(): void {
   // Authored schedule: thin overnight, but a single car at the 08:00 peak, so
   // the Modern advice line has a real shortfall to report (the honesty
   // threshold in scheduleAdvice needs a 2-car gap before it nags).
-  const weekday = hourly.map((v, h) => (h === 8 ? 1 : v >= 0.5 ? 4 : v >= 0.25 ? 3 : 1));
+  const carsFor = (v: number): number => {
+    if (v >= 0.5) return 4;
+    if (v >= 0.25) return 3;
+    return 1;
+  };
+  const weekday = hourly.map((v, h) => (h === 8 ? 1 : carsFor(v)));
   s.tower.setSchedule(std.id, {
     activeCars: { weekday, weekend: weekday.map((v: number) => Math.max(1, v - 1)) },
     waitingCarResponse: 4,

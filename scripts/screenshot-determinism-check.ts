@@ -115,7 +115,7 @@ function runTagged(tag: string, cmd: string, args: string[], opts: SpawnOptions)
       process.stdout.write(`[${tag}] failed to spawn ${cmd}: ${err.message}\n`);
       settle(1);
     });
-    child.on("close", (code, signal) => settle(code == null ? (signal ? 1 : 0) : code));
+    child.on("close", (code, signal) => settle(code ?? (signal ? 1 : 0)));
   });
 }
 
@@ -128,19 +128,16 @@ function stopServer(server: ChildProcess): Promise<void> {
       return resolvePromise();
     }
     let done = false;
-    let backstop: ReturnType<typeof setTimeout> | undefined;
     const finish = (): void => {
       if (done) return;
       done = true;
       // Cancel the SIGKILL backstop the moment the server exits, so it can't fire
       // later against a since-reused PID.
-      if (backstop) clearTimeout(backstop);
+      clearTimeout(backstop);
       liveServers.delete(server);
       resolvePromise();
     };
-    server.once("close", finish);
-    server.kill("SIGTERM");
-    backstop = setTimeout(() => {
+    const backstop = setTimeout(() => {
       try {
         server.kill("SIGKILL");
       } catch {
@@ -149,6 +146,8 @@ function stopServer(server: ChildProcess): Promise<void> {
       finish();
     }, 5_000);
     if (typeof backstop.unref === "function") backstop.unref();
+    server.once("close", finish);
+    server.kill("SIGTERM");
   });
 }
 

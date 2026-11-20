@@ -106,11 +106,9 @@ export function recordAudio(page: Page): AudioResponse[] {
     // Any sound file the page asks for is recorded, listed or not, so one the
     // list lacks shows up as its own path and fails expectAudioFromWorker.
     const sound = /\/audio\/|\.(?:mp3|ogg|wav|m4a|flac|aac|opus|webm)$/i.test(path);
-    const file = AUDIO_ENGINE_CHUNK.test(path)
-      ? "audio engine chunk"
-      : sound
-        ? (AUDIO_RUNTIME_FILES.find((f) => path.endsWith(`/${f}`)) ?? path)
-        : undefined;
+    let file: string | undefined;
+    if (AUDIO_ENGINE_CHUNK.test(path)) file = "audio engine chunk";
+    else if (sound) file = AUDIO_RUNTIME_FILES.find((f) => path.endsWith(`/${f}`)) ?? path;
     if (file) responses.push({ file, ok: r.ok(), fromSW: r.fromServiceWorker() });
   });
   return responses;

@@ -57,7 +57,7 @@ skipped lane.
 
 ```bash
 npm run typecheck   # tsc --noEmit, then the api/ project, then scripts/ and tools/, then e2e/ and the Vite and Playwright configs
-npm run lint        # eslint src api
+npm run lint        # eslint src api scripts tools e2e, with eslint-plugin-lit on src
 npm run format:check  # Prettier; `npm run format` rewrites the files
 npm test            # vitest run (Tier-1 unit tests)
 npm run build       # production build must succeed
@@ -819,7 +819,7 @@ alone.
 | `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. The `UI` shell delegates to friend-modules: `templates/` (lit-html bodies), `uiDialogs`, `uiPanels`, `uiStatus`, `uiPalette`. |
 | `src/storage/` | Save/load, the `VCZ1:` storage container, `.vctower` file handling. Who owns what, and every path: [`docs/architecture/save-paths.md`](./docs/architecture/save-paths.md). |
 | `api/` | Vercel serverless functions, with their own `tsconfig.json` (typecheck and lint cover them). |
-| `scripts/`, `tools/` | Build, release, screenshot and perf scripts, and the SimTower harness in `tools/simtower/`. `scripts/tsconfig.json` type-checks both under `npm run typecheck`; lint does not cover them yet. |
+| `scripts/`, `tools/` | Build, release, screenshot and perf scripts, and the SimTower harness in `tools/simtower/`. `scripts/tsconfig.json` type-checks both under `npm run typecheck`, and `npm run lint` covers them (and `e2e/`) with Node globals. |
 | `help-site/` | The player manual (Astro + Starlight), served at help.verticopolis.com. Its own npm project: `npm run typecheck --prefix help-site` (`astro check`) type-checks its TypeScript and its `.astro` components after `npm ci` in both, and the Help site workflow runs it. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures, integration suites (`*.integration.test.ts`) and the repository-wide guard tests; unit tests colocate next to their source. |

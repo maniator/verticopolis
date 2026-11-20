@@ -117,14 +117,11 @@ export function ghCli() {
     new Promise((resolvePromise, reject) => {
       execFile("gh", args, { maxBuffer: 64 * 1024 * 1024, timeout: 60_000 }, (err, stdout, stderr) => {
         if (!err) return resolvePromise(stdout);
-        const why =
-          err.code === "ENOENT"
-            ? "the gh CLI is not on PATH; install it from https://cli.github.com"
-            : err.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
-              ? "printed more output than expected"
-              : err.killed
-                ? `timed out after a minute${args[0] === "api" ? " (the write may still have landed; the next run checks)" : ""}`
-                : String(stderr).trim() || err.message;
+        let why = String(stderr).trim() || err.message;
+        if (err.code === "ENOENT") why = "the gh CLI is not on PATH; install it from https://cli.github.com";
+        else if (err.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") why = "printed more output than expected";
+        else if (err.killed)
+          why = `timed out after a minute${args[0] === "api" ? " (the write may still have landed; the next run checks)" : ""}`;
         const what = args.filter((a) => !a.startsWith("-")).slice(0, 3);
         const e = new Error(`gh ${what.join(" ")}: ${why}`);
         e.rateLimited = RATE_LIMITED.test(why);
