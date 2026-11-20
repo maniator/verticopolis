@@ -90,9 +90,12 @@ describe("posthog-dashboard planAdditions (add-only sync)", () => {
     expect(plan.add.map((a) => a.spec.name)).toContain("Engine cost per game hour by version, tower size and speed");
   });
 
-  it("adds only the sky bridge looks tile for the real spec list today, because the other overview tiles carry the short id of the insight a run made", () => {
+  it("adds only the per-tower funnel and sky bridge looks tiles for the real spec list today, because the other overview tiles carry the short id of the insight a run made", () => {
     const plan = planAdditions(buildInsights({ newGame: 1 }), [], new Set());
-    expect(plan.add.map((a) => a.spec.name)).toEqual(["Sky bridge looks (Modern)"]);
+    expect(plan.add.map((a) => a.spec.name)).toEqual([
+      "First-tower funnel per tower (24h)",
+      "Sky bridge looks (Modern)",
+    ]);
     expect(plan.added).toEqual([
       "Session FPS by tower size and speed",
       "Engine cost per game hour by version, tower size and speed",
