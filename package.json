@@ -50,12 +50,12 @@
     "postinstall": "node scripts/engine-install.ts"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@vitest/coverage-v8": "^4.1.12",
     "@vitest/ui": "^4.1.12",
     "cross-env": "^10.1.0",
-    "eslint": "^9.39.2",
+    "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-lit": "^2.3.1",
     "globals": "^17.14.0",
@@ -85,6 +85,7 @@
   "overrides": {
     "workbox-build": {
       "glob": "^14.0.6"
-    }
+    },
+    "uri-js": "npm:fast-uri@^3.1.9"
   }
 }

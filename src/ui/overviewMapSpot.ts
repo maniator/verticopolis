@@ -25,7 +25,7 @@ export function storedMapSpot(
   storage: Pick<Storage, "getItem"> | null | undefined,
   layout: MapLayoutClass,
 ): Spot | null {
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = storage ? storage.getItem(MAP_SPOT_STORAGE_KEY[layout]) : null;
   } catch {

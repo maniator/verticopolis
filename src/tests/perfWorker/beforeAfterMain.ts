@@ -89,7 +89,7 @@ function load(repo: string, folder: string): { results: WorkerResults; sha256: s
   try {
     results = JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, "")) as WorkerResults;
   } catch (e) {
-    throw new Error(`${file} is not valid JSON: ${(e as Error).message}`);
+    throw new Error(`${file} is not valid JSON: ${(e as Error).message}`, { cause: e });
   }
   const r = results as Partial<WorkerResults> | null;
   if (

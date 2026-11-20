@@ -58,14 +58,19 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
       // it decoded fine and is simply too big to hold, so say that instead of
       // falling into the version reasoning below.
       if (e instanceof SaveTooLargeError) {
-        throw new Error(`${label}: this .vctower expands to more data than we will hold; it looks crafted, not saved.`);
+        throw new Error(
+          `${label}: this .vctower expands to more data than we will hold; it looks crafted, not saved.`,
+          { cause: e },
+        );
       }
       // Only a version OTHER than 1 can hide here, and only in a file with no
       // separator; with one, the digits are unambiguous and this is simply a
       // damaged v1 file.
       const claimed = /^VCTOWER(\d+)(?=\s|$)/.exec(trimmed)?.[1];
       if (claimed !== undefined && claimed !== "1") {
-        throw new Error(`${label}: unsupported .vctower version (VCTOWER${claimed}; this decoder reads VCTOWER1)`);
+        throw new Error(`${label}: unsupported .vctower version (VCTOWER${claimed}; this decoder reads VCTOWER1)`, {
+          cause: e,
+        });
       }
       // Buffer.from(..., "base64") drops anything outside the alphabet instead
       // of failing, so a truncated or mangled container surfaces as a raw fflate
@@ -77,6 +82,7 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
         claimed === undefined
           ? `${label}: unreadable .vctower (damaged, or a version after VCTOWER1 written without a separating newline): ${detail}`
           : `${label}: damaged .vctower payload (${detail})`,
+        { cause: e },
       );
     }
   }
@@ -118,8 +124,10 @@ export function decodeVctowerFile(bytes: Uint8Array, label = "vctower"): unknown
     );
   } catch (e) {
     if (e instanceof SaveTooLargeError) {
-      throw new Error(`${label}: this .vctower expands to more data than we will hold; it looks crafted, not saved.`);
+      throw new Error(`${label}: this .vctower expands to more data than we will hold; it looks crafted, not saved.`, {
+        cause: e,
+      });
     }
-    throw new Error(`${label}: damaged .vctower payload (${e instanceof Error ? e.message : String(e)})`);
+    throw new Error(`${label}: damaged .vctower payload (${e instanceof Error ? e.message : String(e)})`, { cause: e });
   }
 }

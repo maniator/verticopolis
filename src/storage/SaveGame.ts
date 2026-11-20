@@ -421,11 +421,11 @@ export const SaveGame = {
       // A crafted tiny file can inflate to gigabytes (a decompression bomb);
       // inflate() caps the output and throws this, distinct from "damaged".
       if (err instanceof TowerTooLargeError) {
-        throw new Error("This tower file is too large to open safely.");
+        throw new Error("This tower file is too large to open safely.", { cause: err });
       }
       // Bad base64, corrupt deflate data, mangled UTF-8, or truncated JSON —
       // the container was recognized, so the file is OURS but broken. Say so.
-      throw new Error("This tower file is damaged and can't be read.");
+      throw new Error("This tower file is damaged and can't be read.", { cause: err });
     }
     // The engine parses the save; a text the scan is unsure of is checked
     // here first, and a save the engine refuses is told apart by the caller

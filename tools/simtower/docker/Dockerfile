@@ -21,9 +21,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:0
 
 # WineHQ (current staging) instead of Debian's packaged Wine (8.0 when this was
-# tested; see header).
+# tested; see header). The upgrade pulls Debian security fixes newer than the
+# base image (zlib, for one).
 RUN dpkg --add-architecture i386 \
  && apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends wget ca-certificates gnupg \
  && mkdir -pm755 /etc/apt/keyrings \
  && wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \

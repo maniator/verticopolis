@@ -163,7 +163,7 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
   const mainCommit = run("git", ["rev-parse", "origin/main"], repo);
   const behind = mainCommit ? run("git", ["rev-list", "--count", `HEAD..${mainCommit}`], repo) : null;
   const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string };
-  let playwright: string | null = null;
+  let playwright: string | null;
   try {
     playwright = (
       JSON.parse(readFileSync(join(repo, "node_modules", "playwright-core", "package.json"), "utf8")) as {

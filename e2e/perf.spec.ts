@@ -108,7 +108,7 @@ test.describe("E5-S0 perf gate @perf", () => {
 
     // (B) end-to-end speed under a CPU-throttled profile.
     const client = await page.context().newCDPSession(page);
-    let simMinutesPerRealSecond = 0;
+    let simMinutesPerRealSecond: number;
     try {
       await client.send("Emulation.setCPUThrottlingRate", { rate: CPU_THROTTLE });
       // Resume the real frame loop at full speed: dismiss the splash (it pauses

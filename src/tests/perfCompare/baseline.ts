@@ -40,7 +40,7 @@ const MIN_SHA_LENGTH = 7;
 /** What is wrong with a baseline build, if anything. Reads only files. */
 export function baselineErrors(dist: string): string[] {
   const errors: string[] = [];
-  let stamp: Partial<BaselineRecord> = {};
+  let stamp: Partial<BaselineRecord>;
   try {
     stamp = JSON.parse(readFileSync(join(dist, BASELINE_STAMP), "utf8")) as Partial<BaselineRecord>;
   } catch {
