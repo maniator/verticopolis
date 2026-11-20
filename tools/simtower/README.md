@@ -102,6 +102,13 @@ back to a blank frame).
 Saves you make in the game (File, then Save) land in `saves/` on the host and
 feed straight into the tests below.
 
+The TypeScript tools below write into `tools/simtower/saves/`; set
+`SIMTOWER_SAVES` to write somewhere else. `npm run typecheck` checks them, and
+`src/tests/integration/simtowerTools.integration.test.ts` runs each one into a
+scratch folder and reads the result back with the engine, so a moved import or
+a renamed engine call fails CI instead of the next PC run. That test needs no
+disc and no Wine.
+
 ### Convert one of our towers to `.TDT`
 
 ```bash
