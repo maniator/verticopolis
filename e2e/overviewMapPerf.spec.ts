@@ -154,7 +154,8 @@ function addHotelRooms(): number {
   const s = g.sim.constructor.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
   s.money = 1e9;
   let placed = 0;
-  for (let f = 3; f <= 62; f++) for (let x = 5; x + 4 <= 29; x += 4) if (s.tower.place("hotelSingle", f, x).ok) placed++;
+  for (let f = 3; f <= 62; f++)
+    for (let x = 5; x + 4 <= 29; x += 4) if (s.tower.place("hotelSingle", f, x).ok) placed++;
   g.adoptSim(s, true);
   g.speed = 0;
   return placed;
@@ -220,7 +221,13 @@ test("the Hotel view's hourly repaint on a large tower stays within its ceilings
     const px = bitmap.getContext("2d")!.getImageData(0, 0, bitmap.width, bitmap.height).data;
     let red = 0;
     for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 0 && px[i] > 150 && px[i + 1] < 70 && px[i + 2] < 70) red++;
-    return { hotelRooms: hotels.length, red, steadyMs: median(steady), hourMs: median(hour), repaintMs: median(repaint) };
+    return {
+      hotelRooms: hotels.length,
+      red,
+      steadyMs: median(steady),
+      hourMs: median(hour),
+      repaintMs: median(repaint),
+    };
   });
 
   console.log(`overview map hotel perf: ${JSON.stringify(result)}`);
@@ -296,7 +303,15 @@ test("the Pricing view's reads on a large tower stay within their ceilings", asy
       win.frame();
       repaint.push(performance.now() - t0);
     }
-    return { rooms: g.reader.rooms.length, rows, steadyReads, hourReads, steadyMs: median(steady), hourMs: median(hour), repaintMs: median(repaint) };
+    return {
+      rooms: g.reader.rooms.length,
+      rows,
+      steadyReads,
+      hourReads,
+      steadyMs: median(steady),
+      hourMs: median(hour),
+      repaintMs: median(repaint),
+    };
   });
 
   console.log(`overview map pricing perf: ${JSON.stringify(result)}`);

@@ -81,7 +81,8 @@ function statusProblem(l: PortEditLine, status: number | undefined): string | un
   if (status === undefined) return `a ${l.kind} line with no status`;
   const outcome = outcomeOf(status);
   if (outcome === undefined) return `a ${l.kind} line with the status ${status}, which the contract does not name`;
-  if (outcome === "nothingToStep" && l.kind !== "history") return `a ${l.kind} line with nothing to step, which only an undo or redo answers`;
+  if (outcome === "nothingToStep" && l.kind !== "history")
+    return `a ${l.kind} line with nothing to step, which only an undo or redo answers`;
   if (l.kind === "swap" && outcome !== "done") return "a swap that did not land";
   return undefined;
 }
@@ -129,18 +130,24 @@ export function portEditProblems(start: FrameDayStart, lines: readonly PortEditL
     }
     const still = l.minute === before.minute && l.state === before.state && l.crowd === before.crowd && l.count === 0;
     if (answered && status !== STATUS.done) {
-      if (!still) problems.push(`${at}: ${status === STATUS.nothingToStep ? "nothing to step" : "refused"}, but it moved the tower or drained an event`);
+      if (!still)
+        problems.push(
+          `${at}: ${status === STATUS.nothingToStep ? "nothing to step" : "refused"}, but it moved the tower or drained an event`,
+        );
       if (delta !== undefined && delta !== 0) problems.push(`${at}: refused, but it moved ${delta} in money`);
     }
-    if ((l.kind === "read" || l.kind === "undo step") && !still) problems.push(`${at}: ${l.kind === "read" ? "a read" : "an undo step"} moved the tower or drained an event`);
+    if ((l.kind === "read" || l.kind === "undo step") && !still)
+      problems.push(`${at}: ${l.kind === "read" ? "a read" : "an undo step"} moved the tower or drained an event`);
     if (status === STATUS.done && l.state === before.state) {
       if (delta !== undefined && delta !== 0) problems.push(`${at}: moved ${delta} in money, but not the state`);
       if (l.kind === "history") problems.push(`${at}: took an undo step, but the state did not move`);
     }
   });
   const isPlay = (l: PortEditLine) => l.kind === "play";
-  if (!lines.some((l) => isPlay(l) && typeof l.answer === "object" && l.answer !== null && "hour" in l.answer)) problems.push("plays no hour");
-  if (start.kind === "fixture" && !lines.some((l, i) => i > 0 && isPlay(l) && l.crowd !== lines[i - 1].crowd)) problems.push("the crowd never moves during play");
+  if (!lines.some((l) => isPlay(l) && typeof l.answer === "object" && l.answer !== null && "hour" in l.answer))
+    problems.push("plays no hour");
+  if (start.kind === "fixture" && !lines.some((l, i) => i > 0 && isPlay(l) && l.crowd !== lines[i - 1].crowd))
+    problems.push("the crowd never moves during play");
   return problems;
 }
 
@@ -164,7 +171,9 @@ void LINE_FIELDS_COMPLETE;
  *  that moved. */
 export function writePortEdits(ids: readonly string[], cases: Record<string, PortEditLine[]>): void {
   const body = ids.map((id) => {
-    const rows = cases[id].map((l) => `      ${JSON.stringify(Object.fromEntries(LINE_FIELDS.map((k) => [k, l[k]])))}`).join(",\n");
+    const rows = cases[id]
+      .map((l) => `      ${JSON.stringify(Object.fromEntries(LINE_FIELDS.map((k) => [k, l[k]])))}`)
+      .join(",\n");
     return `    ${JSON.stringify(id)}: [\n${rows}\n    ]`;
   });
   writeGoldenFile(PORT_EDITS_FILE, `{\n  "cases": {\n${body.join(",\n")}\n  }\n}\n`);
@@ -185,7 +194,8 @@ export function firstPortEditDifference(
     const w = want[i];
     if (!g || !w) return `line ${i}: ${g ? "extra" : "missing"} (ran ${got.length}, pinned ${want.length})`;
     const moved = LINE_FIELDS.filter((k) => !mayDiffer(i, k) && canonicalJson(g[k]) !== canonicalJson(w[k]));
-    if (moved.length > 0) return `line ${i} (${w.step}): ${moved.map((k) => `${k} ${canonicalJson(g[k])} != pinned ${canonicalJson(w[k])}`).join(", ")}`;
+    if (moved.length > 0)
+      return `line ${i} (${w.step}): ${moved.map((k) => `${k} ${canonicalJson(g[k])} != pinned ${canonicalJson(w[k])}`).join(", ")}`;
   }
   return null;
 }

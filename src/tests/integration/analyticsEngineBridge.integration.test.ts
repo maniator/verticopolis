@@ -32,7 +32,10 @@ function tower(seed: number) {
   look(engine).money = 1e9;
   const codes = new PortCodes(engine);
   const build = (kind: string, floor: number, x: number) =>
-    expect(engine.buildAt(codes.kind(kind as never), floor, x)[0], `${kind} at ${floor},${x}: ${engine.lastReason()}`).toBe(1);
+    expect(
+      engine.buildAt(codes.kind(kind as never), floor, x)[0],
+      `${kind} at ${floor},${x}: ${engine.lastReason()}`,
+    ).toBe(1);
   return { engine, events: new PortEvents(engine), build };
 }
 

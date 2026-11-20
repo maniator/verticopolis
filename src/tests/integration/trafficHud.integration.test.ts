@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../../main";
 import { jumpFrame, jumpToTraffic, lineSpan, updateTraffic } from "../../game/trafficHud";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
-import { TRAFFIC_LABELS, trafficTier, linePressure, type LineWaitTier } from "@verticopolis/components/presentation/traffic";
+import {
+  TRAFFIC_LABELS,
+  trafficTier,
+  linePressure,
+  type LineWaitTier,
+} from "@verticopolis/components/presentation/traffic";
 import { floorLabel } from "../../ui/floorLabel";
 import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
@@ -43,13 +48,21 @@ function rawLines(engine: EnginePort): Array<[number, number, number, LineWaitTi
 describe.skipIf(!hasWasmPackage())("the traffic chip on the engine", () => {
   it("names the engine's worst line all day, not the floors' remembered waits, and a tap lands on it", () => {
     document.body.innerHTML = `<div id="traffic"><span id="traffic-glyph"></span><span id="traffic-label"></span><span id="traffic-floor"></span></div>`;
-    const engine = wasm().Engine.fromVctower(readFileSync(TOWER, "utf8")) as unknown as EnginePort & { free(): void; tick(m: number): void };
+    const engine = wasm().Engine.fromVctower(readFileSync(TOWER, "utf8")) as unknown as EnginePort & {
+      free(): void;
+      tick(m: number): void;
+    };
     made.push(engine);
     const reader = newViewReader(engine);
     const codes = new PortCodes(engine);
     const sim = newRenderSim(engine, reader);
     const applyView = vi.fn();
-    const app = { engine: { sim, viewWidth: 1280, applyView }, enginePort: engine, lastTrafficTier: 0, frameErrors: [] };
+    const app = {
+      engine: { sim, viewWidth: 1280, applyView },
+      enginePort: engine,
+      lastTrafficTier: 0,
+      frameErrors: [],
+    };
     const label = () => document.getElementById("traffic-label")!.textContent;
     const tag = () => document.getElementById("traffic-floor")!.textContent;
     let named = 0;
@@ -79,7 +92,8 @@ describe.skipIf(!hasWasmPackage())("the traffic chip on the engine", () => {
         // The projection is the step's start: a line that has boarded since
         // has no stretch left, and the tap does nothing rather than light an
         // empty shaft.
-        for (const [s, f] of worst) expect(engine.queueLine(s, f).length, `minute ${minute}: a tap that did nothing had a line to show`).toBe(0);
+        for (const [s, f] of worst)
+          expect(engine.queueLine(s, f).length, `minute ${minute}: a tap that did nothing had a line to show`).toBe(0);
         expect(applyView).not.toHaveBeenCalled();
         continue;
       }
@@ -90,10 +104,18 @@ describe.skipIf(!hasWasmPackage())("the traffic chip on the engine", () => {
       expect(tile, `minute ${minute}: centered on the line`).toBe(jumpFrame(span, 1280).tile);
       // Everyone in the line stands in the band: each person waiting on that
       // floor whose trip card says they wait for this shaft.
-      const riders = sim.crowd.people.filter((p) => p.state === "waiting" && p.floor === floor + 0.5 && codes.slot(engine.personCard(p.id), "personCard", "shaftId") === shaft);
+      const riders = sim.crowd.people.filter(
+        (p) =>
+          p.state === "waiting" &&
+          p.floor === floor + 0.5 &&
+          codes.slot(engine.personCard(p.id), "personCard", "shaftId") === shaft,
+      );
       checked += riders.length;
       for (const p of riders) {
-        expect(p.x, `minute ${minute}: rider ${p.id} of the line stands in ${JSON.stringify(span)}`).toBeGreaterThanOrEqual(span.x);
+        expect(
+          p.x,
+          `minute ${minute}: rider ${p.id} of the line stands in ${JSON.stringify(span)}`,
+        ).toBeGreaterThanOrEqual(span.x);
         expect(p.x, `minute ${minute}: rider ${p.id}`).toBeLessThanOrEqual(span.x + span.width);
       }
       named++;

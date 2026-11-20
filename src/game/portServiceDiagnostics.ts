@@ -20,19 +20,29 @@ const fixOf = (advises: boolean, text: string): string => (advises ? ` ${text}` 
 
 export function hotelRatingLines(rating: string | undefined): Lines {
   if (rating === "counts") return [html`<div style="color:${good}">Counts toward stars: yes.</div>`];
-  if (rating === "excluded") return [html`<div style="color:${bad}">Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income).</div>`];
+  if (rating === "excluded")
+    return [
+      html`<div style="color:${bad}">Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income).</div>`,
+    ];
   return [];
 }
 
-export function hotelConditionLines(condition: string | undefined, days: number, exterminator: boolean, advises: boolean): Lines {
-  if (condition === "dirty") return [
-    html`<div style="color:${bad}">Dirty: the guest checked out, so it can't be re-let until a maid cleans it. Left dirty for ${days} days, it turns infested: cockroaches housekeeping can no longer clear. Staff reach rooms by service elevator or stairs.</div>`,
-  ];
-  if (condition === "infested") return [
-    exterminator && advises
-      ? html`<div style="color:${bad}">Cockroach infested: neglected too long, so housekeeping can no longer clean it. Call an exterminator (clears every room infested at the time you book) or bulldoze this one and rebuild.</div>`
-      : html`<div style="color:${bad}">Cockroach infested: neglected too long. It can't be cleaned.${fixOf(advises, "Bulldoze it and rebuild.")}</div>`,
-  ];
+export function hotelConditionLines(
+  condition: string | undefined,
+  days: number,
+  exterminator: boolean,
+  advises: boolean,
+): Lines {
+  if (condition === "dirty")
+    return [
+      html`<div style="color:${bad}">Dirty: the guest checked out, so it can't be re-let until a maid cleans it. Left dirty for ${days} days, it turns infested: cockroaches housekeeping can no longer clear. Staff reach rooms by service elevator or stairs.</div>`,
+    ];
+  if (condition === "infested")
+    return [
+      exterminator && advises
+        ? html`<div style="color:${bad}">Cockroach infested: neglected too long, so housekeeping can no longer clean it. Call an exterminator (clears every room infested at the time you book) or bulldoze this one and rebuild.</div>`
+        : html`<div style="color:${bad}">Cockroach infested: neglected too long. It can't be cleaned.${fixOf(advises, "Bulldoze it and rebuild.")}</div>`,
+    ];
   return [];
 }
 
@@ -58,15 +68,23 @@ export function housekeepingDisplayLines(c: HousekeepingDisplay, advises: boolea
     html`<div>Fields ${c.maidsPerUnit} maids, each cleaning up to ~${c.roomsPerMaid} rooms a day when travel is short. Tower: ${c.crews} crew${c.crews === 1 ? "" : "s"} (${c.maids} maid${c.maids === 1 ? "" : "s"}) for ${c.rooms} hotel room(s).</div>`,
   ];
   if (c.status === "observedShortfall") {
-    out.push(html`<div style="color:${bad}">Falling behind: ${c.leftover} room(s) went unserved yesterday (${c.cleaned} cleaned).${fixOf(advises, "Add another Housekeeping unit or improve staff transport.")}</div>`);
+    out.push(
+      html`<div style="color:${bad}">Falling behind: ${c.leftover} room(s) went unserved yesterday (${c.cleaned} cleaned).${fixOf(advises, "Add another Housekeeping unit or improve staff transport.")}</div>`,
+    );
   } else if (c.status === "nominalShortfall") {
-    out.push(html`<div style="color:${bad}">Likely under capacity: rooms may pile up dirty.${fixOf(advises, "Add another Housekeeping unit.")}</div>`);
+    out.push(
+      html`<div style="color:${bad}">Likely under capacity: rooms may pile up dirty.${fixOf(advises, "Add another Housekeeping unit.")}</div>`,
+    );
   }
   if (c.hasInfested) {
-    out.push(html`<div style="color:${bad}">${c.infested} room(s) are infested; cleaning can't recover them.${fixOf(advises, c.recovery ? "Call an exterminator, or bulldoze and rebuild." : "Bulldoze and rebuild to clear them.")}</div>`);
+    out.push(
+      html`<div style="color:${bad}">${c.infested} room(s) are infested; cleaning can't recover them.${fixOf(advises, c.recovery ? "Call an exterminator, or bulldoze and rebuild." : "Bulldoze and rebuild to clear them.")}</div>`,
+    );
   }
   if (c.hasOutOfReach) {
-    out.push(html`<div style="color:${bad}">${c.outOfReach} room(s) are out of staff reach and can never be cleaned.${fixOf(advises, "Extend a service elevator or stairs to their floors.")}</div>`);
+    out.push(
+      html`<div style="color:${bad}">${c.outOfReach} room(s) are out of staff reach and can never be cleaned.${fixOf(advises, "Extend a service elevator or stairs to their floors.")}</div>`,
+    );
   }
   return out;
 }
@@ -81,13 +99,16 @@ export interface ParkingDisplay {
 }
 
 export function parkingDisplayLines(c: ParkingDisplay, advises: boolean): Lines {
-  if (c.status === "disconnected") return [
-    html`<div style="color:${bad}">Ramp access: none. This space is dead (no relief).${fixOf(advises, "Chain it to a Parking Ramp.")}</div>`,
-  ];
+  if (c.status === "disconnected")
+    return [
+      html`<div style="color:${bad}">Ramp access: none. This space is dead (no relief).${fixOf(advises, "Chain it to a Parking Ramp.")}</div>`,
+    ];
   if (c.status !== "ramp" && c.status !== "connected") return [];
   const result: Lines = [];
   if (c.status === "connected") result.push(html`<div style="color:${good}">Ramp access: connected.</div>`);
-  result.push(html`<div style="color:${c.shortage ? bad : good}">Parking demand: ${c.total} needed / ${c.have} available (${c.offices} for offices, ${c.suites} for suites).</div>`);
+  result.push(
+    html`<div style="color:${c.shortage ? bad : good}">Parking demand: ${c.total} needed / ${c.have} available (${c.offices} for offices, ${c.suites} for suites).</div>`,
+  );
   return result;
 }
 
@@ -147,7 +168,10 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
  *  working metro platform loses half its trade. Rust decides whether it applies; this only words it. */
 export function commercialLobbyLines(c: ServiceDiagnosticFacts["commercial"], advises: boolean): Lines {
   if (c.lobbyFar !== true) return [];
-  const fix = fixOf(advises, "Keep it within 2 floors of the ground, a sky lobby (every 15th floor) or a working Metro platform.");
+  const fix = fixOf(
+    advises,
+    "Keep it within 2 floors of the ground, a sky lobby (every 15th floor) or a working Metro platform.",
+  );
   return [html`<div style="color:${bad}">Shoppers: too far from a lobby. Traffic is halved.${fix}</div>`];
 }
 
@@ -168,20 +192,40 @@ export function portServiceSections(facts: ServiceDiagnosticFacts, advises: bool
     ),
   ];
   const h = facts.housekeeping;
-  out.push(...housekeepingDisplayLines({
-    status: h.status, crews: h.crews ?? NaN, maids: h.maids ?? NaN,
-    rooms: h.rooms ?? NaN, maidsPerUnit: h.maidsPerUnit ?? NaN,
-    roomsPerMaid: h.roomsPerMaid ?? NaN, cleaned: h.cleaned ?? NaN,
-    leftover: h.leftover ?? NaN, infested: h.infested ?? NaN,
-    outOfReach: h.outOfReach ?? NaN, hasInfested: h.hasInfested === true,
-    hasOutOfReach: h.hasOutOfReach === true, recovery: h.recovery === true,
-  }, advises));
+  out.push(
+    ...housekeepingDisplayLines(
+      {
+        status: h.status,
+        crews: h.crews ?? NaN,
+        maids: h.maids ?? NaN,
+        rooms: h.rooms ?? NaN,
+        maidsPerUnit: h.maidsPerUnit ?? NaN,
+        roomsPerMaid: h.roomsPerMaid ?? NaN,
+        cleaned: h.cleaned ?? NaN,
+        leftover: h.leftover ?? NaN,
+        infested: h.infested ?? NaN,
+        outOfReach: h.outOfReach ?? NaN,
+        hasInfested: h.hasInfested === true,
+        hasOutOfReach: h.hasOutOfReach === true,
+        recovery: h.recovery === true,
+      },
+      advises,
+    ),
+  );
   const p = facts.parking;
-  out.push(...parkingDisplayLines({
-    status: p.status, shortage: p.shortage === true,
-    have: p.have ?? NaN, total: p.total ?? NaN,
-    offices: p.offices ?? NaN, suites: p.suites ?? NaN,
-  }, advises));
+  out.push(
+    ...parkingDisplayLines(
+      {
+        status: p.status,
+        shortage: p.shortage === true,
+        have: p.have ?? NaN,
+        total: p.total ?? NaN,
+        offices: p.offices ?? NaN,
+        suites: p.suites ?? NaN,
+      },
+      advises,
+    ),
+  );
   out.push(...commercialLobbyLines(facts.commercial, advises));
   return { lines: out, trailing: retailDisplayLines(facts.retail) };
 }

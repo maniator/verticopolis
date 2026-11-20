@@ -30,9 +30,16 @@ export function checkAaFolder(name: string, aa: AaMode | null): void {
   const lower = name.toLowerCase();
   if (aa) {
     const other = aa === "ts" ? "wasm" : "ts";
-    if (!lower.includes(`aa-${aa}`)) throw new Error(`--aa ${aa} needs an --out folder name containing aa-${aa}, so the folder cannot be mistaken for a comparison`);
-    if (lower.includes(`aa-${other}`)) throw new Error(`--aa ${aa} cannot write to ${name}, which also names the aa-${other} marker`);
-  } else if (/aa-(ts|wasm)/.test(lower)) throw new Error(`--out ${name} names an A/A folder, but this run is a comparison; pass --aa ts|wasm or pick another name`);
+    if (!lower.includes(`aa-${aa}`))
+      throw new Error(
+        `--aa ${aa} needs an --out folder name containing aa-${aa}, so the folder cannot be mistaken for a comparison`,
+      );
+    if (lower.includes(`aa-${other}`))
+      throw new Error(`--aa ${aa} cannot write to ${name}, which also names the aa-${other} marker`);
+  } else if (/aa-(ts|wasm)/.test(lower))
+    throw new Error(
+      `--out ${name} names an A/A folder, but this run is a comparison; pass --aa ts|wasm or pick another name`,
+    );
 }
 
 /** The report banner that leads an A/A folder. */

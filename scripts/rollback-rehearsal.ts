@@ -23,15 +23,29 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildFactsOf, candidateSaves, loadEnginePackage, nodePackageProblem } from "../src/build/rollbackRehearsalNode.ts";
+import {
+  buildFactsOf,
+  candidateSaves,
+  loadEnginePackage,
+  nodePackageProblem,
+} from "../src/build/rollbackRehearsalNode.ts";
 import { CHURN_HOURS, parseChurn, playChurn, type ChurnMap } from "../src/build/rollbackRehearsalChurn.ts";
-import { buildReport, parseAllowedLosses, preflight, rehearseCase, renderReport } from "../src/build/rollbackRehearsal.ts";
+import {
+  buildReport,
+  parseAllowedLosses,
+  preflight,
+  rehearseCase,
+  renderReport,
+} from "../src/build/rollbackRehearsal.ts";
 import { seedProfile, verifyProfile, AUTOSAVE_WAIT_SECONDS } from "./rollback-rehearsal-browser.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_ALLOWED = join(root, "scripts", "rollback-allowed-losses.json");
 const DEFAULT_HOURS = 24;
-const FIXTURE_DIRS = ["node_modules/@verticopolis/engine/conformance/fixtures", "node_modules/@verticopolis/engine/conformance/fixtures/tdt-reddit"];
+const FIXTURE_DIRS = [
+  "node_modules/@verticopolis/engine/conformance/fixtures",
+  "node_modules/@verticopolis/engine/conformance/fixtures/tdt-reddit",
+];
 
 const fail = (message: string): never => {
   console.error(`rollback-rehearsal: ${message}`);
@@ -43,16 +57,35 @@ const SWITCHES = new Set(["headed"]);
 /** The console line for a passing verify: says plainly when the data-loss check did not run or ran leniently. */
 function passLine(churnUsed: boolean, played: boolean, toReview: number): string {
   if (!played) return "PASS (read only: the data-loss check needs --play-seconds)";
-  if (!churnUsed) return `PASS (LENIENT: no churn.json, so only a dropped top-level field was checked and ${toReview} nested paths are unchecked; run the engine step and verify again)`;
-  return toReview > 0 ? `PASS (${toReview} paths under toReview, within what play alone does, to read before you rely on it)` : "PASS";
+  if (!churnUsed)
+    return `PASS (LENIENT: no churn.json, so only a dropped top-level field was checked and ${toReview} nested paths are unchecked; run the engine step and verify again)`;
+  return toReview > 0
+    ? `PASS (${toReview} paths under toReview, within what play alone does, to read before you rely on it)`
+    : "PASS";
 }
 
-const VALUE_FLAGS = new Set(["ref", "dir", "previous", "candidate", "hours", "only", "out", "allowed", "origin", "profile", "saves", "app-version", "play-seconds", "expect-sha", "churn"]);
+const VALUE_FLAGS = new Set([
+  "ref",
+  "dir",
+  "previous",
+  "candidate",
+  "hours",
+  "only",
+  "out",
+  "allowed",
+  "origin",
+  "profile",
+  "saves",
+  "app-version",
+  "play-seconds",
+  "expect-sha",
+  "churn",
+]);
 
 /** `--name value` pairs after the subcommand, plus the value-less switches above. */
 function flags(args: string[]): Map<string, string> {
   const out = new Map<string, string>();
-  for (let i = 0; i < args.length; ) {
+  for (let i = 0; i < args.length;) {
     const name = args[i];
     if (!name?.startsWith("--")) fail(`expected --name value pairs, got ${args.slice(i).join(" ")}`);
     const key = name!.slice(2);
@@ -102,7 +135,8 @@ if (command === "prepare") {
   run("git", ["fetch", "origin", ref], root);
   if (!existsSync(dir)) run("git", ["worktree", "add", "--detach", dir, "FETCH_HEAD"], root);
   // A folder that is already there must be exactly the requested commit, or the rehearsal would run against a stale build.
-  else if (capture("git", ["rev-parse", "HEAD"], dir) !== capture("git", ["rev-parse", "FETCH_HEAD^{commit}"], root)) fail(`${dir} exists but is not at ${ref}; remove it or choose another --dir`);
+  else if (capture("git", ["rev-parse", "HEAD"], dir) !== capture("git", ["rev-parse", "FETCH_HEAD^{commit}"], root))
+    fail(`${dir} exists but is not at ${ref}; remove it or choose another --dir`);
   // npm ci installs the engine packages a checkout pins. A checkout from
   // before the repository split builds its engine from engine-rs/ instead.
   run("npm", ["ci"], dir);
@@ -113,7 +147,8 @@ if (command === "prepare") {
   }
   console.log(`prepared ${dir}; use it as --previous`);
 } else if (command === "preflight") {
-  if (resolve(need(f, "previous")) === resolve(f.get("candidate") ?? root)) fail("--previous and --candidate are the same folder; the rehearsal needs two different builds");
+  if (resolve(need(f, "previous")) === resolve(f.get("candidate") ?? root))
+    fail("--previous and --candidate are the same folder; the rehearsal needs two different builds");
   const previous = buildFactsOf(need(f, "previous"), "previous");
   const candidate = buildFactsOf(f.get("candidate") ?? root, "candidate");
   process.exit(printFindings(preflight(previous, candidate)) ? 0 : 1);
@@ -122,10 +157,18 @@ if (command === "prepare") {
   const candidateTree = f.get("candidate") ?? root;
   const hours = Number(f.get("hours") ?? DEFAULT_HOURS);
   if (!Number.isFinite(hours) || hours < 0) fail("--hours must be a number of game hours, zero or more");
-  const only = f.get("only")?.split(",").map((n) => n.trim()).filter((n) => n !== "");
+  const only = f
+    .get("only")
+    ?.split(",")
+    .map((n) => n.trim())
+    .filter((n) => n !== "");
   const out = resolve(f.get("out") ?? join(root, ".rollback-rehearsal"));
-  if (resolve(previousTree) === resolve(candidateTree)) fail("--previous and --candidate are the same folder; the rehearsal needs two different builds");
-  for (const [label, tree] of [["previous", previousTree], ["candidate", candidateTree]] as const) {
+  if (resolve(previousTree) === resolve(candidateTree))
+    fail("--previous and --candidate are the same folder; the rehearsal needs two different builds");
+  for (const [label, tree] of [
+    ["previous", previousTree],
+    ["candidate", candidateTree],
+  ] as const) {
     const problem = nodePackageProblem(tree);
     if (problem) fail(`${label}: ${problem}`);
   }
@@ -134,7 +177,12 @@ if (command === "prepare") {
   const candidateFacts = buildFactsOf(candidateTree, "candidate");
   const previous = loadEnginePackage(previousTree, "previous");
   const candidate = loadEnginePackage(candidateTree, "candidate");
-  const saves = candidateSaves(candidate, FIXTURE_DIRS.map((d) => join(resolve(candidateTree), d)), hours, only);
+  const saves = candidateSaves(
+    candidate,
+    FIXTURE_DIRS.map((d) => join(resolve(candidateTree), d)),
+    hours,
+    only,
+  );
   if (saves.length === 0) fail("no fixture saves were found to rehearse");
   const cases = saves.map((s) => rehearseCase(s.name, s.text, previous, candidate, { hours, allowed }));
   const report = buildReport(previousFacts, candidateFacts, hours, cases, allowed);
@@ -150,7 +198,9 @@ if (command === "prepare") {
     try {
       churn[x.name] = playChurn(candidate, x.text, CHURN_HOURS);
     } catch (e) {
-      churnFailures.push(`${x.name}: the candidate could not play this save to find its churn (${e instanceof Error ? e.message : String(e)})`);
+      churnFailures.push(
+        `${x.name}: the candidate could not play this save to find its churn (${e instanceof Error ? e.message : String(e)})`,
+      );
     }
   }
   writeFileSync(join(out, "churn.json"), `${JSON.stringify(churn, null, 2)}\n`);
@@ -162,22 +212,41 @@ if (command === "prepare") {
   process.exit(report.ok && churnFailures.length === 0 ? 0 : 1);
 } else if (command === "seed") {
   const appVersion = f.get("app-version") ?? buildFactsOf(root, "candidate").appVersion;
-  const report = await seedProfile({ origin: need(f, "origin"), profile: resolve(need(f, "profile")), savesDir: resolve(need(f, "saves")), appVersion, headed: f.has("headed") });
+  const report = await seedProfile({
+    origin: need(f, "origin"),
+    profile: resolve(need(f, "profile")),
+    savesDir: resolve(need(f, "saves")),
+    appVersion,
+    headed: f.has("headed"),
+  });
   console.log(JSON.stringify(report, null, 2));
   process.exit(report.engine === "wasm" && !report.failure ? 0 : 1);
 } else if (command === "verify") {
   const playSeconds = Number(f.get("play-seconds") ?? 0);
   if (!Number.isFinite(playSeconds) || playSeconds < 0) fail("--play-seconds must be zero or more");
-  if (playSeconds > 0 && playSeconds < AUTOSAVE_WAIT_SECONDS) fail(`--play-seconds must be at least ${AUTOSAVE_WAIT_SECONDS} so the autosave timer can fire twice, or 0 to only read`);
+  if (playSeconds > 0 && playSeconds < AUTOSAVE_WAIT_SECONDS)
+    fail(
+      `--play-seconds must be at least ${AUTOSAVE_WAIT_SECONDS} so the autosave timer can fire twice, or 0 to only read`,
+    );
   const expectSha = need(f, "expect-sha");
-  if (!/^[0-9a-f]{7,40}$/i.test(expectSha)) fail("--expect-sha must be 7 to 40 hex characters: the commit of the build that is supposed to be running");
+  if (!/^[0-9a-f]{7,40}$/i.test(expectSha))
+    fail("--expect-sha must be 7 to 40 hex characters: the commit of the build that is supposed to be running");
   const savesDir = resolve(need(f, "saves"));
   // The engine step writes churn.json beside the saves folder; without it only a dropped top-level field can fail the rewrite check.
   const churnPath = f.get("churn") ?? join(dirname(savesDir), "churn.json");
   let churn: ChurnMap | undefined;
   if (existsSync(churnPath)) churn = parseChurn(JSON.parse(readFileSync(churnPath, "utf8")));
   else if (f.has("churn")) fail(`${churnPath} does not exist`);
-  const report = await verifyProfile({ origin: need(f, "origin"), profile: resolve(need(f, "profile")), savesDir, churn, playSeconds, allowed: allowedLosses(f), expectSha, headed: f.has("headed") });
+  const report = await verifyProfile({
+    origin: need(f, "origin"),
+    profile: resolve(need(f, "profile")),
+    savesDir,
+    churn,
+    playSeconds,
+    allowed: allowedLosses(f),
+    expectSha,
+    headed: f.has("headed"),
+  });
   const out = f.get("out");
   if (out) {
     mkdirSync(resolve(out), { recursive: true });
@@ -185,8 +254,14 @@ if (command === "prepare") {
   }
   console.log(JSON.stringify(report, null, 2));
   const toReview = report.toReview.reduce((n, r) => n + r.entries.length, 0);
-  console.log(report.ok ? passLine(report.churnUsed, playSeconds > 0, toReview) : `FAIL\n${report.problems.map((p) => `- ${p}`).join("\n")}`);
+  console.log(
+    report.ok
+      ? passLine(report.churnUsed, playSeconds > 0, toReview)
+      : `FAIL\n${report.problems.map((p) => `- ${p}`).join("\n")}`,
+  );
   process.exit(report.ok ? 0 : 1);
 } else {
-  fail(`unknown command ${String(command)}; expected prepare, preflight, engine, seed or verify (see the header of this file)`);
+  fail(
+    `unknown command ${String(command)}; expected prepare, preflight, engine, seed or verify (see the header of this file)`,
+  );
 }

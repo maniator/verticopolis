@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { catalogFor } from "../tests/catalogFixture";
-import { FIRST_PICKED_LOOK, pickedSkyBridgeLook, pickSkyBridgeLook, syncSkyBridgeLookStrip } from "./skyBridgeLookStrip";
+import {
+  FIRST_PICKED_LOOK,
+  pickedSkyBridgeLook,
+  pickSkyBridgeLook,
+  syncSkyBridgeLookStrip,
+} from "./skyBridgeLookStrip";
 
 /** The Sky Bridge tool's look strip: one button per catalog look, shown only
  *  while the tool is armed, the picked look pressed. */
@@ -21,7 +26,9 @@ describe("the bridge look strip", () => {
     expect(strip.hidden).toBe(false);
     const buttons = [...strip.querySelectorAll("button")];
     expect(buttons.map((b) => b.textContent)).toEqual(rule!.looks);
-    expect(buttons.filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent)).toEqual(["Glass Skywalk"]);
+    expect(buttons.filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent)).toEqual([
+      "Glass Skywalk",
+    ]);
   });
 
   it("picks a look on a click and presses it", () => {

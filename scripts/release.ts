@@ -37,7 +37,11 @@ const path = (rel: string) => join(root, rel);
 const read = (rel: string) => readFileSync(path(rel), "utf8");
 const write = (rel: string, text: string) => writeFileSync(path(rel), text);
 const npm = (args: string[]) =>
-  execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", args, { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
+  execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", args, {
+    cwd: root,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
 
 const refuse = (message: string): never => {
   console.error(`release: ${message}`);
@@ -62,7 +66,8 @@ if (!notes || notes.length === 0) refuse(`no pending notes in ${CHANGES_DIR}/, s
 const pending = notes as NonNullable<typeof notes>;
 
 const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-if (!branch.startsWith("release/")) console.warn(`release: on ${branch}; CI checks a release only on a release/ branch`);
+if (!branch.startsWith("release/"))
+  console.warn(`release: on ${branch}; CI checks a release only on a release/ branch`);
 
 const credits = contributorLines(pending);
 const appLevel = highestLevel(pending.map((n) => n.app));
@@ -81,14 +86,26 @@ if (app !== appWas) {
   // only the top line of the update prompt or the changelog sees it.
   const lines = headlineFirst(pending).flatMap((n) => n.player);
   write("CHANGELOG.md", insertSection(read("CHANGELOG.md"), app, lines, credits));
-  if (lines.length > MAX_NOTES) console.warn(`release: ${lines.length} player lines; the update prompt shows ${MAX_NOTES}, so merge some of them in CHANGELOG.md`);
+  if (lines.length > MAX_NOTES)
+    console.warn(
+      `release: ${lines.length} player lines; the update prompt shows ${MAX_NOTES}, so merge some of them in CHANGELOG.md`,
+    );
   const long = lines.filter((l) => l.length > MAX_NOTE_LEN).length;
-  if (long > 0) console.warn(`release: ${long} player line(s) over ${MAX_NOTE_LEN} characters; the update prompt would cut them, so split them in CHANGELOG.md`);
+  if (long > 0)
+    console.warn(
+      `release: ${long} player line(s) over ${MAX_NOTE_LEN} characters; the update prompt would cut them, so split them in CHANGELOG.md`,
+    );
 }
 
 const kept = new Set(notesKeptForCredits(pending, app !== appWas).map((n) => n.file));
-if (kept.size > 0) console.warn(`release: the app does not move, so ${[...kept].join(", ")} stay for the next app release, which credits their Contributors lines`);
+if (kept.size > 0)
+  console.warn(
+    `release: the app does not move, so ${[...kept].join(", ")} stay for the next app release, which credits their Contributors lines`,
+  );
 for (const n of pending) if (!kept.has(n.file)) unlinkSync(path(`${CHANGES_DIR}/${n.file}`));
 console.log(
-  `release: app ${appWas} -> ${app} (${named ? "named" : appLevel}), ${pending.length - kept.size} notes consumed (${pending.filter((n) => !kept.has(n.file)).map((n) => n.file).join(", ")}). Review the changelog, commit, and open the PR from release/${app}.`,
+  `release: app ${appWas} -> ${app} (${named ? "named" : appLevel}), ${pending.length - kept.size} notes consumed (${pending
+    .filter((n) => !kept.has(n.file))
+    .map((n) => n.file)
+    .join(", ")}). Review the changelog, commit, and open the PR from release/${app}.`,
 );

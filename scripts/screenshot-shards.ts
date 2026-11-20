@@ -74,7 +74,29 @@ export const SHARDS: Record<string, string[]> = {
   // are placed-and-frozen with the sim stopped, so neither needs a drawSettle, and
   // the founder pair captures a splash over no tower at all; ~4s for the set, which
   // keeps this shard inside the same ~71s pole as the rest.
-  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic", "schedule-dialog-classic-phone", "compare-escalator-office-modern", "compare-escalator-office-classic", "compare-cinema-modern", "compare-cinema-classic", "boot-no-webgl", "rental-living", "founder-badge", "rental-living-mobile", "founder-badge-mobile"],
+  features: [
+    "overlays",
+    "cleanliness-overlay",
+    "stats",
+    "crash-screen",
+    "basement",
+    "traffic",
+    "lobby-awnings",
+    "update-prompt",
+    "schedule-dialog",
+    "schedule-dialog-express",
+    "schedule-dialog-classic",
+    "schedule-dialog-classic-phone",
+    "compare-escalator-office-modern",
+    "compare-escalator-office-classic",
+    "compare-cinema-modern",
+    "compare-cinema-classic",
+    "boot-no-webgl",
+    "rental-living",
+    "founder-badge",
+    "rental-living-mobile",
+    "founder-badge-mobile",
+  ],
   // ~57s + the two light pricing-modern scenes (one small frozen tower built
   // twice, four DOM panel/dialog shots total; issue #443's Modern fork) + the
   // settings-modern dialog shot (one frozen Modern tower, one modal still),
@@ -88,7 +110,21 @@ export const SHARDS: Record<string, string[]> = {
   // ...plus the four Security scenes (#1886's bomb search and a quiet day):
   // one small frozen tower each, the search run by the engine's own ticks;
   // only the quiet-day lunch crowd settles for a few seconds.
-  showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch", "settings-modern", "returning-player", "returning-player-mobile", "security-search-classic", "security-search-modern", "security-search-joins", "security-search-split", "security-quiet-day"],
+  showcase: [
+    "showcase",
+    "milestones",
+    "sprite-gallery",
+    "pricing-modern",
+    "pricing-modern-batch",
+    "settings-modern",
+    "returning-player",
+    "returning-player-mobile",
+    "security-search-classic",
+    "security-search-modern",
+    "security-search-joins",
+    "security-search-split",
+    "security-quiet-day",
+  ],
   // ~67s: the live-engine scene (its demo shot is drawSettle) + the now-cheap metro
   // + onboarding + the desktop install-affordance shot (a live engine tower with
   // the topbar Install chip surfaced, drawSettle; SPEC-pwa-install).
@@ -101,7 +137,17 @@ export const SHARDS: Record<string, string[]> = {
   // small frozen towers, one to four shots each, about 130s a leg together
   // in CI. They rode in `engine` until that shard passed 4 minutes
   // (November 2026), the slowest capture on a pull request.
-  lobbies: ["tall-lobby-classic", "tall-lobby-modern-sky", "tall-lobby-split-halls", "tall-lobby-flights", "tall-lobby-phone", "venue-flights", "split-lot-street", "sky-bridge", "sky-bridge-looks"],
+  lobbies: [
+    "tall-lobby-classic",
+    "tall-lobby-modern-sky",
+    "tall-lobby-split-halls",
+    "tall-lobby-flights",
+    "tall-lobby-phone",
+    "venue-flights",
+    "split-lot-street",
+    "sky-bridge",
+    "sky-bridge-looks",
+  ],
   // ~71s before the Tools window fit: anchored by the tablet shots (the
   // heaviest drawSettle scene) plus the small scenes + the mobile
   // install-affordance shot (its engine-tower sibling) + the overview Map
@@ -159,7 +205,20 @@ export const SHARDS: Record<string, string[]> = {
   // the rescue helicopter flying in and spraying; two small frozen towers
   // run by the engine's own ticks; its own shard, as new features get.
   "fire-response": ["fire-guards", "fire-helicopter"],
-  misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone", "overview-map-gaps", "overview-map-gaps-phone", "palette-fit"],
+  misc: [
+    "tablet",
+    "mobile",
+    "mobile-landscape",
+    "construction",
+    "crowd",
+    "fire",
+    "install-affordance-mobile",
+    "overview-map",
+    "overview-map-phone",
+    "overview-map-gaps",
+    "overview-map-gaps-phone",
+    "palette-fit",
+  ],
 };
 
 // The shoot jobs. Every shard above keeps its own scenes and its own artifact

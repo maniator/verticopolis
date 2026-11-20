@@ -30,7 +30,11 @@ export function lobbyPickerFor(ui: Pick<UI, "cb" | "tool" | "el">): LobbyHeightP
 }
 
 /** Show the strip while the Lobby tool is armed, with `lobby`'s choice. */
-export function syncLobbyHeightStrip(tool: { type: string; kind?: string }, catalog: Catalog, lobby: LobbyHeightPicker): void {
+export function syncLobbyHeightStrip(
+  tool: { type: string; kind?: string },
+  catalog: Catalog,
+  lobby: LobbyHeightPicker,
+): void {
   const strip = document.getElementById("lobby-height-strip");
   if (!strip) return;
   const armed = tool.type === "build" && tool.kind === "lobby";

@@ -68,7 +68,13 @@ describe("batchPricingTemplate structure and a11y", () => {
 
 describe("batchPricingTemplate reflects state", () => {
   it("shows the preview message and disables Apply when nothing changes", () => {
-    const frag = renderToFragment(batchPricingTemplate(CTX, initialState({ previewMsg: "Set 0 of 5 offices to the default (10,000).", applyDisabled: true }), noop));
+    const frag = renderToFragment(
+      batchPricingTemplate(
+        CTX,
+        initialState({ previewMsg: "Set 0 of 5 offices to the default (10,000).", applyDisabled: true }),
+        noop,
+      ),
+    );
     expect(frag.querySelector("#bp-preview")!.textContent).toContain("Set 0 of 5 offices");
     expect(frag.querySelector<HTMLButtonElement>("#bp-apply")!.disabled).toBe(true);
   });
@@ -95,8 +101,14 @@ describe("batchPricingTemplate reflects state", () => {
 describe("batchPricingTemplate wires its actions inline", () => {
   it("routes the steppers, the price events, the toggles, and the footer", () => {
     const h: BatchPricingHandlers = {
-      onDec: vi.fn(), onInc: vi.fn(), onPriceInput: vi.fn(), onPriceChange: vi.fn(),
-      onModeChange: vi.fn(), onOnlyChange: vi.fn(), onApply: vi.fn(), onCancel: vi.fn(),
+      onDec: vi.fn(),
+      onInc: vi.fn(),
+      onPriceInput: vi.fn(),
+      onPriceChange: vi.fn(),
+      onModeChange: vi.fn(),
+      onOnlyChange: vi.fn(),
+      onApply: vi.fn(),
+      onCancel: vi.fn(),
     };
     const frag = renderToFragment(batchPricingTemplate(CTX, initialState(), h));
     click(frag.querySelector('[data-bp="dec"]')!);
@@ -126,7 +138,15 @@ function classicRungs(kind: "office" | "condo"): readonly PriceRung[] {
 }
 
 const baseResult = (over: Partial<BatchRentResult> = {}): BatchRentResult => ({
-  matched: 5, eligible: 5, changed: 3, skippedSold: 0, skippedCustom: 0, customOverwritten: 0, clampedLow: 0, clampedHigh: 0, ...over,
+  matched: 5,
+  eligible: 5,
+  changed: 3,
+  skippedSold: 0,
+  skippedCustom: 0,
+  customOverwritten: 0,
+  clampedLow: 0,
+  clampedHigh: 0,
+  ...over,
 });
 
 describe("batchPriceText", () => {
@@ -143,7 +163,9 @@ describe("batchPreviewMessage reproduces the honest count sentence", () => {
 
   it("appends the skipped-custom, sold, and overwrite clauses (with pluralization)", () => {
     const one = batchPreviewMessage(CTX, 12000, baseResult({ skippedCustom: 2, customOverwritten: 1, skippedSold: 4 }));
-    expect(one).toBe("Set 3 of 5 offices to $12,000. 2 custom-priced left as-is. 1 custom price will be overwritten. 4 sold skipped.");
+    expect(one).toBe(
+      "Set 3 of 5 offices to $12,000. 2 custom-priced left as-is. 1 custom price will be overwritten. 4 sold skipped.",
+    );
     const many = batchPreviewMessage(CTX, 12000, baseResult({ customOverwritten: 3 }));
     expect(many).toContain("3 custom prices will be overwritten.");
   });
@@ -187,12 +209,13 @@ describe("batchRungTemplate (the Classic ladder variant, ux-pricing-split-editor
   });
 
   it("relabels the primary to Confirm No Rate while armed", () => {
+    expect(renderToFragment(batchRungTemplate(RCTX, rstate(), rnoop)).querySelector("#bp-apply")!.textContent).toBe(
+      "Apply",
+    );
     expect(
-      renderToFragment(batchRungTemplate(RCTX, rstate(), rnoop)).querySelector("#bp-apply")!.textContent,
-    ).toBe("Apply");
-    expect(
-      renderToFragment(batchRungTemplate(RCTX, rstate({ choice: "noRate", noRateArmed: true }), rnoop))
-        .querySelector("#bp-apply")!.textContent,
+      renderToFragment(batchRungTemplate(RCTX, rstate({ choice: "noRate", noRateArmed: true }), rnoop)).querySelector(
+        "#bp-apply",
+      )!.textContent,
     ).toBe("Confirm No Rate");
   });
 

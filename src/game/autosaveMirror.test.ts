@@ -7,12 +7,20 @@ const m = vi.hoisted(() => ({
   access: "granted" as string | null,
   link: "L1" as string | null,
   saveOver: vi.fn(async (id: string) => ({ id, name: "x", kind: "tower", size: 2, modified: 0 })),
-  saveNew: vi.fn(async (name: string, _bytes?: Uint8Array) => ({ id: `${name} (2).vctower`, name: `${name} (2)`, kind: "tower", size: 2, modified: 0 })),
+  saveNew: vi.fn(async (name: string, _bytes?: Uint8Array) => ({
+    id: `${name} (2).vctower`,
+    name: `${name} (2)`,
+    kind: "tower",
+    size: 2,
+    modified: 0,
+  })),
   tower: "T1" as string | null,
   linkedTower: null as string | null,
 }));
 vi.mock("./currentFile", () => ({ currentFileId: () => m.tower, currentLinkedFile: () => m.linkedTower }));
-vi.mock("../storage/fileSpace", () => ({ fileSpace: { get: (id: string) => ({ id, name: id === "T1" ? "Sky" : "Moon" }) } }));
+vi.mock("../storage/fileSpace", () => ({
+  fileSpace: { get: (id: string) => ({ id, name: id === "T1" ? "Sky" : "Moon" }) },
+}));
 vi.mock("../analytics", () => ({ trackAppActionOnce: m.once }));
 vi.mock("./autosaveSchedule", () => ({ autosaveLive: m.live }));
 vi.mock("./portLifecycle", () => ({ saveBytes: m.saveBytes }));
@@ -26,7 +34,15 @@ vi.mock("../storage/linkedFolder", () => ({
 }));
 
 import { decodeVctowerFile } from "../storage/vctowerContainer";
-import { forgetMirrorFile, MIRROR_EVERY_MS, mirrorAutosave, mirrorOn, resetMirrorForTests, setMirror, writeLinkedTower } from "./autosaveMirror";
+import {
+  forgetMirrorFile,
+  MIRROR_EVERY_MS,
+  mirrorAutosave,
+  mirrorOn,
+  resetMirrorForTests,
+  setMirror,
+  writeLinkedTower,
+} from "./autosaveMirror";
 
 /** The save a written file holds. */
 const holds = (bytes: unknown) => decodeVctowerFile(bytes as Uint8Array);
@@ -57,7 +73,10 @@ describe("the copy of each tower in the linked folder", () => {
   it("starts a new file that never replaces one it didn't write, then writes that same file", async () => {
     setMirror(true);
     expect(await mirrorAutosave(app, 0)).toBe(true);
-    expect(m.saveNew, "the copy carries the tower's name").toHaveBeenCalledExactlyOnceWith("Sky", expect.any(Uint8Array));
+    expect(m.saveNew, "the copy carries the tower's name").toHaveBeenCalledExactlyOnceWith(
+      "Sky",
+      expect.any(Uint8Array),
+    );
     expect(await mirrorAutosave(app, MIRROR_EVERY_MS)).toBe(true);
     expect(m.saveOver).toHaveBeenCalledExactlyOnceWith("Sky (2).vctower", expect.any(Uint8Array));
     expect(m.saveNew).toHaveBeenCalledOnce();
@@ -125,7 +144,11 @@ describe("the copy of each tower in the linked folder", () => {
       m.link = `L${i}`;
       await mirrorAutosave(app, 0, true);
     }
-    const files = (JSON.parse(localStorage.getItem("verticopolis-autosave-mirror")!) as { files: Record<string, Record<string, string>> }).files;
+    const files = (
+      JSON.parse(localStorage.getItem("verticopolis-autosave-mirror")!) as {
+        files: Record<string, Record<string, string>>;
+      }
+    ).files;
     expect(Object.keys(files)).toEqual(["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]);
   });
 
@@ -199,7 +222,10 @@ describe("the copy of each tower in the linked folder", () => {
   });
 
   it("leaves the plain Auto-save copy an older version wrote, and starts the tower's own", async () => {
-    localStorage.setItem("verticopolis-autosave-mirror", JSON.stringify({ on: true, files: { L1: "Auto-save.vctower" } }));
+    localStorage.setItem(
+      "verticopolis-autosave-mirror",
+      JSON.stringify({ on: true, files: { L1: "Auto-save.vctower" } }),
+    );
     expect(mirrorOn()).toBe(true);
     await mirrorAutosave(app, 0);
     expect(m.saveOver).not.toHaveBeenCalled();

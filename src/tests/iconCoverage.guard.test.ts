@@ -197,9 +197,7 @@ function unmappedEmoji(files: readonly Source[]): string[] {
  *  caller can hold each to its own non-empty check; a single list over the union
  *  hides a root that has gone empty behind the other root's files. */
 function legacyRootTests(root: string): Source[] {
-  return ALL_TS.filter((f) => f.rel.endsWith(".test.ts") && f.rel.startsWith(`${root}/`)).map(
-    readStripped,
-  );
+  return ALL_TS.filter((f) => f.rel.endsWith(".test.ts") && f.rel.startsWith(`${root}/`)).map(readStripped);
 }
 
 /** Occurrences of a MAPPED emoji that are not message-leading: the mapper only
@@ -360,9 +358,7 @@ describe("bulletin icon coverage (issue #721)", () => {
     // ever noticed a narrowing that emptied a whole layer: losing src/main.ts by
     // itself, or all of src/ui/templates/, read as fine.
     const witness = emitterShapedFiles(srcRoot);
-    expect(witness.length, "the witness traversal found no TypeScript under src/ at all").toBeGreaterThan(
-      0,
-    );
+    expect(witness.length, "the witness traversal found no TypeScript under src/ at all").toBeGreaterThan(0);
     const walked = new Set(ALL_TS.map((f) => f.rel));
     expect(
       witness.filter((r) => !walked.has(r)),
@@ -419,7 +415,10 @@ describe("bulletin icon coverage (issue #721)", () => {
       const svg = iconElement(name);
       expect(svg.getAttribute("fill"), `${name} lost its currentColor root`).toBe("currentColor");
       for (const p of svg.querySelectorAll("path")) {
-        expect(p.getAttribute("fill"), `${name} bakes a path fill; a bulletin icon must inherit severity color`).toBeNull();
+        expect(
+          p.getAttribute("fill"),
+          `${name} bakes a path fill; a bulletin icon must inherit severity color`,
+        ).toBeNull();
       }
     }
   });
@@ -438,7 +437,10 @@ describe("bulletin icon coverage (issue #721)", () => {
       for (const p of iconElement(name).querySelectorAll("path")) {
         const fill = p.getAttribute("fill");
         if (!fill) continue;
-        expect(ACCENT_ICONS.has(name), `${name} bakes a fill but is not an allowlisted accent icon; it must inherit currentColor`).toBe(true);
+        expect(
+          ACCENT_ICONS.has(name),
+          `${name} bakes a fill but is not an allowlisted accent icon; it must inherit currentColor`,
+        ).toBe(true);
         expect(allow.has(fill), `${name} uses a non-allowlisted fill ${fill}`).toBe(true);
       }
     }
@@ -452,6 +454,8 @@ describe("bulletin icon coverage (issue #721)", () => {
   it("carries its MIT provenance", () => {
     // The vendored paths are from Pixelarticons (MIT); the attribution ships in
     // the generated file the icons draw from, as the components package ships it.
-    expect(readFileSync(srcFile("ui/iconPaths.generated.ts"), "utf8")).toMatch(/pixelarticons.*MIT|MIT.*pixelarticons/is);
+    expect(readFileSync(srcFile("ui/iconPaths.generated.ts"), "utf8")).toMatch(
+      /pixelarticons.*MIT|MIT.*pixelarticons/is,
+    );
   });
 });

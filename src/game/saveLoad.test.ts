@@ -4,15 +4,17 @@ import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { mockPort } from "../tests/portKit/mockPort";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
-import { trackAppAction, trackFileExported, trackFileFailure, trackFileImported, trackTdtImportRead } from "../analytics";
+import {
+  trackAppAction,
+  trackFileExported,
+  trackFileFailure,
+  trackFileImported,
+  trackTdtImportRead,
+} from "../analytics";
 import { precedenceUi } from "../ui/precedenceUi.fixture";
 import { showImportReport } from "../ui/uiDialogs";
 import { exportFacts, importFacts } from "@verticopolis/components/port/tdtRecords";
-import {
-  RESUME_AFTER_RECOVERY_KEY,
-  SaveLoad,
-  type SaveLoadDeps,
-} from "./saveLoad";
+import { RESUME_AFTER_RECOVERY_KEY, SaveLoad, type SaveLoadDeps } from "./saveLoad";
 
 vi.mock("../analytics", async (importActual) => ({
   ...(await importActual<typeof import("../analytics")>()),
@@ -39,7 +41,17 @@ vi.mock("../storage/tdtExportReport", () => ({
 }));
 vi.mock("../storage/tdtImportReport", () => ({
   // A whole report, so the real dialog can render it in the waiting tests.
-  importReport: vi.fn(() => ({ towerName: "Old Tower", star: 1, money: 0, day: 1, floors: 1, basements: 0, unitsImported: 0, broughtOver: [], couldNotBring: [] })),
+  importReport: vi.fn(() => ({
+    towerName: "Old Tower",
+    star: 1,
+    money: 0,
+    day: 1,
+    floors: 1,
+    basements: 0,
+    unitsImported: 0,
+    broughtOver: [],
+    couldNotBring: [],
+  })),
 }));
 
 /**
@@ -53,10 +65,7 @@ vi.mock("../storage/tdtImportReport", () => ({
 const GENERATION = 5;
 const HEADER = { mode: "classic", star: 3, population: 420 };
 
-function setup(
-  answers: Parameters<typeof mockPort>[0] = {},
-  rooms: unknown[] = [],
-) {
+function setup(answers: Parameters<typeof mockPort>[0] = {}, rooms: unknown[] = []) {
   const port = mockPort({
     serialize: () => "SAVE",
     generation: () => GENERATION,
@@ -127,10 +136,7 @@ describe("SaveLoad.newGame", () => {
     vi.mocked(SaveGame.hasSave).mockReturnValue(true);
     const { saves, deps } = setup({}, [{}]);
     saves.newGame();
-    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "New tower founded. Good luck!",
-      "good",
-    );
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("New tower founded. Good luck!", "good");
     expect(deps.armOnboarding).not.toHaveBeenCalled();
   });
 
@@ -166,9 +172,7 @@ describe("SaveLoad.recoverFromContextLoss", () => {
     // dialog could cover (#321).
     expect(deps.showRecoveryWait).toHaveBeenCalledOnce();
     expect(deps.ui.toast).not.toHaveBeenCalled();
-    const done = deps.attemptGraphicsRecovery.mock.calls[0][0] as (
-      ok: boolean,
-    ) => void;
+    const done = deps.attemptGraphicsRecovery.mock.calls[0][0] as (ok: boolean) => void;
     expect(endWait).not.toHaveBeenCalled();
     done(true);
     expect(endWait).toHaveBeenCalledOnce();
@@ -176,10 +180,7 @@ describe("SaveLoad.recoverFromContextLoss", () => {
       expect.stringContaining("Your tower was saved first."),
       codes.code("logKinds", "info"),
     );
-    expect(deps.ui.toast).toHaveBeenLastCalledWith(
-      "Graphics recovered. Your tower was saved.",
-      "good",
-    );
+    expect(deps.ui.toast).toHaveBeenLastCalledWith("Graphics recovered. Your tower was saved.", "good");
     expect(deps.showRecoveryWait).toHaveBeenCalledExactlyOnceWith(false);
     expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("graphics_recovered", "game");
   });
@@ -188,16 +189,11 @@ describe("SaveLoad.recoverFromContextLoss", () => {
     let generation = GENERATION;
     const { saves, port, deps } = setup({ generation: () => generation });
     saves.recoverFromContextLoss();
-    const done = deps.attemptGraphicsRecovery.mock.calls[0][0] as (
-      ok: boolean,
-    ) => void;
+    const done = deps.attemptGraphicsRecovery.mock.calls[0][0] as (ok: boolean) => void;
     generation += 1;
     done(true);
     expect(port.logLine).not.toHaveBeenCalled();
-    expect(deps.ui.toast).toHaveBeenLastCalledWith(
-      "Graphics recovered.",
-      "good",
-    );
+    expect(deps.ui.toast).toHaveBeenLastCalledWith("Graphics recovered.", "good");
     vi.mocked(isCrashed).mockReturnValue(true);
     done(true);
     expect(deps.ui.toast).toHaveBeenCalledTimes(1); // only the first recovery spoke
@@ -213,9 +209,7 @@ describe("SaveLoad.recoverFromContextLoss", () => {
         // The card is down before the crash screen goes up.
         expect(endWait).toHaveBeenCalledOnce();
       });
-      (deps.attemptGraphicsRecovery.mock.calls[0][0] as (ok: boolean) => void)(
-        false,
-      );
+      (deps.attemptGraphicsRecovery.mock.calls[0][0] as (ok: boolean) => void)(false);
       expect(deps.showCrashScreen).toHaveBeenCalledOnce();
       const info = deps.showCrashScreen.mock.calls[0][0] as CrashInfo;
       expect(info.crash).toMatchObject({
@@ -237,9 +231,7 @@ describe("SaveLoad.recoverFromContextLoss", () => {
     saves.recoverFromContextLoss();
     saves.recoverFromContextLoss();
     expect(deps.attemptGraphicsRecovery).toHaveBeenCalledOnce();
-    expect(
-      (deps.showCrashScreen.mock.calls[0][0] as CrashInfo).crash.repeat,
-    ).toBe(true);
+    expect((deps.showCrashScreen.mock.calls[0][0] as CrashInfo).crash.repeat).toBe(true);
   });
 
   it("a failed flush shows the screen with the storage blame and whether a prior save exists", () => {
@@ -310,15 +302,16 @@ describe("SaveLoad legacy files", () => {
     await saves.exportLegacy();
     // The report reads the tower's name and the download's name from the engine (#1676).
     expect(exportFacts).toHaveBeenCalledExactlyOnceWith(Float64Array.of(1, 0), expect.any(PortCodes), port);
-    const [, cb] = deps.ui.showExportReport.mock.calls[0] as unknown as [
-      unknown,
-      { onDownload(): void },
-    ];
+    const [, cb] = deps.ui.showExportReport.mock.calls[0] as unknown as [unknown, { onDownload(): void }];
     vi.mocked(deps.ui.downloadFile).mockReturnValueOnce(false);
     cb.onDownload();
     expect(trackFileExported, "a download the page could not start is not an export").not.toHaveBeenCalled();
     vi.mocked(deps.ui.downloadFile).mockReturnValueOnce(true);
-    deps.reader = () => ({ rooms: [] as never, structure: [] as never, header: { ...HEADER, population: 9999 } as never }); // the game ran on
+    deps.reader = () => ({
+      rooms: [] as never,
+      structure: [] as never,
+      header: { ...HEADER, population: 9999 } as never,
+    }); // the game ran on
     cb.onDownload();
     expect(deps.ui.downloadFile).toHaveBeenLastCalledWith("TOWER.TDT", bytes);
     expect(trackFileExported).toHaveBeenCalledExactlyOnceWith("tdt", expect.any(Function));
@@ -332,24 +325,17 @@ describe("SaveLoad legacy files", () => {
     });
     const buffer = Uint8Array.of(9, 9).buffer;
     await saves.importLegacy(buffer, "OLD.TDT");
-    const [, cb] = deps.ui.showImportReport.mock.calls[0] as unknown as [
-      unknown,
-      { onOpen(): void; onShown(): void },
-    ];
+    const [, cb] = deps.ui.showImportReport.mock.calls[0] as unknown as [unknown, { onOpen(): void; onShown(): void }];
     expect(trackTdtImportRead, "not sent until the report is on screen").not.toHaveBeenCalled();
     cb.onShown();
     expect(trackTdtImportRead, "the read is reported with the report's facts").toHaveBeenCalledExactlyOnceWith(
       vi.mocked(importFacts).mock.results[0].value,
     );
     cb.onOpen();
-    const [, name, flush, file] = vi.mocked(adoptConfirmedLegacyImport).mock
-      .calls[0];
+    const [, name, flush, file] = vi.mocked(adoptConfirmedLegacyImport).mock.calls[0];
     expect(name).toBe("Old Tower");
     flush();
-    expect(
-      SaveGame.save,
-      "the flush is the pre-update save",
-    ).toHaveBeenCalledExactlyOnceWith("SAVE");
+    expect(SaveGame.save, "the flush is the pre-update save").toHaveBeenCalledExactlyOnceWith("SAVE");
     expect(port.loadTdt).toHaveBeenCalledOnce();
     expect(file, "the confirmed report's own file goes along").toEqual({
       bytes: new Uint8Array(buffer),
@@ -383,10 +369,14 @@ describe("SaveLoad .TDT import report analytics", () => {
       loadTdt: () => Float64Array.of(1, 0),
     });
     const dialog = precedenceUi();
-    deps.ui.showImportReport.mockImplementation((report, cb) => showImportReport(dialog.ui, report as never, cb as never));
+    deps.ui.showImportReport.mockImplementation((report, cb) =>
+      showImportReport(dialog.ui, report as never, cb as never),
+    );
     const firstFacts = { file: "first" };
     const secondFacts = { file: "second" };
-    vi.mocked(importFacts).mockReturnValueOnce(firstFacts as never).mockReturnValueOnce(secondFacts as never);
+    vi.mocked(importFacts)
+      .mockReturnValueOnce(firstFacts as never)
+      .mockReturnValueOnce(secondFacts as never);
     dialog.openBlocking();
     await saves.importLegacy(new ArrayBuffer(4), "ONE.TDT");
     await saves.importLegacy(new ArrayBuffer(4), "TWO.TDT");
@@ -401,7 +391,9 @@ describe("SaveLoad .TDT import report analytics", () => {
       loadTdt: () => Float64Array.of(1, 0),
     });
     const dialog = precedenceUi();
-    deps.ui.showImportReport.mockImplementation((report, cb) => showImportReport(dialog.ui, report as never, cb as never));
+    deps.ui.showImportReport.mockImplementation((report, cb) =>
+      showImportReport(dialog.ui, report as never, cb as never),
+    );
     dialog.openBlocking();
     await saves.importLegacy(new ArrayBuffer(4), "ONE.TDT");
     dialog.spies.precedence.towerSwapped();
@@ -419,7 +411,9 @@ describe("SaveLoad .vctower import", () => {
     expect(trackFileImported).toHaveBeenCalledExactlyOnceWith("vctower", expect.any(Function));
     expect(vi.mocked(trackFileImported).mock.calls[0][1]()).toBe(HEADER);
     // After the swap, so the header read is the arrived tower's.
-    expect(vi.mocked(trackFileImported).mock.invocationCallOrder[0]).toBeGreaterThan(vi.mocked(deps.towerSwapped).mock.invocationCallOrder[0]!);
+    expect(vi.mocked(trackFileImported).mock.invocationCallOrder[0]).toBeGreaterThan(
+      vi.mocked(deps.towerSwapped).mock.invocationCallOrder[0]!,
+    );
 
     answer = Float64Array.of(0, 0);
     await saves.importGame("not a tower");

@@ -53,21 +53,13 @@ describe("parseBacklogPriorities", () => {
   });
 
   it("reports a priority it cannot read instead of guessing", () => {
-    const { priorities, errors } = parseBacklogPriorities(
-      [...HEAD, row("#12", "high")].join("\n"),
-    );
+    const { priorities, errors } = parseBacklogPriorities([...HEAD, row("#12", "high")].join("\n"));
     expect(priorities.size).toBe(0);
     expect(errors).toEqual(['#12: priority "high" is not P1, P2 or P3']);
   });
 
   it("leaves an issue alone when its rows disagree, whatever the row order", () => {
-    const md = [
-      ...HEAD,
-      row("#15", "P1"),
-      row("#15", "P3"),
-      row("#15", "P1"),
-      row("#16", "P2"),
-    ].join("\n");
+    const md = [...HEAD, row("#15", "P1"), row("#15", "P3"), row("#15", "P1"), row("#16", "P2")].join("\n");
     const { priorities, errors } = parseBacklogPriorities(md);
     expect([...priorities]).toEqual([[16, "P2"]]);
     expect(errors).toEqual(["#15: rows disagree on its priority"]);
@@ -86,9 +78,7 @@ describe("parseBacklogPriorities", () => {
   });
 
   it("fails loudly when the table header is missing", () => {
-    expect(parseBacklogPriorities("# no table").errors).toEqual([
-      "curated-table header not found",
-    ]);
+    expect(parseBacklogPriorities("# no table").errors).toEqual(["curated-table header not found"]);
   });
 
   it("reads the real backlog with no errors", () => {
@@ -96,9 +86,7 @@ describe("parseBacklogPriorities", () => {
       dirname(fileURLToPath(import.meta.url)),
       "../../_bmad-output/implementation-artifacts/backlog.md",
     );
-    const { priorities, errors } = parseBacklogPriorities(
-      readFileSync(backlog, "utf8"),
-    );
+    const { priorities, errors } = parseBacklogPriorities(readFileSync(backlog, "utf8"));
     expect(errors).toEqual([]);
     expect(priorities.size).toBeGreaterThan(0);
   });
@@ -159,9 +147,7 @@ function fakeGh(
     if (noun === "label" && verb === "list") {
       if (opts.labelError) throw new Error("gh label list: HTTP 403");
       return JSON.stringify(
-        ["P1", "P2", "P3", "needs-triage"]
-          .filter((l) => l !== opts.missing)
-          .map((name) => ({ name })),
+        ["P1", "P2", "P3", "needs-triage"].filter((l) => l !== opts.missing).map((name) => ({ name })),
       );
     }
     if (noun === "issue" && verb === "list") {
@@ -178,17 +164,14 @@ function fakeGh(
       const path = args[3];
       const n = Number(/issues\/(\d+)\//.exec(path)?.[1]);
       const label =
-        method === "POST"
-          ? args[args.length - 1].replace("labels[]=", "")
-          : decodeURIComponent(path.split("/").pop()!);
+        method === "POST" ? args[args.length - 1].replace("labels[]=", "") : decodeURIComponent(path.split("/").pop()!);
       writes.push(`#${n} ${method} ${label}`);
       if (n === opts.limitOn && limits-- > 0)
         throw Object.assign(new Error("secondary rate limit (HTTP 403)"), {
           rateLimited: true,
         });
       if (n === opts.failOn) throw new Error("gh api: Bad Gateway (HTTP 502)");
-      if (method === "DELETE" && n === opts.goneOn)
-        throw new Error("gh api: Label does not exist (HTTP 404)");
+      if (method === "DELETE" && n === opts.goneOn) throw new Error("gh api: Label does not exist (HTTP 404)");
       return "";
     }
     throw new Error(`unexpected gh ${args.join(" ")}`);
@@ -197,12 +180,7 @@ function fakeGh(
 }
 
 describe("run", () => {
-  const markdown = [
-    ...HEAD,
-    row("#1", "P1"),
-    row("#2", "P2"),
-    row("#3", "P3"),
-  ].join("\n");
+  const markdown = [...HEAD, row("#1", "P1"), row("#2", "P2"), row("#3", "P3")].join("\n");
   const quiet = () => {};
   const noWait = async () => {};
 
@@ -225,7 +203,14 @@ describe("run", () => {
     const sync = (issues: Record<number, string[]>) =>
       run({ markdown, repo: "o/r", gh: fakeGh(issues).gh, pauseMs: 0, sleep: noWait, log: (l) => lines.push(l) });
     const fake = fakeGh({ 2: [] });
-    const result = await run({ markdown, repo: "o/r", gh: fake.gh, pauseMs: 0, sleep: noWait, log: (l) => lines.push(l) });
+    const result = await run({
+      markdown,
+      repo: "o/r",
+      gh: fake.gh,
+      pauseMs: 0,
+      sleep: noWait,
+      log: (l) => lines.push(l),
+    });
     expect(result.stale).toEqual([1, 3]);
     expect(fake.writes).toEqual(["#2 POST P2"]);
     expect(lines).toContain(
@@ -261,9 +246,7 @@ describe("run", () => {
       log: quiet,
     });
     expect(result.ok).toBe(false);
-    expect(result.errors).toEqual([
-      "label P2 missing from o/r; run the Sync labels workflow first",
-    ]);
+    expect(result.errors).toEqual(["label P2 missing from o/r; run the Sync labels workflow first"]);
     expect(fake.writes).toEqual([]);
   });
 
@@ -278,9 +261,7 @@ describe("run", () => {
       log: quiet,
     });
     expect(result.ok).toBe(false);
-    expect(result.errors).toEqual([
-      "could not list labels: gh label list: HTTP 403",
-    ]);
+    expect(result.errors).toEqual(["could not list labels: gh label list: HTTP 403"]);
     expect(fake.writes).toEqual([]);
   });
 
@@ -346,12 +327,8 @@ describe("run", () => {
 
   it("fails a removal whose 404 is not a missing label", async () => {
     const gh: Gh = async (args) => {
-      if (args[0] === "label")
-        return JSON.stringify(["P1", "P2", "P3"].map((name) => ({ name })));
-      if (args[0] === "issue")
-        return JSON.stringify([
-          { number: 1, labels: [{ name: "P1" }, { name: "P2" }] },
-        ]);
+      if (args[0] === "label") return JSON.stringify(["P1", "P2", "P3"].map((name) => ({ name })));
+      if (args[0] === "issue") return JSON.stringify([{ number: 1, labels: [{ name: "P1" }, { name: "P2" }] }]);
       throw new Error("gh api: Not Found (HTTP 404)");
     };
     const result = await run({
@@ -378,12 +355,7 @@ describe("run", () => {
     });
     expect(result.ok).toBe(true);
     expect(waits).toEqual([60_000]);
-    expect(fake.writes).toEqual([
-      "#1 POST P1",
-      "#2 POST P2",
-      "#2 POST P2",
-      "#3 POST P3",
-    ]);
+    expect(fake.writes).toEqual(["#1 POST P1", "#2 POST P2", "#2 POST P2", "#3 POST P3"]);
   });
 
   it("reports a failed issue listing and writes nothing", async () => {
@@ -397,9 +369,7 @@ describe("run", () => {
       log: quiet,
     });
     expect(result.ok).toBe(false);
-    expect(result.errors).toEqual([
-      "could not list open issues: gh issue list: HTTP 502",
-    ]);
+    expect(result.errors).toEqual(["could not list open issues: gh issue list: HTTP 502"]);
     expect(fake.writes).toEqual([]);
   });
 
@@ -414,12 +384,7 @@ describe("run", () => {
       log: quiet,
     });
     expect(result.ok).toBe(true);
-    expect(fake.writes).toEqual([
-      "#2 POST P2",
-      "#2 DELETE P1",
-      "#2 DELETE P3",
-      "#2 DELETE needs-triage",
-    ]);
+    expect(fake.writes).toEqual(["#2 POST P2", "#2 DELETE P1", "#2 DELETE P3", "#2 DELETE needs-triage"]);
   });
 
   it("writes nothing on a dry run", async () => {
@@ -441,57 +406,40 @@ describe("run", () => {
 describe("ghCli", () => {
   type Callback = (err: Error | null, stdout: string, stderr: string) => void;
   const answer = (err: Error | null, stdout: string, stderr = "") =>
-    execFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: Callback) =>
-        cb(err, stdout, stderr),
+    execFile.mockImplementationOnce((_cmd: string, _args: string[], _opts: unknown, cb: Callback) =>
+      cb(err, stdout, stderr),
     );
 
   it("runs gh with the given arguments and returns its stdout", async () => {
     answer(null, "[]");
     await expect(ghCli()(["label", "list"])).resolves.toBe("[]");
-    expect(execFile.mock.lastCall?.slice(0, 2)).toEqual([
-      "gh",
-      ["label", "list"],
-    ]);
+    expect(execFile.mock.lastCall?.slice(0, 2)).toEqual(["gh", ["label", "list"]]);
   });
 
   it("rejects with gh's stderr and flags a rate limit", async () => {
-    answer(
-      new Error("exit 1"),
-      "",
-      "HTTP 403: You have exceeded a secondary rate limit",
-    );
-    await expect(
-      ghCli()(["api", "--method", "POST", "repos/o/r/issues/7/labels"]),
-    ).rejects.toMatchObject({
-      message:
-        "gh api POST repos/o/r/issues/7/labels: HTTP 403: You have exceeded a secondary rate limit",
+    answer(new Error("exit 1"), "", "HTTP 403: You have exceeded a secondary rate limit");
+    await expect(ghCli()(["api", "--method", "POST", "repos/o/r/issues/7/labels"])).rejects.toMatchObject({
+      message: "gh api POST repos/o/r/issues/7/labels: HTTP 403: You have exceeded a secondary rate limit",
       rateLimited: true,
     });
     answer(new Error("exit 1"), "", "HTTP 502: Bad Gateway");
-    await expect(
-      ghCli()(["api", "--method", "POST", "repos/o/r/issues/7/labels"]),
-    ).rejects.toMatchObject({
+    await expect(ghCli()(["api", "--method", "POST", "repos/o/r/issues/7/labels"])).rejects.toMatchObject({
       rateLimited: false,
     });
   });
 
   it("names a missing gh and a timeout plainly", async () => {
     answer(Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" }), "");
-    await expect(ghCli()(["label", "list"])).rejects.toThrow(
-      "the gh CLI is not on PATH",
-    );
+    await expect(ghCli()(["label", "list"])).rejects.toThrow("the gh CLI is not on PATH");
     answer(Object.assign(new Error("killed"), { killed: true }), "");
-    await expect(
-      ghCli()(["api", "--method", "POST", "repos/o/r/issues/7/labels"]),
-    ).rejects.toThrow("timed out after a minute");
+    await expect(ghCli()(["api", "--method", "POST", "repos/o/r/issues/7/labels"])).rejects.toThrow(
+      "timed out after a minute",
+    );
   });
 
   it("flags the GraphQL wording for mutations sent too fast", async () => {
     answer(new Error("exit 1"), "", "GraphQL: was submitted too quickly");
-    await expect(
-      ghCli()(["api", "--method", "POST", "repos/o/r/issues/7/labels"]),
-    ).rejects.toMatchObject({
+    await expect(ghCli()(["api", "--method", "POST", "repos/o/r/issues/7/labels"])).rejects.toMatchObject({
       rateLimited: true,
     });
   });

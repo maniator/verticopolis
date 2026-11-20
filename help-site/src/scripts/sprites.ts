@@ -56,7 +56,8 @@ function pictureOf(canvas: HTMLCanvasElement, facts: (k: FacilityKind) => Catalo
   };
   const draw =
     span !== null
-      ? (d: DrawCtx, w: number, h: number, mag: number) => drawTransportPortrait(d, factsOf, kind, span, 0, 0, w, h, 0, mag)
+      ? (d: DrawCtx, w: number, h: number, mag: number) =>
+          drawTransportPortrait(d, factsOf, kind, span, 0, 0, w, h, 0, mag)
       : (d: DrawCtx, w: number, h: number, mag: number) => drawRoomPortrait(d, factsOf, kind, pose, 0, 0, w, h, 0, mag);
   return { canvas, ctx, draw, hour, visible: false };
 }
@@ -79,7 +80,12 @@ function paint(p: Picture, anim: number): void {
   p.ctx.fillRect(0, 0, w, h);
   // Lights on, a garage two-thirds full and a recycling plant filling up, at
   // an hour the room is open.
-  p.draw({ ctx: p.ctx, lit: true, anim, hour: p.hour, parkingUse: 0.7, recycleFill: 0.66 }, w, h, Math.round(MAG * dpr));
+  p.draw(
+    { ctx: p.ctx, lit: true, anim, hour: p.hour, parkingUse: 0.7, recycleFill: 0.66 },
+    w,
+    h,
+    Math.round(MAG * dpr),
+  );
 }
 
 async function start(): Promise<void> {

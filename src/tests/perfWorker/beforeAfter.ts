@@ -76,7 +76,16 @@ export interface Row {
   /** The subject's per-repetition ratio over the vouching controls' ratio, with its interval; null on the difference basis or without enough paired repetitions. */
   net: { ratio: number; ciLow: number | null; ciHigh: number | null; pairs: number; controls: ModeName[] } | null;
   /** `ok` means only that no control moved: it is not a verdict, and an effect smaller than the tolerance cannot be told from allowed drift. `noisy-controlled` is the same with only noisy controls behind it. A flat control (`control-flat`) never vouches. */
-  status: "ok" | "noisy-controlled" | "void" | "uncontrolled" | "thin" | "control-ok" | "control-drift" | "control-noisy" | "control-flat";
+  status:
+    | "ok"
+    | "noisy-controlled"
+    | "void"
+    | "uncontrolled"
+    | "thin"
+    | "control-ok"
+    | "control-drift"
+    | "control-noisy"
+    | "control-flat";
   /** For a void row, the controls that moved, with their readings. */
   voidedBy: string[];
   /** Things a reader needs beside an `ok`: a noisy control and its interval, flat controls (pinned at a cap or a floor) that could not vouch, why a controlled ratio row has no net-of-control ratio. */
@@ -112,49 +121,105 @@ export interface BeforeAfter {
   counts: Record<Row["status"], number>;
 }
 
-const identity = (r: WorkerResults, sha256?: string): RunIdentity => ({ commit: r.environment.commit, appVersion: r.environment.appVersion, engineBuildHash: r.environment.engineBuildHash ?? null, startedAt: r.startedAt, reps: r.config.reps, ...(sha256 ? { sha256 } : {}) });
+const identity = (r: WorkerResults, sha256?: string): RunIdentity => ({
+  commit: r.environment.commit,
+  appVersion: r.environment.appVersion,
+  engineBuildHash: r.environment.engineBuildHash ?? null,
+  startedAt: r.startedAt,
+  reps: r.config.reps,
+  ...(sha256 ? { sha256 } : {}),
+});
 
 const goodRuns = (r: WorkerResults) => r.runs.filter((x) => x.ok);
 
 /** Why two result sets cannot be compared, or an empty list. Each run must stand alone as protocol evidence, and the two must differ in nothing but the build. Their roles come from the argument order; the runs may have happened in either order but must not overlap. */
 export function comparability(before: WorkerResults, after: WorkerResults, minPairs: number): string[] {
   const out: string[] = [];
-  for (const [name, r] of [["BEFORE", before], ["AFTER", after]] as const) {
-    if (r.validation?.ok !== true || (r.validation.errors ?? []).length > 0) out.push(`${name} failed its own validation`);
+  for (const [name, r] of [
+    ["BEFORE", before],
+    ["AFTER", after],
+  ] as const) {
+    if (r.validation?.ok !== true || (r.validation.errors ?? []).length > 0)
+      out.push(`${name} failed its own validation`);
     if (r.config.quick !== false) out.push(`${name} is a --quick run, or does not say it was not`);
     if (r.config.aa) out.push(`${name} is an A/A pass (${r.config.aa} in both slots), not a run of a build`);
     const tree = treeProblem({ environment: r.environment });
     if (tree) out.push(`${name}: ${tree}`);
     if (r.browser.rendererException) out.push(`${name} declared renderer exception ${r.browser.rendererException}`);
-    if (r.browser.gpuVerified !== true) out.push(`${name} does not record gpuVerified: true (a pre-#1125 harness, or a renderer that was not verified hardware)`);
+    if (r.browser.gpuVerified !== true)
+      out.push(
+        `${name} does not record gpuVerified: true (a pre-#1125 harness, or a renderer that was not verified hardware)`,
+      );
     else {
       const good = goodRuns(r);
       // The same three reads as `perf:calibrate`: at the page's start, after the frames and after the throttled cold start (absent only for a run without one).
-      const f = rendererFinding(good.map((x) => x.page?.webgl?.renderer), good.map((x) => x.rendererEnd), { quick: false, lateEnds: good.map((x) => x.rendererEndCold) });
+      const f = rendererFinding(
+        good.map((x) => x.page?.webgl?.renderer),
+        good.map((x) => x.rendererEnd),
+        { quick: false, lateEnds: good.map((x) => x.rendererEndCold) },
+      );
       if (f.errors.length) out.push(`${name}: ${f.errors[0]}`);
     }
-    if (!Number.isInteger(r.config.reps) || r.config.reps < minPairs) out.push(`${name} has ${r.config.reps} repetitions, fewer than the ${minPairs} a verdict needs`);
+    if (!Number.isInteger(r.config.reps) || r.config.reps < minPairs)
+      out.push(`${name} has ${r.config.reps} repetitions, fewer than the ${minPairs} a verdict needs`);
   }
   const same = (what: string, key: (r: WorkerResults) => unknown): void => {
     if (stable(key(before)) !== stable(key(after))) out.push(`the runs differ in ${what}`);
   };
-  same("run parameters (repetitions, modes, scenarios, throttles, steps, step size, batch, frame window, speed or viewport)", (r) => ({ ...r.config, quick: false, scenarios: [...r.config.scenarios].sort() }));
+  same(
+    "run parameters (repetitions, modes, scenarios, throttles, steps, step size, batch, frame window, speed or viewport)",
+    (r) => ({ ...r.config, quick: false, scenarios: [...r.config.scenarios].sort() }),
+  );
   same("scenario inputs (the scenario hashes)", (r) => r.scenarios.map((s) => [s.name, s.sha256]).sort());
-  same("machine or runtime", (r) => [r.environment.cpuModel, r.environment.logicalCpus, r.environment.totalMemoryBytes, r.environment.os, r.environment.kernel, r.environment.arch, r.environment.node, r.environment.rust, r.environment.playwright]);
-  same("browser (executable, channel, switches, version or WebGL renderer)", (r) => [r.browser.executable, r.browser.channel, r.browser.args, r.browser.version, [...new Set(goodRuns(r).flatMap((x) => [x.page?.webgl?.renderer, x.rendererEnd, x.rendererEndCold]).filter(Boolean))].sort()]);
+  same("machine or runtime", (r) => [
+    r.environment.cpuModel,
+    r.environment.logicalCpus,
+    r.environment.totalMemoryBytes,
+    r.environment.os,
+    r.environment.kernel,
+    r.environment.arch,
+    r.environment.node,
+    r.environment.rust,
+    r.environment.playwright,
+  ]);
+  same("browser (executable, channel, switches, version or WebGL renderer)", (r) => [
+    r.browser.executable,
+    r.browser.channel,
+    r.browser.args,
+    r.browser.version,
+    [
+      ...new Set(
+        goodRuns(r)
+          .flatMap((x) => [x.page?.webgl?.renderer, x.rendererEnd, x.rendererEndCold])
+          .filter(Boolean),
+      ),
+    ].sort(),
+  ]);
   const span = (r: WorkerResults): [number, number] => [Date.parse(r.startedAt), Date.parse(r.generatedAt)];
   const [s0, e0] = span(before);
   const [s1, e1] = span(after);
-  if (![s0, e0, s1, e1].every(Number.isFinite)) out.push("a run has no readable start or finish time, so whether the two overlapped cannot be checked");
+  if (![s0, e0, s1, e1].every(Number.isFinite))
+    out.push("a run has no readable start or finish time, so whether the two overlapped cannot be checked");
   else if (s0 < e1 && s1 < e0) out.push("the two runs overlapped on the machine");
   if (stable(before) === stable(after)) out.push("BEFORE and AFTER are the same results; name two different runs");
   out.push(...metricProblems("BEFORE", before), ...metricProblems("AFTER", after));
   return out;
 }
 
-const emptyCounts = (): BeforeAfter["counts"] => ({ ok: 0, "noisy-controlled": 0, void: 0, uncontrolled: 0, thin: 0, "control-ok": 0, "control-drift": 0, "control-noisy": 0, "control-flat": 0 });
+const emptyCounts = (): BeforeAfter["counts"] => ({
+  ok: 0,
+  "noisy-controlled": 0,
+  void: 0,
+  uncontrolled: 0,
+  thin: 0,
+  "control-ok": 0,
+  "control-drift": 0,
+  "control-noisy": 0,
+  "control-flat": 0,
+});
 
-const keyOf = (m: Pick<Metric, "group" | "scenario" | "throttle" | "metric">): string => `${m.group}|${m.scenario}|${m.throttle}|${m.metric}`;
+const keyOf = (m: Pick<Metric, "group" | "scenario" | "throttle" | "metric">): string =>
+  `${m.group}|${m.scenario}|${m.throttle}|${m.metric}`;
 
 /** Shape of every metric a run carries, so pairing by repetition number cannot read garbage: unique whole repetitions, one finite value each, and no metric listed twice. */
 function metricProblems(name: string, r: WorkerResults): string[] {
@@ -164,9 +229,15 @@ function metricProblems(name: string, r: WorkerResults): string[] {
     const label = `${name} ${m.mode} ${m.scenario} ${m.throttle}x ${m.metric}`;
     if (seen.has(`${keyOf(m)}|${m.mode}`)) out.push(`${label}: listed twice`);
     seen.add(`${keyOf(m)}|${m.mode}`);
-    if (!Array.isArray(m.reps) || !Array.isArray(m.values) || m.reps.length !== m.values.length) out.push(`${label}: reps and values do not line up`);
-    else if (new Set(m.reps).size !== m.reps.length || m.reps.some((x) => !Number.isInteger(x) || x < 0 || x >= r.config.reps)) out.push(`${label}: repetition numbers repeat or fall outside 0 to ${r.config.reps - 1}`);
-    else if (m.values.some((v) => typeof v !== "number" || !Number.isFinite(v))) out.push(`${label}: a value is not a finite number`);
+    if (!Array.isArray(m.reps) || !Array.isArray(m.values) || m.reps.length !== m.values.length)
+      out.push(`${label}: reps and values do not line up`);
+    else if (
+      new Set(m.reps).size !== m.reps.length ||
+      m.reps.some((x) => !Number.isInteger(x) || x < 0 || x >= r.config.reps)
+    )
+      out.push(`${label}: repetition numbers repeat or fall outside 0 to ${r.config.reps - 1}`);
+    else if (m.values.some((v) => typeof v !== "number" || !Number.isFinite(v)))
+      out.push(`${label}: a value is not a finite number`);
     if (out.length >= 3) break;
   }
   return out;
@@ -178,9 +249,15 @@ const factor = (ratio: number, tolerance: number): boolean => ratio > 1 + tolera
 const differenceMetric = (m: Metric): boolean => m.unit === "count" || BLOCKING.test(m.metric);
 
 /** The controls the runs get when `--controls` is not given. */
-export function resolveControls(before: WorkerResults, after: WorkerResults, options: Partial<BeforeAfterOptions>): ModeName[] {
+export function resolveControls(
+  before: WorkerResults,
+  after: WorkerResults,
+  options: Partial<BeforeAfterOptions>,
+): ModeName[] {
   if (options.controls) return options.controls;
-  const sameBuild = before.environment.commit === after.environment.commit && (before.environment.engineBuildHash ?? null) === (after.environment.engineBuildHash ?? null);
+  const sameBuild =
+    before.environment.commit === after.environment.commit &&
+    (before.environment.engineBuildHash ?? null) === (after.environment.engineBuildHash ?? null);
   return sameBuild ? DEFAULT_CONTROLS : ["ts"];
 }
 
@@ -220,11 +297,30 @@ function pair(b: Metric, a: Metric, mode: ModeName, role: Row["role"]): Paired {
   const r = basis === "ratio" && ratios.length ? summarize(ratios) : null;
   const d = diffs.length ? summarize(diffs) : null;
   const row: Row = {
-    group: b.group, scenario: b.scenario, throttle: b.throttle, metric: b.metric, unit: b.unit, better: b.better, mode, role, basis,
-    ratio: r?.median ?? null, ciLow: r?.medianCiLow ?? null, ciHigh: r?.medianCiHigh ?? null, pairs: reps.length, zeroReference,
-    beforeMedian: beforePaired.length ? summarize(beforePaired).median : null, afterMedian: afterPaired.length ? summarize(afterPaired).median : null,
-    diffMedian: d?.median ?? null, diffCiLow: d?.medianCiLow ?? null, diffCiHigh: d?.medianCiHigh ?? null,
-    net: null, status: "ok", voidedBy: [], notes: [], ...(UNTHROTTLED_WORKER(b.mode, b.throttle) ? { unthrottled: "worker" as const } : {}),
+    group: b.group,
+    scenario: b.scenario,
+    throttle: b.throttle,
+    metric: b.metric,
+    unit: b.unit,
+    better: b.better,
+    mode,
+    role,
+    basis,
+    ratio: r?.median ?? null,
+    ciLow: r?.medianCiLow ?? null,
+    ciHigh: r?.medianCiHigh ?? null,
+    pairs: reps.length,
+    zeroReference,
+    beforeMedian: beforePaired.length ? summarize(beforePaired).median : null,
+    afterMedian: afterPaired.length ? summarize(afterPaired).median : null,
+    diffMedian: d?.median ?? null,
+    diffCiLow: d?.medianCiLow ?? null,
+    diffCiHigh: d?.medianCiHigh ?? null,
+    net: null,
+    status: "ok",
+    voidedBy: [],
+    notes: [],
+    ...(UNTHROTTLED_WORKER(b.mode, b.throttle) ? { unthrottled: "worker" as const } : {}),
   };
   return { row, values: [...beforePaired, ...afterPaired], perRep: basis === "ratio" ? perRep : new Map() };
 }
@@ -238,15 +334,41 @@ function isFlat(row: Row, values: number[], tolerance: number): boolean {
 }
 
 /** A control's reading for the report, in the unit its basis uses. */
-const reading = (c: Row): string => (c.basis === "ratio" ? `${c.ratio!.toFixed(2)}x` : `${c.diffMedian!.toFixed(2)} ${c.unit}${c.beforeMedian === 0 ? " from 0" : ""}`);
+const reading = (c: Row): string =>
+  c.basis === "ratio"
+    ? `${c.ratio!.toFixed(2)}x`
+    : `${c.diffMedian!.toFixed(2)} ${c.unit}${c.beforeMedian === 0 ? " from 0" : ""}`;
 
-export function compareRuns(before: WorkerResults, after: WorkerResults, options: Partial<BeforeAfterOptions> = {}, hashes: { before?: string; after?: string } = {}): BeforeAfter {
+export function compareRuns(
+  before: WorkerResults,
+  after: WorkerResults,
+  options: Partial<BeforeAfterOptions> = {},
+  hashes: { before?: string; after?: string } = {},
+): BeforeAfter {
   const controls = resolveControls(before, after, options);
-  const sameBuild = before.environment.commit === after.environment.commit && (before.environment.engineBuildHash ?? null) === (after.environment.engineBuildHash ?? null);
+  const sameBuild =
+    before.environment.commit === after.environment.commit &&
+    (before.environment.engineBuildHash ?? null) === (after.environment.engineBuildHash ?? null);
   const modes = before.config.modes;
   const subjects = options.subjects ?? modes.filter((m) => !controls.includes(m));
-  const opts: BeforeAfterOptions = { controls, subjects, tolerance: options.tolerance ?? 0.05, minPairs: options.minPairs ?? 10 };
-  const result: BeforeAfter = { kind: sameBuild ? "A/A" : "before-after", options: opts, before: identity(before, hashes.before), after: identity(after, hashes.after), problems: comparability(before, after, opts.minPairs), rows: [], missing: [], notMeasured: 0, unlisted: modes.filter((m) => !controls.includes(m) && !subjects.includes(m)), counts: emptyCounts() };
+  const opts: BeforeAfterOptions = {
+    controls,
+    subjects,
+    tolerance: options.tolerance ?? 0.05,
+    minPairs: options.minPairs ?? 10,
+  };
+  const result: BeforeAfter = {
+    kind: sameBuild ? "A/A" : "before-after",
+    options: opts,
+    before: identity(before, hashes.before),
+    after: identity(after, hashes.after),
+    problems: comparability(before, after, opts.minPairs),
+    rows: [],
+    missing: [],
+    notMeasured: 0,
+    unlisted: modes.filter((m) => !controls.includes(m) && !subjects.includes(m)),
+    counts: emptyCounts(),
+  };
   for (const m of subjects) if (!modes.includes(m)) result.problems.push(`subject mode ${m} was not in the runs`);
   for (const m of subjects) if (controls.includes(m)) result.problems.push(`${m} is both a control and a subject`);
   if (!controls.some((m) => modes.includes(m))) result.problems.push("none of the control modes was in the runs");
@@ -259,13 +381,17 @@ export function compareRuns(before: WorkerResults, after: WorkerResults, options
     const a = afterBy.get(`${keyOf(b)}|${b.mode}`);
     const name = `${b.mode} ${b.scenario} ${b.throttle}x ${b.metric}`;
     if (!a) result.missing.push(`${name}: only in BEFORE`);
-    else if (a.unit !== b.unit || a.better !== b.better) result.missing.push(`${name}: unit or direction differs between the runs, so it is not compared`);
+    else if (a.unit !== b.unit || a.better !== b.better)
+      result.missing.push(`${name}: unit or direction differs between the runs, so it is not compared`);
     else if (b.values.length === 0 && a.values.length === 0) result.notMeasured++;
-    else if (b.values.length === 0 || a.values.length === 0) result.missing.push(`${name}: values only in ${b.values.length === 0 ? "AFTER" : "BEFORE"}`);
+    else if (b.values.length === 0 || a.values.length === 0)
+      result.missing.push(`${name}: values only in ${b.values.length === 0 ? "AFTER" : "BEFORE"}`);
     else if (controls.includes(b.mode)) paired.push(pair(b, a, b.mode, "control"));
     else if (subjects.includes(b.mode)) paired.push(pair(b, a, b.mode, "subject"));
   }
-  for (const m of after.metrics) if (!beforeKeys.has(`${keyOf(m)}|${m.mode}`)) result.missing.push(`${m.mode} ${m.scenario} ${m.throttle}x ${m.metric}: only in AFTER`);
+  for (const m of after.metrics)
+    if (!beforeKeys.has(`${keyOf(m)}|${m.mode}`))
+      result.missing.push(`${m.mode} ${m.scenario} ${m.throttle}x ${m.metric}: only in AFTER`);
   const byKey = new Map<string, Paired[]>();
   for (const p of paired) byKey.set(keyOf(p.row), [...(byKey.get(keyOf(p.row)) ?? []), p]);
   // A control row: moved, thin, flat, noisy, or fine. Its median decides whether it moved, even when it is thin, so a thin control that moved still blocks.
@@ -279,7 +405,13 @@ export function compareRuns(before: WorkerResults, after: WorkerResults, options
     if (moved) row.status = "control-drift";
     else if (row.pairs < opts.minPairs) row.status = "thin";
     else if (isFlat(row, values, opts.tolerance)) row.status = "control-flat";
-    else if (row.basis === "ratio" && row.ciLow !== null && row.ciHigh !== null && (factor(row.ciLow, opts.tolerance) || factor(row.ciHigh, opts.tolerance))) row.status = "control-noisy";
+    else if (
+      row.basis === "ratio" &&
+      row.ciLow !== null &&
+      row.ciHigh !== null &&
+      (factor(row.ciLow, opts.tolerance) || factor(row.ciHigh, opts.tolerance))
+    )
+      row.status = "control-noisy";
     else row.status = "control-ok";
   }
   for (const p of paired.filter((x) => x.row.role === "subject")) {
@@ -290,12 +422,18 @@ export function compareRuns(before: WorkerResults, after: WorkerResults, options
     const noisy = vouching.filter((c) => c.row.status === "control-noisy");
     if (drifted.length) {
       row.status = "void";
-      row.voidedBy = drifted.map((c) => `${c.row.mode} ${reading(c.row)}${c.row.pairs < opts.minPairs ? ` (only ${c.row.pairs} pairs, but it moved)` : ""}`);
+      row.voidedBy = drifted.map(
+        (c) =>
+          `${c.row.mode} ${reading(c.row)}${c.row.pairs < opts.minPairs ? ` (only ${c.row.pairs} pairs, but it moved)` : ""}`,
+      );
     } else if (row.pairs < opts.minPairs) row.status = "thin";
     else if (vouching.length === 0) row.status = "uncontrolled";
     else if (noisy.length === vouching.length) row.status = "noisy-controlled";
     const flat = peers.filter((c) => c.row.status === "control-flat");
-    if (flat.length && row.status !== "void") row.notes.push(`control ${flat.map((c) => c.row.mode).join(", ")} ${flat.length === 1 ? "is" : "are"} flat in both runs (pinned at a cap or a floor), so ${flat.length === 1 ? "it" : "they"} could not have shown drift and ${flat.length === 1 ? "does" : "do"} not vouch`);
+    if (flat.length && row.status !== "void")
+      row.notes.push(
+        `control ${flat.map((c) => c.row.mode).join(", ")} ${flat.length === 1 ? "is" : "are"} flat in both runs (pinned at a cap or a floor), so ${flat.length === 1 ? "it" : "they"} could not have shown drift and ${flat.length === 1 ? "does" : "do"} not vouch`,
+      );
     if ((row.status !== "ok" && row.status !== "noisy-controlled") || row.basis !== "ratio") continue;
     // The subject over the controls, repetition by repetition: the controls' scatter lands in this interval.
     const withRatios = vouching.filter((c) => c.perRep.size > 0);
@@ -304,14 +442,33 @@ export function compareRuns(before: WorkerResults, after: WorkerResults, options
       const cs = withRatios.map((c) => c.perRep.get(rep)).filter((x): x is number => x !== undefined);
       if (cs.length) net.push(ratio / summarize(cs).median);
     }
-    const noisyNote = noisy.map((c) => `${c.row.mode} (ratio ${c.row.ratio!.toFixed(2)}x, interval ${c.row.ciLow!.toFixed(2)} to ${c.row.ciHigh!.toFixed(2)})`).join(", ");
+    const noisyNote = noisy
+      .map(
+        (c) =>
+          `${c.row.mode} (ratio ${c.row.ratio!.toFixed(2)}x, interval ${c.row.ciLow!.toFixed(2)} to ${c.row.ciHigh!.toFixed(2)})`,
+      )
+      .join(", ");
     if (net.length >= opts.minPairs) {
       const s = summarize(net);
-      row.net = { ratio: s.median, ciLow: s.medianCiLow, ciHigh: s.medianCiHigh, pairs: net.length, controls: withRatios.map((c) => c.row.mode) };
-      if (noisy.length) row.notes.push(`noisy control ${noisyNote}: the raw ratio assumes the machine drifted no more than the control's median shows; the net-of-control ratio assumes the drift is common to the subject and the control, and carries the control's scatter`);
+      row.net = {
+        ratio: s.median,
+        ciLow: s.medianCiLow,
+        ciHigh: s.medianCiHigh,
+        pairs: net.length,
+        controls: withRatios.map((c) => c.row.mode),
+      };
+      if (noisy.length)
+        row.notes.push(
+          `noisy control ${noisyNote}: the raw ratio assumes the machine drifted no more than the control's median shows; the net-of-control ratio assumes the drift is common to the subject and the control, and carries the control's scatter`,
+        );
     } else {
-      const why = withRatios.length === 0 ? "no vouching control has a per-repetition ratio (the controls are judged on a difference)" : `only ${net.length} repetitions have a control ratio`;
-      row.notes.push(`no net-of-control ratio: ${why}${noisy.length ? `; noisy control ${noisyNote}, so read the raw ratio against that scatter` : ""}`);
+      const why =
+        withRatios.length === 0
+          ? "no vouching control has a per-repetition ratio (the controls are judged on a difference)"
+          : `only ${net.length} repetitions have a control ratio`;
+      row.notes.push(
+        `no net-of-control ratio: ${why}${noisy.length ? `; noisy control ${noisyNote}, so read the raw ratio against that scatter` : ""}`,
+      );
     }
   }
   const rows = paired.map((p) => p.row);

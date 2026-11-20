@@ -26,7 +26,9 @@ export function finishBootCover(doc: Document = document): void {
   const cover = doc.getElementById("boot-cover");
   if (!cover || cover.classList.contains(BOOT_READY_CLASS)) return;
   const win = doc.defaultView;
-  const reduce = !!win?.matchMedia?.("(prefers-reduced-motion: reduce)").matches || doc.documentElement.classList.contains(REDUCE_MOTION_CLASS);
+  const reduce =
+    !!win?.matchMedia?.("(prefers-reduced-motion: reduce)").matches ||
+    doc.documentElement.classList.contains(REDUCE_MOTION_CLASS);
   if (reduce || typeof cover.getAnimations !== "function") {
     cover.remove();
     return;

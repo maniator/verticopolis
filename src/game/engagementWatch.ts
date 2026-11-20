@@ -22,7 +22,11 @@ export function startEngagementWatch(port: EnginePortCommands, clock: () => numb
   // both after this line.
   const timer = setInterval(() => {
     try {
-      detector.sample({ visible: document.visibilityState === "visible", blocked: isSplashUp() || isDialogOpen(), clock: clock() });
+      detector.sample({
+        visible: document.visibilityState === "visible",
+        blocked: isSplashUp() || isDialogOpen(),
+        clock: clock(),
+      });
     } catch (e) {
       console.error("[engagement] could not sample play:", e);
       clearInterval(timer);

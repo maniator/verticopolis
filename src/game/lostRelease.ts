@@ -22,7 +22,11 @@ export function watchLostRelease(app: GameApp, signal?: AbortSignal): void {
   };
   window.addEventListener("pointerup", releasedElsewhere, capture);
   window.addEventListener("pointercancel", releasedElsewhere, capture);
-  window.addEventListener("blur", () => {
-    if (app.engine) cancelPress(app.engine);
-  }, { signal });
+  window.addEventListener(
+    "blur",
+    () => {
+      if (app.engine) cancelPress(app.engine);
+    },
+    { signal },
+  );
 }

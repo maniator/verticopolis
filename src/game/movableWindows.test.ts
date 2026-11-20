@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
-import { editorPlacedByPlayer, firstDragReporter, forgetEditorPlacement, reportWindowClose, wireMapWindowAnalytics, wireMovableWindows } from "./movableWindows";
+import {
+  editorPlacedByPlayer,
+  firstDragReporter,
+  forgetEditorPlacement,
+  reportWindowClose,
+  wireMapWindowAnalytics,
+  wireMovableWindows,
+} from "./movableWindows";
 
 vi.mock("../analytics", () => ({ trackAppAction: vi.fn() }));
 
@@ -36,7 +43,18 @@ function makeApp() {
 
 function dragTitle(title: HTMLElement): void {
   const at = (type: string, x: number, buttons: number) =>
-    title.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, pointerType: "touch", button: 0, buttons, clientX: x, clientY: 410 }));
+    title.dispatchEvent(
+      new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: "touch",
+        button: 0,
+        buttons,
+        clientX: x,
+        clientY: 410,
+      }),
+    );
   at("pointerdown", 30, 1);
   at("pointermove", 130, 1);
   at("pointerup", 130, 0);
@@ -70,9 +88,31 @@ describe("wireMovableWindows", () => {
   it("counts a press on the title bar that has not moved yet, so the next frame does not dock the card under it", () => {
     const { app, title } = makeApp();
     wireMovableWindows(app);
-    title.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerId: 1, pointerType: "touch", button: 0, buttons: 1, clientX: 30, clientY: 410 }));
+    title.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: "touch",
+        button: 0,
+        buttons: 1,
+        clientX: 30,
+        clientY: 410,
+      }),
+    );
     expect(editorPlacedByPlayer(app)).toBe(true);
-    title.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, pointerId: 1, pointerType: "touch", button: 0, buttons: 0, clientX: 30, clientY: 410 }));
+    title.dispatchEvent(
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: "touch",
+        button: 0,
+        buttons: 0,
+        clientX: 30,
+        clientY: 410,
+      }),
+    );
     expect(editorPlacedByPlayer(app)).toBe(false);
   });
 
@@ -132,7 +172,9 @@ describe("window analytics", () => {
     const close = root.querySelector<HTMLElement>(".overview-map-close")!;
     close.click();
     expect(trackAppAction).not.toHaveBeenCalled();
-    close.dispatchEvent(Object.defineProperty(new MouseEvent("click", { bubbles: true }), "isTrusted", { value: true }));
+    close.dispatchEvent(
+      Object.defineProperty(new MouseEvent("click", { bubbles: true }), "isTrusted", { value: true }),
+    );
     expect(trackAppAction).toHaveBeenCalledWith("window_close", "map");
     vi.mocked(trackAppAction).mockClear();
     placed({ x: 1, y: 2 });

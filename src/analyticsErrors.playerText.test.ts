@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installErrorTracking, resetErrorTrackingForTest } from "./analyticsErrors";
-import { addPlayerTextSource, PLAYER_TEXT_PLACEHOLDER as P, rememberPlayerText, resetPlayerTextForTest } from "./analyticsPlayerText";
+import {
+  addPlayerTextSource,
+  PLAYER_TEXT_PLACEHOLDER as P,
+  rememberPlayerText,
+  resetPlayerTextForTest,
+} from "./analyticsPlayerText";
 import { sendException } from "./analyticsRelay";
 
 // #607: a `$exception` never carries player text the game knows about. The relay,
@@ -59,7 +64,9 @@ describe("$exception scrubs player text (#607)", () => {
     expect(sent().$exception_type).toBe(`${P} Error`);
     expect(sent().$exception_stack_trace_raw).toContain(`at save (https://verticopolis.com/${P}.js:1:2)`);
     expect(sent().source).toBe(`https://verticopolis.com/${P}.js`);
-    expect(sent().$exception_fingerprint).toBe(`${P} Error|A tower named "${P}" already exists.|at save (https://verticopolis.com/${P}.js:1:2)`);
+    expect(sent().$exception_fingerprint).toBe(
+      `${P} Error|A tower named "${P}" already exists.|at save (https://verticopolis.com/${P}.js:1:2)`,
+    );
   });
 
   it("replaces remembered text in a rejection that is not an Error", () => {
@@ -74,7 +81,9 @@ describe("$exception scrubs player text (#607)", () => {
     fireError({ error: err });
     expect(sentText()).not.toMatch(/Secret|"a"/);
     expect(value()).toBe(`Unexpected token "${P}" is not valid JSON`);
-    expect(sent().$exception_stack_trace_raw).toBe(`SyntaxError: ${value()}\n    at JSON.parse (<anonymous>)\n    at load (app.js:1:1)`);
+    expect(sent().$exception_stack_trace_raw).toBe(
+      `SyntaxError: ${value()}\n    at JSON.parse (<anonymous>)\n    at load (app.js:1:1)`,
+    );
   });
 
   it("takes the fingerprint's frame from after a JSON echo that spans lines", () => {
@@ -90,7 +99,9 @@ describe("$exception scrubs player text (#607)", () => {
     err.stack = `SyntaxError: ${err.message}\n    at JSON.parse (<anonymous>)`;
     fireError({ error: err });
     expect(sentText()).not.toMatch(/Secret|"a"/);
-    expect(sent().$exception_stack_trace_raw).toBe(`SyntaxError: ${"w".repeat(1_200)} Unexpected token "${P}" is not valid JSON\n    at JSON.parse (<anonymous>)`);
+    expect(sent().$exception_stack_trace_raw).toBe(
+      `SyntaxError: ${"w".repeat(1_200)} Unexpected token "${P}" is not valid JSON\n    at JSON.parse (<anonymous>)`,
+    );
   });
 
   it("keeps the quotes of an error that is not about JSON, even in a stack through JSON.parse", () => {

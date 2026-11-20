@@ -4,7 +4,11 @@ import { planVersions, readVersions, VERSION_GAP_MS, VERSIONS_KEPT, type TowerVe
 const MIN = 60_000;
 
 /** Write the file at each time in turn (by hand where `manual`), keeping the plans' lists. */
-function writes(times: readonly (number | { at: number; manual: true })[]): { list: TowerVersion[]; dropped: string[]; put: (string | null)[] } {
+function writes(times: readonly (number | { at: number; manual: true })[]): {
+  list: TowerVersion[];
+  dropped: string[];
+  put: (string | null)[];
+} {
   let list: TowerVersion[] = [];
   const dropped: string[] = [];
   const put: (string | null)[] = [];
@@ -33,7 +37,12 @@ describe("a tower file's versions", () => {
   });
 
   it("keeps the last one saved by hand besides the five, replacing the one before it", () => {
-    const times = [0, { at: MIN, manual: true as const }, ...Array.from({ length: VERSIONS_KEPT }, (_, i) => (i + 1) * VERSION_GAP_MS), { at: 99 * MIN, manual: true as const }];
+    const times = [
+      0,
+      { at: MIN, manual: true as const },
+      ...Array.from({ length: VERSIONS_KEPT }, (_, i) => (i + 1) * VERSION_GAP_MS),
+      { at: 99 * MIN, manual: true as const },
+    ];
     const { list, dropped } = writes(times);
     expect(list.filter((v) => v.manual).map((v) => v.at)).toEqual([99 * MIN]);
     expect(list.filter((v) => !v.manual)).toHaveLength(VERSIONS_KEPT);
@@ -47,7 +56,9 @@ describe("a tower file's versions", () => {
 
   it("reads a stored list, dropping any row that is not a version", () => {
     const good = { key: "v:F:1", at: 1, size: 2 };
-    expect(readVersions([good, { key: 1 }, null, { key: "k", at: 2, size: 3, manual: "yes" }, { ...good, manual: true }])).toEqual([good, { ...good, manual: true }]);
+    expect(
+      readVersions([good, { key: 1 }, null, { key: "k", at: 2, size: 3, manual: "yes" }, { ...good, manual: true }]),
+    ).toEqual([good, { ...good, manual: true }]);
     expect(readVersions("nope")).toEqual([]);
   });
 });

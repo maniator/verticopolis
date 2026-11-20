@@ -13,7 +13,8 @@ export type RecoveryCopyOutcome = "saved" | "none" | "failed";
 
 /** The status line for each outcome, said where the player clicked. */
 export const RECOVERY_COPY_STATUS: Readonly<Record<RecoveryCopyOutcome, string>> = {
-  saved: "Recovery copy ready. Check your downloads. It is your stored save exactly as it is, and you can attach it to a bug report.",
+  saved:
+    "Recovery copy ready. Check your downloads. It is your stored save exactly as it is, and you can attach it to a bug report.",
   none: "There is no stored save on this device to copy.",
   failed: "The recovery copy couldn't be saved. Your stored save is untouched.",
 };

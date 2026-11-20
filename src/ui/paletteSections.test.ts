@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { applySectionFolds, PALETTE_FOLDED_CLASS, PALETTE_FOLDED_STORAGE_KEY, storedFoldedGroups, wireSectionFolds } from "./paletteSections";
+import {
+  applySectionFolds,
+  PALETTE_FOLDED_CLASS,
+  PALETTE_FOLDED_STORAGE_KEY,
+  storedFoldedGroups,
+  wireSectionFolds,
+} from "./paletteSections";
 
 /** The palette's item container as buildPalette lays it out: the pinned Tools
  *  cluster, then a section per category, one with a Modern sub-band. */
@@ -26,8 +32,10 @@ function memoryStore(initial: Record<string, string> = {}) {
   };
 }
 
-const section = (root: HTMLElement, title: string) => root.querySelector<HTMLElement>(`.pal-group[data-group="${title}"]`)!;
-const header = (root: HTMLElement, title: string) => section(root, title).querySelector<HTMLElement>(":scope > .pal-group-title[data-group]")!;
+const section = (root: HTMLElement, title: string) =>
+  root.querySelector<HTMLElement>(`.pal-group[data-group="${title}"]`)!;
+const header = (root: HTMLElement, title: string) =>
+  section(root, title).querySelector<HTMLElement>(":scope > .pal-group-title[data-group]")!;
 const folded = (root: HTMLElement, title: string) => section(root, title).classList.contains(PALETTE_FOLDED_CLASS);
 
 describe("folding a palette category from its header", () => {
@@ -137,9 +145,20 @@ describe("folding a palette category from its header", () => {
   it("reads storage that throws, is missing or holds something else as nothing folded, and folds when a write throws", () => {
     expect(storedFoldedGroups(null).size).toBe(0);
     expect(storedFoldedGroups(memoryStore({ [PALETTE_FOLDED_STORAGE_KEY]: "{not json" })).size).toBe(0);
-    expect(storedFoldedGroups(memoryStore({ [PALETTE_FOLDED_STORAGE_KEY]: JSON.stringify({ Leisure: true }) })).size).toBe(0);
-    expect([...storedFoldedGroups(memoryStore({ [PALETTE_FOLDED_STORAGE_KEY]: JSON.stringify(["Living", 3]) }))]).toEqual(["Living"]);
-    const throwing = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("quota"); } };
+    expect(
+      storedFoldedGroups(memoryStore({ [PALETTE_FOLDED_STORAGE_KEY]: JSON.stringify({ Leisure: true }) })).size,
+    ).toBe(0);
+    expect([
+      ...storedFoldedGroups(memoryStore({ [PALETTE_FOLDED_STORAGE_KEY]: JSON.stringify(["Living", 3]) })),
+    ]).toEqual(["Living"]);
+    const throwing = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
     expect(storedFoldedGroups(throwing).size).toBe(0);
     const root = paletteRoot();
     applySectionFolds(root, throwing);

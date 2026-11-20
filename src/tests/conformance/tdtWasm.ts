@@ -41,7 +41,8 @@ export interface BuiltTdt {
 const importTdt = (bytes: Uint8Array, filename: string): string =>
   (wasm() as unknown as { importTdt(bytes: Uint8Array, filename: string): string }).importTdt(bytes, filename);
 
-const bytesOf = (input: ArrayBuffer | Uint8Array): Uint8Array => (input instanceof Uint8Array ? input : new Uint8Array(input));
+const bytesOf = (input: ArrayBuffer | Uint8Array): Uint8Array =>
+  input instanceof Uint8Array ? input : new Uint8Array(input);
 
 /** Read a `.TDT` file the way the game does. The report and facts come from the
  *  engine's load; the save is the importer's own output, before an engine
@@ -54,7 +55,8 @@ export function parseTDT(input: ArrayBuffer | Uint8Array, filename: string): Par
     const record = engine.loadTdt(bytesOf(input), filename);
     if (record[0] !== 1) throw new LegacyImportError(engine.lastReason() ?? "This SimTower save couldn't be read.");
     const facts = importFacts(record, new PortCodes(engine), engine);
-    if (engine.adoptTdt()[0] !== 1) throw new LegacyImportError(engine.lastReason() ?? "This SimTower save couldn't be read.");
+    if (engine.adoptTdt()[0] !== 1)
+      throw new LegacyImportError(engine.lastReason() ?? "This SimTower save couldn't be read.");
     const bytes = bytesOf(input);
     const { save } = JSON.parse(importTdt(bytes, filename)) as { save: SerializedGame };
     return { save, report: importReport(facts), notes: [...facts.notes], facts };

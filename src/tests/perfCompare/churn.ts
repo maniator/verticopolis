@@ -50,7 +50,8 @@ export function churnUnits(save: unknown): Map<string, string> {
   }
   for (const [key, value] of Object.entries(save)) {
     if (Array.isArray(value)) value.forEach((v, i) => out.set(`${key}${SEP}${i}`, JSON.stringify(v)));
-    else if (value !== null && typeof value === "object") for (const [k, v] of Object.entries(value)) out.set(`${key}${SEP}${k}`, JSON.stringify(v));
+    else if (value !== null && typeof value === "object")
+      for (const [k, v] of Object.entries(value)) out.set(`${key}${SEP}${k}`, JSON.stringify(v));
     else out.set(key, JSON.stringify(value));
   }
   return out;
@@ -59,7 +60,10 @@ export function churnUnits(save: unknown): Map<string, string> {
 const sectionOf = (path: string): string => path.split(SEP, 1)[0];
 
 /** Characters changed and total, overall and per section. */
-export function churnBetween(prev: Map<string, string>, next: Map<string, string>): { changed: number; total: number; sections: Record<string, { changed: number; total: number }> } {
+export function churnBetween(
+  prev: Map<string, string>,
+  next: Map<string, string>,
+): { changed: number; total: number; sections: Record<string, { changed: number; total: number }> } {
   let changed = 0;
   let total = 0;
   const sections: Record<string, { changed: number; total: number }> = {};
@@ -88,7 +92,11 @@ function quantile(sorted: number[], q: number): number {
   return sorted[Math.min(sorted.length - 1, Math.ceil(q * sorted.length) - 1)];
 }
 
-const median = (xs: number[]): number => quantile([...xs].sort((a, b) => a - b), 0.5);
+const median = (xs: number[]): number =>
+  quantile(
+    [...xs].sort((a, b) => a - b),
+    0.5,
+  );
 
 /**
  * Run `hours` in-game hours in `dt`-minute steps and measure each hour's churn,
@@ -96,7 +104,8 @@ const median = (xs: number[]): number => quantile([...xs].sort((a, b) => a - b),
  * divide 60 so that an hour is exactly 60 in-game minutes.
  */
 export function measureChurn(mod: WasmModule, sc: Scenario, hours: number, dt: number, warmSteps = 0): ChurnReport {
-  if (!(dt > 0) || !Number.isInteger(60 / dt)) throw new Error(`dt ${dt} does not divide an hour; churn hours would not be 60 minutes`);
+  if (!(dt > 0) || !Number.isInteger(60 / dt))
+    throw new Error(`dt ${dt} does not divide an hour; churn hours would not be 60 minutes`);
   const stepsPerHour = 60 / dt;
   const e = mod.Engine.fromSave(sc.save);
   try {
@@ -127,7 +136,12 @@ export function measureChurn(mod: WasmModule, sc: Scenario, hours: number, dt: n
       medianShare: quantile(shares, 0.5),
       p95Share: quantile(shares, 0.95),
       maxShare: shares[shares.length - 1] ?? NaN,
-      sections: Object.fromEntries(Object.entries(perSection).map(([name, xs]) => [name, { saveShare: saveChars > 0 ? sectionChars[name] / saveChars : 0, medianChurn: median(xs) }])),
+      sections: Object.fromEntries(
+        Object.entries(perSection).map(([name, xs]) => [
+          name,
+          { saveShare: saveChars > 0 ? sectionChars[name] / saveChars : 0, medianChurn: median(xs) },
+        ]),
+      ),
     };
   } finally {
     e.free();

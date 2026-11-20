@@ -46,7 +46,8 @@ export function categorize(path: string): Category {
     return p.endsWith(".js") ? "wasm-glue" : "engine-meta";
   }
   if (base === "sw.js" || /^workbox-[\w-]+\.js$/.test(base)) return "service-worker";
-  if (/^(help|gallery|preview|pageShell|helpContent)[-.]/.test(base) || p.startsWith("assets/help-media/")) return "non-game-pages";
+  if (/^(help|gallery|preview|pageShell|helpContent)[-.]/.test(base) || p.startsWith("assets/help-media/"))
+    return "non-game-pages";
   if (/^worker-[\w-]+\.js$/.test(base)) return "tooling";
   if (/^ToneAudioEngine-[\w-]+\.js$/.test(base)) return "audio-js";
   if (p.endsWith(".js")) return "app-js";
@@ -86,11 +87,27 @@ function uleb(bytes: Uint8Array, pos: number): { value: number; next: number } {
   return { value, next: i };
 }
 
-const SECTION_NAMES = ["custom", "type", "import", "function", "table", "memory", "global", "export", "start", "element", "code", "data", "datacount", "tag"];
+const SECTION_NAMES = [
+  "custom",
+  "type",
+  "import",
+  "function",
+  "table",
+  "memory",
+  "global",
+  "export",
+  "start",
+  "element",
+  "code",
+  "data",
+  "datacount",
+  "tag",
+];
 
 /** The size of every section of a WASM module, custom sections by name. */
 export function wasmSections(bytes: Uint8Array): { name: string; bytes: number }[] {
-  if (bytes.length < 8 || bytes[0] !== 0 || bytes[1] !== 0x61 || bytes[2] !== 0x73 || bytes[3] !== 0x6d) throw new Error("not a wasm module");
+  if (bytes.length < 8 || bytes[0] !== 0 || bytes[1] !== 0x61 || bytes[2] !== 0x73 || bytes[3] !== 0x6d)
+    throw new Error("not a wasm module");
   const out: { name: string; bytes: number }[] = [];
   let pos = 8;
   while (pos < bytes.length) {
@@ -156,7 +173,9 @@ export function sizeOf(buf: Buffer): { raw: number; gzip: number; brotli: number
   return {
     raw: buf.length,
     gzip: gzipSync(buf, { level: 9 }).length,
-    brotli: brotliCompressSync(buf, { params: { [constants.BROTLI_PARAM_QUALITY]: 11, [constants.BROTLI_PARAM_SIZE_HINT]: buf.length } }).length,
+    brotli: brotliCompressSync(buf, {
+      params: { [constants.BROTLI_PARAM_QUALITY]: 11, [constants.BROTLI_PARAM_SIZE_HINT]: buf.length },
+    }).length,
   };
 }
 
@@ -166,7 +185,12 @@ export function analyzeBundle(distDir: string): BundleReport {
   const swPath = paths.includes("sw.js") ? join(distDir, "sw.js") : null;
   const precache = swPath ? precacheUrls(readFileSync(swPath, "utf8")) : [];
   const pre = new Set(precache);
-  const files: FileSize[] = paths.map((p) => ({ path: p, category: categorize(p), ...sizeOf(readFileSync(join(distDir, p))), precached: pre.has(p) }));
+  const files: FileSize[] = paths.map((p) => ({
+    path: p,
+    category: categorize(p),
+    ...sizeOf(readFileSync(join(distDir, p))),
+    precached: pre.has(p),
+  }));
   const byCategory: BundleReport["byCategory"] = {};
   for (const f of files) {
     const c = (byCategory[f.category] ??= { files: 0, raw: 0, gzip: 0, brotli: 0 });
@@ -180,7 +204,12 @@ export function analyzeBundle(distDir: string): BundleReport {
   let wasm: BundleReport["wasm"] = null;
   if (wasmFile) {
     const sections = wasmSections(readFileSync(join(distDir, wasmFile.path)));
-    wasm = { path: wasmFile.path, raw: wasmFile.raw, sections, customBytes: sections.filter((s) => s.name.startsWith("custom:")).reduce((s, x) => s + x.bytes, 0) };
+    wasm = {
+      path: wasmFile.path,
+      raw: wasmFile.raw,
+      sections,
+      customBytes: sections.filter((s) => s.name.startsWith("custom:")).reduce((s, x) => s + x.bytes, 0),
+    };
   }
   const game = (f: FileSize) => !NOT_GAME.includes(f.category);
   return {

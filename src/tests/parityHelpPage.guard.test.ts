@@ -39,7 +39,9 @@ function anchorOf(title: string): string {
 
 /** The help-page anchors of the `### ` sections under a `## ` heading. */
 function helpAnchors(page: string, heading: string): string[] {
-  return (sectionLines(page, heading) ?? []).filter((line) => line.startsWith("### ")).map((line) => anchorOf(line.slice(4)));
+  return (sectionLines(page, heading) ?? [])
+    .filter((line) => line.startsWith("### "))
+    .map((line) => anchorOf(line.slice(4)));
 }
 
 /** Each bullet of a PARITY.md section, with the help anchors it links. */
@@ -58,10 +60,22 @@ const PAIRS = [
 ];
 
 describe("the parity guard's readers", () => {
-  const doc = ["## A", "- one [Help](" + HELP_URL + "first-thing)", "- two, no link", "### Inside A", "## B", "### First thing", "### Second, thing!"].join("\n");
+  const doc = [
+    "## A",
+    "- one [Help](" + HELP_URL + "first-thing)",
+    "- two, no link",
+    "### Inside A",
+    "## B",
+    "### First thing",
+    "### Second, thing!",
+  ].join("\n");
 
   it("stops a section at the next heading of its level", () => {
-    expect(sectionLines(doc, "## A")).toEqual(["- one [Help](" + HELP_URL + "first-thing)", "- two, no link", "### Inside A"]);
+    expect(sectionLines(doc, "## A")).toEqual([
+      "- one [Help](" + HELP_URL + "first-thing)",
+      "- two, no link",
+      "### Inside A",
+    ]);
     expect(sectionLines(doc, "## Missing")).toBeUndefined();
   });
 

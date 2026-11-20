@@ -24,7 +24,10 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 /** Press a key on the wired target; returns whether the browser default was taken. */
-function press(key: string, mods: Partial<Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "shiftKey" | "altKey" | "repeat">> = {}): boolean {
+function press(
+  key: string,
+  mods: Partial<Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "shiftKey" | "altKey" | "repeat">> = {},
+): boolean {
   const e = new KeyboardEvent("keydown", { key, cancelable: true, ...mods });
   target.dispatchEvent(e);
   return e.defaultPrevented;
@@ -32,7 +35,8 @@ function press(key: string, mods: Partial<Pick<KeyboardEvent, "ctrlKey" | "metaK
 
 describe("the File menu's keys", () => {
   it("name Open, Save and Save As with Ctrl or Cmd, and nothing else", () => {
-    const k = (key: string, m: object = {}) => fileCommandFor({ key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...m });
+    const k = (key: string, m: object = {}) =>
+      fileCommandFor({ key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...m });
     expect(k("o", { ctrlKey: true })).toBe("open");
     expect(k("s", { ctrlKey: true })).toBe("save");
     expect(k("S", { ctrlKey: true, shiftKey: true })).toBe("saveAs");

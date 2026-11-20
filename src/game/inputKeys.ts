@@ -36,7 +36,20 @@ function ownsNativeUndo(el: Element | null): boolean {
 const ACTS_ON_SPACE_RELEASE = new Set(["checkbox", "radio", "button", "submit", "reset", "image", "color", "file"]);
 
 /** The input types that take Space as text (an unknown type reads as "text"). */
-const TEXT_ENTRY_TYPES = new Set(["text", "search", "email", "url", "tel", "password", "number", "date", "time", "datetime-local", "month", "week"]);
+const TEXT_ENTRY_TYPES = new Set([
+  "text",
+  "search",
+  "email",
+  "url",
+  "tel",
+  "password",
+  "number",
+  "date",
+  "time",
+  "datetime-local",
+  "month",
+  "week",
+]);
 
 /** A focused field where Space types or opens something on the press: a text
  *  field, a dropdown or a contentEditable region. The field owns that Space,
@@ -97,11 +110,24 @@ function worldCovered(): boolean {
  *  or null for any other key. */
 function cursorStep(key: string, step: number): [dx: number, dy: number] | null {
   switch (key) {
-    case "ArrowLeft": case "a": case "A": return [-step, 0];
-    case "ArrowRight": case "d": case "D": return [step, 0];
-    case "ArrowUp": case "w": case "W": return [0, step];
-    case "ArrowDown": case "s": case "S": return [0, -step];
-    default: return null;
+    case "ArrowLeft":
+    case "a":
+    case "A":
+      return [-step, 0];
+    case "ArrowRight":
+    case "d":
+    case "D":
+      return [step, 0];
+    case "ArrowUp":
+    case "w":
+    case "W":
+      return [0, step];
+    case "ArrowDown":
+    case "s":
+    case "S":
+      return [0, -step];
+    default:
+      return null;
   }
 }
 
@@ -121,7 +147,8 @@ function blocksGameKey(e: KeyboardEvent): boolean {
   // The Map window's canvas (role "application") counts too: Space held
   // there still pans the world, and it does not commit the build cursor.
   const role = ae?.getAttribute("role");
-  const onControl = !!ae && (ae.tagName === "BUTTON" || ae.tagName === "A" || role === "button" || role === "application");
+  const onControl =
+    !!ae && (ae.tagName === "BUTTON" || ae.tagName === "A" || role === "button" || role === "application");
   const activationKey = e.key === "Enter" || isSpaceKey(e);
   if (onControl && activationKey) return true;
   if (isDialogOpen()) return true;
@@ -250,192 +277,227 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   };
   const capture = { capture: true, signal };
   // Capture, so a control that stops a key lower down cannot hide it here.
-  window.addEventListener("keydown", (e) => {
-    // A key on a focused dropdown can open its popup, fresh or repeating, which
-    // can take the Space release unseen, as a press on it can.
-    if (space !== "up" && opensPopup(document.activeElement) && (KEYS_THAT_OPEN_A_DROPDOWN.has(e.key) || (e.repeat && isSpaceKey(e)))) dropSpaceHold();
-    if (enter.withholds(e)) withholdRepeat(e);
-    if (!isSpaceKey(e)) {
-      if (!e.repeat) {
-        if (worldCovered()) heldUncovered.delete(keyId(e));
-        else heldUncovered.add(keyId(e));
-      } else if (heldUncovered.has(keyId(e)) && worldCovered()) {
-        withholdRepeat(e);
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      // A key on a focused dropdown can open its popup, fresh or repeating, which
+      // can take the Space release unseen, as a press on it can.
+      if (
+        space !== "up" &&
+        opensPopup(document.activeElement) &&
+        (KEYS_THAT_OPEN_A_DROPDOWN.has(e.key) || (e.repeat && isSpaceKey(e)))
+      )
+        dropSpaceHold();
+      if (enter.withholds(e)) withholdRepeat(e);
+      if (!isSpaceKey(e)) {
+        if (!e.repeat) {
+          if (worldCovered()) heldUncovered.delete(keyId(e));
+          else heldUncovered.add(keyId(e));
+        } else if (heldUncovered.has(keyId(e)) && worldCovered()) {
+          withholdRepeat(e);
+        }
       }
-    }
-    if (e.repeat) {
+      if (e.repeat) {
+        if (isSpaceKey(e)) {
+          // A Space already down when the page got focus arrives only as repeats:
+          // follow that hold too (it can still become the pan key), with no tap.
+          // No cover got its press, so one that is up does not get the hold, even
+          // a field in it (its repeated spaces are lost).
+          if (!spacePress) spacePress = { target: null, covered: false };
+          if (space === "up" && followsSpace(e)) startSpaceHold();
+          if (coverTookSpace() || focusTookSpace()) withholdRepeat(e);
+        } else if (space === "tap" && !KEYS_THAT_KEEP_THE_TAP.has(e.key)) {
+          // A key held since before Space went down: its first repeat settles the tap.
+          settleTap(e);
+        }
+        return;
+      }
+      if (KEYS_THAT_KEEP_THE_TAP.has(e.key)) return;
+      // A fresh press of any other key settles a pending tap, and a fresh Space
+      // starts a hold of its own.
+      if (space === "tap") settleTap(e);
+      // A Space chord or a Space typed into a field neither builds nor pans, and
+      // it ends a hold whose release was lost.
       if (isSpaceKey(e)) {
-        // A Space already down when the page got focus arrives only as repeats:
-        // follow that hold too (it can still become the pan key), with no tap.
-        // No cover got its press, so one that is up does not get the hold, even
-        // a field in it (its repeated spaces are lost).
-        if (!spacePress) spacePress = { target: null, covered: false };
-        if (space === "up" && followsSpace(e)) startSpaceHold();
-        if (coverTookSpace() || focusTookSpace()) withholdRepeat(e);
-      } else if (space === "tap" && !KEYS_THAT_KEEP_THE_TAP.has(e.key)) {
-        // A key held since before Space went down: its first repeat settles the tap.
-        settleTap(e);
+        endSpaceHold();
+        if (followsSpace(e)) startSpaceHold();
+        notePress();
       }
-      return;
-    }
-    if (KEYS_THAT_KEEP_THE_TAP.has(e.key)) return;
-    // A fresh press of any other key settles a pending tap, and a fresh Space
-    // starts a hold of its own.
-    if (space === "tap") settleTap(e);
-    // A Space chord or a Space typed into a field neither builds nor pans, and
-    // it ends a hold whose release was lost.
-    if (isSpaceKey(e)) {
-      endSpaceHold();
-      if (followsSpace(e)) startSpaceHold();
-      notePress();
-    }
-  }, capture);
-  window.addEventListener("keydown", (e) => {
-    // The crash screen owns all input while it is up: the renderer is dead
-    // and the tower was just flushed, so game shortcuts (undo especially)
-    // must not silently mutate the sim behind the card. Checked before the
-    // undo/redo block below, which deliberately runs ahead of the #modal
-    // guard and would otherwise stay live. The graphics-recovery card holds the
-    // page the same way while the canvas is frozen (#321).
-    if (isCrashed() || isRecoveringGraphics() || isEngineStopped()) return;
-    // Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or +Y), handled BEFORE the
-    // modifier bail below so it isn't swallowed; yielded to a focused field that
-    // keeps its own undo history (INPUT/TEXTAREA/contentEditable, e.g. the rename
-    // box). A focused SELECT is NOT yielded to: it has no native undo, so the
-    // tower undo stays live there (see ownsNativeUndo).
-    {
-      // Never mutate the tower behind the first-run splash or an open dialog:
-      // this block runs BEFORE the modal/splash guards further down (so Ctrl+Z
-      // isn't swallowed by the modifier bail), so it must repeat those two
-      // checks itself. A choice-bearing dialog (the Saves picker) must not have
-      // builds undone under it, and the splash must stay inert; gating any open
-      // #modal is the conservative call and leaves undo fully live in normal
-      // play. A field with its own undo history still keeps it (ownsNativeUndo).
-      const guardsUndo = isSplashUp() || isDialogOpen();
-      if (!guardsUndo && !ownsNativeUndo(document.activeElement) && (e.ctrlKey || e.metaKey)) {
-        const k = e.key.toLowerCase();
-        if (k === "z" && !e.shiftKey) {
-          e.preventDefault();
-          void app.undo();
-          return;
-        }
-        if ((k === "z" && e.shiftKey) || k === "y") {
-          e.preventDefault();
-          void app.redo();
-          return;
+    },
+    capture,
+  );
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      // The crash screen owns all input while it is up: the renderer is dead
+      // and the tower was just flushed, so game shortcuts (undo especially)
+      // must not silently mutate the sim behind the card. Checked before the
+      // undo/redo block below, which deliberately runs ahead of the #modal
+      // guard and would otherwise stay live. The graphics-recovery card holds the
+      // page the same way while the canvas is frozen (#321).
+      if (isCrashed() || isRecoveringGraphics() || isEngineStopped()) return;
+      // Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or +Y), handled BEFORE the
+      // modifier bail below so it isn't swallowed; yielded to a focused field that
+      // keeps its own undo history (INPUT/TEXTAREA/contentEditable, e.g. the rename
+      // box). A focused SELECT is NOT yielded to: it has no native undo, so the
+      // tower undo stays live there (see ownsNativeUndo).
+      {
+        // Never mutate the tower behind the first-run splash or an open dialog:
+        // this block runs BEFORE the modal/splash guards further down (so Ctrl+Z
+        // isn't swallowed by the modifier bail), so it must repeat those two
+        // checks itself. A choice-bearing dialog (the Saves picker) must not have
+        // builds undone under it, and the splash must stay inert; gating any open
+        // #modal is the conservative call and leaves undo fully live in normal
+        // play. A field with its own undo history still keeps it (ownsNativeUndo).
+        const guardsUndo = isSplashUp() || isDialogOpen();
+        if (!guardsUndo && !ownsNativeUndo(document.activeElement) && (e.ctrlKey || e.metaKey)) {
+          const k = e.key.toLowerCase();
+          if (k === "z" && !e.shiftKey) {
+            e.preventDefault();
+            void app.undo();
+            return;
+          }
+          if ((k === "z" && e.shiftKey) || k === "y") {
+            e.preventDefault();
+            void app.redo();
+            return;
+          }
         }
       }
-    }
-    if (blocksGameKey(e)) return;
-    if (e.key >= "0" && e.key <= "3") {
-      app.setSpeed(Number(e.key));
-      return;
-    }
+      if (blocksGameKey(e)) return;
+      if (e.key >= "0" && e.key <= "3") {
+        app.setSpeed(Number(e.key));
+        return;
+      }
 
-    // Keyboard play (F50–52): a virtual build cursor moved with arrows/WASD,
-    // committed with Enter or Space, bulldozed with Delete/X, full mouse-free
-    // play. A held commit or bulldoze key acts once: its repeats land on the
-    // same cell, where they could only fail again.
-    const move = cursorStep(e.key, e.shiftKey ? 10 : 1);
-    if (move) {
-      app.keyboard.moveCursor(...move);
-      e.preventDefault();
-      return;
-    }
-    if (isSpaceKey(e)) {
-      // Builds on the release (the keyup listener below) or at the next
-      // cursor key (the capture keydown above), if the hold stays a tap.
-      // A Space pressed under a cover never becomes a build tap, even once the
-      // cover is gone.
-      if (!e.repeat && space === "held" && !spacePress?.covered) space = "tap";
-      e.preventDefault(); // repeats too
-      return;
-    }
-    switch (e.key) {
-      case "Enter":
-        if (!e.repeat) void app.keyboard.commitCursor();
-        break;
-      case "Delete": case "Backspace": case "x": case "X":
-        if (!e.repeat) void app.keyboard.bulldozeCursor();
-        break;
-      case "+": case "=": app.engine.zoomBy(1.15); return;
-      case "-": case "_": app.engine.zoomBy(1 / 1.15); return;
-      case "c": case "C": {
-        const cur = app.keyboard.cursor();
-        if (cur) app.engine.ensureVisible(cur.tile, cur.floor);
-        else app.engine.center();
+      // Keyboard play (F50–52): a virtual build cursor moved with arrows/WASD,
+      // committed with Enter or Space, bulldozed with Delete/X, full mouse-free
+      // play. A held commit or bulldoze key acts once: its repeats land on the
+      // same cell, where they could only fail again.
+      const move = cursorStep(e.key, e.shiftKey ? 10 : 1);
+      if (move) {
+        app.keyboard.moveCursor(...move);
+        e.preventDefault();
         return;
       }
-      case "Escape":
-        app.keyboard.resetAnchor();
-        app.engine.transportPreview = null;
-        app.keyboard.refreshCursorPreview();
-        app.announce("Cancelled");
+      if (isSpaceKey(e)) {
+        // Builds on the release (the keyup listener below) or at the next
+        // cursor key (the capture keydown above), if the hold stays a tap.
+        // A Space pressed under a cover never becomes a build tap, even once the
+        // cover is gone.
+        if (!e.repeat && space === "held" && !spacePress?.covered) space = "tap";
+        e.preventDefault(); // repeats too
         return;
-      default:
-        return; // not a game key, let it through
-    }
-    e.preventDefault(); // consumed a commit or bulldoze key, repeats included
-  }, { signal });
+      }
+      switch (e.key) {
+        case "Enter":
+          if (!e.repeat) void app.keyboard.commitCursor();
+          break;
+        case "Delete":
+        case "Backspace":
+        case "x":
+        case "X":
+          if (!e.repeat) void app.keyboard.bulldozeCursor();
+          break;
+        case "+":
+        case "=":
+          app.engine.zoomBy(1.15);
+          return;
+        case "-":
+        case "_":
+          app.engine.zoomBy(1 / 1.15);
+          return;
+        case "c":
+        case "C": {
+          const cur = app.keyboard.cursor();
+          if (cur) app.engine.ensureVisible(cur.tile, cur.floor);
+          else app.engine.center();
+          return;
+        }
+        case "Escape":
+          app.keyboard.resetAnchor();
+          app.engine.transportPreview = null;
+          app.keyboard.refreshCursorPreview();
+          app.announce("Cancelled");
+          return;
+        default:
+          return; // not a game key, let it through
+      }
+      e.preventDefault(); // consumed a commit or bulldoze key, repeats included
+    },
+    { signal },
+  );
   // Capture, ahead of a focused button or palette item, which act on the
   // Space release: the release of a pan-key hold, or of a Space pressed before
   // the control got focus, reaches them already canceled.
-  window.addEventListener("keyup", (e) => {
-    // While Cmd is held macOS sends no Space release, so Cmd's own release
-    // ends the hold; a Space still down starts a new one at its next press or
-    // at a repeat the game follows.
-    heldUncovered.delete(keyId(e));
-    enter.keyUp(e);
-    if (e.key === "Meta") dropSpaceHold();
-    if (!isSpaceKey(e)) return;
-    const hold = panReleaseOwed ? "pan" : space;
-    const coverTook = coverTookSpace();
-    const focusTook = focusTookSpace();
-    endSpaceHold();
-    if (worldCovered()) {
-      // Nothing behind a cover pans, so a Space pressed on its controls stays
-      // theirs; one it did not get the press of is not, and builds nothing.
-      if (coverTook) {
-        e.preventDefault();
-        liftKeyboardPress(); // a cover that left focus where it was
+  window.addEventListener(
+    "keyup",
+    (e) => {
+      // While Cmd is held macOS sends no Space release, so Cmd's own release
+      // ends the hold; a Space still down starts a new one at its next press or
+      // at a repeat the game follows.
+      heldUncovered.delete(keyId(e));
+      enter.keyUp(e);
+      if (e.key === "Meta") dropSpaceHold();
+      if (!isSpaceKey(e)) return;
+      const hold = panReleaseOwed ? "pan" : space;
+      const coverTook = coverTookSpace();
+      const focusTook = focusTookSpace();
+      endSpaceHold();
+      if (worldCovered()) {
+        // Nothing behind a cover pans, so a Space pressed on its controls stays
+        // theirs; one it did not get the press of is not, and builds nothing.
+        if (coverTook) {
+          e.preventDefault();
+          liftKeyboardPress(); // a cover that left focus where it was
+        }
+        return;
       }
-      return;
-    }
-    if (hold === "pan" || focusTook) {
-      e.preventDefault();
-      liftKeyboardPress();
-      return;
-    }
-    // Checked again at release: a focused field that came up while Space was
-    // held keeps the build out of the tower.
-    if (hold === "tap" && !blocksGameKey(e)) void app.keyboard.commitCursor();
-  }, capture);
+      if (hold === "pan" || focusTook) {
+        e.preventDefault();
+        liftKeyboardPress();
+        return;
+      }
+      // Checked again at release: a focused field that came up while Space was
+      // held keeps the build out of the tower.
+      if (hold === "tap" && !blocksGameKey(e)) void app.keyboard.commitCursor();
+    },
+    capture,
+  );
   // Pointers are tracked in the capture phase, so a handler further down that
   // stops the event cannot hide a press from the Space hold.
-  window.addEventListener("pointerdown", (e) => {
-    // A primary press means no other pointer of its kind is down, so one still
-    // on record lost its release (a palm the system rejected, a touch taken by a
-    // system gesture) and would make every later Space a pan hold. A mouse press
-    // clears touch and pen ids too: the player has moved on to the mouse.
-    if (e.isPrimary) {
-      for (const [id, kind] of pointersDown) {
-        const stale = kind === e.pointerType || e.pointerType === "mouse";
-        if (stale && id !== e.pointerId) pointersDown.delete(id);
+  window.addEventListener(
+    "pointerdown",
+    (e) => {
+      // A primary press means no other pointer of its kind is down, so one still
+      // on record lost its release (a palm the system rejected, a touch taken by a
+      // system gesture) and would make every later Space a pan hold. A mouse press
+      // clears touch and pen ids too: the player has moved on to the mouse.
+      if (e.isPrimary) {
+        for (const [id, kind] of pointersDown) {
+          const stale = kind === e.pointerType || e.pointerType === "mouse";
+          if (stale && id !== e.pointerId) pointersDown.delete(id);
+        }
       }
-    }
-    pointersDown.set(e.pointerId, e.pointerType);
-    usePanKey();
-    spaceAtPress.set(e, space !== "up");
-    // A dropdown's popup takes the keyboard, so Space can come up inside it,
-    // unseen here, and leave the pan key on.
-    const dropdown = e.target instanceof Element ? e.target.closest("select") : null;
-    if (opensPopup(dropdown) && isPrimaryPress(e)) dropSpaceHold();
-  }, capture);
+      pointersDown.set(e.pointerId, e.pointerType);
+      usePanKey();
+      spaceAtPress.set(e, space !== "up");
+      // A dropdown's popup takes the keyboard, so Space can come up inside it,
+      // unseen here, and leave the pan key on.
+      const dropdown = e.target instanceof Element ? e.target.closest("select") : null;
+      if (opensPopup(dropdown) && isPrimaryPress(e)) dropSpaceHold();
+    },
+    capture,
+  );
   // A native drag (selected text, a link) takes the keyboard until the drop.
   // One the page canceled took nothing.
-  window.addEventListener("dragstart", (e) => {
-    if (!e.defaultPrevented) dropSpaceHold();
-  }, { signal });
+  window.addEventListener(
+    "dragstart",
+    (e) => {
+      if (!e.defaultPrevented) dropSpaceHold();
+    },
+    { signal },
+  );
   const pointerGone = (e: PointerEvent): void => {
     pointersDown.delete(e.pointerId);
   };
@@ -444,44 +506,64 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   // A move tells what a missed event left wrong: no button held means the
   // release went elsewhere (let go over another window); a button held that is
   // not on record means the press came while the page had no focus.
-  window.addEventListener("pointermove", (e) => {
-    if (noButtonHeld(e)) {
-      pointerGone(e);
-    } else if (!pointersDown.has(e.pointerId)) {
-      pointersDown.set(e.pointerId, e.pointerType);
-      usePanKey();
-    }
-  }, { capture: true, passive: true, signal });
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      if (noButtonHeld(e)) {
+        pointerGone(e);
+      } else if (!pointersDown.has(e.pointerId)) {
+        pointersDown.set(e.pointerId, e.pointerType);
+        usePanKey();
+      }
+    },
+    { capture: true, passive: true, signal },
+  );
   // A native context menu or a hidden page can swallow the release; the next
   // move with a button held puts a pointer that is still down back on record.
   // A menu the game kept closed (its own right-click, a touch long-press) took
   // nothing, and the press it came in is still held, so that one is skipped.
   // A native menu takes the keyboard too, so it ends the Space hold as well.
   const forgetPointers = (): void => pointersDown.clear();
-  window.addEventListener("contextmenu", (e) => {
-    if (e.defaultPrevented) return;
-    forgetPointers();
-    dropSpaceHold();
-  }, { signal });
+  window.addEventListener(
+    "contextmenu",
+    (e) => {
+      if (e.defaultPrevented) return;
+      forgetPointers();
+      dropSpaceHold();
+    },
+    { signal },
+  );
   // A tap armed before the tab was hidden does not build at the first cursor
   // key after it comes back.
-  document.addEventListener("visibilitychange", () => {
-    forgetPointers();
-    if (document.hidden) endSpaceHold();
-  }, { signal });
+  document.addEventListener(
+    "visibilitychange",
+    () => {
+      forgetPointers();
+      if (document.hidden) endSpaceHold();
+    },
+    { signal },
+  );
   // The wheel over the world zooms it, so a hold that turned it there was not a
   // build tap. A wheel that scrolls the palette or a panel, or a sideways swipe
   // the camera ignores, leaves the tap.
-  window.addEventListener("wheel", (e) => {
-    if (e.target === app.canvas && wheelZoomDelta(e) !== 0) usePanKey();
-  }, { capture: true, passive: true, signal });
+  window.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.target === app.canvas && wheelZoomDelta(e) !== 0) usePanKey();
+    },
+    { capture: true, passive: true, signal },
+  );
   // A release the page never sees (focus left mid-hold) must not build later.
-  window.addEventListener("blur", () => {
-    pointersDown.clear();
-    heldUncovered.clear();
-    enter.forget();
-    endSpaceHold();
-  }, { signal });
+  window.addEventListener(
+    "blur",
+    () => {
+      pointersDown.clear();
+      heldUncovered.clear();
+      enter.forget();
+      endSpaceHold();
+    },
+    { signal },
+  );
   // First interaction starts audio (browser autoplay policy). Gated on the
   // crash screen the same way the keydown handler is: a stray key or tap behind
   // the crash card must not start the audio bed. A gesture that lands behind the

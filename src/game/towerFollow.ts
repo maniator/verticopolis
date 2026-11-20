@@ -85,7 +85,9 @@ function followStep(app: GameApp): void {
   // A box not yet shown belongs to the step it was earned in.
   app.pendingStarUp = null;
   const stands = (picked: { type: "unit" | "transport"; id: number }): boolean =>
-    picked.type === "unit" ? app.reader.tower.getUnit(picked.id) !== undefined : app.reader.tower.getTransport(picked.id) !== undefined;
+    picked.type === "unit"
+      ? app.reader.tower.getUnit(picked.id) !== undefined
+      : app.reader.tower.getTransport(picked.id) !== undefined;
   // A person's card can name a room the step took away, so it closes either way.
   app.personCard?.close();
   if (app.selected && !stands(app.selected)) app.clearSelection();

@@ -1,7 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
-import { expectAudioFromWorker, expectControlledWithEngine, expectSoundsAfterGesture, hostedGame, installWorker, recordAudio, watch } from "./offlineHelpers";
+import {
+  expectAudioFromWorker,
+  expectControlledWithEngine,
+  expectSoundsAfterGesture,
+  hostedGame,
+  installWorker,
+  recordAudio,
+  watch,
+} from "./offlineHelpers";
 
 /**
  * The installed game on the WASM engine without a network (#985). The service
@@ -31,7 +39,10 @@ async function playSaveAndLoad(page: Page): Promise<void> {
     const ok = g.sim.build("lobby", 1, 160).ok;
     (window as any).game.syncSim();
     const host = (window as any).__vcEngine;
-    const lobbyAt = (x: number) => (JSON.parse(host.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === x);
+    const lobbyAt = (x: number) =>
+      (JSON.parse(host.port.serialize()).units as { kind: string; x: number }[]).some(
+        (u) => u.kind === "lobby" && u.x === x,
+      );
     const id = await g.saveFile("Offline test");
     // Go on in a copy, so the file saved is not the tower being played (that
     // file is the live tower itself, and opening it again loads nothing).
@@ -52,17 +63,30 @@ async function playSaveAndLoad(page: Page): Promise<void> {
       afterLoad: lobbyAt(200),
     };
   });
-  expect(built).toEqual({ ok: true, after: true, beforeLoad: true, hosted: true, lastError: null, saved: true, afterLoad: false });
+  expect(built).toEqual({
+    ok: true,
+    after: true,
+    beforeLoad: true,
+    hosted: true,
+    lastError: null,
+    saved: true,
+    afterLoad: false,
+  });
 }
 
-test("an installed game starts the WASM engine on its first reload offline, and plays, saves and loads", async ({ page, context }) => {
+test("an installed game starts the WASM engine on its first reload offline, and plays, saves and loads", async ({
+  page,
+  context,
+}) => {
   await installWorker(page);
   // The first navigation the worker controls happens with no network, so the
   // shell and the engine come from the precache only and the binary is
   // answered by the service worker. The reload keeps the browser context.
   await context.setOffline(true);
   const seen = watch(page);
-  const binary = page.waitForResponse((r) => r.url().includes("engine/verticopolis_engine_bg.wasm"), { timeout: 30_000 });
+  const binary = page.waitForResponse((r) => r.url().includes("engine/verticopolis_engine_bg.wasm"), {
+    timeout: 30_000,
+  });
   await page.reload();
   expect((await binary).fromServiceWorker(), "the engine binary is served by the service worker").toBe(true);
   await expectControlledWithEngine(page);

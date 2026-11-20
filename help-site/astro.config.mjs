@@ -20,19 +20,29 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import { satteri } from "@astrojs/markdown-satteri";
 import { GITHUB } from "./title-bar.mjs";
-import { HELP_BASE, OLD_ANCHORS, SITE_ORIGIN, oldAnchorRedirects, schemeBootScript, sharedHead, sidebar, siteHref } from "./site.mjs";
+import {
+  HELP_BASE,
+  OLD_ANCHORS,
+  SITE_ORIGIN,
+  oldAnchorRedirects,
+  schemeBootScript,
+  sharedHead,
+  sidebar,
+  siteHref,
+} from "./site.mjs";
 
 const site = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(site, "..");
 const components = join(repo, "node_modules/@verticopolis/components");
-
 
 /** The same compile-time constants the game's Vite build defines, for the
  *  game modules the site shares (telemetry and the from-game link handling). */
 const appVersion = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")).version;
 let appSha = "unknown";
 try {
-  appSha = execSync("git rev-parse --short HEAD", { cwd: repo, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  appSha = execSync("git rev-parse --short HEAD", { cwd: repo, stdio: ["ignore", "pipe", "ignore"] })
+    .toString()
+    .trim();
 } catch {
   // Outside a checkout the build still works; the SHA reads "unknown".
 }
@@ -96,7 +106,11 @@ export default defineConfig({
         "./src/styles/help.css",
         "./src/styles/help-schemes.css",
       ],
-      head: [...sharedHead, { tag: "script", content: schemeBootScript() }, { tag: "script", content: oldAnchorRedirects(OLD_ANCHORS) }],
+      head: [
+        ...sharedHead,
+        { tag: "script", content: schemeBootScript() },
+        { tag: "script", content: oldAnchorRedirects(OLD_ANCHORS) },
+      ],
       sidebar,
     }),
   ],

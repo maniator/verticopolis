@@ -9,7 +9,13 @@ vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The package load and the Rust engine's first tower are stubbed so the boot
 // state can be asserted without a package.
-const wasmStub = vi.hoisted(() => ({ loadError: null as Error | null, module: null as unknown, startError: null as Error | null, rustCorrupt: false, binary: null as { state: "ok"; sourceHash: string } | null }));
+const wasmStub = vi.hoisted(() => ({
+  loadError: null as Error | null,
+  module: null as unknown,
+  startError: null as Error | null,
+  rustCorrupt: false,
+  binary: null as { state: "ok"; sourceHash: string } | null,
+}));
 vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
   const real = await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>();
   return {
@@ -21,7 +27,15 @@ vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
     }),
     rustBootTower: vi.fn(() => {
       if (wasmStub.startError) throw wasmStub.startError;
-      return { port: { engine: "rust", lastReason: () => `the save is not a tower: ${"could not read /home/player/My Secret Tower.vctower"}` }, corrupt: wasmStub.rustCorrupt, loaded: !wasmStub.rustCorrupt, savedAt: undefined };
+      return {
+        port: {
+          engine: "rust",
+          lastReason: () => `the save is not a tower: ${"could not read /home/player/My Secret Tower.vctower"}`,
+        },
+        corrupt: wasmStub.rustCorrupt,
+        loaded: !wasmStub.rustCorrupt,
+        savedAt: undefined,
+      };
     }),
   };
 });
@@ -73,7 +87,8 @@ function requestWasm(): ReturnType<typeof vi.fn> {
 }
 
 const bootState = (): unknown => (globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot;
-const published = (): { status: { hosted: boolean }; port: unknown } | undefined => (globalThis as { __vcEngine?: { status: { hosted: boolean }; port: unknown } }).__vcEngine;
+const published = (): { status: { hosted: boolean }; port: unknown } | undefined =>
+  (globalThis as { __vcEngine?: { status: { hosted: boolean }; port: unknown } }).__vcEngine;
 
 /** Put every stub back to a boot with no package and nothing stored. */
 function resetStubs(): void {
@@ -116,7 +131,11 @@ describe("bootGame engine", () => {
     expect(published()).toBeUndefined();
     expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), wasmStub.loadError);
     // There is no other engine to run on.
-    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-error", message: "404 engine/verticopolis_engine.js" } });
+    expect(bootState()).toEqual({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "load", reason: "boot-error", message: "404 engine/verticopolis_engine.js" },
+    });
   });
 
   it("says why the game did not start when a boot step after the engine throws", async () => {
@@ -128,7 +147,9 @@ describe("bootGame engine", () => {
       throw blocked;
     });
     await expect(bootGame(create)).rejects.toBe(blocked);
-    expect(document.getElementById("boot-fallback-host")!.textContent).toContain("Something went wrong starting the game: The operation is insecure.");
+    expect(document.getElementById("boot-fallback-host")!.textContent).toContain(
+      "Something went wrong starting the game: The operation is insecure.",
+    );
   });
 
   it("hands the app the Rust engine's tower and publishes the engine before the app exists", async () => {
@@ -158,7 +179,12 @@ describe("bootGame engine", () => {
     wasmStub.module = null;
     wasmStub.loadError = new WebAssembly.LinkError("import mismatch");
     await expect(bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })))).rejects.toThrow(/did not start/);
-    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" }, binary });
+    expect(bootState()).toEqual({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" },
+      binary,
+    });
   });
 
   it("writes saves through the engine once the Rust engine starts", async () => {
@@ -186,8 +212,14 @@ describe("bootGame engine", () => {
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(false);
     const message = "the Rust engine failed during a tick: unreachable";
     expect(published()?.status).toMatchObject({ hosted: false, lastError: message });
-    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-tick", message } });
-    expect(document.getElementById("boot-fallback-host")?.textContent).toContain("Reloading your tower from its last autosave.");
+    expect(bootState()).toEqual({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "host", reason: "trap-tick", message },
+    });
+    expect(document.getElementById("boot-fallback-host")?.textContent).toContain(
+      "Reloading your tower from its last autosave.",
+    );
     // The game stops behind the line, as behind the failure message, until the reload.
     expect(document.getElementById("engine-failure")?.getAttribute("data-stage")).toBe("reload");
     expect(reloadSoon).toHaveBeenCalledOnce();
@@ -200,7 +232,11 @@ describe("bootGame engine", () => {
 
   it("reloads the game when the slot census traps, as it does for a tick (#1612)", async () => {
     requestWasm();
-    const Engine = { fromSave: vi.fn(() => { throw new WebAssembly.RuntimeError("unreachable"); }) };
+    const Engine = {
+      fromSave: vi.fn(() => {
+        throw new WebAssembly.RuntimeError("unreachable");
+      }),
+    };
     wasmStub.module = { Engine, encodeVctower: () => "" };
     document.body.innerHTML = '<div id="stage"></div>';
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -208,7 +244,11 @@ describe("bootGame engine", () => {
     expect(() => slotPopulation("a save")).toThrow("unreachable");
     // The trap went down the same path as a tick's: the reader is off and the page reloads from the autosave.
     const message = "the Rust engine failed during a save's population read: unreachable";
-    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-census", message } });
+    expect(bootState()).toEqual({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "host", reason: "trap-census", message },
+    });
     expect(slotPopulation("a save")).toBeUndefined();
     expect(Engine.fromSave).toHaveBeenCalledTimes(1);
     expect(reloadSoon).toHaveBeenCalledOnce();
@@ -232,7 +272,12 @@ describe("bootGame engine", () => {
     // The host stopped as it does for a trap in a tick: nothing runs the tower, the page reloads.
     const message = "the Rust engine failed during a save: unreachable";
     expect(published()?.status).toMatchObject({ hosted: false, lastError: message });
-    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-save", message }, writerLatched: true });
+    expect(bootState()).toEqual({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "host", reason: "trap-save", message },
+      writerLatched: true,
+    });
     expect(engineTrapped()).toBe(true);
     expect(setSpeed).toHaveBeenCalledWith(0);
     expect(reloadSoon).toHaveBeenCalledOnce();
@@ -293,7 +338,11 @@ describe("bootGame engine", () => {
     expect(create).not.toHaveBeenCalled();
     expect(published()).toBeUndefined();
     expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), expect.any(Error));
-    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "start", reason: "boot-error", message: "no engine" } });
+    expect(bootState()).toEqual({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "start", reason: "boot-error", message: "no engine" },
+    });
     expect(encodeVctower).not.toHaveBeenCalled();
   });
 
@@ -314,7 +363,9 @@ const lastRow = (xs: Record<string, unknown>[]): Record<string, unknown> | undef
 const engineRows = (all = false): Record<string, unknown>[] =>
   vi
     .mocked(sendToRelay)
-    .mock.calls.filter(([name, props]) => name === "engine_status" && (all || (props as { trigger?: string }).trigger !== "attempt"))
+    .mock.calls.filter(
+      ([name, props]) => name === "engine_status" && (all || (props as { trigger?: string }).trigger !== "attempt"),
+    )
     .map(([, props]) => props as Record<string, unknown>);
 
 /**
@@ -343,7 +394,16 @@ describe("bootGame engine_status", () => {
   it("reports a clean Rust boot, once", async () => {
     requestWasm();
     await boot();
-    expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine_requested: "wasm", engine: "wasm", build: "wasm-only", fallback_reason: "none", fallbacks: 0 })]);
+    expect(engineRows()).toEqual([
+      expect.objectContaining({
+        trigger: "settle",
+        engine_requested: "wasm",
+        engine: "wasm",
+        build: "wasm-only",
+        fallback_reason: "none",
+        fallbacks: 0,
+      }),
+    ]);
     expect(engineRows(true).map((r) => r.trigger)).toEqual(["attempt", "settle"]);
   });
 
@@ -352,7 +412,15 @@ describe("bootGame engine_status", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     wasmStub.loadError = new Error(secret);
     await expect(boot()).rejects.toThrow(/did not start/);
-    expect(engineRows()).toEqual([expect.objectContaining({ engine_requested: "wasm", engine: "none", fallback_reason: "boot-error", fallback_stage: "load", fallbacks: 1 })]);
+    expect(engineRows()).toEqual([
+      expect.objectContaining({
+        engine_requested: "wasm",
+        engine: "none",
+        fallback_reason: "boot-error",
+        fallback_stage: "load",
+        fallbacks: 1,
+      }),
+    ]);
     expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret|player|vctower/);
   });
 
@@ -361,7 +429,9 @@ describe("bootGame engine_status", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     wasmStub.module = { Engine: class {}, encodeVctower: () => "not a tower file" };
     await boot();
-    expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine: "wasm", writer_latched: false })]);
+    expect(engineRows()).toEqual([
+      expect.objectContaining({ trigger: "settle", engine: "wasm", writer_latched: false }),
+    ]);
     expect(bootState()).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
     await SaveGame.export(SAVE_TEXT);
     expect(lastRow(engineRows())).toMatchObject({ trigger: "writer-latch", engine: "wasm", writer_latched: true });
@@ -377,16 +447,29 @@ describe("bootGame engine_status", () => {
       return engineRows()[0];
     };
     wasmStub.loadError = new EngineBootError("boot-timeout", secret);
-    expect(await settled()).toMatchObject({ engine: "none", fallback_reason: "boot-timeout", fallback_stage: "load", fallbacks: 1 });
+    expect(await settled()).toMatchObject({
+      engine: "none",
+      fallback_reason: "boot-timeout",
+      fallback_stage: "load",
+      fallbacks: 1,
+    });
     wasmStub.loadError = new WebAssembly.LinkError(secret);
-    expect(await settled()).toMatchObject({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "load" });
+    expect(await settled()).toMatchObject({
+      engine: "none",
+      fallback_reason: "package-mismatch",
+      fallback_stage: "load",
+    });
     wasmStub.loadError = null;
     wasmStub.module = { Engine: class {}, encodeVctower: () => "VCTOWER1\n" };
     wasmStub.startError = new Error(secret);
     expect(await settled()).toMatchObject({ engine: "none", fallback_reason: "boot-error", fallback_stage: "start" });
     // A package whose catalogs this build cannot draw is a mismatched one.
     wasmStub.startError = new EngineBootError("package-mismatch", secret);
-    expect(await settled()).toMatchObject({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "start" });
+    expect(await settled()).toMatchObject({
+      engine: "none",
+      fallback_reason: "package-mismatch",
+      fallback_stage: "start",
+    });
     expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret|player|vctower/);
   });
 
@@ -409,7 +492,13 @@ describe("bootGame engine_status", () => {
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
     vi.unstubAllGlobals();
     // A trap that stops the game, with no reload, is a fallback row.
-    expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", engine: "none", fallback_reason: "trap-tick", fallback_stage: "start", fallbacks: 1 });
+    expect(lastRow(engineRows())).toMatchObject({
+      trigger: "fallback",
+      engine: "none",
+      fallback_reason: "trap-tick",
+      fallback_stage: "start",
+      fallbacks: 1,
+    });
     onUpdate!(activate);
     expect(activate).toHaveBeenCalledOnce();
     expect(prompt).toHaveBeenCalledOnce();
@@ -423,28 +512,55 @@ describe("bootGame engine_status", () => {
     await boot({ setSpeed: vi.fn() });
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
     expect(reloadSoon).toHaveBeenCalledOnce();
-    expect(lastRow(engineRows())).toMatchObject({ trigger: "crash-reload", engine: "wasm", fallback_reason: "trap-tick", fallback_stage: "start", fallbacks: 1, trap_kind: "unreachable" });
+    expect(lastRow(engineRows())).toMatchObject({
+      trigger: "crash-reload",
+      engine: "wasm",
+      fallback_reason: "trap-tick",
+      fallback_stage: "start",
+      fallbacks: 1,
+      trap_kind: "unreachable",
+    });
   });
 
   it("names where the engine trapped and the trap's kind: a save is no tick", async () => {
     stubWebGL();
     vi.spyOn(console, "error").mockImplementation(() => {});
-    wasmStub.module = { Engine: class {}, encodeVctower: () => { throw new WebAssembly.RuntimeError("memory access out of bounds"); } };
+    wasmStub.module = {
+      Engine: class {},
+      encodeVctower: () => {
+        throw new WebAssembly.RuntimeError("memory access out of bounds");
+      },
+    };
     document.body.innerHTML = '<div id="stage"></div>';
     await boot({ setSpeed: vi.fn() });
     await SaveGame.export(SAVE_TEXT);
     expect(reloadSoon).toHaveBeenCalledOnce();
-    expect(lastRow(engineRows())).toMatchObject({ trigger: "crash-reload", fallback_reason: "trap-save", trap_kind: "out-of-bounds" });
+    expect(lastRow(engineRows())).toMatchObject({
+      trigger: "crash-reload",
+      fallback_reason: "trap-save",
+      trap_kind: "out-of-bounds",
+    });
   });
 
   it("names a trap in the slot census as the census's", async () => {
     stubWebGL();
     vi.spyOn(console, "error").mockImplementation(() => {});
-    wasmStub.module = { Engine: { fromSave: () => { throw new WebAssembly.RuntimeError("unreachable"); } }, encodeVctower: () => "VCTOWER1\n" };
+    wasmStub.module = {
+      Engine: {
+        fromSave: () => {
+          throw new WebAssembly.RuntimeError("unreachable");
+        },
+      },
+      encodeVctower: () => "VCTOWER1\n",
+    };
     document.body.innerHTML = '<div id="stage"></div>';
     await boot({ setSpeed: vi.fn() });
     expect(() => slotPopulation("a save")).toThrow("unreachable");
-    expect(lastRow(engineRows())).toMatchObject({ trigger: "crash-reload", fallback_reason: "trap-census", trap_kind: "unreachable" });
+    expect(lastRow(engineRows())).toMatchObject({
+      trigger: "crash-reload",
+      fallback_reason: "trap-census",
+      trap_kind: "unreachable",
+    });
   });
 
   it("keeps the row when a boot step after the engine throws, and sends none when the game never existed", async () => {
@@ -465,7 +581,9 @@ describe("bootGame engine_status", () => {
       }),
     ).rejects.toThrow("Secret");
     expect(engineRows()).toEqual([]);
-    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls.filter(([n]) => n === "engine_status"))).not.toMatch(/Secret/);
+    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls.filter(([n]) => n === "engine_status"))).not.toMatch(
+      /Secret/,
+    );
   });
 
   it("reports a package that did not load as a stop, with no engine left", async () => {
@@ -473,12 +591,24 @@ describe("bootGame engine_status", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     wasmStub.loadError = new Error(secret);
     await expect(boot()).rejects.toThrow(/did not start/);
-    expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", build: "wasm-only", engine_requested: "wasm", engine: "none", fallback_reason: "boot-error", fallback_stage: "load", fallbacks: 1 })]);
+    expect(engineRows()).toEqual([
+      expect.objectContaining({
+        trigger: "settle",
+        build: "wasm-only",
+        engine_requested: "wasm",
+        engine: "none",
+        fallback_reason: "boot-error",
+        fallback_stage: "load",
+        fallbacks: 1,
+      }),
+    ]);
     // A package without the engine writer is the wrong package.
     wasmStub.loadError = null;
     wasmStub.module = { Engine: class {} };
     await expect(boot()).rejects.toThrow(/did not start/);
-    expect(engineRows()).toEqual([expect.objectContaining({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "load" })]);
+    expect(engineRows()).toEqual([
+      expect.objectContaining({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "load" }),
+    ]);
     expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
   });
 
@@ -493,8 +623,21 @@ describe("bootGame engine_status", () => {
     window.location.href = "https://verticopolis.com/";
     await expect(bootGame(create)).rejects.toThrow(/did not start/);
     expect(create).not.toHaveBeenCalled();
-    expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", build: "wasm-only", engine: "none", fallback_reason: "package-mismatch", fallback_stage: "start", fallbacks: 1 })]);
-    expect(bootState()).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "start", reason: "package-mismatch" } });
+    expect(engineRows()).toEqual([
+      expect.objectContaining({
+        trigger: "settle",
+        build: "wasm-only",
+        engine: "none",
+        fallback_reason: "package-mismatch",
+        fallback_stage: "start",
+        fallbacks: 1,
+      }),
+    ]);
+    expect(bootState()).toMatchObject({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "start", reason: "package-mismatch" },
+    });
     expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
   });
 });

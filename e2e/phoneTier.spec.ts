@@ -31,7 +31,9 @@ const VIEWPORTS = [
 
 test("the gallery's phone tier matches the page's phone query and phone layout", async ({ page }) => {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, {
+    timeout: 30_000,
+  });
   const seen: Record<string, { tier: boolean; query: boolean; layout: boolean }> = {};
   for (const vp of VIEWPORTS) {
     await page.setViewportSize(vp);

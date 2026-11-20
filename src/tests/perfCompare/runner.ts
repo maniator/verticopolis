@@ -1,7 +1,21 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "./env";
 import { expectEngine, freshPage } from "./freshPage";
-import { adoptScenario, cpuProbe, digestStashed, installEngineBootProbe, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, watchContextLoss, webglRenderer, type PageInfo } from "./page";
+import {
+  adoptScenario,
+  cpuProbe,
+  digestStashed,
+  installEngineBootProbe,
+  installProbes,
+  pageInfo,
+  prepareLiveApp,
+  stashSave,
+  wasmColdLoad,
+  wasmMemoryBytes,
+  watchContextLoss,
+  webglRenderer,
+  type PageInfo,
+} from "./page";
 import { trackContextLoss } from "./contextLoss";
 import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFrames";
 import { simRun, type SimRun } from "./pageSim";
@@ -13,7 +27,16 @@ import { idleLoad } from "./idleLoad";
 import { assertHeld, limitNetwork } from "./network";
 import type { Scenario } from "./scenarios";
 import { frameStats, quantile } from "./stats";
-import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun, SavedStart, StartupSample, StepSummary } from "./types";
+import type {
+  CompareConfig,
+  EngineName,
+  FrameSummary,
+  MemorySummary,
+  ProcessRun,
+  SavedStart,
+  StartupSample,
+  StepSummary,
+} from "./types";
 
 /**
  * One repetition of one engine in a fresh browser process (issue #972):
@@ -53,7 +76,10 @@ export const CLAMP_FRAME_MS = 200;
 async function within<T>(what: string, p: Promise<T>, ms = STEP_TIMEOUT_MS): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   try {
-    return await Promise.race([p, new Promise<T>((_, fail) => (timer = setTimeout(() => fail(new Error(`${what} timed out after ${ms} ms`)), ms)))]);
+    return await Promise.race([
+      p,
+      new Promise<T>((_, fail) => (timer = setTimeout(() => fail(new Error(`${what} timed out after ${ms} ms`)), ms))),
+    ]);
   } finally {
     clearTimeout(timer);
   }
@@ -65,9 +91,14 @@ function resourceMs(info: PageInfo, path: string): number | null {
 }
 
 /** Startup numbers from one page load's marks and timings. */
-export function startupSample(info: PageInfo, servedBeforeReady: ServedRequest[], servedAfterReady: ServedRequest[]): StartupSample {
+export function startupSample(
+  info: PageInfo,
+  servedBeforeReady: ServedRequest[],
+  servedAfterReady: ServedRequest[],
+): StartupSample {
   const m = info.marks;
-  const instantiated = m.wasmInstantiateStart !== undefined && m.wasmInstantiateEnd !== undefined && m.wasmInstantiateEnd >= 0;
+  const instantiated =
+    m.wasmInstantiateStart !== undefined && m.wasmInstantiateEnd !== undefined && m.wasmInstantiateEnd >= 0;
   const via = { 1: "instantiateStreaming", 2: "instantiate" } as const;
   return {
     engineActive: info.engineActive,
@@ -89,20 +120,40 @@ export function startupSample(info: PageInfo, servedBeforeReady: ServedRequest[]
 /** Navigate (or reload) and wait for the app to publish `window.game`. The
  *  served requests are split where the poll first sees it (every 10 ms),
  *  so the before-ready bytes can include a request issued in that gap. */
-async function startup(page: Page, server: PerfServer, go: () => Promise<unknown>): Promise<{ sample: StartupSample; info: PageInfo }> {
+async function startup(
+  page: Page,
+  server: PerfServer,
+  go: () => Promise<unknown>,
+): Promise<{ sample: StartupSample; info: PageInfo }> {
   server.take();
   await go();
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 120_000, polling: 10 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, {
+    timeout: 120_000,
+    polling: 10,
+  });
   const before = server.take();
   await page.waitForLoadState("networkidle", { timeout: 120_000 });
   // A missing first frame stays null and is reported as a missing sample.
-  await page.waitForFunction(() => (window as unknown as { __perfMarks?: { firstFrameAfterReady?: number } }).__perfMarks?.firstFrameAfterReady !== undefined, undefined, { timeout: 30_000 }).catch(() => {});
+  await page
+    .waitForFunction(
+      () =>
+        (window as unknown as { __perfMarks?: { firstFrameAfterReady?: number } }).__perfMarks?.firstFrameAfterReady !==
+        undefined,
+      undefined,
+      { timeout: 30_000 },
+    )
+    .catch(() => {});
   const after = server.take();
   const info = await page.evaluate(pageInfo);
   return { info, sample: startupSample(info, before, after) };
 }
 
-export function stepSummary(r: SimRun, startDigest: string, endDigest: string, attribution: SimRun["attribution"] = r.attribution): StepSummary {
+export function stepSummary(
+  r: SimRun,
+  startDigest: string,
+  endDigest: string,
+  attribution: SimRun["attribution"] = r.attribution,
+): StepSummary {
   return {
     totalMs: r.totalMs,
     loadMs: r.loadMs,
@@ -148,8 +199,19 @@ async function throttle(cdp: CDPSession, rate: number): Promise<void> {
   await cdp.send("Emulation.setCPUThrottlingRate", { rate });
 }
 
-async function newContext(browser: Browser, config: CompareConfig, serviceWorkers: "allow" | "block", onLoss: (line: string) => void, storageState?: ReturnType<typeof autosaveState>): Promise<BrowserContext> {
-  const ctx = await browser.newContext({ viewport: config.viewport, deviceScaleFactor: 1, serviceWorkers, ...(storageState ? { storageState } : {}) });
+async function newContext(
+  browser: Browser,
+  config: CompareConfig,
+  serviceWorkers: "allow" | "block",
+  onLoss: (line: string) => void,
+  storageState?: ReturnType<typeof autosaveState>,
+): Promise<BrowserContext> {
+  const ctx = await browser.newContext({
+    viewport: config.viewport,
+    deviceScaleFactor: 1,
+    serviceWorkers,
+    ...(storageState ? { storageState } : {}),
+  });
   // tsx compiles this harness with esbuild's keepNames, which wraps inner
   // functions in a `__name(fn, "name")` helper. The functions Playwright
   // serializes into the page carry those calls but not the helper, so the
@@ -164,13 +226,19 @@ async function newContext(browser: Browser, config: CompareConfig, serviceWorker
 
 /** The memory pass: each scenario in a fresh page, so no scenario's WASM
  *  memory or heap carries another's (or a bare engine's) high-water mark. */
-async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engine: EngineName): Promise<Record<string, { adoptMs: number; memory: MemorySummary }>> {
+async function memoryPass(
+  page: Page,
+  cdp: CDPSession,
+  opts: RunnerOptions,
+  engine: EngineName,
+): Promise<Record<string, { adoptMs: number; memory: MemorySummary }>> {
   const out: Record<string, { adoptMs: number; memory: MemorySummary }> = {};
   for (const sc of opts.scenarios) {
     await freshPage(page, engine, `${sc.name} memory pass boot`);
     await page.evaluate(stashSave, { name: sc.name, save: sc.save });
     const adopt = await page.evaluate(adoptScenario, sc.name);
-    if (adopt.engineActive !== engine) throw new Error(`${sc.name}: after loading the save, ${adopt.engineActive} runs the tower, not ${engine}`);
+    if (adopt.engineActive !== engine)
+      throw new Error(`${sc.name}: after loading the save, ${adopt.engineActive} runs the tower, not ${engine}`);
     // The hosted load's stamped copy leaves the heap before it is read, so
     // the page holds one save string as it did before the copy existed.
     await page.evaluate(() => {
@@ -189,14 +257,29 @@ async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engi
     const wasmBytes = engine === "wasm" ? await page.evaluate(wasmMemoryBytes) : null;
     const pss = processTreePss(process.pid, /chrom|headless_shell/i);
     await expectEngine(page, engine, `${sc.name} memory pass`);
-    out[sc.name] = { adoptMs: adopt.adoptMs, memory: { jsHeapUsedBytes: heap.usedSize, jsHeapTotalBytes: heap.totalSize, wasmMemoryBytes: wasmBytes, processPssBytes: pss?.bytes ?? null, processes: pss?.processes ?? null } };
+    out[sc.name] = {
+      adoptMs: adopt.adoptMs,
+      memory: {
+        jsHeapUsedBytes: heap.usedSize,
+        jsHeapTotalBytes: heap.totalSize,
+        wasmMemoryBytes: wasmBytes,
+        processPssBytes: pss?.bytes ?? null,
+        processes: pss?.processes ?? null,
+      },
+    };
   }
   return out;
 }
 
-export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineName, order: number): Promise<ProcessRun> {
+export async function runProcess(
+  opts: RunnerOptions,
+  rep: number,
+  slot: EngineName,
+  order: number,
+): Promise<ProcessRun> {
   const { config, scenarios, log, servers } = opts;
-  const engine = config.aa ?? slot, server = serverFor(servers, engine);
+  const engine = config.aa ?? slot,
+    server = serverFor(servers, engine);
   const run: ProcessRun = {
     rep,
     engine: slot,
@@ -236,12 +319,18 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
   // Every page call is bounded, so a hung engine fails the repetition
   // instead of stalling the benchmark.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ev = <A, R>(page: Page, label: string, fn: (arg: A) => R | Promise<R>, arg: A): Promise<R> => within(label, page.evaluate(fn as any, arg) as Promise<R>);
+  const ev = <A, R>(page: Page, label: string, fn: (arg: A) => R | Promise<R>, arg: A): Promise<R> =>
+    within(label, page.evaluate(fn as any, arg) as Promise<R>);
   const slowRate = Math.max(...config.throttles);
   // The CPU probe under a throttle, kept by "<where>:<rate>".
   const probe = async (page: Page, key: string): Promise<void> => {
     const ms = await ev(page, "cpu probe", cpuProbe, undefined);
-    run.cpuProbe = { unthrottledMs: run.cpuProbe?.unthrottledMs ?? NaN, throttledMs: run.cpuProbe?.throttledMs ?? null, rate: slowRate, timed: { ...(run.cpuProbe?.timed ?? {}), [key]: Math.min(ms, run.cpuProbe?.timed[key] ?? ms) } };
+    run.cpuProbe = {
+      unthrottledMs: run.cpuProbe?.unthrottledMs ?? NaN,
+      throttledMs: run.cpuProbe?.throttledMs ?? null,
+      rate: slowRate,
+      timed: { ...(run.cpuProbe?.timed ?? {}), [key]: Math.min(ms, run.cpuProbe?.timed[key] ?? ms) },
+    };
   };
   let browser: Browser | null = null;
   try {
@@ -259,16 +348,28 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     if (config.network) await limitNetwork(cdp, config.network);
     const cold = await startup(page, server, () => page.goto(url, { waitUntil: "commit" }));
     run.cold = cold.sample;
-    run.page = { crossOriginIsolated: cold.info.crossOriginIsolated, timerResolutionMs: cold.info.timerResolutionMs, userAgent: cold.info.userAgent, viewport: cold.info.viewport, webgl: await ev(page, "renderer", webglRenderer, undefined) };
-    if (cold.sample.engineActive !== engine) throw new Error(`requested the ${engine} engine but ${cold.sample.engineActive} is active (host: ${JSON.stringify(cold.info.host)})`);
+    run.page = {
+      crossOriginIsolated: cold.info.crossOriginIsolated,
+      timerResolutionMs: cold.info.timerResolutionMs,
+      userAgent: cold.info.userAgent,
+      viewport: cold.info.viewport,
+      webgl: await ev(page, "renderer", webglRenderer, undefined),
+    };
+    if (cold.sample.engineActive !== engine)
+      throw new Error(
+        `requested the ${engine} engine but ${cold.sample.engineActive} is active (host: ${JSON.stringify(cold.info.host)})`,
+      );
     if (config.network) assertHeld(config.network, cold.info.resources, "cold start", engine);
     const warm = await startup(page, server, () => page.reload({ waitUntil: "commit" }));
     run.warm = warm.sample;
     if (config.network) await limitNetwork(cdp, null);
-    if (warm.sample.engineActive !== engine) throw new Error(`warm start: requested the ${engine} engine but ${warm.sample.engineActive} is active`);
+    if (warm.sample.engineActive !== engine)
+      throw new Error(`warm start: requested the ${engine} engine but ${warm.sample.engineActive} is active`);
     const unthrottledProbe = await ev(page, "cpu probe", cpuProbe, undefined);
     run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: null, rate: slowRate, timed: {} };
-    log(`  rep ${rep} ${slot}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`);
+    log(
+      `  rep ${rep} ${slot}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`,
+    );
 
     const memory = await memoryPass(page, cdp, opts, engine);
 
@@ -276,46 +377,72 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     // scenarioPages.ts). Per scenario and throttle the order is the same on
     // both engines (hosted, then raw); the WASM attribution pass runs after
     // both, so it cannot warm or grow anything they measure.
-    await eachScenarioFresh(scenarios, (sc) => freshPage(page, engine, `${sc.name} timed passes boot`), async (sc) => {
-      await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
-      run.scenarios[sc.name] = { ...memory[sc.name], hosted: {}, raw: {}, frames: {}, framesAudio: {} };
-      const scenarioRun = run.scenarios[sc.name];
-      for (const rate of config.throttles) {
-        const t = String(rate);
-        const sim = (mode: "hosted" | "raw", attribute: boolean) => ev(page, `${sc.name} ${mode}`, simRun, { name: sc.name, mode, engine, steps: config.steps, warmSteps: config.warmSteps, dt: config.dt, engineUrl, attribute });
-        const digest = (key: string) => ev(page, "digest", digestStashed, key);
-        await throttle(cdp, rate);
-        try {
-          // Prove the throttle holds for this scenario's passes.
-          if (rate > 1) await probe(page, `${sc.name}:${t}`);
-          const hosted = await sim("hosted", false);
-          const hostedStart = await digest(hosted.startKey);
-          const hostedEnd = await digest(hosted.endKey);
-          const raw = await sim("raw", false);
-          scenarioRun.raw[t] = stepSummary(raw, await digest(raw.startKey), await digest(raw.endKey));
-          let attribution: SimRun["attribution"] = null;
-          if (engine === "wasm") {
-            // The split, from its own wrapped pass, which must have run the
-            // same simulation as the timed one.
-            const a = await sim("hosted", true);
-            const aStart = await digest(a.startKey);
-            const aEnd = await digest(a.endKey);
-            attribution = a.attribution;
-            if (!attribution || attribution.engineTicks !== config.steps) throw new Error(`${sc.name} ${t}x: the attribution pass saw ${attribution?.engineTicks ?? "no"} engine ticks for ${config.steps} steps`);
-            if (a.engineActive !== "wasm" || a.hostErrorsAdded.length || aStart !== hostedStart || aEnd !== hostedEnd) throw new Error(`${sc.name} ${t}x: the attribution pass did not run the timed pass's simulation (${a.engineActive}, errors ${a.hostErrorsAdded.join("; ") || "none"}, ${aStart}/${aEnd} vs ${hostedStart}/${hostedEnd})`);
+    await eachScenarioFresh(
+      scenarios,
+      (sc) => freshPage(page, engine, `${sc.name} timed passes boot`),
+      async (sc) => {
+        await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
+        run.scenarios[sc.name] = { ...memory[sc.name], hosted: {}, raw: {}, frames: {}, framesAudio: {} };
+        const scenarioRun = run.scenarios[sc.name];
+        for (const rate of config.throttles) {
+          const t = String(rate);
+          const sim = (mode: "hosted" | "raw", attribute: boolean) =>
+            ev(page, `${sc.name} ${mode}`, simRun, {
+              name: sc.name,
+              mode,
+              engine,
+              steps: config.steps,
+              warmSteps: config.warmSteps,
+              dt: config.dt,
+              engineUrl,
+              attribute,
+            });
+          const digest = (key: string) => ev(page, "digest", digestStashed, key);
+          await throttle(cdp, rate);
+          try {
+            // Prove the throttle holds for this scenario's passes.
+            if (rate > 1) await probe(page, `${sc.name}:${t}`);
+            const hosted = await sim("hosted", false);
+            const hostedStart = await digest(hosted.startKey);
+            const hostedEnd = await digest(hosted.endKey);
+            const raw = await sim("raw", false);
+            scenarioRun.raw[t] = stepSummary(raw, await digest(raw.startKey), await digest(raw.endKey));
+            let attribution: SimRun["attribution"] = null;
+            if (engine === "wasm") {
+              // The split, from its own wrapped pass, which must have run the
+              // same simulation as the timed one.
+              const a = await sim("hosted", true);
+              const aStart = await digest(a.startKey);
+              const aEnd = await digest(a.endKey);
+              attribution = a.attribution;
+              if (!attribution || attribution.engineTicks !== config.steps)
+                throw new Error(
+                  `${sc.name} ${t}x: the attribution pass saw ${attribution?.engineTicks ?? "no"} engine ticks for ${config.steps} steps`,
+                );
+              if (a.engineActive !== "wasm" || a.hostErrorsAdded.length || aStart !== hostedStart || aEnd !== hostedEnd)
+                throw new Error(
+                  `${sc.name} ${t}x: the attribution pass did not run the timed pass's simulation (${a.engineActive}, errors ${a.hostErrorsAdded.join("; ") || "none"}, ${aStart}/${aEnd} vs ${hostedStart}/${hostedEnd})`,
+                );
+            }
+            scenarioRun.hosted[t] = stepSummary(hosted, hostedStart, hostedEnd, attribution);
+          } finally {
+            await throttle(cdp, 1);
           }
-          scenarioRun.hosted[t] = stepSummary(hosted, hostedStart, hostedEnd, attribution);
-        } finally {
-          await throttle(cdp, 1);
+          await expectEngine(page, engine, `${sc.name} ${t}x`);
+          log(
+            `  rep ${rep} ${slot} ${sc.name} ${t}x: hosted ${scenarioRun.hosted[t].totalMs.toFixed(0)} ms, raw ${scenarioRun.raw[t].totalMs.toFixed(0)} ms`,
+          );
         }
-        await expectEngine(page, engine, `${sc.name} ${t}x`);
-        log(`  rep ${rep} ${slot} ${sc.name} ${t}x: hosted ${scenarioRun.hosted[t].totalMs.toFixed(0)} ms, raw ${scenarioRun.raw[t].totalMs.toFixed(0)} ms`);
-      }
-    });
+      },
+    );
     // The WASM package's load steps, before any audio runs. The page is the last scenario's fresh page, so the cold load's scenario is stashed in it first.
     if (engine === "ts") {
       await ev(page, "stash", stashSave, { name: scenarios[0].name, save: scenarios[0].save });
-      run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
+      run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, {
+        wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`,
+        jsUrl: engineUrl,
+        scenario: scenarios[0].name,
+      });
     }
 
     // Gameplay frames: an audio-off block and an audio-on block, their order
@@ -323,30 +450,45 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     // Each scenario runs in a fresh page of its own, as above.
     const blocks: ("off" | "on")[] = rep % 2 === 0 ? ["off", "on"] : ["on", "off"];
     for (const block of blocks) {
-      await eachScenarioFresh(scenarios, (sc) => freshPage(page, engine, `${sc.name} frames (audio ${block}) boot`), async (sc) => {
-        await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
-        if ((await ev(page, "audio status", audioStatus, undefined)).started) throw new Error("audio was running in a fresh page");
-        if (block === "on") {
-          run.audio = await ev(page, "start audio", startAudio, 15_000);
-          log(`  rep ${rep} ${slot} ${sc.name}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
-          if (!run.audio.started || !run.audio.contexts.includes("running")) return false;
-        }
-        for (const rate of config.throttles) {
-          await ev(page, "adopt", adoptScenario, sc.name);
-          await ev(page, "prepare", prepareLiveApp, undefined);
-          await throttle(cdp, rate);
-          try {
-            if (rate > 1) await probe(page, `frames-${block}:${rate}`);
-            const f = frameSummary(await ev(page, `${sc.name} frames (audio ${block})`, measureFrames, { windowMs: config.frameWindowMs, warmMs: config.frameWarmMs, speed: config.speed }));
-            (block === "on" ? run.scenarios[sc.name].framesAudio : run.scenarios[sc.name].frames)[String(rate)] = f;
-            log(`  rep ${rep} ${slot} ${sc.name} ${rate}x audio ${block}: frames median ${f.medianMs.toFixed(1)} ms (${f.frames} frames, ${f.clampedFrames} over ${CLAMP_FRAME_MS} ms, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s)`);
-          } finally {
-            await throttle(cdp, 1);
+      await eachScenarioFresh(
+        scenarios,
+        (sc) => freshPage(page, engine, `${sc.name} frames (audio ${block}) boot`),
+        async (sc) => {
+          await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
+          if ((await ev(page, "audio status", audioStatus, undefined)).started)
+            throw new Error("audio was running in a fresh page");
+          if (block === "on") {
+            run.audio = await ev(page, "start audio", startAudio, 15_000);
+            log(
+              `  rep ${rep} ${slot} ${sc.name}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`,
+            );
+            if (!run.audio.started || !run.audio.contexts.includes("running")) return false;
           }
-        }
-        await expectEngine(page, engine, `${sc.name} frames (audio ${block})`);
-        return undefined;
-      });
+          for (const rate of config.throttles) {
+            await ev(page, "adopt", adoptScenario, sc.name);
+            await ev(page, "prepare", prepareLiveApp, undefined);
+            await throttle(cdp, rate);
+            try {
+              if (rate > 1) await probe(page, `frames-${block}:${rate}`);
+              const f = frameSummary(
+                await ev(page, `${sc.name} frames (audio ${block})`, measureFrames, {
+                  windowMs: config.frameWindowMs,
+                  warmMs: config.frameWarmMs,
+                  speed: config.speed,
+                }),
+              );
+              (block === "on" ? run.scenarios[sc.name].framesAudio : run.scenarios[sc.name].frames)[String(rate)] = f;
+              log(
+                `  rep ${rep} ${slot} ${sc.name} ${rate}x audio ${block}: frames median ${f.medianMs.toFixed(1)} ms (${f.frames} frames, ${f.clampedFrames} over ${CLAMP_FRAME_MS} ms, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s)`,
+              );
+            } finally {
+              await throttle(cdp, 1);
+            }
+          }
+          await expectEngine(page, engine, `${sc.name} frames (audio ${block})`);
+          return undefined;
+        },
+      );
       await expectEngine(page, engine, `frames (audio ${block})`);
     }
     // The adapter again, from a new context, once every frame is measured (and
@@ -369,13 +511,22 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
         await throttle(slowCdp, slowRate);
       });
       run.cold4x = c4.sample;
-      if (c4.sample.engineActive !== engine) throw new Error(`${slowRate}x cold start: requested the ${engine} engine but ${c4.sample.engineActive} is active`);
+      if (c4.sample.engineActive !== engine)
+        throw new Error(
+          `${slowRate}x cold start: requested the ${engine} engine but ${c4.sample.engineActive} is active`,
+        );
       if (config.network) {
         assertHeld(config.network, c4.info.resources, `${slowRate}x cold start`, engine);
         await limitNetwork(slowCdp, null);
       }
-      run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: await ev(slowPage, "cpu probe", cpuProbe, undefined), rate: slowRate, timed: run.cpuProbe?.timed ?? {} };
-      run.rendererEndCold = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
+      run.cpuProbe = {
+        unthrottledMs: unthrottledProbe,
+        throttledMs: await ev(slowPage, "cpu probe", cpuProbe, undefined),
+        rate: slowRate,
+        timed: run.cpuProbe?.timed ?? {},
+      };
+      run.rendererEndCold =
+        (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
       await slow.close();
     }
     run.ok = true;
@@ -387,21 +538,36 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
   // service worker allowed, then an offline reload, then the saved-tower
   // starts. Nothing in them can mark the repetition failed.
   if (run.ok && browser) {
-    run.firstVisitWithServiceWorker = await firstVisit(browser, config, server, url, listen, sink).catch((e: unknown) => ({
-      served: [],
-      swActive: false,
-      onlineEngineActive: null,
-      offlineEngineActive: null,
-      onlinePageErrors: [],
-      offlinePageErrors: [],
-      error: e instanceof Error ? e.message : String(e),
-    }));
+    run.firstVisitWithServiceWorker = await firstVisit(browser, config, server, url, listen, sink).catch(
+      (e: unknown) => ({
+        served: [],
+        swActive: false,
+        onlineEngineActive: null,
+        offlineEngineActive: null,
+        onlinePageErrors: [],
+        offlinePageErrors: [],
+        error: e instanceof Error ? e.message : String(e),
+      }),
+    );
     sink.side = null;
-    run.coldSaved = await savedStarts(browser, opts, server, url, engine, run.page?.webgl?.renderer ?? null, listen, sink);
-    for (const [name, r] of Object.entries(run.coldSaved)) log(`  rep ${rep} ${slot} ${name} saved tower: ${r.sample ? `cold ready ${r.sample.gameReadyMs?.toFixed(0)} ms` : `no sample (${r.error})`}`);
+    run.coldSaved = await savedStarts(
+      browser,
+      opts,
+      server,
+      url,
+      engine,
+      run.page?.webgl?.renderer ?? null,
+      listen,
+      sink,
+    );
+    for (const [name, r] of Object.entries(run.coldSaved))
+      log(
+        `  rep ${rep} ${slot} ${name} saved tower: ${r.sample ? `cold ready ${r.sample.gameReadyMs?.toFixed(0)} ms` : `no sample (${r.error})`}`,
+      );
   }
   // The package's load in a blank page (#1005), after everything else.
-  if (run.ok && browser && engine === "ts") run.wasmIdle = await idleLoad(server, () => newContext(browser, config, "block", noteLoss), within);
+  if (run.ok && browser && engine === "ts")
+    run.wasmIdle = await idleLoad(server, () => newContext(browser, config, "block", noteLoss), within);
   await browser?.close().catch(() => {});
   return run;
 }
@@ -411,27 +577,69 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
  *  scenario, a fresh context (fresh HTTP cache, this process) at 1x whose
  *  autosave slot holds the scenario's save. A failed check leaves that
  *  scenario's row without a sample from this repetition and fails nothing. */
-async function savedStarts(browser: Browser, opts: RunnerOptions, server: PerfServer, url: string, engine: EngineName, startRenderer: string | null, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<Record<string, SavedStart>> {
+async function savedStarts(
+  browser: Browser,
+  opts: RunnerOptions,
+  server: PerfServer,
+  url: string,
+  engine: EngineName,
+  startRenderer: string | null,
+  listen: (p: Page) => void,
+  sink: { side: string[] | null },
+): Promise<Record<string, SavedStart>> {
   const out: Record<string, SavedStart> = {};
   for (const sc of opts.scenarios) {
-    const row: SavedStart = { sample: null, error: null, seedSha256: "", renderer: null, pageErrors: [], contextLost: [] };
+    const row: SavedStart = {
+      sample: null,
+      error: null,
+      seedSha256: "",
+      renderer: null,
+      pageErrors: [],
+      contextLost: [],
+    };
     let ctx: BrowserContext | null = null;
     let sample: StartupSample | null = null;
     sink.side = row.pageErrors;
     try {
       const seed = autosaveSeed(sc);
       row.seedSha256 = seed.sha256;
-      ctx = await newContext(browser, opts.config, "block", (line) => row.contextLost.push(line), autosaveState(server.url, seed));
+      ctx = await newContext(
+        browser,
+        opts.config,
+        "block",
+        (line) => row.contextLost.push(line),
+        autosaveState(server.url, seed),
+      );
       const page = await ctx.newPage();
       listen(page);
-      const s = await within("saved-tower start", startup(page, server, () => page.goto(url, { waitUntil: "commit" })), 5 * 60_000);
-      if (s.sample.engineActive !== engine) throw new Error(`requested the ${engine} engine but ${s.sample.engineActive} is active`);
-      if (engine === "wasm" && !(s.sample.engineHostedMs !== null && s.sample.gameReadyMs !== null && s.sample.engineHostedMs <= s.sample.gameReadyMs)) throw new Error(`the engine was not hosted by the time the game was ready (hosted ${s.sample.engineHostedMs ?? "never"}, ready ${s.sample.gameReadyMs ?? "never"})`);
+      const s = await within(
+        "saved-tower start",
+        startup(page, server, () => page.goto(url, { waitUntil: "commit" })),
+        5 * 60_000,
+      );
+      if (s.sample.engineActive !== engine)
+        throw new Error(`requested the ${engine} engine but ${s.sample.engineActive} is active`);
+      if (
+        engine === "wasm" &&
+        !(
+          s.sample.engineHostedMs !== null &&
+          s.sample.gameReadyMs !== null &&
+          s.sample.engineHostedMs <= s.sample.gameReadyMs
+        )
+      )
+        throw new Error(
+          `the engine was not hosted by the time the game was ready (hosted ${s.sample.engineHostedMs ?? "never"}, ready ${s.sample.gameReadyMs ?? "never"})`,
+        );
       // The boot must have loaded the seeded tower, or the row times an empty one.
       const tower = await within("saved tower", page.evaluate(bootedTower), 60_000);
-      if (!tower.loaded || tower.corrupt || tower.population !== sc.population) throw new Error(`the boot did not load the seeded tower (readable save ${tower.loaded}, corrupt ${tower.corrupt}, population ${tower.population}, the save's ${sc.population})`);
-      row.renderer = (await within("renderer after the saved start", page.evaluate(webglRenderer), 60_000))?.renderer ?? null;
-      if (row.renderer !== startRenderer) throw new Error(`the WebGL renderer changed from ${startRenderer ?? "none"} to ${row.renderer ?? "none"}`);
+      if (!tower.loaded || tower.corrupt || tower.population !== sc.population)
+        throw new Error(
+          `the boot did not load the seeded tower (readable save ${tower.loaded}, corrupt ${tower.corrupt}, population ${tower.population}, the save's ${sc.population})`,
+        );
+      row.renderer =
+        (await within("renderer after the saved start", page.evaluate(webglRenderer), 60_000))?.renderer ?? null;
+      if (row.renderer !== startRenderer)
+        throw new Error(`the WebGL renderer changed from ${startRenderer ?? "none"} to ${row.renderer ?? "none"}`);
       sample = s.sample;
     } catch (e) {
       row.error = e instanceof Error ? e.message : String(e);
@@ -448,8 +656,23 @@ async function savedStarts(browser: Browser, opts: RunnerOptions, server: PerfSe
   return out;
 }
 
-async function firstVisit(browser: Browser, config: CompareConfig, server: PerfServer, url: string, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<NonNullable<ProcessRun["firstVisitWithServiceWorker"]>> {
-  const result: NonNullable<ProcessRun["firstVisitWithServiceWorker"]> = { served: [], swActive: false, onlineEngineActive: null, offlineEngineActive: null, onlinePageErrors: [], offlinePageErrors: [], error: null };
+async function firstVisit(
+  browser: Browser,
+  config: CompareConfig,
+  server: PerfServer,
+  url: string,
+  listen: (p: Page) => void,
+  sink: { side: string[] | null },
+): Promise<NonNullable<ProcessRun["firstVisitWithServiceWorker"]>> {
+  const result: NonNullable<ProcessRun["firstVisitWithServiceWorker"]> = {
+    served: [],
+    swActive: false,
+    onlineEngineActive: null,
+    offlineEngineActive: null,
+    onlinePageErrors: [],
+    offlinePageErrors: [],
+    error: null,
+  };
   let sw: BrowserContext | null = null;
   sink.side = result.onlinePageErrors;
   try {
@@ -459,8 +682,19 @@ async function firstVisit(browser: Browser, config: CompareConfig, server: PerfS
     listen(page);
     server.take();
     await page.goto(url, { waitUntil: "commit" });
-    await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 120_000 });
-    result.swActive = await within("service worker", page.evaluate(() => Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise<boolean>((ok) => setTimeout(() => ok(false), 30_000))])), 60_000);
+    await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, {
+      timeout: 120_000,
+    });
+    result.swActive = await within(
+      "service worker",
+      page.evaluate(() =>
+        Promise.race([
+          navigator.serviceWorker.ready.then(() => true),
+          new Promise<boolean>((ok) => setTimeout(() => ok(false), 30_000)),
+        ]),
+      ),
+      60_000,
+    );
     await page.waitForLoadState("networkidle", { timeout: 120_000 });
     await page.waitForTimeout(1000);
     await page.waitForLoadState("networkidle", { timeout: 60_000 });
@@ -473,7 +707,9 @@ async function firstVisit(browser: Browser, config: CompareConfig, server: PerfS
       sink.side = result.offlinePageErrors;
       try {
         await page.reload({ waitUntil: "commit" });
-        await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 60_000 });
+        await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, {
+          timeout: 60_000,
+        });
         await page.waitForTimeout(1000);
         result.offlineEngineActive = (await within("offline info", page.evaluate(pageInfo), 60_000)).engineActive;
       } finally {

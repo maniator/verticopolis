@@ -73,12 +73,7 @@ export function isInspectorOpen(ui: UI): boolean {
 
 /** Anchor the editor card beside a facility's on-screen rect, preferring its
  *  right side, flipping left and clamping so it always stays on screen. */
-export function anchorEditor(
-  ui: UI,
-  rect: { x: number; y: number; w: number },
-  viewW: number,
-  viewH: number,
-): void {
+export function anchorEditor(ui: UI, rect: { x: number; y: number; w: number }, viewW: number, viewH: number): void {
   const { left, top } = anchorBeside(rect, ui.editorSize, viewW, viewH);
   placePanel(ui.el.editor, left, top);
 }

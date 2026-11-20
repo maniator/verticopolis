@@ -98,7 +98,8 @@ describe("the help site's menu bar", () => {
     const deps = stubDeps({ theme: vi.fn(() => "dark" as const) });
     wireHelpMenu(root, deps);
     document.getElementById("hm-options")!.click();
-    const checked = (code: string) => document.querySelector(`[data-help-item="${code}"]`)!.getAttribute("aria-checked");
+    const checked = (code: string) =>
+      document.querySelector(`[data-help-item="${code}"]`)!.getAttribute("aria-checked");
     expect([checked("theme_light"), checked("theme_dark"), checked("theme_auto")]).toEqual(["false", "true", "false"]);
     pick("theme_light");
     expect(deps.setTheme).toHaveBeenCalledWith("light");

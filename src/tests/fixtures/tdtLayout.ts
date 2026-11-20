@@ -76,7 +76,12 @@ export function expressPayloadSize(bottomFloor: number, topFloor: number): numbe
 /** The same, sized the way an older 1994-game reading had it: an express shaft
  *  by the floors it stops at (at least one) rather than the floors it spans.
  *  Kept to build the older files the reader still has to read. */
-export function builtShaftPayloadSizeFor(type: number, bottomFloor: number, topFloor: number, servicedCount: number): number {
+export function builtShaftPayloadSizeFor(
+  type: number,
+  bottomFloor: number,
+  topFloor: number,
+  servicedCount: number,
+): number {
   const spanned = builtShaftPayloadSize(bottomFloor, topFloor);
   return type === EXPRESS ? builtShaftPayloadSize(1, Math.max(1, servicedCount)) : spanned;
 }
@@ -167,7 +172,14 @@ export function wireModel(bytes: Uint8Array): {
     const used = bytes[o];
     const top = bytes[o + 64];
     const bottom = bytes[o + 65];
-    if (used !== 0) elevators.push({ type: bytes[o + 1], cars: bytes[o + 3], x: u16(bytes, o + 62), topFloor: top, bottomFloor: bottom });
+    if (used !== 0)
+      elevators.push({
+        type: bytes[o + 1],
+        cars: bytes[o + 3],
+        x: u16(bytes, o + 62),
+        topFloor: top,
+        bottomFloor: bottom,
+      });
     const payload = bytes[o + 1] === EXPRESS ? expressPayloadSize(bottom, top) : builtShaftPayloadSize(bottom, top);
     o += TDT_ELEVATOR_HEADER_SIZE + (used !== 0 ? payload : 0);
   }

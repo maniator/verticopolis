@@ -27,7 +27,16 @@ export function trackAppAction(action: AppActionName, detail?: string): void {
 }
 
 /** The words the engine's `lastRefusalCode()` answers (`engine-rs/src/file_refusal.rs`). */
-const ENGINE_REFUSAL_CODES = ["too_large", "not_tower", "damaged", "newer_version", "not_save", "unreadable", "modern", "refused"] as const;
+const ENGINE_REFUSAL_CODES = [
+  "too_large",
+  "not_tower",
+  "damaged",
+  "newer_version",
+  "not_save",
+  "unreadable",
+  "modern",
+  "refused",
+] as const;
 
 /** Why a tower file import or export failed (#2075): one of the engine's
  *  refusal codes, or `error` when the engine threw or another step failed.
@@ -42,7 +51,11 @@ export function refusalCode(code: string | undefined): FileFailureCode {
 
 /** An `import_failed` or `export_failed` app action: `detail` the format
  *  (`save` or `tdt`), as before #2075, and `reason` the closed code. */
-export function trackFileFailure(action: "import_failed" | "export_failed", format: "save" | "tdt", reason: FileFailureCode): void {
+export function trackFileFailure(
+  action: "import_failed" | "export_failed",
+  format: "save" | "tdt",
+  reason: FileFailureCode,
+): void {
   trackEvent("app_action", { action, detail: format, reason });
 }
 

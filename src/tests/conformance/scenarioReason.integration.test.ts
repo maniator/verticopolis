@@ -10,7 +10,10 @@ const NO_LOBBY = "Lay a lobby on the ground line first to open your tower.";
 
 function run(commands: unknown[]): void {
   const file = join(dir, "s.json");
-  writeFileSync(file, JSON.stringify({ id: "t", description: "d", start: { newGame: { seed: 1, mode: "classic" } }, commands }));
+  writeFileSync(
+    file,
+    JSON.stringify({ id: "t", description: "d", start: { newGame: { seed: 1, mode: "classic" } }, commands }),
+  );
   runScenario(loadScenario(file), startWasmEngine);
 }
 
@@ -22,15 +25,21 @@ describe.skipIf(!hasWasmPackage())("a refusal pinned by its reason", () => {
   });
 
   it("fails, naming both, when the engine refuses for another reason", () => {
-    expect(() => run([{ ...floorBeforeLobby, reason: "Not enough money." }])).toThrow(/was refused for "Lay a lobby.*", expected "Not enough money\."/);
+    expect(() => run([{ ...floorBeforeLobby, reason: "Not enough money." }])).toThrow(
+      /was refused for "Lay a lobby.*", expected "Not enough money\."/,
+    );
   });
 
   it("does not take a reason without expectFail", () => {
-    expect(() => run([{ op: "build", kind: "floor", floor: 2, x: 170, reason: NO_LOBBY }])).toThrow(/a reason needs expectFail/);
+    expect(() => run([{ op: "build", kind: "floor", floor: 2, x: 170, reason: NO_LOBBY }])).toThrow(
+      /a reason needs expectFail/,
+    );
   });
 
   it("does not take a command that lands for a refusal", () => {
-    expect(() => run([{ op: "build", kind: "lobby", floor: 1, x: 170, expectFail: true, reason: "Structure already here." }])).toThrow(/succeeded but was expected to fail/);
+    expect(() =>
+      run([{ op: "build", kind: "lobby", floor: 1, x: 170, expectFail: true, reason: "Structure already here." }]),
+    ).toThrow(/succeeded but was expected to fail/);
   });
 
   it.each([

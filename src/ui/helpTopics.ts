@@ -71,7 +71,9 @@ export function gripeTopic(cause: string, binding?: string): HelpTopic | undefin
     case "noise":
       return "noise";
     case "congestion":
-      return binding === "walkways" || binding === "stairs" || binding === "escalator" ? "walkwayWaits" : "elevatorWaits";
+      return binding === "walkways" || binding === "stairs" || binding === "escalator"
+        ? "walkwayWaits"
+        : "elevatorWaits";
     case "unmetDemand":
       return "shops";
     case "trash":

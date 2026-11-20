@@ -40,7 +40,10 @@ export const UNMAPPED = "(unmapped)";
  *  (for compressing one source's share on its own). Counts UTF-16 code
  *  units, the unit sourcemap columns use; the minified output is ASCII in
  *  practice, so this is its byte count. */
-export function bytesBySource(code: string, map: { sources: string[]; mappings: string }): { bytes: Map<string, number>; text: Map<string, string[]> } {
+export function bytesBySource(
+  code: string,
+  map: { sources: string[]; mappings: string },
+): { bytes: Map<string, number>; text: Map<string, string[]> } {
   const bytes = new Map<string, number>();
   const text = new Map<string, string[]>();
   const add = (source: string, span: string) => {

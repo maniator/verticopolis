@@ -38,17 +38,25 @@ import viewLayout from "../engineFixtures/viewLayout.json";
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
-const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "expected.json"), "utf8")) as { scenarios: Record<string, Checkpoint[]> };
+const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "expected.json"), "utf8")) as {
+  scenarios: Record<string, Checkpoint[]>;
+};
 const files = readdirSync(SCENARIO_DIR)
   .filter((f) => f.endsWith(".json"))
   .sort();
 
-
 /** The tower's recycling reads: capacity, fill and whether demand is met. */
-interface Recycling { capacity: number; fill: number; met: boolean }
+interface Recycling {
+  capacity: number;
+  fill: number;
+  met: boolean;
+}
 
 /** A shaft card as the engine writes it: the typed array's kind and its slots. */
-interface Card { type: string; slots: number[] }
+interface Card {
+  type: string;
+  slots: number[];
+}
 
 /** One read: the rooms and shafts asked about and what the engine gave. */
 interface Read {
@@ -67,13 +75,19 @@ function roomIds(units: readonly Pick<Unit, "id" | "kind">[]): number[] {
   return units.filter((u) => (u.kind !== "floor" && u.kind !== "lobby") || u === floor || u === lobby).map((u) => u.id);
 }
 
-const cardOf = (card: Float64Array | Int32Array | ArrayLike<number>): Card => ({ type: card.constructor.name, slots: Array.from(card) });
+const cardOf = (card: Float64Array | Int32Array | ArrayLike<number>): Card => ({
+  type: card.constructor.name,
+  slots: Array.from(card),
+});
 
 /** The kinds whose service sections an inert state (fire, gutted, under
  *  construction) switches off: parking, housekeeping and a venue's retail
  *  block. A venue's lobby distance is still answered. */
 const isServiceKind = (kind: Unit["kind"]): boolean =>
-  kind === "parking" || kind === "parkingRamp" || kind === "housekeeping" || catalogFacility(catalogFor("modern"), kind).commercial;
+  kind === "parking" ||
+  kind === "parkingRamp" ||
+  kind === "housekeeping" ||
+  catalogFacility(catalogFor("modern"), kind).commercial;
 
 /** The kinds of the inert service rooms in each read, and of its shafts, for
  *  the tally. */
@@ -87,7 +101,8 @@ const shaftKindsOf = new WeakMap<Read, string[]>();
  *  a command after it, so the message names only where it was found. */
 function quiet(engine: ScenarioEngine, when: string): void {
   const left = engine.drainEvents();
-  if (left.length > 0) throw new Error(`${left.length} gameplay event(s) pending after the read ${when}, which no hash sees`);
+  if (left.length > 0)
+    throw new Error(`${left.length} gameplay event(s) pending after the read ${when}, which no hash sees`);
 }
 
 /** One read of the engine: every room's service facts, every shaft's card
@@ -123,8 +138,14 @@ function read(handle: WasmEngine, reads: Read[]): void {
       throw new Error(`the inert ${u.kind} ${u.id} still answers a service section`);
     }
   }
-  inertOf.set(read, inert.map((u) => u.kind));
-  shaftKindsOf.set(read, save.transports.map((t) => t.kind));
+  inertOf.set(
+    read,
+    inert.map((u) => u.kind),
+  );
+  shaftKindsOf.set(
+    read,
+    save.transports.map((t) => t.kind),
+  );
   reads.push(read);
 }
 
@@ -237,20 +258,54 @@ const nearCapacity = (card: Card): boolean => card.slots[CARD_NEAR_CAPACITY] ===
  *  and guts none of them. Once Modern riders counted the walk to their
  *  first shaft, it lands in the lobby again and guts all six. */
 const CORPUS_SECTIONS: readonly string[] = [
-  "commercial:lobbyFar:false", "commercial:lobbyFar:true",
-  "hotel:counts:dirty", "hotel:counts:infested", "hotel:counts:other", "hotel:excluded:dirty", "hotel:excluded:infested", "hotel:excluded:other",
-  "housekeeping:adequate", "housekeeping:nominalShortfall", "housekeeping:observedShortfall",
-  "inert:amusements", "inert:boutiqueBay", "inert:cinema", "inert:daycare", "inert:fastFood", "inert:foodHall",
+  "commercial:lobbyFar:false",
+  "commercial:lobbyFar:true",
+  "hotel:counts:dirty",
+  "hotel:counts:infested",
+  "hotel:counts:other",
+  "hotel:excluded:dirty",
+  "hotel:excluded:infested",
+  "hotel:excluded:other",
+  "housekeeping:adequate",
+  "housekeeping:nominalShortfall",
+  "housekeeping:observedShortfall",
+  "inert:amusements",
+  "inert:boutiqueBay",
+  "inert:cinema",
+  "inert:daycare",
+  "inert:fastFood",
+  "inert:foodHall",
   "inert:housekeeping",
-  "inert:nightclub", "inert:parking", "inert:parkingRamp", "inert:restaurant", "inert:shop",
-  "inert:skyBar", "inert:spa",
-  "parking:connected", "parking:connected:short", "parking:disconnected", "parking:ramp", "parking:ramp:short",
+  "inert:nightclub",
+  "inert:parking",
+  "inert:parkingRamp",
+  "inert:restaurant",
+  "inert:shop",
+  "inert:skyBar",
+  "inert:spa",
+  "parking:connected",
+  "parking:connected:short",
+  "parking:disconnected",
+  "parking:ramp",
+  "parking:ramp:short",
   "recycling:met:filling",
-  "retail:advice:none", "retail:advice:overBuilt", "retail:advice:underServed", "retail:rain",
-  "retail:tier:average", "retail:tier:booming", "retail:tier:low", "retail:tier:noData",
-  "shaft:idle:elevatorExpress", "shaft:idle:elevatorStandard", "shaft:load:elevatorExpress", "shaft:load:elevatorStandard",
-  "shaft:noReading:elevatorExpress", "shaft:noReading:elevatorService", "shaft:noReading:elevatorStandard",
-  "shaft:noReading:escalator", "shaft:noReading:stairs",
+  "retail:advice:none",
+  "retail:advice:overBuilt",
+  "retail:advice:underServed",
+  "retail:rain",
+  "retail:tier:average",
+  "retail:tier:booming",
+  "retail:tier:low",
+  "retail:tier:noData",
+  "shaft:idle:elevatorExpress",
+  "shaft:idle:elevatorStandard",
+  "shaft:load:elevatorExpress",
+  "shaft:load:elevatorStandard",
+  "shaft:noReading:elevatorExpress",
+  "shaft:noReading:elevatorService",
+  "shaft:noReading:elevatorStandard",
+  "shaft:noReading:escalator",
+  "shaft:noReading:stairs",
 ];
 
 /** Which sections the corpus exercised, so a gap in the comparison shows,
@@ -279,7 +334,8 @@ function tally(read: Read): void {
     else bump(`shaft:${utilization > 0 ? "load" : "idle"}:${kinds[i]}`);
     if (nearCapacity(card)) bump(`shaft:nearCapacity:${kinds[i]}`);
   });
-  if (read.recycling.capacity > 0) bump(`recycling:${read.recycling.met ? "met" : "over"}${read.recycling.fill > 0 ? ":filling" : ""}`);
+  if (read.recycling.capacity > 0)
+    bump(`recycling:${read.recycling.met ? "met" : "over"}${read.recycling.fill > 0 ? ":filling" : ""}`);
   for (const kind of inertOf.get(read) ?? []) bump(`inert:${kind}`);
 }
 
@@ -293,9 +349,15 @@ describe.skipIf(!hasWasmPackage())("service, venue and transport facts through t
     const scenario = loadScenario(resolve(SCENARIO_DIR, file));
     it(`${scenario.id}: every room's service facts, every shaft's card and the recycling reads answer without moving a hash`, () => {
       const pinned = lock.scenarios[scenario.id];
-      if (!pinned?.length) throw new Error(`${scenario.id} has no checkpoints in the lock; regenerate it with the Rust run first`);
+      if (!pinned?.length)
+        throw new Error(`${scenario.id} has no checkpoints in the lock; regenerate it with the Rust run first`);
       const reads: Read[] = [];
-      expect(firstDivergence(runScenario(scenario, (start) => wasmWithReads(startWasmHandle(start), reads)), pinned)).toBeNull();
+      expect(
+        firstDivergence(
+          runScenario(scenario, (start) => wasmWithReads(startWasmHandle(start), reads)),
+          pinned,
+        ),
+      ).toBeNull();
       // One read per checkpoint and two per reload.
       const reloads = scenario.commands.filter((c) => c.op === "reload").length;
       expect(reads.length, `${scenario.id}: reads`).toBe(pinned.length + 2 * reloads);
@@ -313,6 +375,7 @@ describe.skipIf(!hasWasmPackage())("service, venue and transport facts through t
   });
 
   afterAll(() => {
-    if (seen.size > 0) console.info(`service facts compared, by section: ${JSON.stringify(Object.fromEntries([...seen].sort()))}`);
+    if (seen.size > 0)
+      console.info(`service facts compared, by section: ${JSON.stringify(Object.fromEntries([...seen].sort()))}`);
   });
 });

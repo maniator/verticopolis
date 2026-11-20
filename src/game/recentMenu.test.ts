@@ -19,7 +19,12 @@ vi.mock("../storage/fileSpace", () => ({
 }));
 vi.mock("../storage/linkedFolder", () => ({
   canLinkFolder: () => fake.canLink,
-  linkedFolder: { linkId: () => fake.linkId, keptLinkId: () => fake.keptLinkId, state: () => fake.state, allow: fake.allow },
+  linkedFolder: {
+    linkId: () => fake.linkId,
+    keptLinkId: () => fake.keptLinkId,
+    state: () => fake.state,
+    allow: fake.allow,
+  },
 }));
 vi.mock("./fileSpaceCommands", () => ({ openTowersFile: fake.openTowersFile }));
 vi.mock("./linkedFolderCommands", () => ({ openLinkedRow: fake.openLinkedRow }));
@@ -29,9 +34,26 @@ import type { GameApp } from "../main";
 import { RECENT_KEY } from "../storage/recentTowers";
 import { fillRecentMenu, openRecent, recentLabel, wireRecentMenu } from "./recentMenu";
 
-const towers = (n: number, kind: RecentTower["kind"] = "tower"): RecentTower => ({ place: "towers", id: `id${n}`, name: `Tower ${n}`, kind });
-const folder = (file: string, link = "L1"): RecentTower => ({ place: "folder", id: file, name: file, kind: "tower", link });
-const entry = (n: number, name = `Tower ${n}`, kind: TowerFileEntry["kind"] = "tower"): TowerFileEntry => ({ id: `id${n}`, name, kind, size: 1, modified: n });
+const towers = (n: number, kind: RecentTower["kind"] = "tower"): RecentTower => ({
+  place: "towers",
+  id: `id${n}`,
+  name: `Tower ${n}`,
+  kind,
+});
+const folder = (file: string, link = "L1"): RecentTower => ({
+  place: "folder",
+  id: file,
+  name: file,
+  kind: "tower",
+  link,
+});
+const entry = (n: number, name = `Tower ${n}`, kind: TowerFileEntry["kind"] = "tower"): TowerFileEntry => ({
+  id: `id${n}`,
+  name,
+  kind,
+  size: 1,
+  modified: n,
+});
 const stored = () => JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as RecentTower[];
 const keep = (...list: RecentTower[]) => localStorage.setItem(RECENT_KEY, JSON.stringify(list));
 
@@ -43,7 +65,13 @@ const item = (n: number) => root.querySelector<HTMLElement>(`#mb-recent-${n}`)!;
 
 beforeEach(() => {
   localStorage.clear();
-  Object.assign(fake, { open: true, canLink: true, linkId: "L1", keptLinkId: "L1", state: { name: "Towers", access: "granted" } });
+  Object.assign(fake, {
+    open: true,
+    canLink: true,
+    linkId: "L1",
+    keptLinkId: "L1",
+    state: { name: "Towers", access: "granted" },
+  });
   fake.files = new Map([1, 2, 3, 4, 5, 6].map((n) => [`id${n}`, entry(n)]));
   for (const f of [fake.allow, fake.openTowersFile, fake.openLinkedRow, fake.track]) f.mockReset();
   fake.openTowersFile.mockResolvedValue("opened");

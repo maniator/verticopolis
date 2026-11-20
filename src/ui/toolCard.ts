@@ -26,5 +26,8 @@ export function renderToolCard(ui: Pick<UI, "cb" | "tool" | "el">, tool: Tool): 
 
 /** The card's description and notes, the text the one-line bar leaves out. */
 export function cardNotes(card: HTMLElement): string {
-  return [...card.querySelectorAll("p")].map((p) => p.textContent?.trim() ?? "").filter(Boolean).join(" ");
+  return [...card.querySelectorAll("p")]
+    .map((p) => p.textContent?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
 }

@@ -96,7 +96,13 @@ export interface GameStatus {
 }
 
 /** The HUD fields, in the order the bar shows them. */
-export const HUD_FIELDS = ["date", "time", "money", "population", "stars"] as const satisfies readonly (keyof HelpBarHud)[];
+export const HUD_FIELDS = [
+  "date",
+  "time",
+  "money",
+  "population",
+  "stars",
+] as const satisfies readonly (keyof HelpBarHud)[];
 
 /** The longest HUD string a status may carry; the game's are far shorter. */
 const MAX_FIELD = 64;
@@ -110,7 +116,8 @@ export function isBarMessage(data: unknown): data is BarMessage {
 export function isGameStatus(data: unknown): data is GameStatus {
   if (typeof data !== "object" || data === null) return false;
   const s = data as Partial<Record<keyof GameStatus, unknown>>;
-  if (s.game !== "status" || !isTabId(s.tab) || typeof s.heldForHelp !== "boolean" || typeof s.visible !== "boolean") return false;
+  if (s.game !== "status" || !isTabId(s.tab) || typeof s.heldForHelp !== "boolean" || typeof s.visible !== "boolean")
+    return false;
   if (typeof s.speed !== "number" || !Number.isInteger(s.speed) || s.speed < 0 || s.speed > 3) return false;
   const hud = s.hud as Record<string, unknown> | null | undefined;
   if (typeof hud !== "object" || hud === null) return false;

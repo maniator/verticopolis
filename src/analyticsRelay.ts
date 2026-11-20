@@ -107,9 +107,7 @@ function sessionId(): string {
   let minted: string;
   try {
     minted =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : fallbackId();
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : fallbackId();
   } catch {
     minted = fallbackId();
   }

@@ -94,7 +94,11 @@ export function exportFile(
     noteEngineThrow(err);
     throw err;
   }
-  if (file === undefined) throw new ExportRefused(port.lastReason() ?? "The tower could not be exported.", refusalCode(port.lastRefusalCode()));
+  if (file === undefined)
+    throw new ExportRefused(
+      port.lastReason() ?? "The tower could not be exported.",
+      refusalCode(port.lastRefusalCode()),
+    );
   return file;
 }
 
@@ -107,7 +111,10 @@ export function stampCamera(port: Pick<EnginePort, "setCamera">, view: Serialize
 /** Hand a stored save to the engine (the `stored` source, with the founder
  *  rule), for `SaveGame`'s loaders: true when the tower loaded, after
  *  `followed` (the app following the swap) ran. */
-export function loadStored(port: Pick<EnginePort, "loadSave">, followed: () => void = () => {}): (text: string) => boolean {
+export function loadStored(
+  port: Pick<EnginePort, "loadSave">,
+  followed: () => void = () => {},
+): (text: string) => boolean {
   return (text) => {
     if (port.loadSave(text)[0] !== 1) return false;
     followed();

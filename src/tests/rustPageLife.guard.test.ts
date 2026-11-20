@@ -24,10 +24,15 @@ const ALLOWED = new Set(["src/wasmhost/rustEngine.ts", "src/bootstrap.ts", "src/
 const isTestFile = (rel: string): boolean => /\.(test|spec|fixture)\.tsx?$/.test(rel) || rel.startsWith("src/tests/");
 
 describe("the Rust engine enters a page life at the boot only", () => {
-  const files = sourceFiles("src", [".ts", ".tsx"]).map((abs) => ({ rel: repoRel(abs), text: readFileSync(abs, "utf8") }));
+  const files = sourceFiles("src", [".ts", ".tsx"]).map((abs) => ({
+    rel: repoRel(abs),
+    text: readFileSync(abs, "utf8"),
+  }));
 
   it("names each Rust boot call outside the boot and its definition nowhere", () => {
-    const strays = files.filter((f) => !isTestFile(f.rel) && !ALLOWED.has(f.rel) && BOOT_CALLS.some((c) => f.text.includes(c))).map((f) => f.rel);
+    const strays = files
+      .filter((f) => !isTestFile(f.rel) && !ALLOWED.has(f.rel) && BOOT_CALLS.some((c) => f.text.includes(c)))
+      .map((f) => f.rel);
     expect(strays).toEqual([]);
   });
 

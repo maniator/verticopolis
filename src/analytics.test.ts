@@ -21,7 +21,6 @@ function setVisibility(state: "visible" | "hidden"): void {
   Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
 }
 
-
 /** The first-tower funnel's tower fields (#2392): tower `n` of this page life. */
 const tw = (n: number) => ({ tower_n: n, page_life: expect.any(String) });
 describe("gameplay analytics events", () => {
@@ -409,12 +408,36 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
   session_crashes: { crashes: 3 },
   file_imported: { format: "tdt", mode: "classic", star: 3, population: 420 },
-  $pageview: { $referring_domain: "www.reddit.com", $pathname: "/", utm_source: "reddit", utm_medium: null, utm_campaign: null },
+  $pageview: {
+    $referring_domain: "www.reddit.com",
+    $pathname: "/",
+    utm_source: "reddit",
+    utm_medium: null,
+    utm_campaign: null,
+  },
   file_exported: { format: "vctower", mode: "modern", star: 2, population: 90 },
   tdt_import_read: {
-    star: 3, floors: 40, basements: 2, rooms: 120, shafts: 6, flights: 10, decoded: true, hasRoster: true, notes: 2,
-    unknown: 0, droppedFloors: 0, offLot: 0, overlapping: 1, misplaced: 0, clamped: 2, widthMismatch: 0, asleepConverted: 0,
-    droppedShafts: 0, adjustedShafts: 1, droppedFlights: 0, anomalies: 4,
+    star: 3,
+    floors: 40,
+    basements: 2,
+    rooms: 120,
+    shafts: 6,
+    flights: 10,
+    decoded: true,
+    hasRoster: true,
+    notes: 2,
+    unknown: 0,
+    droppedFloors: 0,
+    offLot: 0,
+    overlapping: 1,
+    misplaced: 0,
+    clamped: 2,
+    widthMismatch: 0,
+    asleepConverted: 0,
+    droppedShafts: 0,
+    adjustedShafts: 1,
+    droppedFlights: 0,
+    anomalies: 4,
   },
   engine_status: {
     trigger: "settle",
@@ -494,4 +517,3 @@ describe("no suite leaves its common props installed", () => {
     expect(getCommonProps()).toEqual({});
   });
 });
-

@@ -48,7 +48,11 @@ describe("the tools/simtower save builders", () => {
 
   it("round-trips the venue tower through both converters", () => {
     run("build-venue-cap", "2", "1", "SMOKE");
-    const kinds = (units: { kind: string }[]) => units.filter((u) => u.kind === "cinema" || u.kind === "partyHall").map((u) => u.kind).sort();
+    const kinds = (units: { kind: string }[]) =>
+      units
+        .filter((u) => u.kind === "cinema" || u.kind === "partyHall")
+        .map((u) => u.kind)
+        .sort();
     const built = tdt("SMOKE.TDT");
     expect(kinds(built.units)).toEqual(["cinema", "cinema", "partyHall"]);
 
@@ -62,7 +66,11 @@ describe("the tools/simtower save builders", () => {
   });
 
   it("fails a conversion it cannot do", () => {
-    const r = spawnSync(process.execPath, [TSX, "tools/simtower/tdt-to-vctower.ts", join(SAVES, "MISSING.TDT")], { cwd: ROOT, encoding: "utf8", timeout: 120_000 });
+    const r = spawnSync(process.execPath, [TSX, "tools/simtower/tdt-to-vctower.ts", join(SAVES, "MISSING.TDT")], {
+      cwd: ROOT,
+      encoding: "utf8",
+      timeout: 120_000,
+    });
     expect(r.status).toBe(1);
   });
 });

@@ -49,7 +49,12 @@ function venueDraft(kind: "fastFood" | "restaurant" | "shop"): { draft: Draft; i
  *  so the first hour it steps into fires onHour. `edit` changes the draft's
  *  venue first. `venue()` reads the venue as the engine holds it, and
  *  `triggerHour()` advances one hour so onHour/updatePresence fires. */
-function venueFixture(leg: Leg, kind: "fastFood" | "restaurant" | "shop", hour: number, edit?: (draft: Draft, id: number) => void) {
+function venueFixture(
+  leg: Leg,
+  kind: "fastFood" | "restaurant" | "shop",
+  hour: number,
+  edit?: (draft: Draft, id: number) => void,
+) {
   const { draft, id } = venueDraft(kind);
   edit?.(draft, id);
   setHour(draft, hour);

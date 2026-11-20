@@ -54,15 +54,25 @@ export function assertEnginePackage(): void {
   if (process.env.BASE_URL) return;
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   if (!existsSync(resolve(root, "src", "public", "engine", "BUILD.json"))) {
-    throw new Error("The gallery renders on the Rust engine, but src/public/engine/ has no engine package: run `npm install`.");
+    throw new Error(
+      "The gallery renders on the Rust engine, but src/public/engine/ has no engine package: run `npm install`.",
+    );
   }
   // The tooling package is what a VC_TOOLING=1 build serves, and dist/ is
   // what RUN_SERVER's `vite preview` serves.
   const pinned = recordedSources(resolve(root, "node_modules/@verticopolis/engine/web"));
-  const dirs = ["src/public/engine", "node_modules/@verticopolis/engine/tooling/web", ...(process.env.RUN_SERVER ? ["dist/engine"] : [])];
-  const stale = dirs.filter((d) => existsSync(resolve(root, d, "BUILD.json")) && recordedSources(resolve(root, d)) !== pinned);
+  const dirs = [
+    "src/public/engine",
+    "node_modules/@verticopolis/engine/tooling/web",
+    ...(process.env.RUN_SERVER ? ["dist/engine"] : []),
+  ];
+  const stale = dirs.filter(
+    (d) => existsSync(resolve(root, d, "BUILD.json")) && recordedSources(resolve(root, d)) !== pinned,
+  );
   if (stale.length > 0) {
-    throw new Error(`The served engine package is not the pinned @verticopolis/engine: ${stale.join(", ")}. Run \`npm install\`, then \`VC_TOOLING=1 npm run build\` again before a RUN_SERVER run.`);
+    throw new Error(
+      `The served engine package is not the pinned @verticopolis/engine: ${stale.join(", ")}. Run \`npm install\`, then \`VC_TOOLING=1 npm run build\` again before a RUN_SERVER run.`,
+    );
   }
 }
 
@@ -99,7 +109,18 @@ export function shotShape(v: any): any {
     vipVisitDay: v.vipVisitDay,
     builtWeddingHall: v.builtWeddingHall,
     pendingEvent: Boolean(v.events?.pending),
-    units: (v.units ?? []).map((u: any) => [u.id, u.kind, u.floor, u.x, u.state, u.occupants ?? 0, u.rent ?? null, Boolean(u.noRate), Boolean(u.everOccupied), u.label ?? null]),
+    units: (v.units ?? []).map((u: any) => [
+      u.id,
+      u.kind,
+      u.floor,
+      u.x,
+      u.state,
+      u.occupants ?? 0,
+      u.rent ?? null,
+      Boolean(u.noRate),
+      Boolean(u.everOccupied),
+      u.label ?? null,
+    ]),
     transports: (v.transports ?? []).map((t: any) => [t.id, t.kind, t.x, t.bottom, t.top]),
   };
 }
@@ -117,7 +138,8 @@ export async function installShotHelpers(page: Page): Promise<void> {
  *  must settle. */
 async function settleTower(page: Page, where: string, allowSkip: boolean): Promise<void> {
   const state = await page.evaluate(pgSettle);
-  if (!state.startsWith("settled") && !(allowSkip && state.startsWith("skipped"))) throw new Error(`could not settle ${where} (${state})`);
+  if (!state.startsWith("settled") && !(allowSkip && state.startsWith("skipped")))
+    throw new Error(`could not settle ${where} (${state})`);
   await expectHosted(page, where);
 }
 
@@ -149,7 +171,8 @@ export async function beginSettleStep(page: Page, where: string): Promise<void> 
     const vc = w.__vcEngine;
     if (!vc) return "no engine host (did the engine package load?)";
     const g = (window as unknown as { game?: any }).game;
-    if (!vc.status?.hosted) return `the engine does not hold the tower (${vc.status?.lastError ?? "no error recorded"})`;
+    if (!vc.status?.hosted)
+      return `the engine does not hold the tower (${vc.status?.lastError ?? "no error recorded"})`;
     if (!g || g.enginePort !== vc.port) return "the app does not run on the Rust engine";
     try {
       g.syncSim();
@@ -176,8 +199,12 @@ async function expectHosted(page: Page, where: string): Promise<void> {
 /** Fail the run when a SETTLE_AFTER_SETUP entry names no shot, or a shot
  *  without a setup (the settle runs after a setup only), so a renamed or
  *  reworked shot cannot drop out of the list unnoticed. */
-export function checkSettleList(scenes: readonly { id: string; shots: readonly { name: string; setup?: unknown }[] }[]): void {
-  const withSetup = new Set(scenes.flatMap((s) => s.shots.filter((shot) => shot.setup).map((shot) => `${s.id}/${shot.name}`)));
+export function checkSettleList(
+  scenes: readonly { id: string; shots: readonly { name: string; setup?: unknown }[] }[],
+): void {
+  const withSetup = new Set(
+    scenes.flatMap((s) => s.shots.filter((shot) => shot.setup).map((shot) => `${s.id}/${shot.name}`)),
+  );
   const stale = [...SETTLE_AFTER_SETUP].filter((k) => !withSetup.has(k));
   if (stale.length > 0) throw new Error(`SETTLE_AFTER_SETUP names no shot with a setup: ${stale.join(", ")}`);
 }
@@ -197,9 +224,11 @@ export async function checkHosted(page: Page, where: string, before: string, fix
 
 /** What to change when `checkHosted` fails, by where it ran. */
 export const HOSTED_FIX = {
-  setup: "the setup's edit did not reach the engine: check the tower's hand on (src/game/toolingTower.ts), and add the shot to SETTLE_AFTER_SETUP (if only the clock differs and the setup calls pgSetClock, check pgSetClock and the engine's advanceClock instead)",
+  setup:
+    "the setup's edit did not reach the engine: check the tower's hand on (src/game/toolingTower.ts), and add the shot to SETTLE_AFTER_SETUP (if only the clock differs and the setup calls pgSetClock, check pgSetClock and the engine's advanceClock instead)",
   clock: "the clock pin did not reach the engine: check pgSetClock and the engine's advanceClock",
-  settled: "code that ran after a builder's __vcShotHandoff edited the tower in a way the engine did not follow: move that edit before the handoff",
+  settled:
+    "code that ran after a builder's __vcShotHandoff edited the tower in a way the engine did not follow: move that edit before the handoff",
 } as const;
 
 /** In-page: the page's tower (`game.sim`, the harnesses' tower over the engine) in the
@@ -219,7 +248,8 @@ export function pgCheckHosted(before: string): string {
   const g = w.game;
   const vc = w.__vcEngine;
   if (!g?.sim) return "no game";
-  if (typeof w.__vcShotShape !== "function") return "the shared shape is not installed (installShotHelpers did not run on this page)";
+  if (typeof w.__vcShotShape !== "function")
+    return "the shared shape is not installed (installShotHelpers did not run on this page)";
   const shapeOf = w.__vcShotShape;
   if (!vc) return "no engine host (did the engine package load?)";
   if (!vc.status?.hosted) return "the engine does not hold the tower";
@@ -231,7 +261,8 @@ export function pgCheckHosted(before: string): string {
   const engine = shapeOf(JSON.parse(vc.port.serialize()));
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   for (const key of ["star", "minutes", "vipVisitDay", "builtWeddingHall", "pendingEvent"]) {
-    if (!same(was[key], now[key]) && !same(now[key], engine[key])) return `${key} is ${JSON.stringify(now[key])} on the page, ${JSON.stringify(engine[key])} on the engine`;
+    if (!same(was[key], now[key]) && !same(now[key], engine[key]))
+      return `${key} is ${JSON.stringify(now[key])} on the page, ${JSON.stringify(engine[key])} on the engine`;
   }
   for (const key of ["units", "transports"]) {
     const byId = (rows: unknown[][]) => new Map(rows.map((r) => [r[0], r]));
@@ -244,7 +275,8 @@ export function pgCheckHosted(before: string): string {
       const theirs = e.get(id);
       if (theirs === undefined) return `${key} ${JSON.stringify(row)} is on the page only`;
       // Field by field: only what the step changed has to match.
-      if (row.some((v, j) => (prev === undefined || !same(v, prev[j])) && !same(v, theirs[j]))) return `${key} ${JSON.stringify(row)} on the page, ${JSON.stringify(theirs)} on the engine`;
+      if (row.some((v, j) => (prev === undefined || !same(v, prev[j])) && !same(v, theirs[j])))
+        return `${key} ${JSON.stringify(row)} on the page, ${JSON.stringify(theirs)} on the engine`;
     }
     for (const id of a.keys()) {
       if (!b.has(id) && e.has(id)) return `${key} ${String(id)} was removed on the page only`;
@@ -269,13 +301,20 @@ export function pgCheckHosted(before: string): string {
  */
 export function pgSettle(): string {
   const run = (): string => {
-    const w = window as unknown as { game?: any; __vcEngine?: any; __vcShotSettled?: boolean; __vcShotSettledShape?: string; __vcShotShape?: (v: any) => any };
+    const w = window as unknown as {
+      game?: any;
+      __vcEngine?: any;
+      __vcShotSettled?: boolean;
+      __vcShotSettledShape?: string;
+      __vcShotShape?: (v: any) => any;
+    };
     const g = w.game;
     const vc = w.__vcEngine;
     if (!g?.sim) return "no game";
     if (!vc) return "no engine host (did the engine package load?)";
     if (g.enginePort !== vc.port) return "the app does not run on the Rust engine";
-    if (typeof w.__vcShotShape !== "function") return "the shared shape is not installed (installShotHelpers did not run on this page)";
+    if (typeof w.__vcShotShape !== "function")
+      return "the shared shape is not installed (installShotHelpers did not run on this page)";
     const shapeOf = w.__vcShotShape;
     // Only a title screen still in the page counts: the runner's splash
     // dismissal removes the node and can leave the controller's reference
@@ -287,7 +326,11 @@ export function pgSettle(): string {
     // Telemetry is compared as parsed values with sorted keys: the engine
     // writes a whole float as 0.0 and its keys in its own order.
     const canonOf = (v: unknown) =>
-      JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+      JSON.stringify(v, (_k, x) =>
+        x && typeof x === "object" && !Array.isArray(x)
+          ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1)))
+          : x,
+      );
     const telemetry = JSON.parse(engineBefore.elevatorTelemetry());
     const memos: number[] = [...engineBefore.loopMemos()];
     const keep = {
@@ -322,11 +365,14 @@ export function pgSettle(): string {
       g.refreshEditor?.();
     }
     if (refused) return refused;
-    if (canonOf(JSON.parse(vc.port.elevatorTelemetry())) !== canonOf(telemetry)) return "the engine's elevator telemetry differs from the one handed to it";
-    if (JSON.stringify([...vc.port.loopMemos()]) !== JSON.stringify(memos)) return "the engine's loop memos differ from the ones handed to it";
+    if (canonOf(JSON.parse(vc.port.elevatorTelemetry())) !== canonOf(telemetry))
+      return "the engine's elevator telemetry differs from the one handed to it";
+    if (JSON.stringify([...vc.port.loopMemos()]) !== JSON.stringify(memos))
+      return "the engine's loop memos differ from the ones handed to it";
     const settled = JSON.stringify(shapeOf(g.sim.serialize()));
     // The engine loaded the same tower the page did.
-    if (JSON.stringify(shapeOf(JSON.parse(vc.port.serialize()))) !== settled) return "the engine's tower differs from the one handed to it";
+    if (JSON.stringify(shapeOf(JSON.parse(vc.port.serialize()))) !== settled)
+      return "the engine's tower differs from the one handed to it";
     w.__vcShotSettled = true;
     w.__vcShotSettledShape = settled;
     return "settled";

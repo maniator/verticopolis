@@ -22,7 +22,10 @@ vi.mock("./overviewMapWiring", () => ({
 vi.mock("./fileSpaceCommands", () => files);
 vi.mock("./titleScreen", () => closer);
 vi.mock("@verticopolis/components/windows/movableWindow", () => ({ MovableWindow: movable, WITHIN_PARENT: "parent" }));
-vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
+vi.mock("../ui/splashTemplate", () => ({
+  SPONSOR_URL: "https://sponsor.example/",
+  sponsorOffered: () => sponsor.offered,
+}));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
 const menus = vi.hoisted(() => ({ open: vi.fn(), pick: vi.fn(), dismiss: vi.fn() }));
 vi.mock("../analyticsMenus", async (real) => ({

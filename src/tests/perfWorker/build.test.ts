@@ -10,29 +10,65 @@ function fixture(): string {
   roots.push(root);
   return root;
 }
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 describe("shell-free worker comparison builds", () => {
   it("passes spaces, quotes and shell syntax unchanged to a JS CLI", () => {
     const root = fixture();
     const entry = join(root, "capture & arguments.cjs");
-    writeFileSync(entry, 'require("node:fs").writeFileSync("args.json", JSON.stringify({args: process.argv.slice(2), token: process.env.VC_TEST_EXPAND}));');
-    const args = ["build", "--outDir", join(root, "output & %VC_TEST_EXPAND% ^ (dir)"), 'quotes"and|redirect>input<', "--emptyOutDir"];
+    writeFileSync(
+      entry,
+      'require("node:fs").writeFileSync("args.json", JSON.stringify({args: process.argv.slice(2), token: process.env.VC_TEST_EXPAND}));',
+    );
+    const args = [
+      "build",
+      "--outDir",
+      join(root, "output & %VC_TEST_EXPAND% ^ (dir)"),
+      'quotes"and|redirect>input<',
+      "--emptyOutDir",
+    ];
     runNodeCli(entry, args, root, { ...process.env, VC_TEST_EXPAND: "must stay literal" });
     expect(JSON.parse(readFileSync(join(root, "args.json"), "utf8"))).toEqual({ args, token: "must stay literal" });
   });
 
   it("runs npm prebuild, build and postbuild with the inherited environment", () => {
     const root = fixture();
-    writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { prebuild: "node record.cjs", build: "node record.cjs", postbuild: "node record.cjs" } }));
-    writeFileSync(join(root, "record.cjs"), 'require("node:fs").appendFileSync("lifecycle.txt", process.env.npm_lifecycle_event + ":" + process.env.VC_TEST_EXPAND + "\\n");');
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({
+        scripts: { prebuild: "node record.cjs", build: "node record.cjs", postbuild: "node record.cjs" },
+      }),
+    );
+    writeFileSync(
+      join(root, "record.cjs"),
+      'require("node:fs").appendFileSync("lifecycle.txt", process.env.npm_lifecycle_event + ":" + process.env.VC_TEST_EXPAND + "\\n");',
+    );
     // Started the way the owner's Windows run is: `npx vitest` puts npm_lifecycle_event=npx in the environment.
-    buildProduction(root, { ...process.env, npm_lifecycle_event: "npx", npm_lifecycle_script: "vitest", VC_TEST_EXPAND: "literal & value" });
-    expect(readFileSync(join(root, "lifecycle.txt"), "utf8").split("\n")).toEqual(["prebuild:literal & value", "build:literal & value", "postbuild:literal & value", ""]);
+    buildProduction(root, {
+      ...process.env,
+      npm_lifecycle_event: "npx",
+      npm_lifecycle_script: "vitest",
+      VC_TEST_EXPAND: "literal & value",
+    });
+    expect(readFileSync(join(root, "lifecycle.txt"), "utf8").split("\n")).toEqual([
+      "prebuild:literal & value",
+      "build:literal & value",
+      "postbuild:literal & value",
+      "",
+    ]);
   });
 
   it("drops the parent's lifecycle identity and VC_TOOLING whatever case the platform spells them in", () => {
-    const env = { NPM_LIFECYCLE_EVENT: "npx", Npm_Lifecycle_Script: "vitest", npm_lifecycle_event: "npx", vc_tooling: "1", VC_TOOLING: "1", KEEP: "yes" };
+    const env = {
+      NPM_LIFECYCLE_EVENT: "npx",
+      Npm_Lifecycle_Script: "vitest",
+      npm_lifecycle_event: "npx",
+      vc_tooling: "1",
+      VC_TOOLING: "1",
+      KEEP: "yes",
+    };
     expect(productionBuildEnv(env)).toEqual({ KEEP: "yes" });
   });
 
@@ -42,10 +78,17 @@ describe("shell-free worker comparison builds", () => {
     mkdirSync(join(vite, "bin"), { recursive: true });
     writeFileSync(join(root, "package.json"), "{}");
     writeFileSync(join(vite, "package.json"), JSON.stringify({ name: "vite", version: "0.0.0" }));
-    writeFileSync(join(vite, "bin", "vite.js"), 'require("node:fs").writeFileSync("vite.json", JSON.stringify({args: process.argv.slice(2), tooling: process.env.VC_TOOLING, token: process.env.VC_TEST_EXPAND}));');
+    writeFileSync(
+      join(vite, "bin", "vite.js"),
+      'require("node:fs").writeFileSync("vite.json", JSON.stringify({args: process.argv.slice(2), tooling: process.env.VC_TOOLING, token: process.env.VC_TEST_EXPAND}));',
+    );
     const output = join(root, "dist & %VC_TEST_EXPAND% ^ (tooling)");
     buildTooling(root, output, { ...process.env, VC_TOOLING: "0", VC_TEST_EXPAND: "literal" });
-    expect(JSON.parse(readFileSync(join(root, "vite.json"), "utf8"))).toEqual({ args: ["build", "--outDir", output, "--emptyOutDir"], tooling: "1", token: "literal" });
+    expect(JSON.parse(readFileSync(join(root, "vite.json"), "utf8"))).toEqual({
+      args: ["build", "--outDir", output, "--emptyOutDir"],
+      tooling: "1",
+      token: "literal",
+    });
   });
 
   it("rejects npm lookup failure with an actionable message", () => {
@@ -68,7 +111,10 @@ describe("shell-free worker comparison builds", () => {
   it("keeps a stale VC_TOOLING out of the production build", () => {
     const root = fixture();
     writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { build: "node record.cjs" } }));
-    writeFileSync(join(root, "record.cjs"), 'require("node:fs").writeFileSync("tooling.txt", String(process.env.VC_TOOLING));');
+    writeFileSync(
+      join(root, "record.cjs"),
+      'require("node:fs").writeFileSync("tooling.txt", String(process.env.VC_TOOLING));',
+    );
     buildProduction(root, { ...process.env, VC_TOOLING: "1" });
     expect(readFileSync(join(root, "tooling.txt"), "utf8")).toBe("undefined");
   });

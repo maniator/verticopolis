@@ -45,7 +45,9 @@ const showingCongrats = (): boolean => dialog().open && (dialog().textContent ??
 
 /** A mid-morning Classic tower saved as a TOWER win, with or without an open fire rescue. */
 function savedTower(withChoice: boolean): Draft {
-  const raw = draftTower(2024, "classic").serialize() as unknown as Record<string, unknown> & { events: Record<string, unknown> };
+  const raw = draftTower(2024, "classic").serialize() as unknown as Record<string, unknown> & {
+    events: Record<string, unknown>;
+  };
   raw.evaluatedTower = true;
   raw.minutes = 9 * 60;
   if (withChoice) raw.events.pending = { kind: "fireRescue", cost: 150_000, message: "Fire on the 40th floor!" };
@@ -72,7 +74,15 @@ function makeApp(sim: Draft, ui: UI) {
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn(), setMusicDucked: vi.fn() },
     // The camera shows the whole tower, so the frame carries every person.
-    engine: { cam: { zoom: 1 }, crowdCulled: false, focus: vi.fn(() => ({})), viewWidth: 1, viewHeight: 1, screenToTile: (sx: number) => (sx === 0 ? -1e6 : 1e6), screenToFloor: (sy: number) => (sy === 0 ? 1e6 : -1e6) },
+    engine: {
+      cam: { zoom: 1 },
+      crowdCulled: false,
+      focus: vi.fn(() => ({})),
+      viewWidth: 1,
+      viewHeight: 1,
+      screenToTile: (sx: number) => (sx === 0 ? -1e6 : 1e6),
+      screenToFloor: (sy: number) => (sy === 0 ? 1e6 : -1e6),
+    },
     ui,
     onboarding: { tick: vi.fn() },
     scheduleReview: { tick: vi.fn() },
@@ -212,37 +222,40 @@ describe.skipIf(noEngine)("a TOWER win with the update prompt due in the same pa
   });
 });
 
-describe.skipIf(noEngine)("a TOWER save with an open emergency, under a dialog that holds the player's work (#1121)", () => {
-  it("keeps the dialog, stops time with a notice, then shows the choice and the congratulations in turn", async () => {
-    const { ui } = makeUI();
-    vi.spyOn(ui, "update").mockImplementation(() => {});
-    const sim = savedTower(true);
-    const { app, raw } = makeApp(sim, ui);
-    // The New Tower picker opens protected, as every dialog with a decision does.
-    ui.newTowerModal({ hasSave: true, onFound: vi.fn() });
-    expect(ui.precedence.ownsPendingWork(dialog().open)).toBe(true);
-    const minutes = minutesOf(sim);
-    for (let i = 0; i < 3; i++) pass(app, raw);
-    expect(has('input[name="nt-mode"]')).toBe(true);
-    expect(has('[data-act="accept"]')).toBe(false);
-    expect(raw.shownChoice).toBe(false);
-    expect(showingCongrats()).toBe(false);
-    expect(minutesOf(sim)).toBe(minutes);
-    expect(choiceOf(sim)?.kind).toBe("fireRescue");
-    // One notice, mounted once, however many frozen frames ask for it.
-    const notices = dialog().querySelectorAll(".modal-notice");
-    expect([...notices].map((n) => n.textContent)).toEqual([CHOICE_WAITING_NOTICE]);
-    // The player closes their dialog: the choice comes up, then the win.
-    click('[data-act="cancel"]');
-    expect(dialog().open).toBe(false);
-    pass(app, raw);
-    expect(raw.shownChoice).toBe(true);
-    expect(has('[data-act="decline"]')).toBe(true);
-    click('[data-act="decline"]');
-    await new Promise((r) => setTimeout(r, 0));
-    expect(choiceOf(sim)).toBeNull();
-    pastOutcomeToast(app, raw);
-    pass(app, raw);
-    expect(showingCongrats()).toBe(true);
-  });
-});
+describe.skipIf(noEngine)(
+  "a TOWER save with an open emergency, under a dialog that holds the player's work (#1121)",
+  () => {
+    it("keeps the dialog, stops time with a notice, then shows the choice and the congratulations in turn", async () => {
+      const { ui } = makeUI();
+      vi.spyOn(ui, "update").mockImplementation(() => {});
+      const sim = savedTower(true);
+      const { app, raw } = makeApp(sim, ui);
+      // The New Tower picker opens protected, as every dialog with a decision does.
+      ui.newTowerModal({ hasSave: true, onFound: vi.fn() });
+      expect(ui.precedence.ownsPendingWork(dialog().open)).toBe(true);
+      const minutes = minutesOf(sim);
+      for (let i = 0; i < 3; i++) pass(app, raw);
+      expect(has('input[name="nt-mode"]')).toBe(true);
+      expect(has('[data-act="accept"]')).toBe(false);
+      expect(raw.shownChoice).toBe(false);
+      expect(showingCongrats()).toBe(false);
+      expect(minutesOf(sim)).toBe(minutes);
+      expect(choiceOf(sim)?.kind).toBe("fireRescue");
+      // One notice, mounted once, however many frozen frames ask for it.
+      const notices = dialog().querySelectorAll(".modal-notice");
+      expect([...notices].map((n) => n.textContent)).toEqual([CHOICE_WAITING_NOTICE]);
+      // The player closes their dialog: the choice comes up, then the win.
+      click('[data-act="cancel"]');
+      expect(dialog().open).toBe(false);
+      pass(app, raw);
+      expect(raw.shownChoice).toBe(true);
+      expect(has('[data-act="decline"]')).toBe(true);
+      click('[data-act="decline"]');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(choiceOf(sim)).toBeNull();
+      pastOutcomeToast(app, raw);
+      pass(app, raw);
+      expect(showingCongrats()).toBe(true);
+    });
+  },
+);

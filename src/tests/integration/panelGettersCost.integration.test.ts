@@ -32,7 +32,10 @@ describe.skipIf(!hasWasmPackage())("panel getter cost", () => {
       const h = wasm().Engine.fromSave(scenario.save);
       try {
         for (let i = 0; i < 36; i++) h.tick(60);
-        const unitId = (JSON.parse(h.serialize()) as { units: { id: number; kind: string }[] }).units.find((u) => u.kind === "office")?.id ?? 1;
+        const unitId =
+          (JSON.parse(h.serialize()) as { units: { id: number; kind: string }[] }).units.find(
+            (u) => u.kind === "office",
+          )?.id ?? 1;
         const rows: Record<string, number> = {
           towerStats: time(() => h.towerStats()),
           statsReport: time(() => h.statsReport()),
@@ -42,7 +45,9 @@ describe.skipIf(!hasWasmPackage())("panel getter cost", () => {
           onboardingFacts: time(() => h.onboardingFacts()),
           ...Object.fromEntries(HEATMAP_MODES.map((m) => [`floorHeatmap(${m})`, time(() => h.floorHeatmap(m))])),
         };
-        console.info(`panel getter medians (ms), ${scenario.name}, ${scenario.units} units: ${JSON.stringify(Object.fromEntries(Object.entries(rows).map(([k, v]) => [k, Number(v.toFixed(3))])))}`);
+        console.info(
+          `panel getter medians (ms), ${scenario.name}, ${scenario.units} units: ${JSON.stringify(Object.fromEntries(Object.entries(rows).map(([k, v]) => [k, Number(v.toFixed(3))])))}`,
+        );
         for (const [name, ms] of Object.entries(rows)) expect(ms, name).toBeLessThan(TRIPWIRE_MS);
       } finally {
         h.free();

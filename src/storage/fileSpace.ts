@@ -17,8 +17,26 @@
 
 import { cleanFileName, copyName, freeName, sameName } from "./fileNames";
 import { originalVersion, planVersions, readVersions, versionsKey, type TowerVersion } from "./fileVersions";
-import { asWriteError, committed, done, FileConflictError, FileGoneError, FileNameTakenError, FileSpaceFullError, readIndex, type TowerFileEntry, type TowerFileKind } from "./fileSpaceDb";
-export { FileConflictError, FileGoneError, FileNameTakenError, FileSpaceFullError, type TowerFileEntry, type TowerFileKind } from "./fileSpaceDb";
+import {
+  asWriteError,
+  committed,
+  done,
+  FileConflictError,
+  FileGoneError,
+  FileNameTakenError,
+  FileSpaceFullError,
+  readIndex,
+  type TowerFileEntry,
+  type TowerFileKind,
+} from "./fileSpaceDb";
+export {
+  FileConflictError,
+  FileGoneError,
+  FileNameTakenError,
+  FileSpaceFullError,
+  type TowerFileEntry,
+  type TowerFileKind,
+} from "./fileSpaceDb";
 export { cleanFileName, copyName, FILE_NAME_MAX, freeName } from "./fileNames";
 
 const DB_NAME = "verticopolis-files";
@@ -75,7 +93,11 @@ interface Change<T> {
  * review). `bodyOf` also reads that file's bytes for the plan. A plan that
  * throws writes nothing and the write rejects with its error.
  */
-function update<T>(o: Open, plan: (list: TowerFileEntry[], body: Uint8Array | null) => Change<T>, bodyOf?: string): Promise<T> {
+function update<T>(
+  o: Open,
+  plan: (list: TowerFileEntry[], body: Uint8Array | null) => Change<T>,
+  bodyOf?: string,
+): Promise<T> {
   return queue(o, async () => {
     const tx = o.db.transaction([META, BODIES], "readwrite");
     const out: { change: Change<T> | null; refused: unknown } = { change: null, refused: null };
@@ -184,7 +206,11 @@ async function writeOver(o: Open, w: WriteOver, newVersion: boolean): Promise<To
   const tx = o.db.transaction([META, BODIES], "readwrite");
   const meta = tx.objectStore(META);
   const bodies = tx.objectStore(BODIES);
-  const out: { entries: TowerFileEntry[] | null; entry: TowerFileEntry | null; refused: Error | null } = { entries: null, entry: null, refused: null };
+  const out: { entries: TowerFileEntry[] | null; entry: TowerFileEntry | null; refused: Error | null } = {
+    entries: null,
+    entry: null,
+    refused: null,
+  };
   const indexReq = meta.get(INDEX);
   const versionsReq = meta.get(versionsKey(w.id));
   // The body is read only for a file with no versions yet: its original,
@@ -301,7 +327,13 @@ export const fileSpace = {
    * {@link FileSpaceFullError} when the device has no room, and nothing
    * changes then.
    */
-  save(name: string, kind: TowerFileKind, bytes: Uint8Array, modified = Date.now(), replace = true): Promise<TowerFileEntry> {
+  save(
+    name: string,
+    kind: TowerFileKind,
+    bytes: Uint8Array,
+    modified = Date.now(),
+    replace = true,
+  ): Promise<TowerFileEntry> {
     const o = need();
     const clean = cleanFileName(name);
     if (!clean) return Promise.reject(new Error("Type a name for the tower."));
@@ -322,7 +354,13 @@ export const fileSpace = {
     const o = need();
     const clean = cleanFileName(name) || "Tower";
     return update(o, (list) => {
-      const entry: TowerFileEntry = { id: newId(), name: freeName(clean, list), kind, size: bytes.byteLength, modified };
+      const entry: TowerFileEntry = {
+        id: newId(),
+        name: freeName(clean, list),
+        kind,
+        size: bytes.byteLength,
+        modified,
+      };
       return { entries: [...list, entry], body: { id: entry.id, bytes }, result: entry };
     }).then((entry) => seen(o, entry));
   },
@@ -369,7 +407,13 @@ export const fileSpace = {
    * doesn't fit, the file is written without it, but never without its
    * original.
    */
-  overwrite(id: string, bytes: Uint8Array, modified = Date.now(), manual = false, onlyNewer = false): Promise<TowerFileEntry> {
+  overwrite(
+    id: string,
+    bytes: Uint8Array,
+    modified = Date.now(),
+    manual = false,
+    onlyNewer = false,
+  ): Promise<TowerFileEntry> {
     const o = need();
     return queue(o, async () => {
       try {
@@ -438,7 +482,13 @@ export const fileSpace = {
         indexReq.onsuccess = () => {
           const list = readIndex(indexReq.result);
           for (const f of files) {
-            const entry: TowerFileEntry = { id: newId(), name: freeName(f.name, list), kind: f.kind, size: f.bytes.byteLength, modified: f.modified };
+            const entry: TowerFileEntry = {
+              id: newId(),
+              name: freeName(f.name, list),
+              kind: f.kind,
+              size: f.bytes.byteLength,
+              modified: f.modified,
+            };
             tx.objectStore(BODIES).put(f.bytes, entry.id);
             list.push(entry);
           }

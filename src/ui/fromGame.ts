@@ -40,7 +40,18 @@ export const HELP_SOURCE_PARAM = "via";
  * Statistics' links to a problem's help page (#2036), and `help_key` for F1
  * pressed with no room card up (the guide's front page).
  */
-export const GAME_HELP_SOURCES = ["game_menu", "title", "mode_badge", "compare", "welcome", "update_prompt", "about", "inspector", "stats", "help_key"] as const;
+export const GAME_HELP_SOURCES = [
+  "game_menu",
+  "title",
+  "mode_badge",
+  "compare",
+  "welcome",
+  "update_prompt",
+  "about",
+  "inspector",
+  "stats",
+  "help_key",
+] as const;
 
 /** A place in the game that opens the manual. */
 export type GameHelpSource = (typeof GAME_HELP_SOURCES)[number];
@@ -116,7 +127,11 @@ function isGameSource(value: string | null): value is GameHelpSource {
  * even in a tab the game once opened (a search result followed later, say).
  * Blocked storage only loses that reload memory.
  */
-export function helpVisitSource(search: string, repeats: boolean, storage: () => Storage = () => sessionStorage): HelpSource {
+export function helpVisitSource(
+  search: string,
+  repeats: boolean,
+  storage: () => Storage = () => sessionStorage,
+): HelpSource {
   if (openedFromGame(search)) {
     const via = new URLSearchParams(search).get(HELP_SOURCE_PARAM);
     const source: GameHelpSource | "game" = isGameSource(via) ? via : "game";

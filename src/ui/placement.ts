@@ -96,7 +96,12 @@ export type PlaceOutcome =
  *  facility and where it landed; failure prefers the engine's reason (e.g.
  *  "Not enough money." or "Floor already built here") and falls back to a
  *  generic can't-place line when the engine didn't say why. */
-export function announceForPlacement(placed: PlaceOutcome, catalog: Catalog, kind: FacilityKind, floor: number): string {
+export function announceForPlacement(
+  placed: PlaceOutcome,
+  catalog: Catalog,
+  kind: FacilityKind,
+  floor: number,
+): string {
   // Ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so the
   // spoken line must name a lobby too, matching the visual toast (a screen-reader
   // user was otherwise told "Floor" for a lobby that was built).

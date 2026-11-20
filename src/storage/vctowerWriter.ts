@@ -42,7 +42,12 @@ const FILE_SHAPE = new RegExp(`^${TOWER_FILE_MAGIC}\\n[A-Za-z0-9+/]+={0,2}\\n$`)
  *  bytes (checked against the cap by `encodeSaveJson`), and its stamp. */
 export function packVctower(json: string, bytes: Uint8Array, stamp: { appVersion?: string; savedAt?: number }): string {
   const { appVersion, savedAt } = stamp;
-  if (engineWriter && bytes.length <= ENGINE_WRITER_MAX_BYTES && typeof appVersion === "string" && typeof savedAt === "number") {
+  if (
+    engineWriter &&
+    bytes.length <= ENGINE_WRITER_MAX_BYTES &&
+    typeof appVersion === "string" &&
+    typeof savedAt === "number"
+  ) {
     try {
       const text = engineWriter(json, appVersion, savedAt);
       if (FILE_SHAPE.test(text)) return text;

@@ -256,7 +256,12 @@ describe("a bulldoze drag removes only the kind it first touched (#644)", () => 
     hooks.onActionMove!(3, 2, OFFICE);
     hooks.onActionMove!(4, 2, SHAFT);
     hooks.onActionMove!(5, 2, { ...OFFICE, id: 5 });
-    expect(vi.mocked(app.build.bulldozePicked).mock.calls.slice(1).map(([p]) => p)).toEqual([OFFICE, { ...OFFICE, id: 5 }]);
+    expect(
+      vi
+        .mocked(app.build.bulldozePicked)
+        .mock.calls.slice(1)
+        .map(([p]) => p),
+    ).toEqual([OFFICE, { ...OFFICE, id: 5 }]);
   });
 
   it("starts fresh on the next press", () => {
@@ -270,7 +275,8 @@ describe("a bulldoze drag removes only the kind it first touched (#644)", () => 
 
 describe("a bulldoze drag says once on release why it stopped (#2046)", () => {
   const TILE = (x: number) => ({ type: "unit", id: 0, kind: "floor", cell: { floor: 2, x } });
-  const FLOOR_RULE = "In Classic, only the tile at either end of a floor can be removed, so a floor never has a gap in the middle.";
+  const FLOOR_RULE =
+    "In Classic, only the tile at either end of a floor can be removed, so a floor never has a gap in the middle.";
   type Sink = ((reason: string) => void) | undefined;
   /** The engine keeps every tile from `kept` on, with the floor rule's reason. */
   const keepFrom = (app: ReturnType<typeof makeApp>["app"], kept: number) =>
@@ -324,7 +330,8 @@ describe("a bulldoze drag sweeps more than one thing", () => {
   const FLOOR_TILE = (x: number) => ({ type: "unit", id: 0, kind: "floor", cell: { floor: 15, x } });
   const SHAFT = { type: "transport", id: 9, kind: "elevatorExpress" };
   const OFFICE = { type: "unit", id: 4, kind: "office" };
-  const swept = (app: ReturnType<typeof makeApp>["app"]) => vi.mocked(app.build.bulldozePicked).mock.calls.map(([p]) => p);
+  const swept = (app: ReturnType<typeof makeApp>["app"]) =>
+    vi.mocked(app.build.bulldozePicked).mock.calls.map(([p]) => p);
 
   it("clears every sky lobby tile it crosses, past the shaft in the hall", () => {
     const { app, hooks } = makeApp({ type: "bulldoze" });

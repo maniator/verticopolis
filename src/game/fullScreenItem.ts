@@ -19,7 +19,11 @@ import { isInstalledStandalone } from "../ui/standalone";
  * fills the screen right now: the item then stays, so whatever got the page
  * there, the player can always leave from the menu.
  */
-export function fullScreenOffered(state: { readonly phone: boolean; readonly installed: boolean; readonly filling: boolean }): boolean {
+export function fullScreenOffered(state: {
+  readonly phone: boolean;
+  readonly installed: boolean;
+  readonly filling: boolean;
+}): boolean {
   if (state.filling) return true;
   return !(state.phone && state.installed);
 }

@@ -20,7 +20,8 @@ import { CONFORMANCE_ROOT } from "../packagePaths";
 const FIXTURE = resolve(CONFORMANCE_ROOT, "fixtures/split-tower.vctower");
 
 /** A save packed as `SaveGame.saveTo` stores it. */
-const storeValue = (text: string): string => STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(text), { level: 1 }));
+const storeValue = (text: string): string =>
+  STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(text), { level: 1 }));
 
 /** A stored save carried to a `.vctower` file, then read by the import. */
 async function throughTheCodec(text: string): Promise<string> {

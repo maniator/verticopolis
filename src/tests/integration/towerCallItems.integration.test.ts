@@ -44,7 +44,9 @@ function appOf(sim: PortSim, mode: GameMode): Parameters<typeof towerCalls>[0] {
       return text === undefined ? null : (JSON.parse(text) as PendingChoiceView);
     },
   };
-  return { enginePort: sim.port, portCodes: new PortCodes(sim.port), reader: { header } } as unknown as Parameters<typeof towerCalls>[0];
+  return { enginePort: sim.port, portCodes: new PortCodes(sim.port), reader: { header } } as unknown as Parameters<
+    typeof towerCalls
+  >[0];
 }
 
 describeEngines("Tower menu calls for help", (leg) => {

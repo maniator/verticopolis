@@ -98,7 +98,9 @@ describe.skipIf(noEngine)("Stats panel — Households section (Modern only)", ()
     // A sold condo keeps the catalog's sale price, scaled by its household over 3.
     const sale = catalogFacility(catalogFor("modern"), "condo").rent!.default;
     const expected = Math.round((sale * unit(sim, id).residents!) / 3);
-    expect(renderToFragment(unitEditor(sim, { id })).querySelector('[data-field="rent"]')!.textContent).toBe(`$${groupDigits(expected)}`);
+    expect(renderToFragment(unitEditor(sim, { id })).querySelector('[data-field="rent"]')!.textContent).toBe(
+      `$${groupDigits(expected)}`,
+    );
   });
 
   it("keeps 'People housed' equal to the census even when a sold condo lacks residents", async () => {
@@ -116,7 +118,9 @@ describe.skipIf(noEngine)("Stats panel — Households section (Modern only)", ()
     bare.residents = undefined; // sold but no household on the record
     const pop = population(sim);
     expect(pop).toBe(unit(sim, a).residents! + 3); // census counts the bare condo as 3
-    const cell = [...renderToFragment(statsBodyOf(sim)).querySelectorAll("span.k")].find((el) => el.textContent === "People housed")!.nextElementSibling!;
+    const cell = [...renderToFragment(statsBodyOf(sim)).querySelectorAll("span.k")].find(
+      (el) => el.textContent === "People housed",
+    )!.nextElementSibling!;
     // Locale-proof digit-strip parse (toLocaleString's separator varies).
     expect(Number(cell.textContent!.replace(/\D/g, ""))).toBe(pop); // agrees with the census
   });

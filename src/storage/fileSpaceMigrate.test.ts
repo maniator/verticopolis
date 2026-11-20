@@ -17,7 +17,11 @@ describe("slotFiles", () => {
   it("turns each filled slot into its .vctower text with the payload untouched", () => {
     const raw = storeValue(TOWER);
     const values: Record<number, string> = { 1: raw, 3: storeValue({ ...TOWER, towerName: "Mall" }) };
-    const files = slotFiles((n) => values[n] ?? null, [row(1, { towerName: "Spire", savedAt: 50 }), row(3, { towerName: "Mall" })], () => undefined);
+    const files = slotFiles(
+      (n) => values[n] ?? null,
+      [row(1, { towerName: "Spire", savedAt: 50 }), row(3, { towerName: "Mall" })],
+      () => undefined,
+    );
     expect(files.map((f) => f.name)).toEqual(["Spire", "Mall"]);
     expect(text(files[0]!.bytes)).toBe(`${TOWER_FILE_MAGIC}\n${raw.slice(STORE_MAGIC.length)}\n`);
     expect(files[0]).toMatchObject({ kind: "tower", modified: 50 });
@@ -25,14 +29,22 @@ describe("slotFiles", () => {
 
   it("names a file by the slot's own name first, then its tower, then its number", () => {
     const raw = storeValue(TOWER);
-    const files = slotFiles(() => raw, [row(1, { towerName: "Spire" }), row(2, { towerName: "" })], (n) => (n === 1 ? "My best" : undefined));
+    const files = slotFiles(
+      () => raw,
+      [row(1, { towerName: "Spire" }), row(2, { towerName: "" })],
+      (n) => (n === 1 ? "My best" : undefined),
+    );
     expect(files.map((f) => f.name)).toEqual(["My best", "Slot 2", "Slot 3"]);
   });
 
   it("keeps the bytes of a slot this build can't read, and leaves out one that is no save", () => {
     const unreadable = STORE_MAGIC + "not-base64!";
     const values: Record<number, string> = { 1: unreadable, 2: "   " };
-    const files = slotFiles((n) => values[n] ?? null, [], () => undefined);
+    const files = slotFiles(
+      (n) => values[n] ?? null,
+      [],
+      () => undefined,
+    );
     expect(files).toHaveLength(1);
     expect(text(files[0]!.bytes)).toBe(`${TOWER_FILE_MAGIC}\nnot-base64!\n`);
   });

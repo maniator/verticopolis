@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { churnOf, classifyLosses, isLoss, lossKey, parseChurn, playChurn } from "./rollbackRehearsalChurn.ts";
 import { diffSaves, type EngineHandle, type EnginePackage } from "./rollbackRehearsal.ts";
 
-const SAVE = { money: 5, units: [{ state: 1, name: "a" }, { state: 2, name: "b" }], queue: [1, 2, 3], milestones: { first: 1 } };
+const SAVE = {
+  money: 5,
+  units: [
+    { state: 1, name: "a" },
+    { state: 2, name: "b" },
+  ],
+  queue: [1, 2, 3],
+  milestones: { first: 1 },
+};
 
 describe("diffSaves list shrinks", () => {
   it("counts the elements a list lost over every place, so an earlier growth cannot hide a later shrink", () => {
@@ -23,7 +31,11 @@ describe("diffSaves list shrinks", () => {
 describe("churn", () => {
   it("lists dropped paths and shrunk lists, sorted and unique", () => {
     const after = { money: 5, units: [{ name: "a" }, { name: "b" }], queue: [], milestones: {} };
-    expect(churnOf(SAVE, after)).toEqual({ "changed queue[] length": 3, "dropped milestones.first": 1, "dropped units[].state": 2 });
+    expect(churnOf(SAVE, after)).toEqual({
+      "changed queue[] length": 3,
+      "dropped milestones.first": 1,
+      "dropped units[].state": 2,
+    });
   });
 
   it("plays the save on the engine and keeps only what play removed", () => {
@@ -32,7 +44,12 @@ describe("churn", () => {
       fromSave: (): EngineHandle => {
         let played = false;
         return {
-          serialize: () => JSON.stringify(played ? { money: 5, units: [{ name: "a" }, { name: "b" }], queue: [1, 2, 3], milestones: { first: 1 } } : SAVE),
+          serialize: () =>
+            JSON.stringify(
+              played
+                ? { money: 5, units: [{ name: "a" }, { name: "b" }], queue: [1, 2, 3], milestones: { first: 1 } }
+                : SAVE,
+            ),
           tick() {
             played = true;
             ticks.n += 1;
@@ -63,7 +80,10 @@ describe("churn", () => {
 
   it("counts what the load itself leaves out, because the browser compares against the seeded text", () => {
     const leaner = { money: 5, units: [{ name: "a" }, { name: "b" }], queue: [1, 2, 3], milestones: { first: 1 } };
-    const pkg: EnginePackage = { label: "cand", fromSave: (): EngineHandle => ({ serialize: () => JSON.stringify(leaner), tick() {}, free() {} }) };
+    const pkg: EnginePackage = {
+      label: "cand",
+      fromSave: (): EngineHandle => ({ serialize: () => JSON.stringify(leaner), tick() {}, free() {} }),
+    };
     expect(playChurn(pkg, JSON.stringify(SAVE), 1)).toEqual({ "dropped units[].state": 2 });
   });
 
@@ -89,11 +109,18 @@ describe("classifyLosses", () => {
   it("with a churn record fails every loss that play alone does not explain", () => {
     const { failing, review } = classifyLosses(losses, { "dropped units[].state": 2, "changed queue[] length": 3 });
     expect(review.map((d) => d.path).sort()).toEqual(["queue[] length", "units[].state"]);
-    expect(failing.map((d) => `${d.kind} ${d.path}`)).toEqual(expect.arrayContaining(["dropped milestones", "changed units[] length"]));
+    expect(failing.map((d) => `${d.kind} ${d.path}`)).toEqual(
+      expect.arrayContaining(["dropped milestones", "changed units[] length"]),
+    );
   });
 
   it("fails a loss in more places than play alone makes it", () => {
-    const both = diffSaves(SAVE, { money: 5, units: [{ name: "a" }, { name: "b" }], queue: [1, 2, 3], milestones: { first: 1 } }).filter(isLoss);
+    const both = diffSaves(SAVE, {
+      money: 5,
+      units: [{ name: "a" }, { name: "b" }],
+      queue: [1, 2, 3],
+      milestones: { first: 1 },
+    }).filter(isLoss);
     const { failing, review } = classifyLosses(both, { "dropped units[].state": 1 });
     expect(failing.map(lossKey)).toEqual(["dropped units[].state"]);
     expect(review).toEqual([]);
@@ -102,7 +129,9 @@ describe("classifyLosses", () => {
 
   it("counts elements, so a rollback that empties a list play only shortened by one still fails", () => {
     const rollback = diffSaves(SAVE, { ...SAVE, queue: [] }).filter(isLoss);
-    expect(classifyLosses(rollback, { "changed queue[] length": 1 }).failing.map(lossKey)).toEqual(["changed queue[] length"]);
+    expect(classifyLosses(rollback, { "changed queue[] length": 1 }).failing.map(lossKey)).toEqual([
+      "changed queue[] length",
+    ]);
     expect(classifyLosses(rollback, { "changed queue[] length": 3 }).failing).toEqual([]);
   });
 });

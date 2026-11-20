@@ -33,7 +33,8 @@ function mountSplash(o: {
   ctl.showSplash({
     hasSave: o.hasSave ?? false,
     onContinue: vi.fn(),
-    onLoadTower: vi.fn(), onNewTower: vi.fn(),
+    onLoadTower: vi.fn(),
+    onNewTower: vi.fn(),
     muted: () => o.muted ?? false,
     onToggleMute: o.onToggleMute,
     installOffered: o.installOffered === undefined ? undefined : () => o.installOffered!,
@@ -55,9 +56,7 @@ afterEach(() => {
  */
 describe("splash Open Tower… action (SPEC-splash-load-tower CAP-1)", () => {
   const order = (el: HTMLElement) =>
-    Array.from(el.querySelectorAll<HTMLElement>(".splash-actions button")).map((b) =>
-      b.getAttribute("data-splash"),
-    );
+    Array.from(el.querySelectorAll<HTMLElement>(".splash-actions button")).map((b) => b.getAttribute("data-splash"));
 
   it("renders for a returning player, between Continue and New Tower", () => {
     // New Tower sits AFTER it because New Tower is the only action here that
@@ -235,7 +234,13 @@ describe("splash Ground floor badge (2.0 upgrade recognition)", () => {
 describe("a tower swapped in without the player choosing it (#874)", () => {
   function controllerWithSplash() {
     const { ctl, opts } = makeController();
-    ctl.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn(), muted: () => false });
+    ctl.showSplash({
+      hasSave: true,
+      onContinue: vi.fn(),
+      onLoadTower: vi.fn(),
+      onNewTower: vi.fn(),
+      muted: () => false,
+    });
     return { ctl, opts };
   }
   const sim = {} as Parameters<OnboardingController["adoptSim"]>[0];
@@ -280,7 +285,6 @@ describe("Getting Started card across the phone tier", () => {
     listener!();
     expect(card.classList.contains("onboard--mobile")).toBe(false);
   });
-
 });
 
 /**

@@ -8,22 +8,42 @@ const scenarios = [{ name: "medium" }, { name: "large" }];
 describe("eachScenarioFresh", () => {
   it("opens a fresh page before each scenario's body, once per scenario, in order", async () => {
     const log: string[] = [];
-    await eachScenarioFresh(scenarios, async (sc) => void log.push(`fresh ${sc.name}`), async (sc) => void log.push(`run ${sc.name}`));
+    await eachScenarioFresh(
+      scenarios,
+      async (sc) => void log.push(`fresh ${sc.name}`),
+      async (sc) => void log.push(`run ${sc.name}`),
+    );
     expect(log).toEqual(["fresh medium", "run medium", "fresh large", "run large"]);
   });
 
   it("stops after a body that returns false, without a fresh page for the rest", async () => {
     const log: string[] = [];
-    await eachScenarioFresh(scenarios, async (sc) => void log.push(`fresh ${sc.name}`), async (sc) => {
-      log.push(`run ${sc.name}`);
-      return false;
-    });
+    await eachScenarioFresh(
+      scenarios,
+      async (sc) => void log.push(`fresh ${sc.name}`),
+      async (sc) => {
+        log.push(`run ${sc.name}`);
+        return false;
+      },
+    );
     expect(log).toEqual(["fresh medium", "run medium"]);
   });
 
   it("passes a failure from the fresh page or the body to the caller", async () => {
-    await expect(eachScenarioFresh(scenarios, async () => Promise.reject(new Error("no page")), async () => undefined)).rejects.toThrow("no page");
-    await expect(eachScenarioFresh(scenarios, async () => undefined, async () => Promise.reject(new Error("body")))).rejects.toThrow("body");
+    await expect(
+      eachScenarioFresh(
+        scenarios,
+        async () => Promise.reject(new Error("no page")),
+        async () => undefined,
+      ),
+    ).rejects.toThrow("no page");
+    await expect(
+      eachScenarioFresh(
+        scenarios,
+        async () => undefined,
+        async () => Promise.reject(new Error("body")),
+      ),
+    ).rejects.toThrow("body");
   });
 });
 
@@ -35,8 +55,12 @@ describe("the perf:compare runner", () => {
     // The timed and frames loops are the helper's, so no bare loop over the scenarios is left (the memory pass and the saved-tower starts loop over opts.scenarios, each in its own fresh page or context).
     expect(source).not.toMatch(/for \(const sc of scenarios\)/);
     // Each use opens a fresh page for the scenario.
-    expect(source).toMatch(/eachScenarioFresh\(scenarios, \(sc\) => freshPage\(page, engine, `\$\{sc\.name\} timed passes boot`\)/);
-    expect(source).toMatch(/eachScenarioFresh\(scenarios, \(sc\) => freshPage\(page, engine, `\$\{sc\.name\} frames \(audio \$\{block\}\) boot`\)/);
+    expect(source).toMatch(
+      /eachScenarioFresh\(\s*scenarios,\s*\(sc\) => freshPage\(page, engine, `\$\{sc\.name\} timed passes boot`\)/,
+    );
+    expect(source).toMatch(
+      /eachScenarioFresh\(\s*scenarios,\s*\(sc\) => freshPage\(page, engine, `\$\{sc\.name\} frames \(audio \$\{block\}\) boot`\)/,
+    );
     // One page boot for all scenarios is the pattern that biased the second tower.
     expect(source).not.toMatch(/"timed passes boot"/);
   });
@@ -48,15 +72,26 @@ describe("the perf:compare runner", () => {
   });
 
   it("gives each saved-tower start a fresh context, seeded at creation and closed whatever happens (#1254)", () => {
-    const body = source.slice(source.indexOf("async function savedStarts("), source.indexOf("async function firstVisit("));
-    expect(body).toMatch(/for \(const sc of opts\.scenarios\) \{[\s\S]*ctx = await newContext\(browser, opts\.config, "block", \(line\) => row\.contextLost\.push\(line\), autosaveState\(server\.url, seed\)\);/);
+    const body = source.slice(
+      source.indexOf("async function savedStarts("),
+      source.indexOf("async function firstVisit("),
+    );
+    expect(body).toMatch(
+      /for \(const sc of opts\.scenarios\) \{[\s\S]*ctx = await newContext\(\s*browser,\s*opts\.config,\s*"block",\s*\(line\) => row\.contextLost\.push\(line\),\s*autosaveState\(server\.url, seed\),?\s*\);/,
+    );
     expect(body).toMatch(/\} finally \{\n\s*await ctx\?\.close\(\)/);
     // It runs after the first visit, outside the repetition's try, so it cannot fail the repetition.
-    expect(source.indexOf("run.coldSaved = await savedStarts(")).toBeGreaterThan(source.indexOf("run.firstVisitWithServiceWorker = await firstVisit("));
-    expect(source.indexOf("run.coldSaved = await savedStarts(")).toBeGreaterThan(source.indexOf("    run.ok = true;\n  } catch (e) {"));
+    expect(source.indexOf("run.coldSaved = await savedStarts(")).toBeGreaterThan(
+      source.indexOf("run.firstVisitWithServiceWorker = await firstVisit("),
+    );
+    expect(source.indexOf("run.coldSaved = await savedStarts(")).toBeGreaterThan(
+      source.indexOf("    run.ok = true;\n  } catch (e) {"),
+    );
   });
 
   it("stashes the cold load's scenario in the page it runs in, which is the last scenario's fresh page", () => {
-    expect(source).toMatch(/stashSave, \{ name: scenarios\[0\]\.name, save: scenarios\[0\]\.save \}\);\s*run\.wasmCold = await ev\(page, "wasm cold load", wasmColdLoad/);
+    expect(source).toMatch(
+      /stashSave, \{ name: scenarios\[0\]\.name, save: scenarios\[0\]\.save \}\);\s*run\.wasmCold = await ev\(page, "wasm cold load", wasmColdLoad/,
+    );
   });
 });

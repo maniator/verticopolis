@@ -156,7 +156,8 @@ const QUOTE = /["'“”]/;
  *  JSON", or V8's position (after one of its fixed phrases). Anything else
  *  after the last quote may be input whose own closing quote is missing, so it
  *  is blanked too. */
-const JSON_TAIL = /^(?:\.\.\.)?(?: is not valid JSON|(?: after (?:property value|array element|property name))? in JSON at position \d+(?: \(line \d+ column \d+\))?)?\.?$/;
+const JSON_TAIL =
+  /^(?:\.\.\.)?(?: is not valid JSON|(?: after (?:property value|array element|property name))? in JSON at position \d+(?: \(line \d+ column \d+\))?)?\.?$/;
 
 /**
  * A JSON error message with everything from its first quote to its last
@@ -173,7 +174,12 @@ const JSON_TAIL = /^(?:\.\.\.)?(?: is not valid JSON|(?: after (?:property value
 export function scrubJsonEcho(message: string): string {
   const first = message.search(QUOTE);
   if (first < 0) return message;
-  const last = Math.max(message.lastIndexOf('"'), message.lastIndexOf("'"), message.lastIndexOf("”"), message.lastIndexOf("“"));
+  const last = Math.max(
+    message.lastIndexOf('"'),
+    message.lastIndexOf("'"),
+    message.lastIndexOf("”"),
+    message.lastIndexOf("“"),
+  );
   const end = last > first && JSON_TAIL.test(message.slice(last + 1)) ? last + 1 : message.length;
   return `${message.slice(0, first)}"${PLAYER_TEXT_PLACEHOLDER}"${message.slice(end)}`;
 }

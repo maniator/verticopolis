@@ -39,7 +39,11 @@ export function shownBucket(ms: number): "under_1m" | "1_5m" | "over_5m" {
 
 const HOME_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["condo", "rentalStudio", "rentalApartment"]);
 const HOTEL_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["hotelSingle", "hotelDouble", "hotelSuite"]);
-const ELEVATOR_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["elevatorStandard", "elevatorService", "elevatorExpress"]);
+const ELEVATOR_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>([
+  "elevatorStandard",
+  "elevatorService",
+  "elevatorExpress",
+]);
 
 /** The window color a room's kind lights. */
 export function windowColor(kind: FacilityKind): string {
@@ -53,10 +57,18 @@ export function windowColor(kind: FacilityKind): string {
  *  A room is lit when someone is in it. */
 export function towerSnapshot(view: Pick<SimView, "rooms" | "structure" | "tower">): TowerSnapshot {
   return {
-    structure: view.structure.filter((r) => r.floor >= 0).map((r) => ({ floor: r.floor, x: r.x, width: r.width * r.count })),
+    structure: view.structure
+      .filter((r) => r.floor >= 0)
+      .map((r) => ({ floor: r.floor, x: r.x, width: r.width * r.count })),
     rooms: view.rooms
       .filter((r) => r.floor >= 0)
-      .map((r) => ({ floor: r.floor, x: r.x, width: r.width, color: windowColor(r.kind), lit: r.state === "occupied" || r.state === "moving_in" })),
+      .map((r) => ({
+        floor: r.floor,
+        x: r.x,
+        width: r.width,
+        color: windowColor(r.kind),
+        lit: r.state === "occupied" || r.state === "moving_in",
+      })),
     shafts: view.tower.transports
       .filter((t) => ELEVATOR_KINDS.has(t.kind) && t.top >= 0)
       .map((t) => ({ x: t.x, width: t.width, bottom: Math.max(0, t.bottom), top: t.top })),

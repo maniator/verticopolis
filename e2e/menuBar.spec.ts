@@ -66,7 +66,9 @@ test.describe("the menu bar on a desktop", () => {
     await expect(page.locator("#mb-options")).toBeFocused();
   });
 
-  test("Tower Info opens from the Tower menu, the Bulletin starts open, and both stay as left across a reload", async ({ page }) => {
+  test("Tower Info opens from the Tower menu, the Bulletin starts open, and both stay as left across a reload", async ({
+    page,
+  }) => {
     await boot(page);
     await expect(page.locator("#tower-win")).toBeHidden();
     await expect(page.locator("#bulletin-win #log")).toBeVisible();
@@ -118,7 +120,10 @@ test.describe("the menu bar on a desktop", () => {
     const top = await log.evaluate((el) => {
       const box = el.getBoundingClientRect();
       const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 8)?.closest(".log-line");
-      return { hit: hit?.textContent ?? null, newest: ((g) => g.enginePort.logText(g.reader.header.logSeq) ?? null)((window as any).game) };
+      return {
+        hit: hit?.textContent ?? null,
+        newest: ((g) => g.enginePort.logText(g.reader.header.logSeq) ?? null)((window as any).game),
+      };
     });
     expect(top.newest).not.toBeNull();
     expect(top.hit).toBe(top.newest);
@@ -144,7 +149,9 @@ test.describe("the menu bar on a desktop", () => {
     await expect.poll(lineAt).toBe(before + added);
   });
 
-  test("with no fire or pests, the Tower menu grays both calls for help, and only Modern lists the exterminator", async ({ page }) => {
+  test("with no fire or pests, the Tower menu grays both calls for help, and only Modern lists the exterminator", async ({
+    page,
+  }) => {
     await boot(page);
     const modern = await page.evaluate(() => (window as any).game.reader.header.mode === "modern");
     await page.locator("#mb-tower").click();

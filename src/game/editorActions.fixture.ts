@@ -10,19 +10,16 @@ import { EditorActions, type EditorActionsDeps } from "./editorActions";
 export const CATALOG = catalogFor("classic");
 
 /** A command record: status 1 (done) or 0 (refused), then the op's slots. */
-export function rec(
-  op: string,
-  ok: boolean,
-  slots: Record<string, number> = {},
-): Float64Array {
+export function rec(op: string, ok: boolean, slots: Record<string, number> = {}): Float64Array {
   const all: Record<string, number> = { ...slots, status: ok ? 1 : 0 };
   return Float64Array.from(LAYOUT.records[op].map((n) => all[n] ?? 0));
 }
 
-export const office: { id: number; kind: string; filmPolicy?: string; ticketPrice?: string | null; screen2?: unknown } = {
-  id: 7,
-  kind: "office",
-};
+export const office: { id: number; kind: string; filmPolicy?: string; ticketPrice?: string | null; screen2?: unknown } =
+  {
+    id: 7,
+    kind: "office",
+  };
 export const lift = {
   id: 12,
   kind: "elevatorStandard",

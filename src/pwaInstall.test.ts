@@ -53,7 +53,10 @@ describe("standalone / iOS detection", () => {
   });
 
   it("isIos detects iPhone and iPadOS-as-desktop", () => {
-    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)", configurable: true });
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)",
+      configurable: true,
+    });
     expect(isIos()).toBe(true);
     Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (Macintosh)", configurable: true });
     Object.defineProperty(navigator, "platform", { value: "MacIntel", configurable: true });
@@ -123,7 +126,10 @@ describe("installAvailability", () => {
   });
 
   it("is 'ios-howto' on iOS with no captured event", () => {
-    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)", configurable: true });
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)",
+      configurable: true,
+    });
     initPwaInstall();
     expect(installAvailability()).toBe("ios-howto");
   });

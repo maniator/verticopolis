@@ -11,7 +11,9 @@ import {
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
 
 /** Minimal chrome-state stub. Only the fields the module reads exist. */
-function makeApp(over: Partial<{ shownChoice: boolean; shownUpdate: boolean; shownStar: boolean; editorBusy: boolean }> = {}): GameApp {
+function makeApp(
+  over: Partial<{ shownChoice: boolean; shownUpdate: boolean; shownStar: boolean; editorBusy: boolean }> = {},
+): GameApp {
   return {
     shownChoice: over.shownChoice ?? false,
     shownUpdate: over.shownUpdate ?? false,
@@ -76,7 +78,13 @@ describe("interactionState reads", () => {
   it("isEditorBusy reads the predicate and never throws out", () => {
     expect(isEditorBusy(makeApp({ editorBusy: true }))).toBe(true);
     // A throwing predicate degrades to idle rather than escaping.
-    const throwing = { ui: { isEditorBusy: () => { throw new Error("boom"); } } } as unknown as GameApp;
+    const throwing = {
+      ui: {
+        isEditorBusy: () => {
+          throw new Error("boom");
+        },
+      },
+    } as unknown as GameApp;
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(isEditorBusy(throwing)).toBe(false);
     // A missing ui (a fault during construction) is idle, not a crash.

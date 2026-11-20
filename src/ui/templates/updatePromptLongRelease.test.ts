@@ -22,7 +22,9 @@ function note(i: number, len: number): string {
   return `${text.slice(0, len - 1).trimEnd()}.`;
 }
 
-const LENGTHS = [455, 380, 360, 420, 104, 190, 300, 170, 479, 190, 140, 100, 220, 110, 250, 470, 680, 330, 180, 120, 470, 101];
+const LENGTHS = [
+  455, 380, 360, 420, 104, 190, 300, 170, 479, 190, 140, 100, 220, 110, 250, 470, 680, 330, 180, 120, 470, 101,
+];
 const LONG = LENGTHS.map((len, i) => note(i + 1, len));
 const CHANGELOG = `# Changelog\n\n## 3.2.0\n\n${LONG.map((n) => `- ${n}`).join("\n")}\n\n## 3.1.0\n\n- Earlier note.\n`;
 
@@ -53,6 +55,9 @@ describe("update prompt with a long release (Release 3.2.0 regression)", () => {
     const shown = notesSinceRunning(info!, "3.0.0");
     const frag = renderToFragment(updatePromptTemplate(shown, noop));
     expect([...frag.querySelectorAll(".whatsnew-ver")].map((h) => h.textContent)).toEqual(["3.2.0", "3.1.0"]);
-    expect([...frag.querySelectorAll(".whatsnew-log li")].map((li) => li.textContent)).toEqual([...LONG, "Earlier note."]);
+    expect([...frag.querySelectorAll(".whatsnew-log li")].map((li) => li.textContent)).toEqual([
+      ...LONG,
+      "Earlier note.",
+    ]);
   });
 });

@@ -36,7 +36,10 @@ export function reportWindowClose(e: Pick<Event, "isTrusted">, name: WindowClose
  *  time the player drags the window in this page life, while `counts` says
  *  yes. A double-click that puts it home (`null`) is not a drag. One boolean
  *  read per finished drag; nothing per frame. */
-export function firstDragReporter(name: WindowMoveName, counts: () => boolean = () => true): (spot: Spot | null) => void {
+export function firstDragReporter(
+  name: WindowMoveName,
+  counts: () => boolean = () => true,
+): (spot: Spot | null) => void {
   let sent = false;
   return (spot) => {
     if (sent || !spot || !counts()) return;
@@ -60,10 +63,20 @@ export const MOVABLE_TITLE = {
 export function wireMovableWindows(app: GameApp): void {
   if (editorMovers.has(app) || !document.getElementById("stage")) return;
   const { editor, modal } = app.ui.el;
-  const card = new MovableWindow({ win: editor, title: MOVABLE_TITLE.editor, within: editor.parentElement, placed: firstDragReporter("card") });
+  const card = new MovableWindow({
+    win: editor,
+    title: MOVABLE_TITLE.editor,
+    within: editor.parentElement,
+    placed: firstDragReporter("card"),
+  });
   editorMovers.set(app, card);
   app.mobileMq.addEventListener("change", () => card.reset());
-  const dialog = new MovableWindow({ win: modal, title: MOVABLE_TITLE.dialog, within: null, placed: firstDragReporter("dialog") });
+  const dialog = new MovableWindow({
+    win: modal,
+    title: MOVABLE_TITLE.dialog,
+    within: null,
+    placed: firstDragReporter("dialog"),
+  });
   modal.addEventListener("close", () => dialog.reset());
 }
 
@@ -88,4 +101,3 @@ export function wireMapWindowAnalytics(root: HTMLElement, onDesk: () => boolean)
   root.querySelector(".overview-map-close")?.addEventListener("click", (e) => reportWindowClose(e, "map"));
   return firstDragReporter("map", () => !onDesk());
 }
-

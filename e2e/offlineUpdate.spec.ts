@@ -70,7 +70,9 @@ async function expectCacheIs(page: Page, which: Deployment): Promise<void> {
     `/engine/verticopolis_engine_bg.wasm?__WB_REVISION__=${r.wasm}`,
     `/engine/BUILD.json?__WB_REVISION__=${r.record}`,
   ];
-  expect(keys.filter((k) => k.includes("/engine/")).sort(), `the engine files are all ${which}'s`).toEqual(expected.sort());
+  expect(keys.filter((k) => k.includes("/engine/")).sort(), `the engine files are all ${which}'s`).toEqual(
+    expected.sort(),
+  );
 }
 
 /**
@@ -117,22 +119,30 @@ async function servedByWorker(page: Page, browserName: string, path: string): Pr
   // miss, so there the text must also equal the worker's precache entry.
   const cache = browserName === "firefox" ? "default" : "no-store";
   const response = page.waitForResponse((r) => new URL(r.url()).pathname === `/${path}`, { timeout: 30_000 });
-  const text = await page.evaluate((args) => fetch(new URL(args.path, document.baseURI), { cache: args.cache }).then((r) => r.text()), { path, cache } as const);
+  const text = await page.evaluate(
+    (args) => fetch(new URL(args.path, document.baseURI), { cache: args.cache }).then((r) => r.text()),
+    { path, cache } as const,
+  );
   expect((await response).fromServiceWorker(), `${path} is answered by the service worker`).toBe(true);
   if (cache === "default") {
-    const cached = await page.evaluate((p) => caches.match(new URL(p, document.baseURI).href, { ignoreSearch: true }).then((r) => r?.text()), path);
+    const cached = await page.evaluate(
+      (p) => caches.match(new URL(p, document.baseURI).href, { ignoreSearch: true }).then((r) => r?.text()),
+      path,
+    );
     expect(text, `${path} equals the worker's precache entry`).toBe(cached);
   }
   return text;
 }
 
 /** The glue the page would load, as the worker answers it. */
-const servedGlue = (page: Page, browserName: string): Promise<string> => servedByWorker(page, browserName, "engine/verticopolis_engine.js");
+const servedGlue = (page: Page, browserName: string): Promise<string> =>
+  servedByWorker(page, browserName, "engine/verticopolis_engine.js");
 
 /** The requests the browser itself makes to check for a new worker: the worker
  *  script and the scripts it imports. They are not the game's or the worker's
  *  fetches, and Playwright's offline flag does not stop them. */
-const isUpdateCheck = (path: string): boolean => path === "/sw.js" || path === "/sw-navigation-fallback.js" || /^\/workbox-[\w-]+\.js$/.test(path);
+const isUpdateCheck = (path: string): boolean =>
+  path === "/sw.js" || path === "/sw-navigation-fallback.js" || /^\/workbox-[\w-]+\.js$/.test(path);
 
 // The second deployment is a full `vite build`. It runs here, with a budget of
 // its own, so the build does not eat into the test's.
@@ -144,7 +154,10 @@ test.afterAll(async () => {
   await deployments?.close();
 });
 
-test("an update replaces the engine files in the cache, and the updated game plays with no network", async ({ browser, browserName }) => {
+test("an update replaces the engine files in the cache, and the updated game plays with no network", async ({
+  browser,
+  browserName,
+}) => {
   let context: BrowserContext | undefined;
   try {
     const first = await installedFirst(browser);
@@ -156,7 +169,9 @@ test("an update replaces the engine files in the cache, and the updated game pla
     await test.step("an update moves the engine files to the new build and leaves no old engine entry", async () => {
       await updateTo(page, "B", "999.0.0");
       await expectCacheIs(page, "B");
-      expect(await servedGlue(page, browserName), "the page now gets the second build's glue").toContain("deployment B");
+      expect(await servedGlue(page, browserName), "the page now gets the second build's glue").toContain(
+        "deployment B",
+      );
       const record = JSON.parse(await servedByWorker(page, browserName, "engine/BUILD.json"));
       expect(record.package, "and the second build's record").toBe(deployments.packageId.B);
       await expectEngineHosted(page);
@@ -176,7 +191,10 @@ test("an update replaces the engine files in the cache, and the updated game pla
       await page.reload();
       await expectControlledWithEngine(page);
       await hostedGame(page);
-      expect(await servedGlue(page, browserName), "the offline start runs the second build's glue from the cache").toContain("deployment B");
+      expect(
+        await servedGlue(page, browserName),
+        "the offline start runs the second build's glue from the cache",
+      ).toContain("deployment B");
       await page.evaluate(() => (window as any).game.setSpeed(1));
       const minutes = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
       await page.waitForFunction((m) => (window as any).game.sim.clock.minutes > m + 5, minutes, { timeout: 30_000 });
@@ -194,7 +212,10 @@ test("an update replaces the engine files in the cache, and the updated game pla
       deployments.failVersionJson(true);
       const asked = deployments.requests.filter((r) => r.path === "/version.json").length;
       await updateTo(page, "A", null);
-      expect(deployments.requests.filter((r) => r.path === "/version.json").length, "the page did ask for it").toBeGreaterThan(asked);
+      expect(
+        deployments.requests.filter((r) => r.path === "/version.json").length,
+        "the page did ask for it",
+      ).toBeGreaterThan(asked);
       await expectCacheIs(page, "A");
       expect(await servedGlue(page, browserName)).not.toContain("deployment B");
       await expectEngineHosted(page);
@@ -215,7 +236,9 @@ test("an update replaces the engine files in the cache, and the updated game pla
  * names the same files under the same keys; without the suffix it would find
  * the damaged entries under its own keys and keep them.
  */
-test("a worker with the same engine bytes does not trust entries stored under the pre-integrity keys", async ({ browser }) => {
+test("a worker with the same engine bytes does not trust entries stored under the pre-integrity keys", async ({
+  browser,
+}) => {
   let context: BrowserContext | undefined;
   try {
     // The earlier test leaves version.json failing; this one starts clean on the first build.
@@ -229,7 +252,11 @@ test("a worker with the same engine bytes does not trust entries stored under th
     for (const revision of [rev.glue, rev.wasm, rev.record]) {
       expect(revision.endsWith(ENGINE_REVISION_SUFFIX), "the revision carries the rotation suffix").toBe(true);
     }
-    const paths = { glue: "/engine/verticopolis_engine.js", wasm: "/engine/verticopolis_engine_bg.wasm", record: "/engine/BUILD.json" } as const;
+    const paths = {
+      glue: "/engine/verticopolis_engine.js",
+      wasm: "/engine/verticopolis_engine_bg.wasm",
+      record: "/engine/BUILD.json",
+    } as const;
 
     // Leave the cache as an earlier worker would have: each engine file under
     // its plain-MD5 key, the binary not the build's bytes, nothing under the new keys.
@@ -239,7 +266,10 @@ test("a worker with the same engine bytes does not trust entries stored under th
         const cache = await caches.open(names[0]);
         for (const [path, revision] of entries) {
           const current = new URL(`${path}?__WB_REVISION__=${revision}`, location.href).href;
-          const old = new URL(`${path}?__WB_REVISION__=${revision.slice(0, revision.length - suffixLength)}`, location.href).href;
+          const old = new URL(
+            `${path}?__WB_REVISION__=${revision.slice(0, revision.length - suffixLength)}`,
+            location.href,
+          ).href;
           const response = (await cache.match(current))!;
           let bytes = new Uint8Array(await response.arrayBuffer());
           if (path.endsWith(".wasm")) bytes = new Uint8Array([...bytes, 0x00, 0x03, 0x01, 0x42, 0x00]);
@@ -261,7 +291,9 @@ test("a worker with the same engine bytes does not trust entries stored under th
 
     // A new worker, the same files. It installs, the player takes the update.
     deployments.reissueWorker(true);
-    const version = (JSON.parse(readFileSync(new URL("../dist/version.json", import.meta.url), "utf8")) as { version: string }).version;
+    const version = (
+      JSON.parse(readFileSync(new URL("../dist/version.json", import.meta.url), "utf8")) as { version: string }
+    ).version;
     await updateTo(page, "A", version);
     await expectCacheIs(page, "A");
 
@@ -272,18 +304,36 @@ test("a worker with the same engine bytes does not trust entries stored under th
       for (const name of await caches.keys()) {
         const cache = await caches.open(name);
         for (const request of await cache.keys()) {
-          if (new URL(request.url).pathname.startsWith("/engine/")) out[request.url] = hex(await crypto.subtle.digest("SHA-256", await (await cache.match(request))!.arrayBuffer()));
+          if (new URL(request.url).pathname.startsWith("/engine/"))
+            out[request.url] = hex(
+              await crypto.subtle.digest("SHA-256", await (await cache.match(request))!.arrayBuffer()),
+            );
         }
       }
       return out;
     });
-    const record = JSON.parse(readFileSync(new URL("../dist/engine/BUILD.json", import.meta.url), "utf8")) as { files: Record<string, { sha256: string }> };
+    const record = JSON.parse(readFileSync(new URL("../dist/engine/BUILD.json", import.meta.url), "utf8")) as {
+      files: Record<string, { sha256: string }>;
+    };
     const byPath = (path: string) => Object.entries(stored).filter(([url]) => new URL(url).pathname === path);
-    expect(byPath(paths.wasm).map(([, sha]) => sha), "the binary is the build's, fetched under the new key").toEqual([record.files["verticopolis_engine_bg.wasm"].sha256]);
+    expect(
+      byPath(paths.wasm).map(([, sha]) => sha),
+      "the binary is the build's, fetched under the new key",
+    ).toEqual([record.files["verticopolis_engine_bg.wasm"].sha256]);
     expect(byPath(paths.glue).map(([, sha]) => sha)).toEqual([record.files["verticopolis_engine.js"].sha256]);
-    for (const [revision, path] of [[rev.glue, paths.glue], [rev.wasm, paths.wasm], [rev.record, paths.record]] as const) {
-      expect(byPath(path).map(([url]) => url), `${path} has only its rotated key`).toEqual([new URL(`${path}?__WB_REVISION__=${revision}`, page.url()).href]);
-      expect(byPath(path).some(([url]) => url.endsWith(`=${plain(revision)}`)), `no plain-key entry for ${path}`).toBe(false);
+    for (const [revision, path] of [
+      [rev.glue, paths.glue],
+      [rev.wasm, paths.wasm],
+      [rev.record, paths.record],
+    ] as const) {
+      expect(
+        byPath(path).map(([url]) => url),
+        `${path} has only its rotated key`,
+      ).toEqual([new URL(`${path}?__WB_REVISION__=${revision}`, page.url()).href]);
+      expect(
+        byPath(path).some(([url]) => url.endsWith(`=${plain(revision)}`)),
+        `no plain-key entry for ${path}`,
+      ).toBe(false);
     }
     await expectEngineHosted(page);
   } finally {
@@ -308,7 +358,9 @@ test("an update still installs when the host rewrites the HTML page", async ({ b
     deployments.rewritePage(true);
     await updateTo(first.page, "B", "999.0.0");
     await expectCacheIs(first.page, "B");
-    const page = await first.page.evaluate(async () => (await caches.match("index.html", { ignoreSearch: true }))?.text());
+    const page = await first.page.evaluate(async () =>
+      (await caches.match("index.html", { ignoreSearch: true }))?.text(),
+    );
     expect(page, "the page is stored as the server sent it").toContain("data-host-toolbar");
   } finally {
     deployments.rewritePage(false);
@@ -332,7 +384,12 @@ test("an install refuses the next build's page, and the next install stores its 
     const page = await context.newPage();
     deployments.pageFrom("B");
     await page.goto("/");
-    await expect.poll(() => deployments.requests.some((r) => r.path === "/index.html" && r.from === "B"), { message: "the installing worker fetched B's page", timeout: 30_000 }).toBe(true);
+    await expect
+      .poll(() => deployments.requests.some((r) => r.path === "/index.html" && r.from === "B"), {
+        message: "the installing worker fetched B's page",
+        timeout: 30_000,
+      })
+      .toBe(true);
     const workerState = () =>
       page.evaluate(async () => {
         const r = await navigator.serviceWorker.getRegistration();
@@ -340,7 +397,10 @@ test("an install refuses the next build's page, and the next install stores its 
       });
     await expect.poll(workerState, { message: "the install was refused", timeout: 30_000 }).toBe("no worker");
     expect(await page.evaluate(() => navigator.serviceWorker.controller), "nothing controls the page").toBeNull();
-    expect(await page.evaluate(async () => (await caches.match("index.html", { ignoreSearch: true })) ?? null), "B's page was not stored").toBeNull();
+    expect(
+      await page.evaluate(async () => (await caches.match("index.html", { ignoreSearch: true })) ?? null),
+      "B's page was not stored",
+    ).toBeNull();
 
     deployments.pageFrom(null);
     await installWorker(page);
@@ -372,7 +432,10 @@ test("an update refuses the older build's page while the newer build installs", 
       await (await navigator.serviceWorker.getRegistration())?.update().catch(() => undefined);
     });
     await expect
-      .poll(() => deployments.requests.slice(before).some((r) => r.path === "/index.html" && r.from === "A"), { message: "B's installing worker fetched A's page", timeout: 90_000 })
+      .poll(() => deployments.requests.slice(before).some((r) => r.path === "/index.html" && r.from === "A"), {
+        message: "B's installing worker fetched A's page",
+        timeout: 90_000,
+      })
       .toBe(true);
     const pending = () =>
       first.page.evaluate(async () => {
@@ -385,7 +448,11 @@ test("an update refuses the older build's page while the newer build installs", 
     // the shared precache (only an activation clears them), so check A's own.
     const { keys } = await cacheContents(first.page);
     const r = deployments.revisions.A;
-    for (const name of [`verticopolis_engine.js?__WB_REVISION__=${r.glue}`, `verticopolis_engine_bg.wasm?__WB_REVISION__=${r.wasm}`, `BUILD.json?__WB_REVISION__=${r.record}`]) {
+    for (const name of [
+      `verticopolis_engine.js?__WB_REVISION__=${r.glue}`,
+      `verticopolis_engine_bg.wasm?__WB_REVISION__=${r.wasm}`,
+      `BUILD.json?__WB_REVISION__=${r.record}`,
+    ]) {
       expect(keys, "A's engine files are still in the cache").toContain(`/engine/${name}`);
     }
     deployments.pageFrom(null);

@@ -44,9 +44,14 @@ export function baselineErrors(dist: string): string[] {
   try {
     stamp = JSON.parse(readFileSync(join(dist, BASELINE_STAMP), "utf8")) as Partial<BaselineRecord>;
   } catch {
-    return [`${dist} has no readable ${BASELINE_STAMP}, so which commit it was built from is unknown; run once without --skip-build`];
+    return [
+      `${dist} has no readable ${BASELINE_STAMP}, so which commit it was built from is unknown; run once without --skip-build`,
+    ];
   }
-  if (stamp.commit !== TS_BASELINE.commit) errors.push(`${dist} was built from ${stamp.commit ?? "an unknown commit"}, not the pinned ${TS_BASELINE.commit}; run once without --skip-build`);
+  if (stamp.commit !== TS_BASELINE.commit)
+    errors.push(
+      `${dist} was built from ${stamp.commit ?? "an unknown commit"}, not the pinned ${TS_BASELINE.commit}; run once without --skip-build`,
+    );
   let version: { version?: unknown; sha?: unknown; engineBuild?: unknown } = {};
   try {
     version = JSON.parse(readFileSync(join(dist, "version.json"), "utf8")) as typeof version;
@@ -54,10 +59,24 @@ export function baselineErrors(dist: string): string[] {
     errors.push(`${dist}/version.json cannot be read`);
     return errors;
   }
-  if (version.version !== TS_BASELINE.appVersion) errors.push(`${dist} is app ${String(version.version)}, not the pinned ${TS_BASELINE.appVersion}`);
-  if (typeof version.sha !== "string" || version.sha.length < MIN_SHA_LENGTH || !TS_BASELINE.commit.startsWith(version.sha)) errors.push(`${dist}/version.json names commit ${String(version.sha)}, not the pinned ${TS_BASELINE.commit.slice(0, 8)}`);
-  if (version.engineBuild !== "switchable") errors.push(`${dist} is a ${String(version.engineBuild)} build; the TypeScript arm needs the switchable build that honors /?engine=ts`);
-  if (existsSync(join(dist, "engine"))) errors.push(`${dist}/engine exists; the baseline is a TypeScript-only build, and the engine package is overlaid by the server`);
+  if (version.version !== TS_BASELINE.appVersion)
+    errors.push(`${dist} is app ${String(version.version)}, not the pinned ${TS_BASELINE.appVersion}`);
+  if (
+    typeof version.sha !== "string" ||
+    version.sha.length < MIN_SHA_LENGTH ||
+    !TS_BASELINE.commit.startsWith(version.sha)
+  )
+    errors.push(
+      `${dist}/version.json names commit ${String(version.sha)}, not the pinned ${TS_BASELINE.commit.slice(0, 8)}`,
+    );
+  if (version.engineBuild !== "switchable")
+    errors.push(
+      `${dist} is a ${String(version.engineBuild)} build; the TypeScript arm needs the switchable build that honors /?engine=ts`,
+    );
+  if (existsSync(join(dist, "engine")))
+    errors.push(
+      `${dist}/engine exists; the baseline is a TypeScript-only build, and the engine package is overlaid by the server`,
+    );
   return errors;
 }
 
@@ -74,12 +93,15 @@ export function requireBaselineCommit(repo: string, run: Git = git): void {
   try {
     run(repo, "cat-file", "-e", `${TS_BASELINE.commit}^{commit}`);
   } catch {
-    throw new Error(`the pinned baseline commit ${TS_BASELINE.commit} is not in this clone; fetch it with \`git fetch origin ${TS_BASELINE.commit}\` (or a full fetch) and run again`);
+    throw new Error(
+      `the pinned baseline commit ${TS_BASELINE.commit} is not in this clone; fetch it with \`git fetch origin ${TS_BASELINE.commit}\` (or a full fetch) and run again`,
+    );
   }
 }
 
 /** Variables of the caller that would change what the pinned build is or which dependencies install. */
-const SCRUBBED_ENV = /^(VC_ENGINE|VC_PUBLIC_DIR|VC_TOOLING|NODE_ENV|npm_lifecycle_event|npm_lifecycle_script|npm_config_(omit|production|include|only|dev|ignore_scripts))$/i;
+const SCRUBBED_ENV =
+  /^(VC_ENGINE|VC_PUBLIC_DIR|VC_TOOLING|NODE_ENV|npm_lifecycle_event|npm_lifecycle_script|npm_config_(omit|production|include|only|dev|ignore_scripts))$/i;
 
 /** Variables that would point git at another repository than the one it is run in. */
 const GIT_REPO_ENV = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] as const;
@@ -136,7 +158,9 @@ function buildLocked(repo: string, log: (line: string) => void, steps: BaselineS
     }
   }
   if (!existsSync(tree)) {
-    log(`baseline: checking out the TypeScript baseline ${TS_BASELINE.commit.slice(0, 8)} (app ${TS_BASELINE.appVersion}) into ${BASELINE_TREE}/`);
+    log(
+      `baseline: checking out the TypeScript baseline ${TS_BASELINE.commit.slice(0, 8)} (app ${TS_BASELINE.appVersion}) into ${BASELINE_TREE}/`,
+    );
     git(repo, "worktree", "add", "--detach", "--force", tree, TS_BASELINE.commit);
   }
   log("baseline: installing the baseline's dependencies (npm ci)");
@@ -160,7 +184,11 @@ export function requireBaselineDist(distTs: string): void {
 
 /** The servers a run measures from: the current timed build for Rust, and, when a TypeScript arm runs, the pinned baseline
  *  with the current engine package overlaid at `/engine` so the package-load side measurements have a package in that origin. */
-export async function startArmServers(distPerf: string, distTs: string, needsBaseline: boolean): Promise<Partial<Record<"ts" | "wasm", PerfServer>>> {
+export async function startArmServers(
+  distPerf: string,
+  distTs: string,
+  needsBaseline: boolean,
+): Promise<Partial<Record<"ts" | "wasm", PerfServer>>> {
   const wasm = await startServer(distPerf);
   if (!needsBaseline) return { wasm };
   try {

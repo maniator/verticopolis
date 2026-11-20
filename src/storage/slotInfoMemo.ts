@@ -43,14 +43,19 @@ function sameList<T>(a: readonly T[], b: readonly T[]): boolean {
  * a reuse hands out a fresh one, so a caller that edits a row cannot change the
  * next one.
  */
-export function rememberedSlotInfo(slot: SlotInfo["slot"], keys: readonly string[], read: (raws: readonly (string | null)[]) => SlotInfo): SlotInfo {
+export function rememberedSlotInfo(
+  slot: SlotInfo["slot"],
+  keys: readonly string[],
+  read: (raws: readonly (string | null)[]) => SlotInfo,
+): SlotInfo {
   const raws = keys.map((key) => saveStore.get(key));
   // Read the epoch BEFORE `read`: a census trap inside `read` removes the
   // reader (raising the epoch), and a row stored under the older epoch is then
   // read again on the next open, with no census.
   const epoch = slotCensusEpoch();
   const known = memo.get(slot);
-  if (known && known.epoch === epoch && sameList(known.keys, keys) && sameList(known.raws, raws)) return { ...known.info };
+  if (known && known.epoch === epoch && sameList(known.keys, keys) && sameList(known.raws, raws))
+    return { ...known.info };
   const info = read(raws);
   if (info.exists || !info.present) memo.set(slot, { keys: [...keys], raws, epoch, info: { ...info } });
   else memo.delete(slot);

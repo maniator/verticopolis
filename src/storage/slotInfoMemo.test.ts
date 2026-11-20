@@ -106,7 +106,10 @@ describe("rememberedSlotInfo", () => {
     setSlotPopulationReader(() => 7);
     // A census trap removes the reader in the middle of the read, as boot's trap
     // handler does, and the row still loads from another key.
-    const read = vi.fn().mockImplementationOnce(() => (setSlotPopulationReader(null), row(1))).mockReturnValue(row(2));
+    const read = vi
+      .fn()
+      .mockImplementationOnce(() => (setSlotPopulationReader(null), row(1)))
+      .mockReturnValue(row(2));
     rememberedSlotInfo(1, ["k"], read);
     expect(rememberedSlotInfo(1, ["k"], read).population).toBe(2);
     expect(read).toHaveBeenCalledTimes(2);

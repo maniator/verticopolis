@@ -24,17 +24,29 @@ describe("applyCharge (the scenario charge ops)", () => {
   });
 
   it("fails when the balance moved by something other than the reported delta", () => {
-    expect(() => applyCharge(stub({ ok: true, delta: -40 }, 0), op())).toThrow("the balance moved 0 but the command reported -40");
+    expect(() => applyCharge(stub({ ok: true, delta: -40 }, 0), op())).toThrow(
+      "the balance moved 0 but the command reported -40",
+    );
   });
 
   it("fails a refusal that reports a delta", () => {
-    expect(() => applyCharge(stub({ ok: false, reason: "Not enough money.", delta: -5 }, -5), op("Not enough money."))).toThrow("refused but reported a delta of -5");
+    expect(() =>
+      applyCharge(stub({ ok: false, reason: "Not enough money.", delta: -5 }, -5), op("Not enough money.")),
+    ).toThrow("refused but reported a delta of -5");
   });
 
   it("pins the refusal copy when the scenario names it", () => {
-    expect(() => applyCharge(stub({ ok: false, reason: "Not enough money.", delta: 0 }, 0), op("Not enough money."))).not.toThrow();
-    expect(() => applyCharge(stub({ ok: false, reason: "Not enough money.", delta: 0 }, 0), op("Other."))).toThrow("failed with Not enough money., expected Other.");
-    expect(() => applyCharge(stub({ ok: true, delta: -40 }, -40), op("Other."))).toThrow("expected to fail with Other.");
-    expect(() => applyCharge(stub({ ok: false, reason: "Not enough money.", delta: 0 }, 0), op())).toThrow("failed: Not enough money.");
+    expect(() =>
+      applyCharge(stub({ ok: false, reason: "Not enough money.", delta: 0 }, 0), op("Not enough money.")),
+    ).not.toThrow();
+    expect(() => applyCharge(stub({ ok: false, reason: "Not enough money.", delta: 0 }, 0), op("Other."))).toThrow(
+      "failed with Not enough money., expected Other.",
+    );
+    expect(() => applyCharge(stub({ ok: true, delta: -40 }, -40), op("Other."))).toThrow(
+      "expected to fail with Other.",
+    );
+    expect(() => applyCharge(stub({ ok: false, reason: "Not enough money.", delta: 0 }, 0), op())).toThrow(
+      "failed: Not enough money.",
+    );
   });
 });

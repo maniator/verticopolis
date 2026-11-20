@@ -23,7 +23,9 @@ export function fakeEnginePort(sim: SpiedSim) {
     // How the engine cuts owed minutes into steps is its own
     // (`engine-rs/tests/fixed_step.rs`): this one steps nothing and hands back
     // the carry it was given, unless a test answers otherwise.
-    advance: vi.fn((owed: number, _dtMs: number, _minutesPerSecond: number, _steadyClock: boolean, _step: boolean) => Float64Array.of(0, owed)),
+    advance: vi.fn((owed: number, _dtMs: number, _minutesPerSecond: number, _steadyClock: boolean, _step: boolean) =>
+      Float64Array.of(0, owed),
+    ),
     hotspot: vi.fn(() => Float64Array.of(0, NaN)),
     setPeopleWindow: vi.fn((_floorLo: number, _floorHi: number, _xLo: number, _xHi: number) => undefined),
     evaluatedTower: vi.fn(() => sim.evaluatedTower === true),
@@ -41,7 +43,12 @@ export function fakeEnginePort(sim: SpiedSim) {
 /** The shared reader over the fake sim: the header reads the sim's star and
  *  emergency as they stand, and its population is the census taken at the
  *  last update, as the real reader's is. */
-export function fakeReader(sim: { star: number; pendingChoice: unknown; clock: { minutes: number }; tower: { totalPopulation: unknown } }) {
+export function fakeReader(sim: {
+  star: number;
+  pendingChoice: unknown;
+  clock: { minutes: number };
+  tower: { totalPopulation: unknown };
+}) {
   let population = 0;
   return {
     generation: 0,
@@ -51,7 +58,15 @@ export function fakeReader(sim: { star: number; pendingChoice: unknown; clock: {
     rooms: [],
     structure: [],
     get header() {
-      return { star: sim.star, pendingChoice: sim.pendingChoice, population, minutes: sim.clock.minutes, mode: "modern", modernCalendar: "realWorld", ...DATE_SLOTS };
+      return {
+        star: sim.star,
+        pendingChoice: sim.pendingChoice,
+        population,
+        minutes: sim.clock.minutes,
+        mode: "modern",
+        modernCalendar: "realWorld",
+        ...DATE_SLOTS,
+      };
     },
   };
 }
@@ -94,12 +109,21 @@ export function makeApp(over: Record<string, unknown> = {}) {
     shownUpdate: false,
     speed: 3,
     prefs: { steadyClock: true },
-    sim, events: sim, // the fake sim drains as the port's events do
+    sim,
+    events: sim, // the fake sim drains as the port's events do
     enginePort: fakeEnginePort(sim), // commands land on the fake's spies
     portCodes,
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn(), setMusicDucked: vi.fn() },
-    engine: { focus: vi.fn(() => ({})), cam: { zoom: 1 }, crowdCulled: false, viewWidth: 800, viewHeight: 600, screenToTile: vi.fn((sx: number) => sx / 8), screenToFloor: vi.fn((sy: number) => 40 - sy / 20) },
+    engine: {
+      focus: vi.fn(() => ({})),
+      cam: { zoom: 1 },
+      crowdCulled: false,
+      viewWidth: 800,
+      viewHeight: 600,
+      screenToTile: vi.fn((sx: number) => sx / 8),
+      screenToFloor: vi.fn((sy: number) => 40 - sy / 20),
+    },
     reader: fakeReader(sim),
     ui: {
       update: vi.fn(),

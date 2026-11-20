@@ -92,7 +92,7 @@ labels:
   # --- area ---
   - name: engine
     color: "c5def5"
-    description: "The TypeScript simulation: tenants, demand, stars, events"
+    description: "How the game uses the engine package (the simulation lives in Verticopolis/engine)"
   - name: engine-rs
     color: "c5def5"
     description: "The Rust engine crate, its binding and the conformance lock"

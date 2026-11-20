@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SCENARIOS, SCENARIO_NAMES, buildScenarios, loadScenario, pinnedTowers, unknownScenarios } from "./scenarios";
+import {
+  DEFAULT_SCENARIOS,
+  SCENARIO_NAMES,
+  buildScenarios,
+  loadScenario,
+  pinnedTowers,
+  unknownScenarios,
+} from "./scenarios";
 
 interface SavedTower {
   mode: string;
@@ -8,7 +15,8 @@ interface SavedTower {
   transports: { kind: string }[];
 }
 
-const tower = (name: (typeof SCENARIO_NAMES)[number]): SavedTower => JSON.parse(buildScenarios([name])[0].save) as SavedTower;
+const tower = (name: (typeof SCENARIO_NAMES)[number]): SavedTower =>
+  JSON.parse(buildScenarios([name])[0].save) as SavedTower;
 const count = <T>(items: readonly T[], keep: (item: T) => boolean): number => items.filter(keep).length;
 
 describe("choosing scenarios (#1270)", () => {
@@ -43,7 +51,11 @@ describe("the pinned towers (#1875)", () => {
   it("hash to their records and carry the records' counts", () => {
     const pinned = pinnedTowers();
     expect(Object.keys(pinned)).toEqual([...SCENARIO_NAMES]);
-    for (const sc of buildScenarios(SCENARIO_NAMES)) expect({ sha256: sc.sha256, population: sc.population, units: sc.units, transports: sc.transports }, sc.name).toEqual(pinned[sc.name]);
+    for (const sc of buildScenarios(SCENARIO_NAMES))
+      expect(
+        { sha256: sc.sha256, population: sc.population, units: sc.units, transports: sc.transports },
+        sc.name,
+      ).toEqual(pinned[sc.name]);
   });
 
   it("keep the many-unit tower a five-star, 100-floor tower with both transport pools full", () => {
@@ -65,6 +77,8 @@ describe("the pinned towers (#1875)", () => {
   it("refuse a tower file that no longer hashes to its record", () => {
     const small = pinnedTowers().small;
     expect(() => loadScenario("small", undefined)).toThrow(/small: towers\/manifest.json has no record/);
-    expect(() => loadScenario("small", { ...small, sha256: "0".repeat(64) })).toThrow(/small: src\/tests\/perfCompare\/towers\/small.vctower hashes to [0-9a-f]{64}, but towers\/manifest.json records 0{64}/);
+    expect(() => loadScenario("small", { ...small, sha256: "0".repeat(64) })).toThrow(
+      /small: src\/tests\/perfCompare\/towers\/small.vctower hashes to [0-9a-f]{64}, but towers\/manifest.json records 0{64}/,
+    );
   });
 });

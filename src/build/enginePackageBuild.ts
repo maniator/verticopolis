@@ -9,8 +9,19 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { precacheFile } from "../precacheEntry.ts";
-import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "@verticopolis/components/host/enginePackageNames";
-import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEnginePackage } from "@verticopolis/components/host/enginePackageRecord";
+import {
+  DEV_SKIP_MARKER,
+  ENGINE_BUILD_RECORD,
+  ENGINE_DIR,
+  ENGINE_GLUE,
+  ENGINE_WASM,
+} from "@verticopolis/components/host/enginePackageNames";
+import {
+  canonicalFilesJson,
+  expectedOf,
+  parseEngineRecord,
+  type ExpectedEnginePackage,
+} from "@verticopolis/components/host/enginePackageRecord";
 
 /** A text file as the page reads it: the page's TextDecoder drops a leading
  *  byte order mark, so the build does too. */
@@ -37,10 +48,15 @@ export function readExpectedPackage(publicDir: string, mode: "build" | "other"):
   if (!existsSync(file)) {
     // An empty folder counts as no package, as scripts/verify-precache.ts counts it.
     if (!existsSync(dir) || readdirSync(dir).length === 0) return null;
-    throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from a package that exists; reinstall it with npm install`);
+    throw new Error(
+      `${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from a package that exists; reinstall it with npm install`,
+    );
   }
   const parsed = parseEngineRecord(readText(file));
-  if (!parsed.ok) throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); reinstall it with npm install`);
+  if (!parsed.ok)
+    throw new Error(
+      `${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); reinstall it with npm install`,
+    );
   return { ...expectedOf(parsed.record), revisions: revisionsOf(dir) };
 }
 
@@ -77,7 +93,9 @@ export function revisionsOf(engineDir: string): Record<string, string> {
 export function manifestRevisions(manifest: string): Map<string, string | undefined> {
   const found = new Map<string, string | undefined>();
   for (const m of manifest.matchAll(/\{[^{}]*\}/g)) {
-    const url = KEY("url").exec(m[0])?.[2]?.replace(/^\.?\//, "");
+    const url = KEY("url")
+      .exec(m[0])?.[2]
+      ?.replace(/^\.?\//, "");
     if (url) found.set(url, KEY("revision").exec(m[0])?.[2]);
   }
   return found;
@@ -89,7 +107,9 @@ export function integrityOf(bytes: Uint8Array): string {
 }
 
 /** The engine files whose precache entries carry `integrity`, as manifest URLs. */
-export const INTEGRITY_FILES: readonly string[] = [ENGINE_GLUE, ENGINE_WASM, ENGINE_BUILD_RECORD].map((f) => ENGINE_DIR + f);
+export const INTEGRITY_FILES: readonly string[] = [ENGINE_GLUE, ENGINE_WASM, ENGINE_BUILD_RECORD].map(
+  (f) => ENGINE_DIR + f,
+);
 
 interface ManifestEntry {
   url: string;
@@ -101,12 +121,18 @@ interface ManifestEntry {
 /** One manifest entry with the `integrity` of its file under `distDir`, and
  *  for the three engine files the revision of {@link engineRevision}. An entry
  *  whose file is not there stops the build rather than ship without a check. */
-export function entryWithIntegrity<E extends { url: string; revision?: string | null }>(entry: E, distDir: string): E & { integrity: string } {
+export function entryWithIntegrity<E extends { url: string; revision?: string | null }>(
+  entry: E,
+  distDir: string,
+): E & { integrity: string } {
   const url = entry.url.split(/[?#]/)[0].replace(/^\.?\//, "");
   const file = precacheFile(distDir, url);
-  if (!existsSync(file)) throw new Error(`precache entry ${url} has no file under ${distDir}, so it cannot carry integrity`);
+  if (!existsSync(file))
+    throw new Error(`precache entry ${url} has no file under ${distDir}, so it cannot carry integrity`);
   const bytes = readFileSync(file);
-  return INTEGRITY_FILES.includes(url) ? { ...entry, revision: engineRevision(bytes), integrity: integrityOf(bytes) } : { ...entry, integrity: integrityOf(bytes) };
+  return INTEGRITY_FILES.includes(url)
+    ? { ...entry, revision: engineRevision(bytes), integrity: integrityOf(bytes) }
+    : { ...entry, integrity: integrityOf(bytes) };
 }
 
 /**
@@ -151,7 +177,10 @@ export const PAGE_FILE_ATTRIBUTE = /\b(?:src|href)\s*=\s*["']([^"']+)["']/gi;
  *  does not precache (#1949), so a build with one missing would fail every
  *  install, and a page that names none would mean the worker's check passes
  *  everything. */
-export function pageAssetsMissing(html: string, manifestUrls: ReadonlySet<string>): { named: string[]; missing: string[] } {
+export function pageAssetsMissing(
+  html: string,
+  manifestUrls: ReadonlySet<string>,
+): { named: string[]; missing: string[] } {
   const base = new URL("https://page.invalid/index.html");
   const named = new Set<string>();
   for (const match of html.matchAll(PAGE_FILE_ATTRIBUTE)) {
@@ -177,7 +206,9 @@ const KEY = (key: string) => new RegExp(`(?:^|[{,\\s])["']?${key}["']?\\s*:\\s*(
 export function manifestIntegrity(manifest: string): Map<string, string | undefined> {
   const found = new Map<string, string | undefined>();
   for (const m of manifest.matchAll(/\{[^{}]*\}/g)) {
-    const url = KEY("url").exec(m[0])?.[2]?.replace(/^\.?\//, "");
+    const url = KEY("url")
+      .exec(m[0])?.[2]
+      ?.replace(/^\.?\//, "");
     if (!url) continue;
     found.set(url, KEY("integrity").exec(m[0])?.[2]);
   }
@@ -206,20 +237,29 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
       continue;
     }
     const bytes = readFileSync(file);
-    if (bytes.length !== record.files[name].bytes) problems.push(`dist/${ENGINE_DIR}${name} is ${bytes.length} bytes; BUILD.json says ${record.files[name].bytes}`);
-    if (sha(bytes) !== record.files[name].sha256) problems.push(`dist/${ENGINE_DIR}${name} does not match the digest in BUILD.json`);
+    if (bytes.length !== record.files[name].bytes)
+      problems.push(`dist/${ENGINE_DIR}${name} is ${bytes.length} bytes; BUILD.json says ${record.files[name].bytes}`);
+    if (sha(bytes) !== record.files[name].sha256)
+      problems.push(`dist/${ENGINE_DIR}${name} does not match the digest in BUILD.json`);
   }
-  if (sha(canonicalFilesJson(record.files)) !== record.package) problems.push(`BUILD.json's package id is not the hash of its own files block`);
+  if (sha(canonicalFilesJson(record.files)) !== record.package)
+    problems.push(`BUILD.json's package id is not the hash of its own files block`);
   const integrity = manifestIntegrity(manifest);
   for (const url of INTEGRITY_FILES) {
     const file = resolve(distDir, url);
     if (!integrity.has(url)) {
-      problems.push(`precache entry ${url} is missing from the manifest, so the installed worker would not cache it with the rest of the package`);
+      problems.push(
+        `precache entry ${url} is missing from the manifest, so the installed worker would not cache it with the rest of the package`,
+      );
       continue;
     }
     const have = integrity.get(url);
-    if (!have) problems.push(`precache entry ${url} carries no integrity, so a body from another build could enter the precache`);
-    else if (existsSync(file) && have !== integrityOf(readFileSync(file))) problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
+    if (!have)
+      problems.push(
+        `precache entry ${url} carries no integrity, so a body from another build could enter the precache`,
+      );
+    else if (existsSync(file) && have !== integrityOf(readFileSync(file)))
+      problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
   }
   // Repair names the running build's cache keys by revision, so each engine
   // entry's revision must be the one of the file the shell was built with.
@@ -227,7 +267,10 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
   const wanted = revisionsOf(resolve(distDir, ENGINE_DIR));
   for (const url of INTEGRITY_FILES) {
     const want = wanted[url.slice(ENGINE_DIR.length)];
-    if (revisions.has(url) && revisions.get(url) !== want) problems.push(`precache entry ${url} has revision ${revisions.get(url) ?? "none"}; the file in dist/ has ${want}, so Repair would name another cache key`);
+    if (revisions.has(url) && revisions.get(url) !== want)
+      problems.push(
+        `precache entry ${url} has revision ${revisions.get(url) ?? "none"}; the file in dist/ has ${want}, so Repair would name another cache key`,
+      );
   }
   return problems;
 }
@@ -245,8 +288,12 @@ export function manifestIntegrityProblems(distDir: string, manifest: string): st
   for (const [url, have] of manifestIntegrity(manifest)) {
     const file = precacheFile(distDir, url);
     if (!existsSync(file)) problems.push(`precache entry ${url} has no file in dist/`);
-    else if (!have) problems.push(`precache entry ${url} carries no integrity, so a miss would not refill the precache after the browser drops it`);
-    else if (have !== integrityOf(readFileSync(file))) problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
+    else if (!have)
+      problems.push(
+        `precache entry ${url} carries no integrity, so a miss would not refill the precache after the browser drops it`,
+      );
+    else if (have !== integrityOf(readFileSync(file)))
+      problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
   }
   return problems;
 }
@@ -264,7 +311,10 @@ export function shellRevisionProblems(distDir: string): string[] {
     .map((f) => readFileSync(resolve(distDir, f), "utf8"));
   const problems: string[] = [];
   for (const [name, revision] of Object.entries(revisionsOf(resolve(distDir, ENGINE_DIR)))) {
-    if (!texts.some((t) => t.includes(revision))) problems.push(`no script in dist/ carries the precache revision of ${ENGINE_DIR}${name}, so Repair could not name its cache key`);
+    if (!texts.some((t) => t.includes(revision)))
+      problems.push(
+        `no script in dist/ carries the precache revision of ${ENGINE_DIR}${name}, so Repair could not name its cache key`,
+      );
   }
   return problems;
 }
@@ -273,7 +323,11 @@ export function shellRevisionProblems(distDir: string): string[] {
 function emittedScripts(dir: string): string[] {
   return readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile() && /\.(?:js|mjs|html)$/.test(e.name))
-    .map((e) => relative(dir, resolve(e.parentPath ?? (e as { path?: string }).path ?? dir, e.name)).split(sep).join("/"));
+    .map((e) =>
+      relative(dir, resolve(e.parentPath ?? (e as { path?: string }).path ?? dir, e.name))
+        .split(sep)
+        .join("/"),
+    );
 }
 
 /** A package id as an object literal's `package` member, bare or quoted key. */
@@ -298,20 +352,31 @@ export function shellProblems(distDir: string, hasEngine: boolean): string[] {
   const withId = new Map<string, Set<string>>();
   for (const file of scripts) {
     const text = readFileSync(resolve(distDir, file), "utf8");
-    if (text.includes(DEV_SKIP_MARKER)) problems.push(`dist/${file} still carries the development-only skip of the engine byte check`);
+    if (text.includes(DEV_SKIP_MARKER))
+      problems.push(`dist/${file} still carries the development-only skip of the engine byte check`);
     const ids = new Set([...text.matchAll(PACKAGE_MEMBER)].map((m) => m[1]));
     if (ids.size > 0) withId.set(file, ids);
   }
   if (!hasEngine) return problems;
   const recordFile = resolve(distDir, ENGINE_DIR, ENGINE_BUILD_RECORD);
   const parsed = existsSync(recordFile) ? parseEngineRecord(readText(recordFile)) : null;
-  if (!parsed?.ok) return [...problems, `cannot compare the shell with the engine package: dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing or unusable`];
+  if (!parsed?.ok)
+    return [
+      ...problems,
+      `cannot compare the shell with the engine package: dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing or unusable`,
+    ];
   const want = parsed.record.package;
   const carriers = [...withId].filter(([, ids]) => ids.has(want)).map(([file]) => file);
-  if (carriers.length === 0) problems.push(`no script in dist/ carries the engine package id ${want.slice(0, 12)} from BUILD.json, so the page would check the engine against nothing`);
+  if (carriers.length === 0)
+    problems.push(
+      `no script in dist/ carries the engine package id ${want.slice(0, 12)} from BUILD.json, so the page would check the engine against nothing`,
+    );
   for (const [file, ids] of withId) {
     const other = [...ids].filter((id) => id !== want);
-    if (other.length > 0) problems.push(`dist/${file} carries engine package id ${other.map((id) => id.slice(0, 12)).join(", ")}, but dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} says ${want.slice(0, 12)}`);
+    if (other.length > 0)
+      problems.push(
+        `dist/${file} carries engine package id ${other.map((id) => id.slice(0, 12)).join(", ")}, but dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} says ${want.slice(0, 12)}`,
+      );
   }
   return problems;
 }

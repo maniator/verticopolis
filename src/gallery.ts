@@ -56,14 +56,28 @@ function roomEntry(
   facilityOf(kind);
   return {
     label,
-    draw: (d, cx, cy, cw, ch) => drawRoomPortrait(d, facilityOf, kind, { state, occupants: occ, subtype, floor: floorOverride }, cx, cy, cw, ch, CAPTION_H, MAG),
+    draw: (d, cx, cy, cw, ch) =>
+      drawRoomPortrait(
+        d,
+        facilityOf,
+        kind,
+        { state, occupants: occ, subtype, floor: floorOverride },
+        cx,
+        cy,
+        cw,
+        ch,
+        CAPTION_H,
+        MAG,
+      ),
   };
 }
 
 /** One gallery cell per canon retail variant, labeled with its canon name so
  *  the catalog teaches the vocabulary the inspector and TDT round-trip use. */
 function retailEntries(kind: FacilityKind): Entry[] {
-  return (facilityOf(kind).subtypes ?? []).map((name) => roomEntry(`${facilityOf(kind).name}: ${name}`, kind, "occupied", undefined, name));
+  return (facilityOf(kind).subtypes ?? []).map((name) =>
+    roomEntry(`${facilityOf(kind).name}: ${name}`, kind, "occupied", undefined, name),
+  );
 }
 
 function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
@@ -201,7 +215,10 @@ let ITEMS: GalleryItem[] = [];
 /** Assign each item a screen cell. A header closes the current row, spans the
  *  full width in its own shorter band, and forces the next item onto a fresh
  *  row. Returns the placements and the total canvas height. */
-function layoutItems(items: GalleryItem[]): { placed: Array<{ item: GalleryItem; x: number; y: number }>; height: number } {
+function layoutItems(items: GalleryItem[]): {
+  placed: Array<{ item: GalleryItem; x: number; y: number }>;
+  height: number;
+} {
   const placed: Array<{ item: GalleryItem; x: number; y: number }> = [];
   let col = 0;
   let y = PAD;
@@ -356,7 +373,9 @@ async function start(): Promise<void> {
     ITEMS = buildItems();
   } catch (e) {
     console.error("Sprite gallery: the Rust engine's catalog is unavailable.", e);
-    document.querySelector(".gallery-scroll")?.replaceChildren("The sprite gallery needs the game engine, and it did not load. Reload the page to try again.");
+    document
+      .querySelector(".gallery-scroll")
+      ?.replaceChildren("The sprite gallery needs the game engine, and it did not load. Reload the page to try again.");
     return;
   }
   relayout();

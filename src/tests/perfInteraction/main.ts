@@ -3,11 +3,25 @@ import { cpus, platform } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, type Page } from "playwright";
 import { webglRenderer } from "../perfCompare/page";
-import { browserLaunch, browserName, classifyRenderer, launchOptions, type BrowserLaunch } from "../perfCompare/renderer";
+import {
+  browserLaunch,
+  browserName,
+  classifyRenderer,
+  launchOptions,
+  type BrowserLaunch,
+} from "../perfCompare/renderer";
 import { buildScenarios, unknownScenarios, type Scenario } from "../perfCompare/scenarios";
 import { startServer, type PerfServer } from "../perfCompare/server";
 import { activityTable, compareArms, comparisonTable, phaseMetrics, type Arm, type ArmRun } from "./analysis";
-import { adoptForInteraction, collectRecord, fastForwardTo, installRecorder, restoreCamera, saveCamera, setPhase } from "./pageRecorder";
+import {
+  adoptForInteraction,
+  collectRecord,
+  fastForwardTo,
+  installRecorder,
+  restoreCamera,
+  saveCamera,
+  setPhase,
+} from "./pageRecorder";
 import { PHASES, preparePhase, runPhase, type Viewport } from "./phases";
 
 /**
@@ -37,7 +51,8 @@ export interface InteractionArgs {
   allowSoftware: boolean;
 }
 
-const USAGE = "usage: npm run perf:interaction -- --a <tooling build dir> --b <tooling build dir> [--reps 6] [--throttles 1,4] [--phase-ms 20000] [--warm-ms 10000] [--scenario large] [--viewport 1920x1080] [--out <dir>] [--quick] [--allow-software]";
+const USAGE =
+  "usage: npm run perf:interaction -- --a <tooling build dir> --b <tooling build dir> [--reps 6] [--throttles 1,4] [--phase-ms 20000] [--warm-ms 10000] [--scenario large] [--viewport 1920x1080] [--out <dir>] [--quick] [--allow-software]";
 
 function positiveInt(flag: string, v: string | undefined): number {
   const n = Number(v);
@@ -47,7 +62,20 @@ function positiveInt(flag: string, v: string | undefined): number {
 
 /** Parse the command line. Throws with the usage on a mistake. */
 export function parseArgs(argv: readonly string[]): InteractionArgs {
-  const args: InteractionArgs = { a: "", b: "", reps: 6, throttles: [1, 4], phaseMs: 20000, warmMs: 10000, speed: 3, startMinute: 450, scenario: "large", viewport: { width: 1920, height: 1080 }, out: null, allowSoftware: false };
+  const args: InteractionArgs = {
+    a: "",
+    b: "",
+    reps: 6,
+    throttles: [1, 4],
+    phaseMs: 20000,
+    warmMs: 10000,
+    speed: 3,
+    startMinute: 450,
+    scenario: "large",
+    viewport: { width: 1920, height: 1080 },
+    out: null,
+    allowSoftware: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     const value = (): string => {
@@ -56,29 +84,53 @@ export function parseArgs(argv: readonly string[]): InteractionArgs {
       return v;
     };
     switch (flag) {
-      case "--a": args.a = value(); break;
-      case "--b": args.b = value(); break;
-      case "--reps": args.reps = positiveInt(flag, value()); break;
-      case "--phase-ms": args.phaseMs = positiveInt(flag, value()); break;
-      case "--warm-ms": args.warmMs = positiveInt(flag, value()); break;
-      case "--scenario": args.scenario = value(); break;
-      case "--out": args.out = value(); break;
-      case "--throttles": args.throttles = value().split(",").map((t) => positiveInt(flag, t)); break;
+      case "--a":
+        args.a = value();
+        break;
+      case "--b":
+        args.b = value();
+        break;
+      case "--reps":
+        args.reps = positiveInt(flag, value());
+        break;
+      case "--phase-ms":
+        args.phaseMs = positiveInt(flag, value());
+        break;
+      case "--warm-ms":
+        args.warmMs = positiveInt(flag, value());
+        break;
+      case "--scenario":
+        args.scenario = value();
+        break;
+      case "--out":
+        args.out = value();
+        break;
+      case "--throttles":
+        args.throttles = value()
+          .split(",")
+          .map((t) => positiveInt(flag, t));
+        break;
       case "--viewport": {
         const m = /^(\d+)x(\d+)$/.exec(value());
         if (!m) throw new Error(`--viewport needs WIDTHxHEIGHT, such as 1920x1080\n${USAGE}`);
         args.viewport = { width: Number(m[1]), height: Number(m[2]) };
         break;
       }
-      case "--quick": Object.assign(args, { reps: 1, throttles: [1], phaseMs: 3000, warmMs: 2000 }); break;
-      case "--allow-software": args.allowSoftware = true; break;
-      default: throw new Error(`unknown argument "${flag}"\n${USAGE}`);
+      case "--quick":
+        Object.assign(args, { reps: 1, throttles: [1], phaseMs: 3000, warmMs: 2000 });
+        break;
+      case "--allow-software":
+        args.allowSoftware = true;
+        break;
+      default:
+        throw new Error(`unknown argument "${flag}"\n${USAGE}`);
     }
   }
   if (!args.a || !args.b) throw new Error(`--a and --b are both required\n${USAGE}`);
   if (unknownScenarios([args.scenario]).length) throw new Error(`unknown scenario "${args.scenario}"`);
   if (new Set(args.throttles).size !== args.throttles.length) throw new Error("--throttles names a throttle twice");
-  if (args.allowSoftware && !args.out) throw new Error("--allow-software needs --out: a preview never lands in docs/performance/results");
+  if (args.allowSoftware && !args.out)
+    throw new Error("--allow-software needs --out: a preview never lands in docs/performance/results");
   return args;
 }
 
@@ -97,23 +149,42 @@ interface RunContext {
 
 async function waitForGame(page: Page): Promise<void> {
   try {
-    await page.waitForFunction(() => {
-      const g = (window as unknown as { game?: { enginePort?: unknown; engine?: unknown } }).game;
-      return Boolean(g?.enginePort && g.engine);
-    }, null, { timeout: 120000 });
+    await page.waitForFunction(
+      () => {
+        const g = (window as unknown as { game?: { enginePort?: unknown; engine?: unknown } }).game;
+        return Boolean(g?.enginePort && g.engine);
+      },
+      null,
+      { timeout: 120000 },
+    );
   } catch {
-    throw new Error("the page never published window.game: build each arm with VC_TOOLING=1 (see docs/performance/interaction-benchmark.md)");
+    throw new Error(
+      "the page never published window.game: build each arm with VC_TOOLING=1 (see docs/performance/interaction-benchmark.md)",
+    );
   }
 }
 
-type Run = ArmRun & { renderer: string | null; browserVersion: string; startMinute: number; errors: string[]; frameErrors: number; stalled: string[]; noEffect: string[]; missedAutosave: string[] };
+type Run = ArmRun & {
+  renderer: string | null;
+  browserVersion: string;
+  startMinute: number;
+  errors: string[];
+  frameErrors: number;
+  stalled: string[];
+  noEffect: string[];
+  missedAutosave: string[];
+};
 
 /** One arm at one throttle in one repetition, in its own browser. */
 async function runArm(ctx: RunContext, server: PerfServer, arm: Arm, rep: number, throttle: number): Promise<Run> {
   const { args, scenario } = ctx;
   const browser = await chromium.launch(launchOptions(ctx.executablePath, ctx.launch));
   try {
-    const context = await browser.newContext({ viewport: args.viewport, deviceScaleFactor: 1, serviceWorkers: "block" });
+    const context = await browser.newContext({
+      viewport: args.viewport,
+      deviceScaleFactor: 1,
+      serviceWorkers: "block",
+    });
     // tsx wraps named functions in `__name(fn, "name")`; the page has no such helper.
     await context.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
     const page = await context.newPage();
@@ -126,7 +197,9 @@ async function runArm(ctx: RunContext, server: PerfServer, arm: Arm, rep: number
     await waitForGame(page);
     const renderer = (await page.evaluate(webglRenderer))?.renderer ?? null;
     if (classifyRenderer(renderer) !== "hardware" && !args.allowSoftware) {
-      throw new Error(`the page's renderer is ${renderer ?? "none"}, not a named hardware GPU, so its numbers are not evidence; run on a machine with a GPU, or pass --allow-software (with --out) for a labeled preview`);
+      throw new Error(
+        `the page's renderer is ${renderer ?? "none"}, not a named hardware GPU, so its numbers are not evidence; run on a machine with a GPU, or pass --allow-software (with --out) for a labeled preview`,
+      );
     }
     await page.evaluate(adoptForInteraction, scenario.save);
     const startMinute = await page.evaluate(fastForwardTo, args.startMinute);
@@ -164,10 +237,29 @@ async function runArm(ctx: RunContext, server: PerfServer, arm: Arm, rep: number
     if ((acts.build?.effective ?? 0) === 0) noEffect.push("build (no office placed)");
     if ((acts.panels?.effective ?? 0) === 0) noEffect.push("panels (no dialog opened)");
     const built = acts.build?.effective ?? 0;
-    ctx.log(`perf:interaction: rep ${rep} ${throttle}x ${arm}: start ${Math.floor(startMinute / 60)}:${String(startMinute % 60).padStart(2, "0")}, ${built} offices placed, ${errors.length} page errors, ${record.frameErrors} frame errors${stalled.length ? `, tower stalled in ${stalled.join(", ")}` : ""}`);
-    for (const what of noEffect) ctx.log(`perf:interaction: warning: ${arm} rep ${rep}: ${what}, so that phase measured nothing it names`);
-    for (const phase of missedAutosave) ctx.log(`perf:interaction: warning: ${arm} rep ${rep}: ${phase} did not run exactly one autosave, so it is not comparable with the other arm`);
-    return { arm, rep, throttle, phases, renderer, browserVersion: browser.version(), startMinute, errors: [...errors], frameErrors: record.frameErrors, stalled, noEffect, missedAutosave };
+    ctx.log(
+      `perf:interaction: rep ${rep} ${throttle}x ${arm}: start ${Math.floor(startMinute / 60)}:${String(startMinute % 60).padStart(2, "0")}, ${built} offices placed, ${errors.length} page errors, ${record.frameErrors} frame errors${stalled.length ? `, tower stalled in ${stalled.join(", ")}` : ""}`,
+    );
+    for (const what of noEffect)
+      ctx.log(`perf:interaction: warning: ${arm} rep ${rep}: ${what}, so that phase measured nothing it names`);
+    for (const phase of missedAutosave)
+      ctx.log(
+        `perf:interaction: warning: ${arm} rep ${rep}: ${phase} did not run exactly one autosave, so it is not comparable with the other arm`,
+      );
+    return {
+      arm,
+      rep,
+      throttle,
+      phases,
+      renderer,
+      browserVersion: browser.version(),
+      startMinute,
+      errors: [...errors],
+      frameErrors: record.frameErrors,
+      stalled,
+      noEffect,
+      missedAutosave,
+    };
   } finally {
     await browser.close();
   }
@@ -186,30 +278,50 @@ function buildVersion(dir: string): { version: string | null; sha: string | null
 /** The default results folder: date, both commits, a label, and a counter so a
  *  second run on the same day keeps the first. */
 function defaultOut(repo: string, a: string | null, b: string | null): string {
-  const base = resolve(repo, "docs/performance/results", `${new Date().toISOString().slice(0, 10)}-${a ?? "a"}-vs-${b ?? "b"}-interaction`);
+  const base = resolve(
+    repo,
+    "docs/performance/results",
+    `${new Date().toISOString().slice(0, 10)}-${a ?? "a"}-vs-${b ?? "b"}-interaction`,
+  );
   let out = base;
   for (let n = 2; existsSync(out); n++) out = `${base}-${n}`;
   return out;
 }
 
-export async function main(argv: readonly string[], repo: string, log: (line: string) => void = (l) => process.stdout.write(`${l}\n`)): Promise<number> {
+export async function main(
+  argv: readonly string[],
+  repo: string,
+  log: (line: string) => void = (l) => process.stdout.write(`${l}\n`),
+): Promise<number> {
   const args = parseArgs(argv);
   const launch = browserLaunch(process.env);
   const executablePath = process.env.PW_CHROMIUM_PATH || null;
   const scenario = buildScenarios([args.scenario])[0];
   const dirs: Record<Arm, string> = { A: resolve(repo, args.a), B: resolve(repo, args.b) };
   const versions = { A: buildVersion(dirs.A), B: buildVersion(dirs.B) };
-  log(`perf:interaction: ${browserName(launch.channel, executablePath)}, scenario ${scenario.name} (${scenario.units} units), ${args.reps} reps at ${args.throttles.join(", ")}x, ${args.phaseMs} ms per phase`);
+  log(
+    `perf:interaction: ${browserName(launch.channel, executablePath)}, scenario ${scenario.name} (${scenario.units} units), ${args.reps} reps at ${args.throttles.join(", ")}x, ${args.phaseMs} ms per phase`,
+  );
   const out = args.out ? resolve(repo, args.out) : defaultOut(repo, versions.A.sha, versions.B.sha);
   const servers: Record<Arm, PerfServer> = { A: await startServer(dirs.A), B: await startServer(dirs.B) };
   const ctx: RunContext = { args, scenario, launch, executablePath, log };
   const runs: Run[] = [];
   const isPreview = (): boolean => runs.some((r) => classifyRenderer(r.renderer) !== "hardware");
-  const meta = { date: new Date().toISOString(), machine: { platform: platform(), cpu: cpus()[0]?.model ?? null }, args, scenario: { name: scenario.name, sha256: scenario.sha256, units: scenario.units }, launch, arms: { A: { dir: args.a, ...versions.A }, B: { dir: args.b, ...versions.B } } };
+  const meta = {
+    date: new Date().toISOString(),
+    machine: { platform: platform(), cpu: cpus()[0]?.model ?? null },
+    args,
+    scenario: { name: scenario.name, sha256: scenario.sha256, units: scenario.units },
+    launch,
+    arms: { A: { dir: args.a, ...versions.A }, B: { dir: args.b, ...versions.B } },
+  };
   // The folder appears with the first measured arm, so a run refused at the start leaves nothing behind.
   const save = (): void => {
     mkdirSync(out, { recursive: true });
-    writeFileSync(join(out, "results.json"), `${JSON.stringify({ ...meta, preview: isPreview(), runs, comparisons: compareArms(runs, PHASES) }, null, 2)}\n`);
+    writeFileSync(
+      join(out, "results.json"),
+      `${JSON.stringify({ ...meta, preview: isPreview(), runs, comparisons: compareArms(runs, PHASES) }, null, 2)}\n`,
+    );
   };
   try {
     for (const throttle of args.throttles) {
@@ -226,7 +338,8 @@ export async function main(argv: readonly string[], repo: string, log: (line: st
   }
   const renderers = [...new Set(runs.map((r) => r.renderer ?? "none"))];
   const preview = isPreview();
-  const arm = (k: Arm): string => `${k}: ${versions[k].version ?? "unknown version"} at ${versions[k].sha ?? "unknown commit"} (\`${k === "A" ? args.a : args.b}\`)`;
+  const arm = (k: Arm): string =>
+    `${k}: ${versions[k].version ?? "unknown version"} at ${versions[k].sha ?? "unknown commit"} (\`${k === "A" ? args.a : args.b}\`)`;
   const report = [
     preview
       ? `**Preview of ${meta.date.slice(0, 10)}, not evidence: the renderer is not a named hardware GPU, so render cost dominates every frame.**`
@@ -249,7 +362,12 @@ export async function main(argv: readonly string[], repo: string, log: (line: st
   ].join("\n");
   writeFileSync(join(out, "report.md"), report);
   log(`perf:interaction: wrote ${out}`);
-  const problems = runs.filter((r) => r.errors.length || r.frameErrors || r.stalled.length || r.noEffect.length || r.missedAutosave.length);
-  for (const r of problems) log(`perf:interaction: ${r.arm} rep ${r.rep} at ${r.throttle}x is not clean: ${r.errors.length} page errors, ${r.frameErrors} frame errors, stalled in ${r.stalled.join(", ") || "none"}, took no effect in ${r.noEffect.join(", ") || "none"}, autosave not run once in ${r.missedAutosave.join(", ") || "none"}`);
+  const problems = runs.filter(
+    (r) => r.errors.length || r.frameErrors || r.stalled.length || r.noEffect.length || r.missedAutosave.length,
+  );
+  for (const r of problems)
+    log(
+      `perf:interaction: ${r.arm} rep ${r.rep} at ${r.throttle}x is not clean: ${r.errors.length} page errors, ${r.frameErrors} frame errors, stalled in ${r.stalled.join(", ") || "none"}, took no effect in ${r.noEffect.join(", ") || "none"}, autosave not run once in ${r.missedAutosave.join(", ") || "none"}`,
+    );
   return problems.length ? 1 : 0;
 }

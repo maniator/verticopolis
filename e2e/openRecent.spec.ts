@@ -63,7 +63,9 @@ const generation = (page: Page) => page.evaluate(() => (window as any).game.engi
 const KEEP_NOTED_MS = 20_000;
 
 async function waitForNewTower(page: Page, before: number): Promise<void> {
-  await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, { timeout: 10_000 });
+  await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, {
+    timeout: 10_000,
+  });
 }
 
 test("lists the towers saved last, newest first, opens one by mouse or by its number, and keeps the list after a reload", async () => {

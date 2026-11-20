@@ -51,7 +51,8 @@ export function smallTower(extra: (d: Draft) => void): Draft {
   d.money = 1e8;
   d.star = 3;
   for (let x = 160; x < 280; x++) must(d.build("lobby", 1, x), `lobby at ${x}`);
-  for (const floor of [2, 3]) for (let x = 160; x < 280; x++) must(d.build("floor", floor, x), `floor ${floor} at ${x}`);
+  for (const floor of [2, 3])
+    for (let x = 160; x < 280; x++) must(d.build("floor", floor, x), `floor ${floor} at ${x}`);
   extra(d);
   return d;
 }

@@ -58,7 +58,9 @@ describe("toolInfoTemplate escapes catalog copy as text", () => {
     // The catalog is trusted static copy, but lit hardens it for free (the
     // legacy builder interpolated these raw); this pins that hardening.
     const hostile = `<img src=x onerror="alert(1)">`;
-    const frag = renderToFragment(toolInfoTemplate({ name: hostile, cost: 1, population: 0, description: hostile }, false));
+    const frag = renderToFragment(
+      toolInfoTemplate({ name: hostile, cost: 1, population: 0, description: hostile }, false),
+    );
     expect(frag.querySelector("img")).toBeNull();
     expect(frag.querySelector(".ti-name")!.textContent).toBe(hostile);
     expect(frag.querySelector("p")!.textContent).toBe(hostile);
@@ -97,7 +99,9 @@ describe("the Lobby card's height picker (#308)", () => {
   });
 
   it("shows no picker on another tool's card, or with no picker given", () => {
-    expect(renderToFragment(toolInfoFor(catalogFor("classic"), "office", picker(1))).querySelector(".ti-lobby-height")).toBeNull();
+    expect(
+      renderToFragment(toolInfoFor(catalogFor("classic"), "office", picker(1))).querySelector(".ti-lobby-height"),
+    ).toBeNull();
     expect(renderToFragment(toolInfoFor(catalogFor("classic"), "lobby")).querySelector(".ti-lobby-height")).toBeNull();
   });
 });

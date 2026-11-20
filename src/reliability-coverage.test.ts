@@ -11,7 +11,11 @@ import {
 
 const life = (settled: boolean, attempted: boolean) => ({ settled, attempted });
 const none = { recovered: 0, stopped: 0, reloaded: 0, unknown: 0, trapped: 0 };
-const base = { coverage: { boots: 10, engineSessions: 8, engineNoEnd: 2 }, traps: none, lives: [life(true, true), life(true, true), life(false, true)] };
+const base = {
+  coverage: { boots: 10, engineSessions: 8, engineNoEnd: 2 },
+  traps: none,
+  lives: [life(true, true), life(true, true), life(false, true)],
+};
 const meta = { windowLabel: "last 7 days", truncated: false };
 
 describe("the coverage queries", () => {
@@ -46,8 +50,16 @@ describe("the coverage queries", () => {
 describe("coverageFromRows", () => {
   it("reads a missing or malformed row as zeros", () => {
     expect(coverageFromRows([])).toEqual({ boots: 0, engineSessions: 0, engineNoEnd: 0 });
-    expect(coverageFromRows([{ boots: "x", engine_sessions: -3, engine_no_end: 1.5 }])).toEqual({ boots: 0, engineSessions: 0, engineNoEnd: 0 });
-    expect(coverageFromRows([{ boots: 176, engine_sessions: 104, engine_no_end: 13 }])).toEqual({ boots: 176, engineSessions: 104, engineNoEnd: 13 });
+    expect(coverageFromRows([{ boots: "x", engine_sessions: -3, engine_no_end: 1.5 }])).toEqual({
+      boots: 0,
+      engineSessions: 0,
+      engineNoEnd: 0,
+    });
+    expect(coverageFromRows([{ boots: 176, engine_sessions: 104, engine_no_end: 13 }])).toEqual({
+      boots: 176,
+      engineSessions: 104,
+      engineNoEnd: 13,
+    });
   });
 });
 
@@ -59,7 +71,9 @@ describe("classifyTrap", () => {
     expect(classifyTrap({ later_trap_fallbacks: 0, later_clean_settles: 1, later_settles: 1 })).toBe("recovered");
   });
   it("does not call a session recovered when it trapped and reloaded again", () => {
-    expect(classifyTrap({ later_trap_fallbacks: 0, later_traps: 1, later_clean_settles: 2, later_settles: 2 })).toBe("reloaded");
+    expect(classifyTrap({ later_trap_fallbacks: 0, later_traps: 1, later_clean_settles: 2, later_settles: 2 })).toBe(
+      "reloaded",
+    );
   });
   it("calls a later settle without a clean engine run reloaded, not recovered", () => {
     expect(classifyTrap({ later_trap_fallbacks: 0, later_clean_settles: 0, later_settles: 1 })).toBe("reloaded");
@@ -109,10 +123,20 @@ describe("renderCoverageMarkdown", () => {
   });
 
   it("never prints a bare zero for a count with none, in the coverage table or the outcome table", () => {
-    const empty = renderCoverageMarkdown({ ...base, coverage: { boots: 0, engineSessions: 0, engineNoEnd: 0 }, lives: [] }, meta);
-    const full = renderCoverageMarkdown({ ...base, traps: { trapped: 3, recovered: 0, stopped: 0, reloaded: 0, unknown: 3 } }, meta);
+    const empty = renderCoverageMarkdown(
+      { ...base, coverage: { boots: 0, engineSessions: 0, engineNoEnd: 0 }, lives: [] },
+      meta,
+    );
+    const full = renderCoverageMarkdown(
+      { ...base, traps: { trapped: 3, recovered: 0, stopped: 0, reloaded: 0, unknown: 3 } },
+      meta,
+    );
     for (const text of [empty, full]) {
-      const rows = text.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Check") && !l.startsWith("| Outcome") && !l.startsWith("| ---"));
+      const rows = text
+        .split("\n")
+        .filter(
+          (l) => l.startsWith("| ") && !l.startsWith("| Check") && !l.startsWith("| Outcome") && !l.startsWith("| ---"),
+        );
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.every((l) => !/\| 0 \|$/.test(l))).toBe(true);
     }
@@ -120,7 +144,10 @@ describe("renderCoverageMarkdown", () => {
   });
 
   it("prints the outcome counts as counts of sessions, with unknown not a failure", () => {
-    const text = renderCoverageMarkdown({ ...base, traps: { trapped: 4, recovered: 2, stopped: 1, reloaded: 0, unknown: 1 } }, meta);
+    const text = renderCoverageMarkdown(
+      { ...base, traps: { trapped: 4, recovered: 2, stopped: 1, reloaded: 0, unknown: 1 } },
+      meta,
+    );
     expect(text).toContain("sessions with a `crash-reload` row: 4");
     expect(text).toContain("Counts of sessions, not a rate");
     expect(text).toMatch(/\| Recovered .* \| 2 \|/);

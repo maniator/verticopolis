@@ -39,7 +39,7 @@ export function buildEngineTower(): void {
   for (let x = cx - 1; x >= left; x--) sim.tower.place("lobby", 1, x);
   for (let f = 2; f <= 12; f++) for (let x = left + 4; x < left + 56; x++) sim.tower.place("floor", f, x);
   for (let f = 3; f <= 7; f++)
-    for (let x = left + 10; x + 1 <= left + 55; ) {
+    for (let x = left + 10; x + 1 <= left + 55;) {
       const r = sim.tower.place("office", f, x);
       if (r.ok) {
         const u = sim.tower.getUnit(r.unitId);
@@ -49,14 +49,14 @@ export function buildEngineTower(): void {
       } else x += 1;
     }
   for (let f = 8; f <= 12; f++)
-    for (let x = left + 10; x + 6 <= left + 55; ) {
+    for (let x = left + 10; x + 6 <= left + 55;) {
       const r = sim.tower.place("hotelDouble", f, x);
       if (r.ok) {
         sim.tower.getUnit(r.unitId).state = "asleep";
         x += sim.tower.getUnit(r.unitId).width;
       } else x += 1;
     }
-  for (let x = left + 6; x + 1 <= left + 55; ) {
+  for (let x = left + 6; x + 1 <= left + 55;) {
     const r = sim.tower.place("fastFood", 2, x);
     if (r.ok) {
       sim.tower.getUnit(r.unitId).state = "occupied";
@@ -86,7 +86,7 @@ export function buildCrowdTower(): void {
   for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
   for (let f = 2; f <= 10; f++) for (let x = left + 4; x < left + 46; x++) s.tower.place("floor", f, x);
   for (let f = 3; f <= 9; f++)
-    for (let x = left + 10; x + 1 <= left + 45; ) {
+    for (let x = left + 10; x + 1 <= left + 45;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -124,7 +124,7 @@ export function buildFireTower(): void {
   for (let f = 2; f <= 9; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
   s.tower.placeTransport("elevatorStandard", left + 2, 1, 9);
   const fill = (f: number, kind: string) => {
-    for (let x = left + 6; x + 1 <= right; ) {
+    for (let x = left + 6; x + 1 <= right;) {
       const r = s.tower.place(kind, f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -136,7 +136,9 @@ export function buildFireTower(): void {
   };
   for (let f = 2; f <= 9; f++) fill(f, "office");
   // Ignite a room mid-tower plus its immediate neighbors so the blaze reads.
-  const targets = s.tower.units.filter((u: any) => u.kind === "office" && u.floor === 5).sort((a: any, b: any) => a.x - b.x);
+  const targets = s.tower.units
+    .filter((u: any) => u.kind === "office" && u.floor === 5)
+    .sort((a: any, b: any) => a.x - b.x);
   const mid = targets[Math.floor(targets.length / 2)];
   for (const u of targets) if (Math.abs(u.x - (mid?.x ?? 0)) <= 12) u.state = "fire";
   s.evaluateStar();
@@ -164,7 +166,7 @@ export function buildStatsTower(): void {
   s.tower.placeTransport("elevatorStandard", left + 4, 1, 14);
   s.tower.placeTransport("elevatorStandard", right - 4, 1, 14);
   const fill = (f: number, kind: string, state: string) => {
-    for (let x = left + 8; x + 1 <= right - 4; ) {
+    for (let x = left + 8; x + 1 <= right - 4;) {
       const r = s.tower.place(kind, f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -175,7 +177,7 @@ export function buildStatsTower(): void {
       } else x += 1;
     }
   };
-  for (let x = left + 8; x + 1 <= right - 4; ) {
+  for (let x = left + 8; x + 1 <= right - 4;) {
     const r = s.tower.place("fastFood", 2, x);
     if (r.ok) {
       s.tower.getUnit(r.unitId).state = "occupied";
@@ -187,7 +189,7 @@ export function buildStatsTower(): void {
   // A basement parking run so "Parking demand" has both sides of the ledger.
   for (let x = left; x <= right; x++) s.tower.place("floor", 0, x);
   s.tower.place("parkingRamp", 0, left + 4);
-  for (let x = left + 20; x + 1 <= right; ) {
+  for (let x = left + 20; x + 1 <= right;) {
     const r = s.tower.place("parking", 0, x);
     if (r.ok) x += s.tower.getUnit(r.unitId).width;
     else x += 1;
@@ -205,7 +207,8 @@ export function buildStatsTower(): void {
   const handoff = (window as unknown as { __vcShotHandoff?: () => string }).__vcShotHandoff;
   if (handoff) {
     const state = handoff();
-    if (!state.startsWith("settled") && !state.startsWith("skipped")) throw new Error(`could not settle the tower before the ticks (${state})`);
+    if (!state.startsWith("settled") && !state.startsWith("skipped"))
+      throw new Error(`could not settle the tower before the ticks (${state})`);
     s = g.sim;
   }
   for (let i = 0; i < 90; i++) s.tick(60);
@@ -222,7 +225,9 @@ export function buildStatsTower(): void {
  *  for the traffic meter's top level. */
 export function buildHotspotTower(): void {
   const g = (window as unknown as { game: any }).game;
-  const jamFloors = (window as unknown as { __vcGridlock?: boolean }).__vcGridlock ? [11, 12, 13, 14, 15, 16, 17, 18, 19, 20] : [11, 12, 13];
+  const jamFloors = (window as unknown as { __vcGridlock?: boolean }).__vcGridlock
+    ? [11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    : [11, 12, 13];
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(1);
   const s = g.sim;
@@ -246,7 +251,7 @@ export function buildHotspotTower(): void {
   s.tower.setCars(s.tower.transports[1].id, 1);
   const fill = (f: number, n: number) => {
     let placed = 0;
-    for (let x = 0; x + 1 <= W && placed < n; ) {
+    for (let x = 0; x + 1 <= W && placed < n;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -306,7 +311,7 @@ export function buildOverlayTower(): void {
   // overlay, and the far-right columns left unoccupied so they sit far from a
   // shaft (satisfaction overlay).
   const fill = (f: number, occupy: boolean) => {
-    for (let x = left + 6; x + 1 <= right; ) {
+    for (let x = left + 6; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -331,7 +336,8 @@ export function buildOverlayTower(): void {
   for (const f of [0, -1]) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
   if (!s.tower.place("parkingRamp", 0, left).ok) throw new Error("overlay tower: no room for its parking ramp");
   for (let x = left + 16; x + 4 <= left + 40; x += 4) s.tower.place("parking", 0, x);
-  if (!s.tower.place("recycling", -1, right - 25).ok) throw new Error("overlay tower: no room for its recycling center");
+  if (!s.tower.place("recycling", -1, right - 25).ok)
+    throw new Error("overlay tower: no room for its recycling center");
   s.evaluateStar();
   // Monday 08:00 + a FIXED tick budget so crowd + congestion develop identically
   // every run, then FREEZE so the capture is byte-stable.
@@ -344,7 +350,8 @@ export function buildOverlayTower(): void {
   const handoff = (window as unknown as { __vcShotHandoff?: () => string }).__vcShotHandoff;
   if (handoff) {
     const state = handoff();
-    if (!state.startsWith("settled") && !state.startsWith("skipped")) throw new Error(`could not settle the tower before the ticks (${state})`);
+    if (!state.startsWith("settled") && !state.startsWith("skipped"))
+      throw new Error(`could not settle the tower before the ticks (${state})`);
     s = g.sim;
   }
   for (let i = 0; i < 150; i++) s.tick(1);
@@ -407,7 +414,7 @@ export function buildCleanlinessTower(): void {
   if (hk.ok) s.tower.getUnit(hk.unitId).state = "occupied"; // in service now, skip construction
   // Fill every floor with hotel rooms, guests asleep.
   for (let f = 2; f <= 12; f++) {
-    for (let x = left + 27; x + 1 <= right; ) {
+    for (let x = left + 27; x + 1 <= right;) {
       const r = s.tower.place("hotelDouble", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -453,7 +460,7 @@ export function buildTabletTower(): void {
   s.tower.placeTransport("elevatorStandard", C - 6, 1, 16);
   s.tower.placeTransport("elevatorStandard", C + 6, 1, 16);
   const fill = (f: number, kind: string) => {
-    for (let x = C - 36; x + 1 <= C + 40; ) {
+    for (let x = C - 36; x + 1 <= C + 40;) {
       const r = s.tower.place(kind, f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -473,4 +480,3 @@ export function buildTabletTower(): void {
   g.speed = 1;
   g.engine.paused = false;
 }
-

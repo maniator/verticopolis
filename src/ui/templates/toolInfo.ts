@@ -1,5 +1,10 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import {
+  catalogBuildKind,
+  catalogFacility,
+  catalogTileCost,
+  type Catalog,
+} from "@verticopolis/components/catalog/catalogTypes";
 import { isCommercialKind } from "@verticopolis/components/presentation/viewKinds";
 import { facilityDescription } from "@verticopolis/components/presentation/facilityPresentation";
 import type { FacilityKind } from "@verticopolis/components/shared/types";
@@ -58,7 +63,12 @@ export function toolInfoTemplate(
 export function toolInfoFor(catalog: Catalog, kind: FacilityKind, lobby?: LobbyHeightPicker): TemplateResult {
   // The description is display copy, which the catalog leaves to the UI.
   const f = { ...catalogFacility(catalog, kind), description: facilityDescription(kind, catalog.world) };
-  const card = toolInfoTemplate(f, isCommercialKind(kind), groundFloorCost(catalog, kind), noFloorYetCost(catalog, kind));
+  const card = toolInfoTemplate(
+    f,
+    isCommercialKind(kind),
+    groundFloorCost(catalog, kind),
+    noFloorYetCost(catalog, kind),
+  );
   return kind === "lobby" && lobby ? html`${card}${lobbyHeightTemplate(catalog, lobby)}` : card;
 }
 
@@ -73,7 +83,9 @@ export interface LobbyHeightPicker {
  *  `maxLobbyHeight` stories, which floors may rise (the catalog's
  *  `tallSkyLobbies`), the price per story, and the original's keys. */
 export function lobbyHeightTemplate(catalog: Catalog, lobby: LobbyHeightPicker): TemplateResult {
-  const where = catalog.rules.tallSkyLobbies ? "The ground lobby and sky lobbies can rise." : "Only the ground lobby can rise.";
+  const where = catalog.rules.tallSkyLobbies
+    ? "The ground lobby and sky lobbies can rise."
+    : "Only the ground lobby can rise.";
   const per = groupDigits(catalogFacility(catalog, "lobby").cost);
   return html`<div class="ti-lobby-height" role="group" aria-label="Lobby height">Height: ${lobbyHeightButtons(catalog, lobby)}</div><p style="margin-top:6px;color:var(--muted)">${where} A floor's first lobby sets its height, and it never changes after. Each story costs $${per} a tile. On a keyboard, hold Ctrl for 2 stories or Ctrl+Shift for 3 as you place it.</p>`;
 }

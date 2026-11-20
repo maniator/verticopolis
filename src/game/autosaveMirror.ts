@@ -156,14 +156,20 @@ function beat(now: number, force: boolean): boolean {
  * screen: a failure is counted once per visit as `folder_mirror` `failed`, and
  * the next autosave tries again.
  */
-export async function mirrorAutosave(app: Pick<GameApp, "enginePort" | "engine">, now = Date.now(), force = false, file?: Uint8Array): Promise<boolean> {
+export async function mirrorAutosave(
+  app: Pick<GameApp, "enginePort" | "engine">,
+  now = Date.now(),
+  force = false,
+  file?: Uint8Array,
+): Promise<boolean> {
   const tower = currentFileId();
   if (!readPref().on || tower === null || linkedFolder.state()?.access !== "granted" || !autosaveLive()) return false;
   if (!beat(now, force)) return false;
   copying = true;
   const link = linkedFolder.linkId();
   try {
-    const bytes = file ?? vctowerFileOf((await packSave(saveBytes(app.enginePort, app.engine.viewState(), currentStamp()))).packed);
+    const bytes =
+      file ?? vctowerFileOf((await packSave(saveBytes(app.enginePort, app.engine.viewState(), currentStamp()))).packed);
     // Unlinked or linked again while the save packed: this file was for the
     // folder that was linked then.
     if (link === null || linkedFolder.linkId() !== link || linkedFolder.state()?.access !== "granted") return false;
@@ -171,7 +177,10 @@ export async function mirrorAutosave(app: Pick<GameApp, "enginePort" | "engine">
     const copy = readPref().files[link]?.[tower];
     if (copy !== undefined) await linkedFolder.saveOver(copy, bytes);
     else {
-      const entry = await linkedFolder.saveNew(fileSpace.get(tower)?.name ?? (app.enginePort.towerName() || "Tower"), bytes);
+      const entry = await linkedFolder.saveNew(
+        fileSpace.get(tower)?.name ?? (app.enginePort.towerName() || "Tower"),
+        bytes,
+      );
       if (linkedFolder.linkId() === link) rememberFile(link, tower, entry.id);
     }
     return true;

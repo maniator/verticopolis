@@ -86,7 +86,9 @@ describe.runIf(hasWasmPackage())("the binary .vctower through the engine binding
 
   it("refuses a binary file that was decoded as text", () => {
     const [first] = fixtures;
-    const binary = using(engines().fromVctower(readFileSync(resolve(FIXTURES, first), "utf8")), (e) => e.exportVctowerBytes(VERSION, SAVED_AT)!);
+    const binary = using(engines().fromVctower(readFileSync(resolve(FIXTURES, first), "utf8")), (e) =>
+      e.exportVctowerBytes(VERSION, SAVED_AT)!,
+    );
     expect(() => engines().fromVctower(new TextDecoder().decode(binary))).toThrow();
     expect(() => engines().fromVctowerBytes(binary.subarray(0, 8))).toThrow();
   });

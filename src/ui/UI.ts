@@ -22,11 +22,17 @@ import * as status from "./uiStatus";
 import type { HudSource } from "./uiStatus";
 import { buildPalette } from "./uiPalette";
 import { wireBulletinReadBack } from "./bulletinReadBack";
-import { ModalPrecedence, routeNotice, type ModalOpts, type NoticeKind } from "@verticopolis/components/windows/modalPrecedence";
+import {
+  ModalPrecedence,
+  routeNotice,
+  type ModalOpts,
+  type NoticeKind,
+} from "@verticopolis/components/windows/modalPrecedence";
 import { finishModal } from "@verticopolis/components/windows/uiModal";
 import { isEngineStopped } from "../game/interactionState";
 
-export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" } | { type: "skyBridge" };
+export type Tool =
+  { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" } | { type: "skyBridge" };
 
 export interface UICallbacks {
   /** The live tower's catalog (#921), re-read per call. */
@@ -197,7 +203,11 @@ export class UI {
     this.setAudioGlyph(this.cb.isMuted());
     this.el.audioToggle.addEventListener("click", () => this.cb.onToggleAudio());
     mountToolbarIcons();
-    status.onHistoryClick(this.el.undo, () => this.cb.onUndo(), () => this.cb.undoUnderWay());
+    status.onHistoryClick(
+      this.el.undo,
+      () => this.cb.onUndo(),
+      () => this.cb.undoUnderWay(),
+    );
     status.onHistoryClick(this.el.redo, () => this.cb.onRedo());
 
     // Quick Save is the top-bar 💾 (index.html); null-safe so a trimmed DOM that omits it does not throw.
@@ -263,8 +273,6 @@ export class UI {
       engineStopped: isEngineStopped,
     });
   }
-
-
 
   closeModal(): void {
     const dialog = this.el.modal as HTMLDialogElement;
@@ -426,7 +434,11 @@ export class UI {
     dialogs.showStats(this, body, handlers);
   }
 
-  showScheduleReview(rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): HTMLElement {
+  showScheduleReview(
+    rows: readonly ReviewRow[],
+    handlers: Record<string, () => void> = {},
+    focus?: string,
+  ): HTMLElement {
     return dialogs.showScheduleReview(this, rows, handlers, focus);
   }
 
@@ -445,7 +457,10 @@ export class UI {
     dialogs.confirmModal(this, title, body, onYes, yesLabel);
   }
 
-  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind, startUnbridged: boolean) => void }): void {
+  newTowerModal(opts: {
+    hasSave: boolean;
+    onFound: (mode: GameMode, modernCalendar: CalendarKind, startUnbridged: boolean) => void;
+  }): void {
     dialogs.newTowerModal(this, opts);
   }
 
@@ -459,10 +474,18 @@ export class UI {
 
   /** The guide (the Help site in a new tab), About this game, and the
    *  Classic vs Modern comparison (src/ui/uiHelp.ts). */
-  showHelp(source: GameHelpSource): void { help.showHelp(this, source); }
-  showAbout(): void { help.showAbout(this); }
-  showCompare(): void { help.showCompare(this); }
-  showTowerRules(): void { help.showTowerRules(this); }
+  showHelp(source: GameHelpSource): void {
+    help.showHelp(this, source);
+  }
+  showAbout(): void {
+    help.showAbout(this);
+  }
+  showCompare(): void {
+    help.showCompare(this);
+  }
+  showTowerRules(): void {
+    help.showTowerRules(this);
+  }
 
   showSettings(): void {
     dialogs.showSettings(this);

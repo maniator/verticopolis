@@ -6,7 +6,15 @@ import { canonicalJson, digestText } from "../conformance/canonical";
 import { GOLDEN_SPEEDS } from "./goldenSpeeds";
 import { FRAME_TIMES_MS, freshDumpDir, startTower, type FrameDayStart } from "./frameDays";
 import { crowdProblem, midRouteAvoiding, shaftsBetween, walkingTo, type CrowdView } from "./portEditCrowd";
-import { answerNumber, outcomeOf, STATUS_SLOT, type AnswerValue, type LineKind, type Outcome, type PortEditLine } from "./portEditLines";
+import {
+  answerNumber,
+  outcomeOf,
+  STATUS_SLOT,
+  type AnswerValue,
+  type LineKind,
+  type Outcome,
+  type PortEditLine,
+} from "./portEditLines";
 
 /**
  * The port-edit golden: the player's edits the dual run mirrored
@@ -167,12 +175,20 @@ export class PortEditSession {
   }
 
   /** Send a command that must land, and record its answer. */
-  done<K extends CommandOp>(step: string, op: K, ...args: Parameters<EnginePortCommands[K]>): Record<string, number | string> {
+  done<K extends CommandOp>(
+    step: string,
+    op: K,
+    ...args: Parameters<EnginePortCommands[K]>
+  ): Record<string, number | string> {
     return this.command("done", step, op, args);
   }
 
   /** Send a command that must be refused, and record its answer. */
-  refused<K extends CommandOp>(step: string, op: K, ...args: Parameters<EnginePortCommands[K]>): Record<string, number | string> {
+  refused<K extends CommandOp>(
+    step: string,
+    op: K,
+    ...args: Parameters<EnginePortCommands[K]>
+  ): Record<string, number | string> {
     return this.command("refused", step, op, args);
   }
 
@@ -234,16 +250,19 @@ export class PortEditSession {
     const statusAt = fields.indexOf(STATUS_SLOT);
     if (statusAt < 0) throw new Error(`${this.caseId}: ${op}'s record has no ${STATUS_SLOT} slot`);
     const reason = this.port.lastReason();
-    if (rec.length !== fields.length) throw new Error(`${this.caseId}: ${step}: ${op} answered ${rec.length} slots, the layout names ${fields.length}`);
+    if (rec.length !== fields.length)
+      throw new Error(`${this.caseId}: ${step}: ${op} answered ${rec.length} slots, the layout names ${fields.length}`);
     const answer: Record<string, number | string> = {};
     fields.forEach((name, i) => {
       if (name !== GENERATION) answer[name] = answerNumber(rec[i]);
     });
     for (const [key, text] of Object.entries({ reason, ...extra })) {
-      if (key in answer) throw new Error(`${this.caseId}: ${op}'s record has a slot named ${key}, which the answer's text would hide`);
+      if (key in answer)
+        throw new Error(`${this.caseId}: ${op}'s record has a slot named ${key}, which the answer's text would hide`);
       if (text !== undefined) answer[key] = text;
     }
-    if (outcomeOf(rec[statusAt]) !== want) throw new Error(`${this.caseId}: ${step}: the script says ${want}, the engine answered ${canonicalJson(answer)}`);
+    if (outcomeOf(rec[statusAt]) !== want)
+      throw new Error(`${this.caseId}: ${step}: the script says ${want}, the engine answered ${canonicalJson(answer)}`);
     this.line(step, kind, answer);
     return answer;
   }
@@ -285,7 +304,8 @@ export class PortEditSession {
   /** The shafts on the routes of the people who set out after the mark
    *  and ride at least one shaft. Throws as `shaftsBetween` does. */
   ridersSince(since: PeopleMark): number[][] {
-    if (this.port.generation() !== since.generation) throw new Error(`${this.caseId}: a swap since the mark can start the crowd's ids again`);
+    if (this.port.generation() !== since.generation)
+      throw new Error(`${this.caseId}: a swap since the mark can start the crowd's ids again`);
     return this.crowd()
       .people.filter((p) => p.id >= since.nextId && p.shafts.length > 0)
       .map((p) => [...p.shafts]);
@@ -305,9 +325,13 @@ export class PortEditSession {
    *  people who set out after the mark. A swap since it throws, as the
    *  ids can start again. */
   shaftsBetween(a: number, b: number, since: PeopleMark): number[] {
-    if (this.port.generation() !== since.generation) throw new Error(`${this.caseId}: a swap since the mark can start the crowd's ids again`);
+    if (this.port.generation() !== since.generation)
+      throw new Error(`${this.caseId}: a swap since the mark can start the crowd's ids again`);
     const view = this.crowd();
-    if (view.nextId < since.nextId) throw new Error(`${this.caseId}: the crowd's next person id went from ${since.nextId} to ${view.nextId} with no swap`);
+    if (view.nextId < since.nextId)
+      throw new Error(
+        `${this.caseId}: the crowd's next person id went from ${since.nextId} to ${view.nextId} with no swap`,
+      );
     return shaftsBetween(view, a, b, since.nextId);
   }
 
@@ -347,7 +371,8 @@ export class PortEditSession {
     let found: SavedUnit | undefined;
     for (const u of this.save().units) {
       if (STRUCTURE_KINDS.has(u.kind)) continue;
-      if (typeof u.width !== "number" || !Number.isFinite(u.width)) throw new Error(`${this.caseId}: the ${u.kind} with id ${u.id} has no width`);
+      if (typeof u.width !== "number" || !Number.isFinite(u.width))
+        throw new Error(`${this.caseId}: the ${u.kind} with id ${u.id} has no width`);
       if (!found && u.floor === floor && x >= u.x && x < u.x + u.width) found = u;
     }
     return found;
@@ -411,7 +436,8 @@ export class PortEditSession {
 
   /** `play`'s frames; `onMove` runs after each frame that moves the clock. */
   private playFrames(minutes: number, onMove?: () => void): void {
-    if (!(Number.isFinite(minutes) && minutes > 0)) throw new Error(`${this.caseId}: play needs a positive number of minutes, and got ${minutes}`);
+    if (!(Number.isFinite(minutes) && minutes > 0))
+      throw new Error(`${this.caseId}: play needs a positive number of minutes, and got ${minutes}`);
     const mps = GOLDEN_SPEEDS[PLAY_SPEED];
     const step = `play ${minutes} minutes`;
     const from = this.minute();
@@ -421,19 +447,28 @@ export class PortEditSession {
     let still = 0;
     let lastWasLine = false;
     while (now < from + minutes) {
-      [, this.owed] = this.port.advance(this.owed, FRAME_TIMES_MS[frames % FRAME_TIMES_MS.length], mps, STEADY_CLOCK_OFF, STEP_OWED_MINUTES);
+      [, this.owed] = this.port.advance(
+        this.owed,
+        FRAME_TIMES_MS[frames % FRAME_TIMES_MS.length],
+        mps,
+        STEADY_CLOCK_OFF,
+        STEP_OWED_MINUTES,
+      );
       frames++;
       this.drain(this.batch);
       const before = now;
       now = this.minute();
-      if (typeof this.port.pendingChoice() === "string") throw new Error(`${this.caseId}: a choice opened at minute ${now}; the golden plays no choices`);
+      if (typeof this.port.pendingChoice() === "string")
+        throw new Error(`${this.caseId}: a choice opened at minute ${now}; the golden plays no choices`);
       if (!(now >= before)) throw new Error(`${this.caseId}: the clock went from minute ${before} to ${now}`);
       still = now === before ? still + 1 : 0;
-      if (still > MAX_STILL_FRAMES) throw new Error(`${this.caseId}: the clock stood still for ${still} frames at minute ${now}`);
+      if (still > MAX_STILL_FRAMES)
+        throw new Error(`${this.caseId}: the clock stood still for ${still} frames at minute ${now}`);
       const nowHour = Math.floor(now / 60);
       // The catch-up cap keeps a frame inside one hour boundary; two would
       // merge two hours into one line.
-      if (nowHour > hour + 1) throw new Error(`${this.caseId}: one frame crossed ${nowHour - hour} hours at minute ${now}`);
+      if (nowHour > hour + 1)
+        throw new Error(`${this.caseId}: one frame crossed ${nowHour - hour} hours at minute ${now}`);
       const first = !this.played;
       this.played = true;
       lastWasLine = first || nowHour !== hour;
@@ -462,9 +497,21 @@ export class PortEditSession {
     const crowd = this.leg.crowdView();
     if (this.dumpTo !== undefined) {
       const file = resolve(this.dumpTo, `${String(this.lines.length).padStart(3, "0")}.json`);
-      writeFileSync(file, `${JSON.stringify({ step, kind, answer, minute, state: JSON.parse(state), crowd: JSON.parse(crowd), events: this.batch }, null, 1)}\n`);
+      writeFileSync(
+        file,
+        `${JSON.stringify({ step, kind, answer, minute, state: JSON.parse(state), crowd: JSON.parse(crowd), events: this.batch }, null, 1)}\n`,
+      );
     }
-    this.lines.push({ step, kind, answer, minute, state: digestText(state), crowd: digestText(crowd), events: digestText(canonicalJson(this.batch)), count: this.batch.length });
+    this.lines.push({
+      step,
+      kind,
+      answer,
+      minute,
+      state: digestText(state),
+      crowd: digestText(crowd),
+      events: digestText(canonicalJson(this.batch)),
+      count: this.batch.length,
+    });
     this.batch = [];
   }
 }

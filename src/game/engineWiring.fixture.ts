@@ -34,7 +34,11 @@ export function makeApp(toolOver: Record<string, unknown> = {}) {
   const engine: FakeEngine = {};
   const canvas = document.createElement("canvas");
   // A drag latch (generation) and a shaft quote; the real answers: shaftPreview.integration.test.ts.
-  const enginePort = mockPort({ generation: () => 1, quoteShaft: () => record("quoteShaft", { ok: 1 }), lastReason: () => undefined });
+  const enginePort = mockPort({
+    generation: () => 1,
+    quoteShaft: () => record("quoteShaft", { ok: 1 }),
+    lastReason: () => undefined,
+  });
   const portCodes = new PortCodes(mockPort());
   const reader = { unlocked: vi.fn(() => true), header: { mode: "classic" } };
   const app = {

@@ -74,7 +74,13 @@ export function originalVersion(id: string, at: number, size: number): TowerVers
  * one when none is newer than {@link VERSION_GAP_MS} before it, and the oldest
  * goes once more than {@link VERSIONS_KEPT} are kept. The original stays.
  */
-export function planVersions(list: readonly TowerVersion[], id: string, at: number, size: number, manual: boolean): VersionPlan {
+export function planVersions(
+  list: readonly TowerVersion[],
+  id: string,
+  at: number,
+  size: number,
+  manual: boolean,
+): VersionPlan {
   const original = list.filter((v) => v.original);
   const timed = list.filter((v) => !v.manual && !v.original).sort((a, b) => a.at - b.at);
   let byHand = list.find((v) => v.manual) ?? null;

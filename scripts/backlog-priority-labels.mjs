@@ -38,8 +38,7 @@ import { dirname, resolve } from "node:path";
 export const PRIORITY_LABELS = ["P1", "P2", "P3"];
 export const TRIAGE_LABEL = "needs-triage";
 
-const HEADER =
-  "| Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |";
+const HEADER = "| Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |";
 
 /** Issue number to the priority its row records. Rows without a `#N` in the GH
  *  column (finished rows carry `—`) are skipped, and so are rows citing
@@ -54,8 +53,7 @@ export function parseBacklogPriorities(markdown) {
   const priorities = new Map();
   const errors = [];
   const conflicted = new Set();
-  if (start < 0)
-    return { priorities, errors: ["curated-table header not found"] };
+  if (start < 0) return { priorities, errors: ["curated-table header not found"] };
   for (let i = start + 2; i < lines.length && lines[i].trim() !== ""; i++) {
     const cells = lines[i].split(/(?<!\\)\|/).map((c) => c.trim());
     const gh = /^#(\d+)$/.exec(cells[3] ?? "");
@@ -63,9 +61,7 @@ export function parseBacklogPriorities(markdown) {
     const issue = Number(gh[1]);
     const priority = cells[6];
     if (!PRIORITY_LABELS.includes(priority)) {
-      errors.push(
-        `#${issue}: priority ${JSON.stringify(priority)} is not P1, P2 or P3`,
-      );
+      errors.push(`#${issue}: priority ${JSON.stringify(priority)} is not P1, P2 or P3`);
       // Hold the issue back, as for rows that disagree.
       priorities.delete(issue);
       conflicted.add(issue);
@@ -93,10 +89,7 @@ export function planLabelChanges(priorities, openIssues) {
     const labels = openIssues.get(issue);
     if (!labels) continue;
     const add = labels.includes(want) ? null : want;
-    const remove = [
-      ...PRIORITY_LABELS.filter((p) => p !== want),
-      TRIAGE_LABEL,
-    ].filter((l) => labels.includes(l));
+    const remove = [...PRIORITY_LABELS.filter((p) => p !== want), TRIAGE_LABEL].filter((l) => labels.includes(l));
     if (add || remove.length) plan.push({ issue, add, remove });
   }
   return plan;
@@ -104,17 +97,14 @@ export function planLabelChanges(priorities, openIssues) {
 
 /** Row-cited issues that are not open, so the rows can be trued up. */
 export function citedButNotOpen(priorities, openIssues) {
-  return [...priorities.keys()]
-    .filter((n) => !openIssues.has(n))
-    .sort((a, b) => a - b);
+  return [...priorities.keys()].filter((n) => !openIssues.has(n)).sort((a, b) => a - b);
 }
 
 /** What gh prints when GitHub refuses a call because of a rate limit: the
  *  primary and secondary limit messages, a bare 429 (`gh api` ends each error
  *  with the HTTP status), and the GraphQL wording for mutations sent too fast.
  *  gh passes GitHub's own message through, so this follows GitHub's wording. */
-const RATE_LIMITED =
-  /rate limit|HTTP 429|submitted too quickly|abuse detection/i;
+const RATE_LIMITED = /rate limit|HTTP 429|submitted too quickly|abuse detection/i;
 
 /** Runs the GitHub CLI and resolves to its stdout. `gh` brings the auth
  *  (`GH_TOKEN` in the workflow, a `gh auth login` session locally), the
@@ -125,26 +115,21 @@ const RATE_LIMITED =
 export function ghCli() {
   return (args) =>
     new Promise((resolvePromise, reject) => {
-      execFile(
-        "gh",
-        args,
-        { maxBuffer: 64 * 1024 * 1024, timeout: 60_000 },
-        (err, stdout, stderr) => {
-          if (!err) return resolvePromise(stdout);
-          const why =
-            err.code === "ENOENT"
-              ? "the gh CLI is not on PATH; install it from https://cli.github.com"
-              : err.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
-                ? "printed more output than expected"
-                : err.killed
-                  ? `timed out after a minute${args[0] === "api" ? " (the write may still have landed; the next run checks)" : ""}`
-                  : String(stderr).trim() || err.message;
-          const what = args.filter((a) => !a.startsWith("-")).slice(0, 3);
-          const e = new Error(`gh ${what.join(" ")}: ${why}`);
-          e.rateLimited = RATE_LIMITED.test(why);
-          reject(e);
-        },
-      );
+      execFile("gh", args, { maxBuffer: 64 * 1024 * 1024, timeout: 60_000 }, (err, stdout, stderr) => {
+        if (!err) return resolvePromise(stdout);
+        const why =
+          err.code === "ENOENT"
+            ? "the gh CLI is not on PATH; install it from https://cli.github.com"
+            : err.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
+              ? "printed more output than expected"
+              : err.killed
+                ? `timed out after a minute${args[0] === "api" ? " (the write may still have landed; the next run checks)" : ""}`
+                : String(stderr).trim() || err.message;
+        const what = args.filter((a) => !a.startsWith("-")).slice(0, 3);
+        const e = new Error(`gh ${what.join(" ")}: ${why}`);
+        e.rateLimited = RATE_LIMITED.test(why);
+        reject(e);
+      });
     });
 }
 
@@ -155,25 +140,14 @@ const LIST_LIMIT = 10_000;
 async function ghList(gh, args) {
   const items = JSON.parse(await gh([...args, "--limit", String(LIST_LIMIT)]));
   if (items.length >= LIST_LIMIT)
-    throw new Error(
-      `gh ${args.slice(0, 2).join(" ")} returned ${items.length} items, the --limit; raise LIST_LIMIT`,
-    );
+    throw new Error(`gh ${args.slice(0, 2).join(" ")} returned ${items.length} items, the --limit; raise LIST_LIMIT`);
   return items;
 }
 
 /** Open issues to their label names. `gh issue list` returns issues only,
  *  never pull requests. */
 async function openIssueLabels(gh, repo) {
-  const issues = await ghList(gh, [
-    "issue",
-    "list",
-    "--repo",
-    repo,
-    "--state",
-    "open",
-    "--json",
-    "number,labels",
-  ]);
+  const issues = await ghList(gh, ["issue", "list", "--repo", repo, "--state", "open", "--json", "number,labels"]);
   return new Map(issues.map((i) => [i.number, i.labels.map((l) => l.name)]));
 }
 
@@ -197,8 +171,7 @@ export async function run({
   const { priorities, errors } = parseBacklogPriorities(markdown);
   for (const e of errors) log(`error: ${e}`);
   if (priorities.size === 0) {
-    if (errors.length === 0)
-      log("no open backlog row cites an issue; nothing to sync");
+    if (errors.length === 0) log("no open backlog row cites an issue; nothing to sync");
     return { ok: errors.length === 0, plan: [], failures: [], errors, stale: [] };
   }
   const stop = (why) => {
@@ -209,9 +182,7 @@ export async function run({
   // fail every issue one by one. Check once and stop with a clear reason.
   let missing;
   try {
-    const labels = (
-      await ghList(gh, ["label", "list", "--repo", repo, "--json", "name"])
-    ).map((l) => l.name);
+    const labels = (await ghList(gh, ["label", "list", "--repo", repo, "--json", "name"])).map((l) => l.name);
     missing = PRIORITY_LABELS.filter((p) => !labels.includes(p));
   } catch (err) {
     return stop(`could not list labels: ${message(err)}`);
@@ -233,9 +204,7 @@ export async function run({
       `::error::backlog rows cite numbers that are not open issues (closed, or a pull request); true the rows up: ${stale.map((n) => `#${n}`).join(" ")}`,
     );
   const plan = planLabelChanges(priorities, open);
-  log(
-    `${priorities.size} row-cited issues, ${plan.length} to relabel${dryRun ? " (dry run)" : ""}`,
-  );
+  log(`${priorities.size} row-cited issues, ${plan.length} to relabel${dryRun ? " (dry run)" : ""}`);
   const failures = [];
   // Writes go through `gh api` to the REST endpoints: one request per label,
   // where `gh issue edit` spends several GraphQL requests on each edit and
@@ -257,38 +226,20 @@ export async function run({
   };
   const labelsPath = (issue) => `repos/${repo}/issues/${issue}/labels`;
   for (const c of plan) {
-    log(
-      `#${c.issue}: ${[c.add && `+${c.add}`, ...c.remove.map((l) => `-${l}`)].filter(Boolean).join(" ")}`,
-    );
+    log(`#${c.issue}: ${[c.add && `+${c.add}`, ...c.remove.map((l) => `-${l}`)].filter(Boolean).join(" ")}`);
     if (dryRun) continue;
     try {
       // Add first, so a failure partway leaves an extra label for the next run
       // to clear, never an issue with no P label at all.
-      if (c.add)
-        await write([
-          "api",
-          "--method",
-          "POST",
-          labelsPath(c.issue),
-          "--silent",
-          "-f",
-          `labels[]=${c.add}`,
-        ]);
+      if (c.add) await write(["api", "--method", "POST", labelsPath(c.issue), "--silent", "-f", `labels[]=${c.add}`]);
       for (const l of c.remove) {
         try {
-          await write([
-            "api",
-            "--method",
-            "DELETE",
-            `${labelsPath(c.issue)}/${encodeURIComponent(l)}`,
-            "--silent",
-          ]);
+          await write(["api", "--method", "DELETE", `${labelsPath(c.issue)}/${encodeURIComponent(l)}`, "--silent"]);
         } catch (err) {
           // The label is already off the issue: the state we want. `gh api`
           // prints GitHub's message and the status; any other 404 (a missing
           // issue, lost access) stays a failure.
-          if (!/Label does not exist \(HTTP 404\)/.test(message(err)))
-            throw err;
+          if (!/Label does not exist \(HTTP 404\)/.test(message(err))) throw err;
         }
       }
     } catch (err) {
@@ -297,9 +248,7 @@ export async function run({
       if (err?.rateLimited) {
         const skipped = plan.slice(plan.indexOf(c) + 1).map((x) => x.issue);
         failures.push(...skipped);
-        log(
-          `error: rate limited; stopping, the next run picks up ${skipped.length} skipped issue(s)`,
-        );
+        log(`error: rate limited; stopping, the next run picks up ${skipped.length} skipped issue(s)`);
         break;
       }
     }
@@ -318,9 +267,7 @@ async function main() {
   // The backlog's issue numbers belong to this repository, so a local run
   // targets it whatever checkout, fork or codespace the shell is in. Only an
   // Actions run reads GITHUB_REPOSITORY, which the job guards to this repo.
-  const repo =
-    (process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_REPOSITORY) ||
-    "Verticopolis/web";
+  const repo = (process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_REPOSITORY) || "Verticopolis/web";
   const backlog = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "../_bmad-output/implementation-artifacts/backlog.md",
@@ -336,10 +283,7 @@ async function main() {
   if (!result.ok || result.stale.length) process.exit(1);
 }
 
-if (
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((err) => {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);

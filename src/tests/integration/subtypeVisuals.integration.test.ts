@@ -3,7 +3,16 @@ import { LOT_WIDTH, newSeededDraft } from "../portKit/draftFixtures";
 import type { Draft } from "../portKit/drafts";
 import { catalogFor } from "../catalogFixture";
 import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
-import { AMUSEMENTS_LOOKS, BOUTIQUE_LOOKS, CLINIC_LOOKS, FASTFOOD_LOOKS, FITNESS_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "@verticopolis/components/render/pixelSprites";
+import {
+  AMUSEMENTS_LOOKS,
+  BOUTIQUE_LOOKS,
+  CLINIC_LOOKS,
+  FASTFOOD_LOOKS,
+  FITNESS_LOOKS,
+  FOODHALL_LOOKS,
+  RESTAURANT_LOOKS,
+  SHOP_LOOKS,
+} from "@verticopolis/components/render/pixelSprites";
 import { buildTDT, describeWithCodec, parseTDT } from "../conformance/tdtWasm";
 import type { FacilityKind } from "@verticopolis/components/shared/types";
 

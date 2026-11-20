@@ -37,7 +37,14 @@ const isIntegerList = (list: unknown): list is number[] => Array.isArray(list) &
 export function isCrowdPerson(entry: unknown): entry is CrowdPerson {
   if (typeof entry !== "object" || entry === null) return false;
   const { id, floors, shafts, leg, state } = entry as Record<string, unknown>;
-  if (!isInteger(id) || !isIntegerList(floors) || !isIntegerList(shafts) || !isInteger(leg) || typeof state !== "string") return false;
+  if (
+    !isInteger(id) ||
+    !isIntegerList(floors) ||
+    !isIntegerList(shafts) ||
+    !isInteger(leg) ||
+    typeof state !== "string"
+  )
+    return false;
   const routed = floors.length === shafts.length + 1 || (floors.length === 0 && shafts.length === 0);
   return routed && leg >= 0 && leg <= shafts.length;
 }
@@ -63,7 +70,9 @@ export function crowdProblem(view: unknown): string | undefined {
 
 /** The ids of the people walking to the shaft their current leg takes. */
 export function walkingTo(view: CrowdView, shaftId: number): number[] {
-  return view.people.filter((p) => p.state === WALKING_TO_SHAFT && p.leg < p.shafts.length && p.shafts[p.leg] === shaftId).map((p) => p.id);
+  return view.people
+    .filter((p) => p.state === WALKING_TO_SHAFT && p.leg < p.shafts.length && p.shafts[p.leg] === shaftId)
+    .map((p) => p.id);
 }
 
 /** The legs of a person's route still ahead, counting the one they are on. */
@@ -84,5 +93,7 @@ export function midRouteAvoiding(view: CrowdView, shaftId: number): number[] {
  *  people whose id is at least `sinceId`. */
 export function shaftsBetween(view: CrowdView, a: number, b: number, sinceId: number): number[] {
   const joins = (from: number, to: number): boolean => (from === a && to === b) || (from === b && to === a);
-  return view.people.filter((p) => p.id >= sinceId).flatMap((p) => p.shafts.filter((_, i) => joins(p.floors[i], p.floors[i + 1])));
+  return view.people
+    .filter((p) => p.id >= sinceId)
+    .flatMap((p) => p.shafts.filter((_, i) => joins(p.floors[i], p.floors[i + 1])));
 }

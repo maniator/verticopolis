@@ -51,7 +51,9 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       const officeUnit = mustFind(reader.tower.units, (u) => u.kind === "office" && u.floor === 2);
       expect(reader.tower.unitAt(2, mid - 4)?.id).toBe(officeUnit.id);
 
-      for (const floor of [2, 3]) for (let x = mid + 5; x < mid + 16; x++) must(s, (p) => p.buildAt(kind("floor"), floor, x), `floor ${floor} at ${x}`);
+      for (const floor of [2, 3])
+        for (let x = mid + 5; x < mid + 16; x++)
+          must(s, (p) => p.buildAt(kind("floor"), floor, x), `floor ${floor} at ${x}`);
       expect(reader.tower.structureKindAt(3, mid + 8)).toBe("floor");
 
       must(s, (p) => p.buildShaft(kind("elevatorStandard"), mid + 8, 1, 2), "shaft");
@@ -93,7 +95,9 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
     it("carries each command's arguments to the engine, as its save and events show", () => {
       const s = subject(make);
       const mid = lobbyCenter(s);
-      for (const floor of [2, 3]) for (let x = mid + 5; x < mid + 16; x++) must(s, (p) => p.buildAt(kind("floor"), floor, x), `floor ${floor} at ${x}`);
+      for (const floor of [2, 3])
+        for (let x = mid + 5; x < mid + 16; x++)
+          must(s, (p) => p.buildAt(kind("floor"), floor, x), `floor ${floor} at ${x}`);
       must(s, (p) => p.buildShaft(kind("elevatorStandard"), mid + 8, 1, 3), "shaft");
       const shaft = mustFind(s.reader.tower.transports, (t) => t.kind === "elevatorStandard").id;
       const savedShaft = () => mustFind(saved(s).transports, (t) => t.id === shaft);
@@ -117,7 +121,11 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       must(s, (p) => p.demolish(offices[0].id, true), "bulldoze");
       must(s, (p) => p.demolish(offices[1].id, false), "sell");
       s.port.tick(1);
-      expect(drain(s.port).filter((e) => e.name === "facility_removed").map((e) => e.payload)).toEqual([
+      expect(
+        drain(s.port)
+          .filter((e) => e.name === "facility_removed")
+          .map((e) => e.payload),
+      ).toEqual([
         { kind: "office", method: "bulldoze" },
         { kind: "office", method: "sell" },
       ]);
@@ -129,8 +137,15 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       const mid = lobbyCenter(s);
       // Bridging off (a Modern tower's choice), so the gap at `mid + 10`
       // stays open until the case builds it.
-      expect(slot("chooseAutoBridge", must(s, (p) => p.chooseAutoBridge(false), "bridging off"), "value")).toBe(0);
-      for (let x = mid + 5; x < mid + 16; x++) if (x !== mid + 10) must(s, (p) => p.buildAt(kind("floor"), 2, x), `floor at ${x}`);
+      expect(
+        slot(
+          "chooseAutoBridge",
+          must(s, (p) => p.chooseAutoBridge(false), "bridging off"),
+          "value",
+        ),
+      ).toBe(0);
+      for (let x = mid + 5; x < mid + 16; x++)
+        if (x !== mid + 10) must(s, (p) => p.buildAt(kind("floor"), 2, x), `floor at ${x}`);
       expect(runsOn(reader, 2)).toEqual([
         ["floor", mid + 5, 1, 5],
         ["floor", mid + 11, 1, 5],
@@ -148,7 +163,9 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       s.port.tick(1);
       must(s, (p) => p.labelUnit(office, "Kept"), "a label");
       expect(reader.header.revision, "a tick and a label move no revision").toBe(revision);
-      expect(reader.rooms === rooms && reader.structure === structure, "the same arrays while the revision holds").toBe(true);
+      expect(reader.rooms === rooms && reader.structure === structure, "the same arrays while the revision holds").toBe(
+        true,
+      );
       expect(mustFind(reader.rooms, (u) => u.id === office).label, "a kept entry reads current").toBe("Kept");
 
       must(s, (p) => p.buildAt(kind("floor"), 2, mid + 10), "the gap");
@@ -195,7 +212,11 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       must(s, (p) => p.buildAt(kind("office"), 2, mid - 4), "office on 2");
       must(s, (p) => p.buildAt(kind("office"), 3, mid - 4), "office on 3");
       s.port.tick(1);
-      expect(drain(s.port).filter((e) => e.name === "facility_placed").map((e) => e.payload)).toEqual([
+      expect(
+        drain(s.port)
+          .filter((e) => e.name === "facility_placed")
+          .map((e) => e.payload),
+      ).toEqual([
         { kind: "office", floor: 2, count: 1 },
         { kind: "office", floor: 3, count: 1 },
       ]);
@@ -230,9 +251,21 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       expect(delta(must(s, (p) => p.markStop(t.shaft, 3, false), "skip an endpoint"))).toBe(0);
       expect(s.port.serialize()).toBe(unskipped);
 
-      expect(slot("flipAutoBridge", must(s, (p) => p.flipAutoBridge(), "bridging flipped"), "value")).toBe(0);
+      expect(
+        slot(
+          "flipAutoBridge",
+          must(s, (p) => p.flipAutoBridge(), "bridging flipped"),
+          "value",
+        ),
+      ).toBe(0);
       expect(saved(s).autoBridge).toBe(false);
-      expect(slot("chooseAutoBridge", must(s, (p) => p.chooseAutoBridge(true), "bridging on"), "value")).toBe(1);
+      expect(
+        slot(
+          "chooseAutoBridge",
+          must(s, (p) => p.chooseAutoBridge(true), "bridging on"),
+          "value",
+        ),
+      ).toBe(1);
       expect(saved(s).autoBridge ?? true).toBe(true);
 
       must(s, (p) => p.nameTower("Contract Tower"), "a name");
@@ -353,15 +386,25 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       // Without bridging, a basement tile must touch the tower (a Modern
       // ground lobby may stand apart, a basement may not): each pass lays
       // the one tile next to the last, so three passes lay all three.
-      const basement = run(brushed, (p) => p.paintTiles(kind("floor"), 0, Float64Array.of(right + 1, right, right - 1)), "the basement brush");
+      const basement = run(
+        brushed,
+        (p) => p.paintTiles(kind("floor"), 0, Float64Array.of(right + 1, right, right - 1)),
+        "the basement brush",
+      );
       const passes = [right + 1, right, right - 1, right + 1, right, right + 1];
       const builds = passes.map((x) => run(oneByOne, (p) => p.buildAt(kind("floor"), 0, x), `basement at ${x}`));
       expect(builds.map(done)).toEqual([false, false, true, false, true, true]);
       expect([done(basement), slot("paintTiles", basement, "placed")]).toEqual([true, 3]);
       expect(delta(basement)).toBe(builds.reduce((sum, b) => sum + delta(b), 0));
 
-      const floor = must(brushed, (p) => p.paintTiles(kind("floor"), 2, Float64Array.of(right - 1, right - 1, right - 2)), "the floor brush");
-      const single = [right - 1, right - 2].map((x) => must(oneByOne, (p) => p.buildAt(kind("floor"), 2, x), `floor at ${x}`));
+      const floor = must(
+        brushed,
+        (p) => p.paintTiles(kind("floor"), 2, Float64Array.of(right - 1, right - 1, right - 2)),
+        "the floor brush",
+      );
+      const single = [right - 1, right - 2].map((x) =>
+        must(oneByOne, (p) => p.buildAt(kind("floor"), 2, x), `floor at ${x}`),
+      );
       expect([slot("paintTiles", floor, "placed"), delta(floor)]).toEqual([2, delta(single[0]) + delta(single[1])]);
       expect(drain(brushed.port)).toEqual(drain(oneByOne.port));
       expect(brushed.port.serialize()).toBe(oneByOne.port.serialize());
@@ -375,14 +418,27 @@ export function describeEngineContract(name: string, make: MakeEngine): void {
       const right = lobbyRight(brushed, lobbyCenter(brushed));
       const column = Float64Array.of(right - 4, right - 3, right - 2, right - 1);
       for (const s of [brushed, oneByOne]) {
-        for (let floor = 2; floor <= 15; floor++) expect(slot("paintTiles", must(s, (p) => p.paintTiles(kind("floor"), floor, column), `floor ${floor}`), "placed")).toBe(4);
+        for (let floor = 2; floor <= 15; floor++)
+          expect(
+            slot(
+              "paintTiles",
+              must(s, (p) => p.paintTiles(kind("floor"), floor, column), `floor ${floor}`),
+              "placed",
+            ),
+          ).toBe(4);
         drain(s.port);
       }
       // Two tiles of plain floor, then one with nothing under it, refused on
       // both passes.
       const tiles = [right - 2, right - 4, right];
-      const lobby = run(brushed, (p) => p.paintTiles(kind("lobby"), 15, Float64Array.from(tiles)), "the sky lobby brush");
-      const builds = [...tiles, right].map((x) => run(oneByOne, (p) => p.buildAt(kind("lobby"), 15, x), `lobby at ${x}`));
+      const lobby = run(
+        brushed,
+        (p) => p.paintTiles(kind("lobby"), 15, Float64Array.from(tiles)),
+        "the sky lobby brush",
+      );
+      const builds = [...tiles, right].map((x) =>
+        run(oneByOne, (p) => p.buildAt(kind("lobby"), 15, x), `lobby at ${x}`),
+      );
       expect(builds.map(done)).toEqual([true, true, false, false]);
       expect([done(lobby), slot("paintTiles", lobby, "placed")]).toEqual([true, 2]);
       expect(delta(lobby)).toBe(builds.reduce((sum, b) => sum + delta(b), 0));
@@ -430,6 +486,9 @@ function expectRoomsAndStructure(view: SimView): void {
     const [a, b] = [runs[i - 1], runs[i]];
     const end = a.x + a.count * a.width;
     expect(a.floor < b.floor || (a.floor === b.floor && end <= b.x), `runs ${i - 1} and ${i} in order`).toBe(true);
-    expect(a.floor === b.floor && a.kind === b.kind && a.width === b.width && end === b.x, `runs ${i - 1} and ${i} would join`).toBe(false);
+    expect(
+      a.floor === b.floor && a.kind === b.kind && a.width === b.width && end === b.x,
+      `runs ${i - 1} and ${i} would join`,
+    ).toBe(false);
   }
 }

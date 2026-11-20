@@ -43,5 +43,7 @@ export function contextLossFinding(losses: readonly (readonly string[] | undefin
   const lost = losses.filter((l) => l && l.length > 0);
   if (lost.length === 0) return [];
   const first = lost[0]?.[0] ?? "";
-  return [`${lost.length} of ${losses.length} process runs lost a WebGL context (${first}), so the frames are not from one live GPU context and the page may have rebuilt its canvas (benchmark-protocol.md, "The renderer must be the GPU")`];
+  return [
+    `${lost.length} of ${losses.length} process runs lost a WebGL context (${first}), so the frames are not from one live GPU context and the page may have rebuilt its canvas (benchmark-protocol.md, "The renderer must be the GPU")`,
+  ];
 }

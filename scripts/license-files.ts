@@ -9,9 +9,18 @@
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { byCodePoint, isLicenseFileName, isLicenseTextFileName, isNoticeFileName } from "../src/build/thirdPartyNotices.ts";
+import {
+  byCodePoint,
+  isLicenseFileName,
+  isLicenseTextFileName,
+  isNoticeFileName,
+} from "../src/build/thirdPartyNotices.ts";
 
-export function readLicenseFiles(dir: string): { licenseText: string; hasLicenseFile: boolean; problems: { file: string; reason: string }[] } {
+export function readLicenseFiles(dir: string): {
+  licenseText: string;
+  hasLicenseFile: boolean;
+  problems: { file: string; reason: string }[];
+} {
   const problems: { file: string; reason: string }[] = [];
   let names: string[];
   try {
@@ -43,6 +52,8 @@ export function readLicenseFiles(dir: string): { licenseText: string; hasLicense
     problems,
     // An empty LICENSE, or a COPYRIGHT line alone, does not count as license text.
     hasLicenseFile: readable.some((n) => isLicenseTextFileName(n) && texts.get(n)!.trim() !== ""),
-    licenseText: readable.map((n) => (readable.length > 1 ? `--- ${n} ---\n\n` : "") + texts.get(n)!.trimEnd()).join("\n\n"),
+    licenseText: readable
+      .map((n) => (readable.length > 1 ? `--- ${n} ---\n\n` : "") + texts.get(n)!.trimEnd())
+      .join("\n\n"),
   };
 }

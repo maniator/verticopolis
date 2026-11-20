@@ -68,7 +68,10 @@ export function pgWatchModalPhase(): void {
       // so a detached member makes the set be found again.
       let layers = rec.layers.get(box);
       if (!layers || layers.some((el) => !el.isConnected)) {
-        layers = [box, ...Array.from(box.querySelectorAll("*")).filter((el) => getComputedStyle(el).position === "sticky")];
+        layers = [
+          box,
+          ...Array.from(box.querySelectorAll("*")).filter((el) => getComputedStyle(el).position === "sticky"),
+        ];
         rec.layers.set(box, layers);
       }
       const p = layers
@@ -145,7 +148,9 @@ export function pgStopModalPhaseWatch(): {
   const bar = box?.querySelector(".win-title");
   const label = bar?.querySelector("#verticopolis-modal-title");
   const button = bar?.querySelector("button");
-  const text = (label ? label.textContent ?? "" : (bar?.textContent ?? "").replace(button?.textContent ?? "", "")).trim();
+  const text = (
+    label ? (label.textContent ?? "") : (bar?.textContent ?? "").replace(button?.textContent ?? "", "")
+  ).trim();
   const title = box ? text || "(untitled dialog)" : "(no open dialog)";
   let target: "ok" | "displaced" | "closed" | "unmarked" = "ok";
   if (!rec.target) target = "unmarked";

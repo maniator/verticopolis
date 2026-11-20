@@ -15,7 +15,10 @@ function otherWindowWrites(id: string, body: Uint8Array, modified: number): void
   const db = fake.lastDb!;
   db.store("bodies").set(id, body);
   const index = db.store("meta").get("index") as { id: string; modified: number }[];
-  db.store("meta").set("index", index.map((e) => (e.id === id ? { ...e, modified } : e)));
+  db.store("meta").set(
+    "index",
+    index.map((e) => (e.id === id ? { ...e, modified } : e)),
+  );
 }
 const open = () => fileSpace.open(fake.asFactory());
 const reopen = async () => {
@@ -70,10 +73,15 @@ describe("fileSpace.overwrite", () => {
     const a = await fileSpace.save("Sky", "tower", bytes(1), 0);
     await fileSpace.overwrite(a.id, bytes(2), VERSION_GAP_MS);
     fake.failPutsOf = (key) => key.startsWith("v:");
-    expect(await fileSpace.overwrite(a.id, bytes(3), 2 * VERSION_GAP_MS)).toMatchObject({ modified: 2 * VERSION_GAP_MS });
+    expect(await fileSpace.overwrite(a.id, bytes(3), 2 * VERSION_GAP_MS)).toMatchObject({
+      modified: 2 * VERSION_GAP_MS,
+    });
     fake.failPutsOf = null;
     expect(await fileSpace.read(a.id), "the save itself landed").toEqual(bytes(3));
-    expect((await fileSpace.versions(a.id)).map((v) => v.at / VERSION_GAP_MS), "the versions are as they were").toEqual([1, 0]);
+    expect(
+      (await fileSpace.versions(a.id)).map((v) => v.at / VERSION_GAP_MS),
+      "the versions are as they were",
+    ).toEqual([1, 0]);
   });
 
   it("keeps a file's original on a nearly full device, dropping only the new version", async () => {
@@ -97,7 +105,10 @@ describe("fileSpace.overwrite", () => {
     expect(await fileSpace.versions(a.id)).toEqual([]);
     // With room again, the first write keeps the original after all.
     await fileSpace.overwrite(a.id, bytes(3), 2 * VERSION_GAP_MS);
-    expect((await fileSpace.versions(a.id)).map((v) => [v.at / VERSION_GAP_MS, v.original ?? false])).toEqual([[2, false], [0, true]]);
+    expect((await fileSpace.versions(a.id)).map((v) => [v.at / VERSION_GAP_MS, v.original ?? false])).toEqual([
+      [2, false],
+      [0, true],
+    ]);
   });
 
   it("refuses to write over a file another window wrote since this one read or wrote it, and writes nothing", async () => {
@@ -139,7 +150,10 @@ describe("a tower file's versions in My Towers", () => {
     expect(await fileSpace.readVersion(versions[0].key)).toEqual(bytes(99));
     expect(await fileSpace.readVersion(versions[5].key)).toEqual(bytes(2));
     expect(await fileSpace.readVersion(versions[6].key), "the file as it was before the first write").toEqual(bytes(0));
-    expect(fake.row(DB, "bodies", `v:${a.id}:${VERSION_GAP_MS}`), "the dropped version's bytes are gone").toBeUndefined();
+    expect(
+      fake.row(DB, "bodies", `v:${a.id}:${VERSION_GAP_MS}`),
+      "the dropped version's bytes are gone",
+    ).toBeUndefined();
   });
 
   it("are out of the list and the folder's count", async () => {

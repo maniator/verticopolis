@@ -24,7 +24,10 @@ vi.mock("./overviewMapWiring", () => ({
 vi.mock("./fileSpaceCommands", () => files);
 vi.mock("./titleScreen", () => closer);
 vi.mock("@verticopolis/components/windows/movableWindow", () => ({ MovableWindow: movable, WITHIN_PARENT: "parent" }));
-vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
+vi.mock("../ui/splashTemplate", () => ({
+  SPONSOR_URL: "https://sponsor.example/",
+  sponsorOffered: () => sponsor.offered,
+}));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
 const menus = vi.hoisted(() => ({ open: vi.fn(), pick: vi.fn(), dismiss: vi.fn() }));
 vi.mock("../analyticsMenus", async (real) => ({
@@ -41,7 +44,16 @@ vi.mock("../ui/overviewMapPrefs", () => ({
 }));
 
 import * as fileShortcuts from "./fileShortcuts";
-import { MENU_WINDOW, NO_FULL_SCREEN, STATUS_BAR_HIDDEN_CLASS, STATUS_BAR_KEY, TOWER_ONLY_ITEMS, TOWER_ONLY_MENUS, toggleFullScreen, wireMenus } from "./menuWiring";
+import {
+  MENU_WINDOW,
+  NO_FULL_SCREEN,
+  STATUS_BAR_HIDDEN_CLASS,
+  STATUS_BAR_KEY,
+  TOWER_ONLY_ITEMS,
+  TOWER_ONLY_MENUS,
+  toggleFullScreen,
+  wireMenus,
+} from "./menuWiring";
 
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */
@@ -185,7 +197,6 @@ describe("wireMenus", () => {
     expect(ui.cb.onToggleAudio).toHaveBeenCalledOnce();
     expect(ui.cb.onReplayOnboarding).toHaveBeenCalledOnce();
   });
-
 
   it("checks Sound at once when it is picked, so the desk's tray and Control Panel follow without a menu opening", () => {
     const { app, ui } = fakeApp();
@@ -386,14 +397,22 @@ describe("wireMenus", () => {
 });
 
 describe("wireMenus analytics", () => {
-  const pointerClick = (el: HTMLElement) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+  const pointerClick = (el: HTMLElement) =>
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
 
   it("a trip sends menu_open, then one menu_pick naming the item, its menu, the menus shown and how", () => {
     const bar = wireMenus(fakeApp().app)!;
     pointerClick($("mb-file"));
     expect(menus.open).toHaveBeenCalledExactlyOnceWith({ menu: "file", via: "click", screen: "tower" });
     pointerClick($("mb-quick-save"));
-    expect(menus.pick).toHaveBeenCalledExactlyOnceWith({ menu: "file", item: "quick_save", via: "pointer", screen: "tower", browsed: 1, grayed: false });
+    expect(menus.pick).toHaveBeenCalledExactlyOnceWith({
+      menu: "file",
+      item: "quick_save",
+      via: "pointer",
+      screen: "tower",
+      browsed: 1,
+      grayed: false,
+    });
     expect(bar.current()).toBeNull();
     expect(menus.dismiss).not.toHaveBeenCalled();
   });
@@ -402,17 +421,28 @@ describe("wireMenus analytics", () => {
     const bar = wireMenus(fakeApp().app)!;
     bar.open($("mb-file") as HTMLButtonElement, true, "keys");
     $("mb-win-bulletin").click(); // Enter on a focused item: a click with no pointer
-    expect(menus.pick).toHaveBeenLastCalledWith(expect.objectContaining({ item: "bulletin", via: "keys", state: "off" }));
+    expect(menus.pick).toHaveBeenLastCalledWith(
+      expect.objectContaining({ item: "bulletin", via: "keys", state: "off" }),
+    );
     bar.open($("mb-file") as HTMLButtonElement, false);
     pointerClick($("mb-win-bulletin"));
-    expect(menus.pick).toHaveBeenLastCalledWith(expect.objectContaining({ item: "bulletin", via: "pointer", state: "on" }));
+    expect(menus.pick).toHaveBeenLastCalledWith(
+      expect.objectContaining({ item: "bulletin", via: "pointer", state: "on" }),
+    );
   });
 
   it("a grayed item reports a grayed pick with no state, and the menu stays open", () => {
     const bar = wireMenus(fakeApp().app)!; // the toolbar's Undo is grayed
     pointerClick($("mb-file"));
     pointerClick($("mb-undo"));
-    expect(menus.pick).toHaveBeenCalledExactlyOnceWith({ menu: "file", item: "undo", via: "pointer", screen: "tower", browsed: 1, grayed: true });
+    expect(menus.pick).toHaveBeenCalledExactlyOnceWith({
+      menu: "file",
+      item: "undo",
+      via: "pointer",
+      screen: "tower",
+      browsed: 1,
+      grayed: true,
+    });
     expect(bar.current()).toBe($("mb-file"));
     bar.close(true, "escape");
     expect(menus.dismiss).toHaveBeenCalledExactlyOnceWith({ menu: "file", how: "escape", screen: "tower", browsed: 1 });
@@ -433,14 +463,18 @@ describe("wireMenus analytics", () => {
     pointerClick($("mb-file"));
     expect(menus.open).toHaveBeenLastCalledWith({ menu: "file", via: "click", screen: "title" });
     pointerClick($("btn-new"));
-    expect(menus.pick).toHaveBeenLastCalledWith(expect.objectContaining({ item: "new_tower", screen: "title", grayed: false }));
+    expect(menus.pick).toHaveBeenLastCalledWith(
+      expect.objectContaining({ item: "new_tower", screen: "title", grayed: false }),
+    );
     expect(bar.current()).toBeNull();
     splash.remove();
   });
 
   it("a window's close button sends window_close, and its first move off the desk window_move, once", () => {
     wireMenus(fakeApp().app);
-    const bulletin = movable.mock.calls.find(([o]) => o.win === $("bulletin-win"))![0] as { placed: (s: unknown) => void };
+    const bulletin = movable.mock.calls.find(([o]) => o.win === $("bulletin-win"))![0] as {
+      placed: (s: unknown) => void;
+    };
     document.body.classList.add("desk"); // the desk sends desk_window bulletin_move instead
     bulletin.placed({ x: 1, y: 2 });
     expect(sponsor.track).not.toHaveBeenCalledWith("window_move", "bulletin");
@@ -451,13 +485,22 @@ describe("wireMenus analytics", () => {
     close.click(); // the desk's window menu: closes, but is the menu's pick
     expect(sponsor.track).not.toHaveBeenCalledWith("window_close", "bulletin");
     expect($("bulletin-win").hidden).toBe(true);
-    close.dispatchEvent(Object.defineProperty(new MouseEvent("click", { bubbles: true }), "isTrusted", { value: true }));
+    close.dispatchEvent(
+      Object.defineProperty(new MouseEvent("click", { bubbles: true }), "isTrusted", { value: true }),
+    );
     expect(sponsor.track).toHaveBeenCalledWith("window_close", "bulletin");
   });
 });
 
 describe("toggleFullScreen", () => {
-  function doc(over: Partial<{ fullscreenElement: Element | null; fullscreenEnabled: boolean; request: unknown; exit: () => Promise<void> }>) {
+  function doc(
+    over: Partial<{
+      fullscreenElement: Element | null;
+      fullscreenEnabled: boolean;
+      request: unknown;
+      exit: () => Promise<void>;
+    }>,
+  ) {
     return {
       fullscreenElement: over.fullscreenElement ?? null,
       fullscreenEnabled: over.fullscreenEnabled ?? true,

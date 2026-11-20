@@ -21,7 +21,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(resolve(here, rel), "utf8");
 
 const live = { liveEvents: 50, exportLiveEvents: 20, autosaveSessions: 0 };
-const row = (action: string, detail: string | null, events: number, sessions = events) => ({ action, detail, events, sessions });
+const row = (action: string, detail: string | null, events: number, sessions = events) => ({
+  action,
+  detail,
+  events,
+  sessions,
+});
 
 describe("the persistence failure query", () => {
   const sql = buildPersistenceQuery(168);
@@ -64,7 +69,9 @@ describe("the presence probe", () => {
   it("counts live rows (boot or app_action, so a long-lived tab counts) and the sessions with an autosave failure from one grouping-free read, behind the same gate", () => {
     expect(sql).toContain("count() AS live_events");
     expect(sql).toContain("WHERE event IN ('boot', 'app_action')");
-    expect(sql).toContain("uniqIf(distinct_id, event = 'app_action' AND properties.action = 'autosave_failed' AND properties.detail IN ('timer', 'swap', 'manual', 'file')) AS autosave_sessions");
+    expect(sql).toContain(
+      "uniqIf(distinct_id, event = 'app_action' AND properties.action = 'autosave_failed' AND properties.detail IN ('timer', 'swap', 'manual', 'file')) AS autosave_sessions",
+    );
     expect(sql).toContain("properties.environment = 'production'");
     expect(sql).toContain("INTERVAL 168 HOUR");
     expect(sql).toContain(">= [2, 78, 4]");
@@ -76,8 +83,16 @@ describe("the presence probe", () => {
 
   it("reads a missing or malformed row as no presence", () => {
     expect(presenceFromRows([])).toEqual({ liveEvents: 0, exportLiveEvents: 0, autosaveSessions: 0 });
-    expect(presenceFromRows([{ live_events: "x", export_live_events: null, autosave_sessions: -1 }])).toEqual({ liveEvents: 0, exportLiveEvents: 0, autosaveSessions: 0 });
-    expect(presenceFromRows([{ live_events: 12, export_live_events: 5, autosave_sessions: 2 }])).toEqual({ liveEvents: 12, exportLiveEvents: 5, autosaveSessions: 2 });
+    expect(presenceFromRows([{ live_events: "x", export_live_events: null, autosave_sessions: -1 }])).toEqual({
+      liveEvents: 0,
+      exportLiveEvents: 0,
+      autosaveSessions: 0,
+    });
+    expect(presenceFromRows([{ live_events: 12, export_live_events: 5, autosave_sessions: 2 }])).toEqual({
+      liveEvents: 12,
+      exportLiveEvents: 5,
+      autosaveSessions: 2,
+    });
   });
 });
 
@@ -96,7 +111,10 @@ describe("the first version that sends the codes", () => {
     const parts = (v: string) => v.split(".").map(Number);
     const cmp = (x: number[], y: number[]) => x.reduce((acc, n, i) => acc || Math.sign(n - y[i]), 0);
     expect(cmp(parts(EXPORT_FAILURE_SINCE), parts(PERSISTENCE_FAILURE_SINCE))).toBeGreaterThan(0);
-    expect(cmp(parts(EXPORT_FAILURE_SINCE), parts(current)), `${EXPORT_FAILURE_SINCE} must not be later than the app version ${current}`).toBeLessThanOrEqual(0);
+    expect(
+      cmp(parts(EXPORT_FAILURE_SINCE), parts(current)),
+      `${EXPORT_FAILURE_SINCE} must not be later than the app version ${current}`,
+    ).toBeLessThanOrEqual(0);
   });
 
   it("names the export codes the game sends in the vocabulary, and export_failed in the data map", () => {
@@ -119,7 +137,13 @@ describe("the first version that sends the codes", () => {
 
 describe("tallyRows", () => {
   it("keys by action and detail, sums rows, and ignores an action or detail it does not read", () => {
-    const t = tallyRows([row("import_failed", "save", 2), row("import_failed", "save", 1), row("import_failed", "tdt", 4), row("quick_save", null, 99), row("load_failed", "", 3)]);
+    const t = tallyRows([
+      row("import_failed", "save", 2),
+      row("import_failed", "save", 1),
+      row("import_failed", "tdt", 4),
+      row("quick_save", null, 99),
+      row("load_failed", "", 3),
+    ]);
     expect(t.get("import_failed:save")).toEqual({ events: 3, sessions: 3 });
     expect(t.get("import_failed:tdt")).toEqual({ events: 4, sessions: 4 });
     expect(t.get("load_failed")).toEqual({ events: 3, sessions: 3 });
@@ -128,16 +152,33 @@ describe("tallyRows", () => {
 
   it("keeps every autosave source the game sends: timer, swap (#1631), manual and file", () => {
     const t = tallyRows(["timer", "swap", "manual", "file"].map((d) => row("autosave_failed", d, 1)));
-    expect([...t.keys()].sort()).toEqual(["autosave_failed:file", "autosave_failed:manual", "autosave_failed:swap", "autosave_failed:timer"]);
+    expect([...t.keys()].sort()).toEqual([
+      "autosave_failed:file",
+      "autosave_failed:manual",
+      "autosave_failed:swap",
+      "autosave_failed:timer",
+    ]);
   });
 
   it("leaves out a detail the game never sends, and a detail on an action that has none", () => {
-    const t = tallyRows([row("autosave_failed", "bogus", 5), row("import_failed", "zip", 2), row("load_failed", "x", 3), row("import_failed", "save", 1)]);
+    const t = tallyRows([
+      row("autosave_failed", "bogus", 5),
+      row("import_failed", "zip", 2),
+      row("load_failed", "x", 3),
+      row("import_failed", "save", 1),
+    ]);
     expect([...t.keys()]).toEqual(["import_failed:save"]);
   });
 
   it("keys the export codes by action and detail, and leaves out an export detail it does not read", () => {
-    const t = tallyRows([row("export_save", null, 9), row("export_tdt", null, 4), row("export_failed", "save", 2), row("export_failed", "tdt", 1), row("export_failed", "zip", 7), row("export_failed", "", 3)]);
+    const t = tallyRows([
+      row("export_save", null, 9),
+      row("export_tdt", null, 4),
+      row("export_failed", "save", 2),
+      row("export_failed", "tdt", 1),
+      row("export_failed", "zip", 7),
+      row("export_failed", "", 3),
+    ]);
     expect(t.get("export_save")).toEqual({ events: 9, sessions: 9 });
     expect(t.get("export_failed:save")).toEqual({ events: 2, sessions: 2 });
     expect(t.get("export_failed:tdt")).toEqual({ events: 1, sessions: 1 });
@@ -145,7 +186,10 @@ describe("tallyRows", () => {
   });
 
   it("reads a malformed count as zero rather than inventing one", () => {
-    const t = tallyRows([row("load_slot", null, Number.NaN), { action: "load_slot", detail: null, events: -5, sessions: "x" }]);
+    const t = tallyRows([
+      row("load_slot", null, Number.NaN),
+      { action: "load_slot", detail: null, events: -5, sessions: "x" },
+    ]);
     expect(t.get("load_slot")).toEqual({ events: 0, sessions: 0 });
   });
 });
@@ -179,10 +223,19 @@ describe("rateOf: a rate needs attempts", () => {
 });
 
 describe("summarizePersistence: which denominators are real", () => {
-  const find = (ms: ReturnType<typeof summarizePersistence>, text: string) => ms.find((m) => m.measure.startsWith(text))!;
+  const find = (ms: ReturnType<typeof summarizePersistence>, text: string) =>
+    ms.find((m) => m.measure.startsWith(text))!;
 
   it("divides each import by its own attempt count, .vctower and .TDT apart", () => {
-    const ms = summarizePersistence(tallyRows([row("import_save", null, 20), row("import_failed", "save", 1), row("import_tdt", null, 10), row("import_failed", "tdt", 3)]), live);
+    const ms = summarizePersistence(
+      tallyRows([
+        row("import_save", null, 20),
+        row("import_failed", "save", 1),
+        row("import_tdt", null, 10),
+        row("import_failed", "tdt", 3),
+      ]),
+      live,
+    );
     expect(find(ms, "Import of a .vctower")).toMatchObject({ failures: 1, attempts: 20 });
     expect(find(ms, "Import of a .TDT")).toMatchObject({ failures: 3, attempts: 10 });
   });
@@ -194,7 +247,15 @@ describe("summarizePersistence: which denominators are real", () => {
   });
 
   it("prints each export's failures and attempts side by side and no rate, whatever the counts", () => {
-    const ms = summarizePersistence(tallyRows([row("export_save", null, 40), row("export_failed", "save", 2, 1), row("export_tdt", null, 10), row("export_failed", "tdt", 0)]), live);
+    const ms = summarizePersistence(
+      tallyRows([
+        row("export_save", null, 40),
+        row("export_failed", "save", 2, 1),
+        row("export_tdt", null, 10),
+        row("export_failed", "tdt", 0),
+      ]),
+      live,
+    );
     const save = find(ms, "Export of a .vctower");
     expect(save).toMatchObject({ failures: 2, sessions: 1, attempts: 40 });
     expect(save.rate.status).toBe("unavailable");
@@ -203,7 +264,11 @@ describe("summarizePersistence: which denominators are real", () => {
   });
 
   it("reads the export rows as Not measurable when only older builds ran, while the other rows still count", () => {
-    const ms = summarizePersistence(tallyRows([row("import_save", null, 5), row("import_failed", "save", 1)]), { liveEvents: 6, exportLiveEvents: 0, autosaveSessions: 0 });
+    const ms = summarizePersistence(tallyRows([row("import_save", null, 5), row("import_failed", "save", 1)]), {
+      liveEvents: 6,
+      exportLiveEvents: 0,
+      autosaveSessions: 0,
+    });
     expect(find(ms, "Import of a .vctower")).toMatchObject({ failures: 1, attempts: 5 });
     for (const m of ms.filter((x) => x.measure.startsWith("Export of"))) {
       expect(m.rate.status).toBe("not-measurable");
@@ -213,7 +278,12 @@ describe("summarizePersistence: which denominators are real", () => {
 
   it("never infers an autosave rate, whatever else was sent", () => {
     const busy = summarizePersistence(
-      tallyRows([row("autosave_failed", "timer", 7, 7), row("load_slot", null, 500), row("import_save", null, 500), row("quick_save", null, 900)]),
+      tallyRows([
+        row("autosave_failed", "timer", 7, 7),
+        row("load_slot", null, 500),
+        row("import_save", null, 500),
+        row("quick_save", null, 900),
+      ]),
       { liveEvents: 50, exportLiveEvents: 20, autosaveSessions: 7 },
     );
     const m = find(busy, "Autosave");
@@ -228,12 +298,19 @@ describe("summarizePersistence: which denominators are real", () => {
     // One tab: the timer autosave failed, it reloaded (the once-latch is module
     // memory), then Quick Save failed. Each detail row sees that one session.
     const rows = [row("autosave_failed", "timer", 1, 1), row("autosave_failed", "manual", 1, 1)];
-    const m = find(summarizePersistence(tallyRows(rows), { liveEvents: 10, exportLiveEvents: 0, autosaveSessions: 1 }), "Autosave");
+    const m = find(
+      summarizePersistence(tallyRows(rows), { liveEvents: 10, exportLiveEvents: 0, autosaveSessions: 1 }),
+      "Autosave",
+    );
     expect(m.sessions).toBe(1);
   });
 
   it("counts a long-lived tab whose boot was before the window: app_action rows alone make the window measurable", () => {
-    const ms = summarizePersistence(tallyRows([row("import_save", null, 5), row("import_failed", "save", 1)]), { liveEvents: 6, exportLiveEvents: 0, autosaveSessions: 0 });
+    const ms = summarizePersistence(tallyRows([row("import_save", null, 5), row("import_failed", "save", 1)]), {
+      liveEvents: 6,
+      exportLiveEvents: 0,
+      autosaveSessions: 0,
+    });
     expect(find(ms, "Import of a .vctower")).toMatchObject({ failures: 1, attempts: 5 });
     expect(find(ms, "Import of a .vctower").rate.status).not.toBe("not-measurable");
   });
@@ -246,19 +323,35 @@ describe("summarizePersistence: which denominators are real", () => {
 
   it("reads a window with no build that sends the codes as Not measurable, with no zero anywhere", () => {
     // Stray rows must not leak into the cells either.
-    const ms = summarizePersistence(tallyRows([row("load_slot", null, 9)]), { liveEvents: 0, exportLiveEvents: 0, autosaveSessions: 0 });
+    const ms = summarizePersistence(tallyRows([row("load_slot", null, 9)]), {
+      liveEvents: 0,
+      exportLiveEvents: 0,
+      autosaveSessions: 0,
+    });
     for (const m of ms) {
       expect(m.rate.status).toBe("not-measurable");
       expect(m.rate.text).toMatch(/^Not measurable: no build that sends these codes ran/);
       expect([m.failures, m.sessions, m.attempts]).toEqual([null, null, null]);
     }
     const md = renderPersistenceMarkdown(ms, { windowLabel: "last 7 days", truncated: false });
-    expect(md.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Measure") && !l.startsWith("| ---")).every((l) => !/\| 0 \|/.test(l))).toBe(true);
+    expect(
+      md
+        .split("\n")
+        .filter((l) => l.startsWith("| ") && !l.startsWith("| Measure") && !l.startsWith("| ---"))
+        .every((l) => !/\| 0 \|/.test(l)),
+    ).toBe(true);
   });
 });
 
 describe("renderPersistenceMarkdown", () => {
-  const md = renderPersistenceMarkdown(summarizePersistence(tallyRows([row("load_slot", null, 4), row("autosave_failed", "timer", 1)]), { liveEvents: 50, exportLiveEvents: 20, autosaveSessions: 1 }), { windowLabel: "last 7 days", truncated: false });
+  const md = renderPersistenceMarkdown(
+    summarizePersistence(tallyRows([row("load_slot", null, 4), row("autosave_failed", "timer", 1)]), {
+      liveEvents: 50,
+      exportLiveEvents: 20,
+      autosaveSessions: 1,
+    }),
+    { windowLabel: "last 7 days", truncated: false },
+  );
 
   it("states the window, the first version, and that an earlier window is not zero", () => {
     expect(md).toContain("last 7 days");

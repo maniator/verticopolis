@@ -18,13 +18,15 @@ export function descriptionId(key: string): string {
 
 /** Wire the hint over `palette` once (the buttons inside may be rebuilt). */
 export function wirePaletteHints(palette: HTMLElement, doc: Document = palette.ownerDocument): void {
-  const itemOf = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>(".pal-item") : null);
+  const itemOf = (target: EventTarget | null) =>
+    target instanceof Element ? target.closest<HTMLElement>(".pal-item") : null;
   palette.addEventListener("pointerover", (e) => {
     if (e.pointerType === "mouse") showHint(itemOf(e.target), doc);
   });
   palette.addEventListener("pointerout", (e) => {
     const item = itemOf(e.target);
-    if (e.pointerType === "mouse" && item && !(e.relatedTarget instanceof Node && item.contains(e.relatedTarget))) showHint(null, doc);
+    if (e.pointerType === "mouse" && item && !(e.relatedTarget instanceof Node && item.contains(e.relatedTarget)))
+      showHint(null, doc);
   });
   palette.addEventListener("focusin", (e) => showHint(itemOf(e.target), doc));
   palette.addEventListener("focusout", () => showHint(null, doc));

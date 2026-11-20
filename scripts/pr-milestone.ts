@@ -14,11 +14,7 @@
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
 import { execFileSync } from "node:child_process";
-import {
-  milestonePullRequest,
-  type Milestone,
-  type MilestonePort,
-} from "../src/build/prMilestone.ts";
+import { milestonePullRequest, type Milestone, type MilestonePort } from "../src/build/prMilestone.ts";
 
 const dryRun = process.argv.includes("--dry-run");
 const sweep = process.argv.includes("--sweep");
@@ -32,8 +28,7 @@ const env = (name: string): string => {
 const repo = env("GH_REPO");
 const currentRelease = env("CURRENT_RELEASE");
 
-const gh = (args: string[]): string =>
-  execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+const gh = (args: string[]): string => execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 /** One JSON value per line, so paginated pages need no merging. */
 const ghLines = (path: string, jq: string): unknown[] =>
   gh(["api", "--paginate", path, "--jq", jq])
@@ -42,12 +37,7 @@ const ghLines = (path: string, jq: string): unknown[] =>
     .map((line) => JSON.parse(line) as unknown);
 
 const milestoneOf = (number: number): number | null => {
-  const value = gh([
-    "api",
-    `repos/${repo}/issues/${number}`,
-    "--jq",
-    ".milestone.number // empty",
-  ]).trim();
+  const value = gh(["api", `repos/${repo}/issues/${number}`, "--jq", ".milestone.number // empty"]).trim();
   return value === "" ? null : Number(value);
 };
 
@@ -74,15 +64,7 @@ const port: MilestonePort = {
       console.log(`Would set #${pull} to milestone ${milestone}.`);
       return;
     }
-    gh([
-      "api",
-      "-X",
-      "PATCH",
-      `repos/${repo}/issues/${pull}`,
-      "-F",
-      `milestone=${milestone}`,
-      "--silent",
-    ]);
+    gh(["api", "-X", "PATCH", `repos/${repo}/issues/${pull}`, "-F", `milestone=${milestone}`, "--silent"]);
   },
 };
 
@@ -93,14 +75,7 @@ interface PullSummary {
 }
 
 const readPull = (number: number): PullSummary =>
-  JSON.parse(
-    gh([
-      "api",
-      `repos/${repo}/pulls/${number}`,
-      "--jq",
-      "{number, body} | @json",
-    ]),
-  ) as PullSummary;
+  JSON.parse(gh(["api", `repos/${repo}/pulls/${number}`, "--jq", "{number, body} | @json"])) as PullSummary;
 
 const pulls: PullSummary[] = sweep
   ? // The issues endpoint lists pull requests too and filters by milestone.
@@ -110,26 +85,16 @@ const pulls: PullSummary[] = sweep
     ) as PullSummary[])
   : [readPull(Number(env("PR")))];
 
-if (sweep)
-  console.log(`${pulls.length} open pull request(s) without a milestone.`);
+if (sweep) console.log(`${pulls.length} open pull request(s) without a milestone.`);
 // One pull request that fails (a GitHub error, a locked thread) must not
 // stop the sweep from reaching the older ones, so each is tried on its own
 // and the run fails at the end.
 let failed = 0;
 for (const pull of pulls) {
   try {
-    if (!Number.isInteger(pull.number) || pull.number <= 0)
-      throw new Error("PR is not a pull request number");
-    const outcome = milestonePullRequest(
-      { number: pull.number, body: pull.body ?? "" },
-      currentRelease,
-      port,
-    );
-    console.log(
-      outcome.set === null
-        ? `Nothing to do: ${outcome.reason}.`
-        : `${outcome.reason}; set.`,
-    );
+    if (!Number.isInteger(pull.number) || pull.number <= 0) throw new Error("PR is not a pull request number");
+    const outcome = milestonePullRequest({ number: pull.number, body: pull.body ?? "" }, currentRelease, port);
+    console.log(outcome.set === null ? `Nothing to do: ${outcome.reason}.` : `${outcome.reason}; set.`);
   } catch (error) {
     failed += 1;
     console.log(`::error::#${pull.number}: ${(error as Error).message}`);

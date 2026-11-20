@@ -169,7 +169,8 @@ export function wireOverviewMap(app: GameApp): void {
   windows.set(app, win);
   // The browser perf test reaches the window here (`e2e/overviewMapPerf.spec.ts`), in
   // a dev serve or a tooling build only, like the `window.game` handle.
-  if (import.meta.env.DEV || __TOOLING_BUILD__) (window as unknown as { overviewMap?: OverviewMapWindow }).overviewMap = win;
+  if (import.meta.env.DEV || __TOOLING_BUILD__)
+    (window as unknown as { overviewMap?: OverviewMapWindow }).overviewMap = win;
 }
 
 /** Bring the window up to date for this frame. A page without it, or a closed

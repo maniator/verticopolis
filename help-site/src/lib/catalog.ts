@@ -30,9 +30,13 @@ export function catalogs(): Promise<Record<GameMode, Catalog>> {
     try {
       wasm = readFileSync(resolve(engineDir, "verticopolis_engine_bg.wasm"));
     } catch {
-      throw new Error("the help site needs the engine package for its room facts: run `npm ci` (or `npm run engine:install`) in the game's checkout first");
+      throw new Error(
+        "the help site needs the engine package for its room facts: run `npm ci` (or `npm run engine:install`) in the game's checkout first",
+      );
     }
-    const mod = (await import(/* @vite-ignore */ pathToFileURL(resolve(engineDir, "verticopolis_engine.js")).href)) as EngineModule;
+    const mod = (await import(
+      /* @vite-ignore */ pathToFileURL(resolve(engineDir, "verticopolis_engine.js")).href
+    )) as EngineModule;
     mod.initSync({ module: wasm });
     return { classic: readCatalog(mod, "classic"), modern: readCatalog(mod, "modern") };
   })();

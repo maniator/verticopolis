@@ -42,7 +42,7 @@ export function buildEscalatorOfficeModern(): void {
   for (let f = 2; f <= 4; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
   // Floor 2 is commercial (shops); floors 3-4 are offices. Escalators may touch
   // the commercial floor in BOTH modes; only Modern lets them touch offices.
-  for (let x = left; x + 1 <= right; ) {
+  for (let x = left; x + 1 <= right;) {
     const r = s.tower.place("shop", 2, x);
     if (r.ok) {
       const u = s.tower.getUnit(r.unitId);
@@ -53,7 +53,7 @@ export function buildEscalatorOfficeModern(): void {
     } else x += 1;
   }
   for (let f = 3; f <= 4; f++) {
-    for (let x = left; x + 1 <= right; ) {
+    for (let x = left; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -101,7 +101,7 @@ export function buildEscalatorOfficeClassic(): void {
   for (let x = cx; x <= cx + 19; x++) s.tower.place("lobby", 1, x);
   for (let x = cx - 1; x >= cx - 20; x--) s.tower.place("lobby", 1, x);
   for (let f = 2; f <= 4; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
-  for (let x = left; x + 1 <= right; ) {
+  for (let x = left; x + 1 <= right;) {
     const r = s.tower.place("shop", 2, x);
     if (r.ok) {
       const u = s.tower.getUnit(r.unitId);
@@ -112,7 +112,7 @@ export function buildEscalatorOfficeClassic(): void {
     } else x += 1;
   }
   for (let f = 3; f <= 4; f++) {
-    for (let x = left; x + 1 <= right; ) {
+    for (let x = left; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);

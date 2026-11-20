@@ -16,14 +16,18 @@ type Looks = { cx: number; sky: number; gaps: number[] };
 /** Pick the look strip's button `look`, as a player does. */
 async function pickLook(page: Page, look: number): Promise<void> {
   await page.locator(`#sky-bridge-look-strip button[data-look="${look}"]`).click();
-  await page.locator(`#sky-bridge-look-strip button[data-look="${look}"][aria-pressed="true"]`).waitFor({ timeout: 4000 });
+  await page
+    .locator(`#sky-bridge-look-strip button[data-look="${look}"][aria-pressed="true"]`)
+    .waitFor({ timeout: 4000 });
 }
 
 /** Arm the tool and lay one bridge per gap, in looks 1 to 4. */
 async function layLookBridges(page: Page): Promise<void> {
   await page.locator('.pal-item[data-tool="skyBridge"]').first().click();
   await page.locator("#sky-bridge-look-strip:not([hidden])").waitFor({ timeout: 4000 });
-  const gaps = await page.evaluate(() => (window as unknown as { __vcShotSkyBridgeLooks: Looks }).__vcShotSkyBridgeLooks.gaps);
+  const gaps = await page.evaluate(
+    () => (window as unknown as { __vcShotSkyBridgeLooks: Looks }).__vcShotSkyBridgeLooks.gaps,
+  );
   for (let i = 0; i < gaps.length; i++) {
     await pickLook(page, i + 1);
     await page.evaluate((x) => {

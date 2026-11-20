@@ -29,7 +29,8 @@ function choose(box: HTMLElement, id: string) {
   radio.dispatchEvent(new Event("change"));
 }
 
-const press = (box: HTMLElement, which: "ok" | "cancel") => box.querySelector<HTMLButtonElement>(`[data-appearance="${which}"]`)!.click();
+const press = (box: HTMLElement, which: "ok" | "cancel") =>
+  box.querySelector<HTMLButtonElement>(`[data-appearance="${which}"]`)!.click();
 
 describe("the Appearance dialog", () => {
   afterEach(() => document.body.replaceChildren());

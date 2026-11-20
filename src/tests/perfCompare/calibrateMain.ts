@@ -23,7 +23,12 @@ import type { CompareResults } from "./types";
  * with fewer passes or a looser limit than the defaults is never adoptable
  * and exits 1.
  */
-export function parseCalibrateArgs(argv: string[]): { folders: string[]; out: string; minPassesPerEngine?: number; exceedanceLimit?: number } {
+export function parseCalibrateArgs(argv: string[]): {
+  folders: string[];
+  out: string;
+  minPassesPerEngine?: number;
+  exceedanceLimit?: number;
+} {
   const folders: string[] = [];
   let out: string | null = null;
   let minPassesPerEngine: number | undefined;
@@ -47,12 +52,20 @@ export function parseCalibrateArgs(argv: string[]): { folders: string[]; out: st
       if (exceedanceLimit !== undefined) throw new Error("--exceedance-limit is given twice");
       if (!(x > 0 && x < 1)) throw new Error("--exceedance-limit needs a number above 0 and below 1");
       exceedanceLimit = x;
-    } else if (argv[i].startsWith("--")) throw new Error(`unknown argument ${argv[i]}; expected result folders, --out DIR, --min-passes N and --exceedance-limit X`);
+    } else if (argv[i].startsWith("--"))
+      throw new Error(
+        `unknown argument ${argv[i]}; expected result folders, --out DIR, --min-passes N and --exceedance-limit X`,
+      );
     else folders.push(argv[i]);
   }
   if (folders.length === 0) throw new Error("name at least one A/A result folder");
   if (out === null) throw new Error("--out DIR is required");
-  return { folders, out, ...(minPassesPerEngine !== undefined ? { minPassesPerEngine } : {}), ...(exceedanceLimit !== undefined ? { exceedanceLimit } : {}) };
+  return {
+    folders,
+    out,
+    ...(minPassesPerEngine !== undefined ? { minPassesPerEngine } : {}),
+    ...(exceedanceLimit !== undefined ? { exceedanceLimit } : {}),
+  };
 }
 
 export function main(argv: string[], repo: string, now: () => string = () => new Date().toISOString()): number {
@@ -72,13 +85,27 @@ export function main(argv: string[], repo: string, now: () => string = () => new
     }
     const r = results as Partial<CompareResults> | null;
     const worker = isWorkerResults(r);
-    if (!r || !r.config || !r.environment || !Array.isArray(r.metrics) || !r.validation || (!worker && !Array.isArray(r.comparisons))) throw new Error(`${file} is not a perf:compare or perf:worker results.json (config, environment, comparisons, metrics or validation is missing)`);
+    if (
+      !r ||
+      !r.config ||
+      !r.environment ||
+      !Array.isArray(r.metrics) ||
+      !r.validation ||
+      (!worker && !Array.isArray(r.comparisons))
+    )
+      throw new Error(
+        `${file} is not a perf:compare or perf:worker results.json (config, environment, comparisons, metrics or validation is missing)`,
+      );
     // The hash is of the parsed JSON with sorted keys, so a copy re-saved with
     // other line endings, indentation or key order is the same pass.
     return { folder: f, worker, results, sha256: createHash("sha256").update(stable(results)).digest("hex") };
   });
   const opts = { minPassesPerEngine: args.minPassesPerEngine, exceedanceLimit: args.exceedanceLimit };
-  const compareFolders = folders.filter((f) => !f.worker) as { folder: string; results: CompareResults; sha256: string }[];
+  const compareFolders = folders.filter((f) => !f.worker) as {
+    folder: string;
+    results: CompareResults;
+    sha256: string;
+  }[];
   const workerFolders = folders.filter((f) => f.worker) as { folder: string; results: WorkerPass; sha256: string }[];
   const compare: Calibration | null = compareFolders.length ? calibrate(compareFolders, opts) : null;
   const m4 = workerFolders.length ? calibrateM4(workerFolders, opts) : null;
@@ -91,9 +118,29 @@ export function main(argv: string[], repo: string, now: () => string = () => new
   const missingFamilies = [...(compare ? [] : ["M1", "M2", "M3", "M5-1x", "M5-4x"]), ...(m4 ? [] : ["M4"])];
   mkdirSync(out, { recursive: true });
   const generatedAt = now();
-  writeFileSync(join(out, "calibration.json"), JSON.stringify({ generatedAt, ...(compare ?? {}), m4, missingFamilies, problems, adoptable }, null, 1) + "\n");
-  const mixed = m4 ? { m4Window: m4.window, m4Commits: [...new Set(m4.passes.map((p) => p.commit.slice(0, 7)))], adoptable, problems: [...m4Problems, ...across] } : null;
-  writeFileSync(join(out, "calibration.md"), [compare ? calibrationMarkdown(compare, generatedAt, mixed) : null, m4 ? m4Markdown(m4, generatedAt, compare !== null) : null].filter((x) => x !== null).join("\n"));
-  process.stdout.write(`perf:calibrate: wrote ${out} (${adoptable ? "adoptable" : `not adoptable: ${problems.length} problem(s)`}${missingFamilies.length ? `; partial, no folders for ${missingFamilies.join(", ")}` : ""})\n`);
+  writeFileSync(
+    join(out, "calibration.json"),
+    JSON.stringify({ generatedAt, ...(compare ?? {}), m4, missingFamilies, problems, adoptable }, null, 1) + "\n",
+  );
+  const mixed = m4
+    ? {
+        m4Window: m4.window,
+        m4Commits: [...new Set(m4.passes.map((p) => p.commit.slice(0, 7)))],
+        adoptable,
+        problems: [...m4Problems, ...across],
+      }
+    : null;
+  writeFileSync(
+    join(out, "calibration.md"),
+    [
+      compare ? calibrationMarkdown(compare, generatedAt, mixed) : null,
+      m4 ? m4Markdown(m4, generatedAt, compare !== null) : null,
+    ]
+      .filter((x) => x !== null)
+      .join("\n"),
+  );
+  process.stdout.write(
+    `perf:calibrate: wrote ${out} (${adoptable ? "adoptable" : `not adoptable: ${problems.length} problem(s)`}${missingFamilies.length ? `; partial, no folders for ${missingFamilies.join(", ")}` : ""})\n`,
+  );
   return adoptable ? 0 : 1;
 }

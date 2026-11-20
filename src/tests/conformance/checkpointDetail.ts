@@ -22,11 +22,19 @@ export interface CheckpointDetail {
  *  WASM adapter (`wasmEngine.ts`, which reads the frame header) use the same. */
 export const FX_SLOTS = [
   "santaFxSeq",
-  "explosionSeq", "explosionFloor", "explosionX",
-  "thiefSeq", "thiefCaught", "thiefFloor",
-  "treasureSeq", "treasureFloor", "treasureX",
+  "explosionSeq",
+  "explosionFloor",
+  "explosionX",
+  "thiefSeq",
+  "thiefCaught",
+  "thiefFloor",
+  "treasureSeq",
+  "treasureFloor",
+  "treasureX",
   "vipFxSeq",
-  "fires", "firesGutRooms", "bombs",
+  "fires",
+  "firesGutRooms",
+  "bombs",
 ] as const;
 export type FxSlot = (typeof FX_SLOTS)[number];
 

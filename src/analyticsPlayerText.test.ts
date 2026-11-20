@@ -69,16 +69,24 @@ describe("scrubPlayerText", () => {
 
 describe("scrubJsonEcho", () => {
   it("blanks everything a Chrome JSON error quotes, inner quotes included", () => {
-    expect(scrubJsonEcho(`Unexpected token 'S', "{"a": Secret Spire}" is not valid JSON`)).toBe(`Unexpected token "${P}" is not valid JSON`);
-    expect(scrubJsonEcho(`Unexpected token 'S', ..."a": Secret "... is not valid JSON`)).toBe(`Unexpected token "${P}"... is not valid JSON`);
+    expect(scrubJsonEcho(`Unexpected token 'S', "{"a": Secret Spire}" is not valid JSON`)).toBe(
+      `Unexpected token "${P}" is not valid JSON`,
+    );
+    expect(scrubJsonEcho(`Unexpected token 'S', ..."a": Secret "... is not valid JSON`)).toBe(
+      `Unexpected token "${P}"... is not valid JSON`,
+    );
   });
 
   it("blanks across a line break in the echoed text", () => {
-    expect(scrubJsonEcho(`Unexpected token 'x', "{\n Secret}" is not valid JSON`)).toBe(`Unexpected token "${P}" is not valid JSON`);
+    expect(scrubJsonEcho(`Unexpected token 'x', "{\n Secret}" is not valid JSON`)).toBe(
+      `Unexpected token "${P}" is not valid JSON`,
+    );
   });
 
   it("blanks the input a Safari JSON error quotes", () => {
-    expect(scrubJsonEcho(`JSON Parse error: Unexpected identifier "Spire"`)).toBe(`JSON Parse error: Unexpected identifier "${P}"`);
+    expect(scrubJsonEcho(`JSON Parse error: Unexpected identifier "Spire"`)).toBe(
+      `JSON Parse error: Unexpected identifier "${P}"`,
+    );
   });
 
   it("blanks to the end when a quote has no partner", () => {
@@ -134,7 +142,9 @@ describe("the known player text", () => {
     addPlayerTextSource(() => ["İstanbul", "i\u0307stanbul"]);
     const known = knownPlayerText();
     expect(known).toHaveLength(2);
-    expect(scrubPlayerText("open İstanbul, then i\u0307stanbul", playerTextMatcher(known))).toBe(`open ${P}, then ${P}`);
+    expect(scrubPlayerText("open İstanbul, then i\u0307stanbul", playerTextMatcher(known))).toBe(
+      `open ${P}, then ${P}`,
+    );
   });
 
   it("stops reading a source once it is removed", () => {

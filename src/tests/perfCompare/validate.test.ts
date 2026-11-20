@@ -23,43 +23,87 @@ describe("validateResults", () => {
   });
 
   it("fails a software renderer and warns on a quick run", () => {
-    const soft = (runs: ReturnType<typeof good>) => runs.map((r) => ({ ...r, page: { ...r.page!, webgl: { renderer: "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)", vendor: "Google Inc. (Google)" } }, rendererEnd: "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)" }));
+    const soft = (runs: ReturnType<typeof good>) =>
+      runs.map((r) => ({
+        ...r,
+        page: {
+          ...r.page!,
+          webgl: {
+            renderer: "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)",
+            vendor: "Google Inc. (Google)",
+          },
+        },
+        rendererEnd: "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)",
+      }));
     const v = validateResults(config(), soft(good()), [node()]);
     expect(v.ok).toBe(false);
     expect(v.errors.join(" ")).toMatch(/software rasterizer.*SwiftShader.*run it on the GPU/);
     const quick = validateResults({ ...config(), quick: true }, soft(good()), [node()]);
     expect(quick.errors).toEqual([]);
     expect(quick.warnings.join(" ")).toMatch(/software rasterizer/);
-    const mixed = good().map((r, i) => (i === 0 ? { ...r, page: { ...r.page!, webgl: { renderer: "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)", vendor: "AMD" } }, rendererEnd: "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)" } : r));
+    const mixed = good().map((r, i) =>
+      i === 0
+        ? {
+            ...r,
+            page: {
+              ...r.page!,
+              webgl: { renderer: "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)", vendor: "AMD" },
+            },
+            rendererEnd: "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)",
+          }
+        : r,
+    );
     expect(validateResults(config(), mixed, [node()]).errors.join(" ")).toMatch(/different WebGL renderers/);
   });
 
   it("fails closed on a run with no renderer, an unnamed one, or none read after the frames", () => {
     const noGl = good().map((r) => ({ ...r, page: { ...r.page!, webgl: null } }));
     expect(validateResults(config(), noGl, [node()]).errors.join(" ")).toMatch(/recorded no WebGL renderer/);
-    const nulls = good().map((r) => ({ ...r, page: { ...r.page!, webgl: { renderer: "null", vendor: "" } }, rendererEnd: "null" }));
+    const nulls = good().map((r) => ({
+      ...r,
+      page: { ...r.page!, webgl: { renderer: "null", vendor: "" } },
+      rendererEnd: "null",
+    }));
     expect(validateResults(config(), nulls, [node()]).errors.join(" ")).toMatch(/does not name a hardware adapter/);
     const noEnd = good().map((r) => ({ ...r, rendererEnd: undefined }));
     expect(validateResults(config(), noEnd, [node()]).errors.join(" ")).toMatch(/none after the frames/);
-    expect(validateResults({ ...config(), quick: true }, noGl, [node()]).errors.filter((e) => /renderer/i.test(e))).toEqual([]);
+    expect(
+      validateResults({ ...config(), quick: true }, noGl, [node()]).errors.filter((e) => /renderer/i.test(e)),
+    ).toEqual([]);
   });
 
   it("downgrades unverified renderers to warnings under a register exception, but keeps a missing, changed or lost renderer an error", () => {
     const noGl = good().map((r) => ({ ...r, page: { ...r.page!, webgl: null }, rendererEnd: null }));
     const v = validateResults(config(), noGl, [node()], "EX-9");
     expect(v.errors.join(" ")).toMatch(/exception EX-9: .*recorded no WebGL renderer/);
-    const software = good().map((r) => ({ ...r, page: { ...r.page!, webgl: { renderer: "llvmpipe (LLVM 15.0.7, 256 bits)", vendor: "v" } }, rendererEnd: "llvmpipe (LLVM 15.0.7, 256 bits)" }));
+    const software = good().map((r) => ({
+      ...r,
+      page: { ...r.page!, webgl: { renderer: "llvmpipe (LLVM 15.0.7, 256 bits)", vendor: "v" } },
+      rendererEnd: "llvmpipe (LLVM 15.0.7, 256 bits)",
+    }));
     const s = validateResults(config(), software, [node()], "EX-9");
     expect(s.errors.filter((e) => /renderer|rasterizer/i.test(e))).toEqual([]);
     expect(s.warnings.join(" ")).toMatch(/exception EX-9/);
-    const hw = (renderer: string | null) => good().map((r) => ({ ...r, page: { ...r.page!, webgl: { renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11, D3D11)", vendor: "v" } }, rendererEnd: renderer }));
-    expect(validateResults(config(), hw("llvmpipe (LLVM 15.0.7, 256 bits)"), [node()], "EX-9").errors.join(" ")).toMatch(/renderer changed after the frames in/);
+    const hw = (renderer: string | null) =>
+      good().map((r) => ({
+        ...r,
+        page: {
+          ...r.page!,
+          webgl: { renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11, D3D11)", vendor: "v" },
+        },
+        rendererEnd: renderer,
+      }));
+    expect(
+      validateResults(config(), hw("llvmpipe (LLVM 15.0.7, 256 bits)"), [node()], "EX-9").errors.join(" "),
+    ).toMatch(/renderer changed after the frames in/);
     expect(validateResults(config(), hw(null), [node()], "EX-9").errors.join(" ")).toMatch(/none after the frames/);
   });
 
   it("judges an A/A pass by the engine that ran", () => {
     const aa = (ran: "ts" | "wasm") =>
-      [0, 1].flatMap((rep) => (["ts", "wasm"] as const).map((slot) => ({ ...processRun(rep, ran), engine: slot, ranEngine: ran })));
+      [0, 1].flatMap((rep) =>
+        (["ts", "wasm"] as const).map((slot) => ({ ...processRun(rep, ran), engine: slot, ranEngine: ran })),
+      );
     for (const ran of ["ts", "wasm"] as const) {
       const v = validateResults({ ...config(), aa: ran }, aa(ran), [node()]);
       expect(v.errors).toEqual([]);
@@ -67,7 +111,9 @@ describe("validateResults", () => {
     const wrong = validateResults({ ...config(), aa: "wasm" }, aa("ts"), [node()]);
     expect(wrong.errors).toContain("rep 0 ts: an A/A pass of wasm ran ts");
     const slotted = [processRun(0, "ts", { ranEngine: "wasm" }), processRun(0, "wasm")];
-    expect(validateResults(config(), slotted, [node()]).errors).toContain("rep 0 ts: a comparison run launched wasm in the ts slot");
+    expect(validateResults(config(), slotted, [node()]).errors).toContain(
+      "rep 0 ts: a comparison run launched wasm in the ts slot",
+    );
   });
 
   it("names a WASM fallback as an error and never counts it", () => {
@@ -75,7 +121,9 @@ describe("validateResults", () => {
     runs[1].cold!.engineActive = "ts";
     const v = validateResults(config(), runs, [node()]);
     expect(v.ok).toBe(false);
-    expect(v.errors).toContain("rep 0 wasm: cold start: the WASM engine did not initialize; the page fell back to TypeScript");
+    expect(v.errors).toContain(
+      "rep 0 wasm: cold start: the WASM engine did not initialize; the page fell back to TypeScript",
+    );
   });
 
   it("flags a simulation or frame sample that ran on the other engine", () => {
@@ -95,7 +143,11 @@ describe("validateResults", () => {
 
   it("refuses samples that started or ended in different states", () => {
     const runs = good();
-    runs[3].scenarios.small.raw["1"] = step("ts", { startDigest: "other", endDigest: "other-end", end: { minutes: 599, money: 1, star: 2, population: 10, people: 3 } });
+    runs[3].scenarios.small.raw["1"] = step("ts", {
+      startDigest: "other",
+      endDigest: "other-end",
+      end: { minutes: 599, money: 1, star: 2, population: 10, people: 3 },
+    });
     const v = validateResults(config(), runs, [node()]);
     expect(v.errors.some((e) => e.startsWith("small: the samples did not start from one state"))).toBe(true);
     expect(v.errors.some((e) => e.startsWith("small: the samples did not end in one state"))).toBe(true);
@@ -107,7 +159,13 @@ describe("validateResults", () => {
     runs[2] = { ...runs[2], ok: false, error: "boom" };
     delete (runs[0].scenarios as Record<string, unknown>).small;
     const v = validateResults(config(), runs, [node()]);
-    expect(v.errors).toEqual(expect.arrayContaining(["rep 1 ts: no process run recorded", "rep 1 wasm: failed: boom", "rep 0 ts: scenario small missing"]));
+    expect(v.errors).toEqual(
+      expect.arrayContaining([
+        "rep 1 ts: no process run recorded",
+        "rep 1 wasm: failed: boom",
+        "rep 0 ts: scenario small missing",
+      ]),
+    );
   });
 
   it("reports duplicate runs, a missing phase and missing per-throttle samples", () => {
@@ -116,17 +174,35 @@ describe("validateResults", () => {
     delete runs[1].scenarios.small.raw["1"];
     delete runs[1].scenarios.small.frames["1"];
     const v = validateResults(config(), runs, [node()]);
-    expect(v.errors).toEqual(expect.arrayContaining(["rep 1 ts: 2 process runs recorded, expected one", "rep 0 ts: no warm start sample", "rep 0 wasm: small raw at 1x missing", "rep 0 wasm: small frames at 1x missing"]));
+    expect(v.errors).toEqual(
+      expect.arrayContaining([
+        "rep 1 ts: 2 process runs recorded, expected one",
+        "rep 0 ts: no warm start sample",
+        "rep 0 wasm: small raw at 1x missing",
+        "rep 0 wasm: small frames at 1x missing",
+      ]),
+    );
   });
 
   it("warns about a saved-tower start with no sample, and fails nothing (#1254)", () => {
     const runs = good();
     const row = runs[1].coldSaved!.small;
     runs[0] = { ...runs[0], coldSaved: {} };
-    runs[1] = { ...runs[1], coldSaved: { small: { ...row, sample: null, error: "the boot did not load the seeded tower", pageErrors: ["console: x"] } } };
+    runs[1] = {
+      ...runs[1],
+      coldSaved: {
+        small: { ...row, sample: null, error: "the boot did not load the seeded tower", pageErrors: ["console: x"] },
+      },
+    };
     const v = validateResults(config(), runs, [node()]);
     expect(v.errors).toEqual([]);
-    expect(v.warnings).toEqual(expect.arrayContaining(["rep 0 ts: the small saved-tower cold start is missing; its saved-tower rows have no sample from it", "rep 0 wasm: the small saved-tower cold start has no sample (the boot did not load the seeded tower); its saved-tower rows have no sample from it", "rep 0 wasm: the small saved-tower cold start logged 1 page error(s), first: console: x"]));
+    expect(v.warnings).toEqual(
+      expect.arrayContaining([
+        "rep 0 ts: the small saved-tower cold start is missing; its saved-tower rows have no sample from it",
+        "rep 0 wasm: the small saved-tower cold start has no sample (the boot did not load the seeded tower); its saved-tower rows have no sample from it",
+        "rep 0 wasm: the small saved-tower cold start logged 1 page error(s), first: console: x",
+      ]),
+    );
     // Its page errors stay off the repetition's own list, which the run checks.
     expect(v.warnings.some((w) => w.startsWith("rep 0 wasm: 1 page error"))).toBe(false);
   });
@@ -137,8 +213,13 @@ describe("validateResults", () => {
     expect(v.ok).toBe(true);
     expect(v.warnings.some((w) => /saved-tower/.test(w))).toBe(false);
     const resumed = good();
-    resumed[0] = { ...resumed[0], coldSaved: { small: { ...resumed[0].coldSaved!.small, seedSha256: "seed-repacked" } } };
-    expect(validateResults(config(), resumed, [node()]).warnings).toContain("small: the saved-tower starts booted 2 different autosave seeds (a resumed run packs the seed again, with a new write time), and their rows pool them");
+    resumed[0] = {
+      ...resumed[0],
+      coldSaved: { small: { ...resumed[0].coldSaved!.small, seedSha256: "seed-repacked" } },
+    };
+    expect(validateResults(config(), resumed, [node()]).warnings).toContain(
+      "small: the saved-tower starts booted 2 different autosave seeds (a resumed run packs the seed again, with a new write time), and their rows pool them",
+    );
   });
 
   it("fails on a missing Node check", () => {
@@ -148,12 +229,26 @@ describe("validateResults", () => {
   it("fails when the configurations cannot be compared", () => {
     const runs = good();
     runs[2].browserVersion = "140.0";
-    runs[3].page = { ...runs[3].page!, viewport: { width: 800, height: 600, dpr: 1 }, crossOriginIsolated: false, timerResolutionMs: 0.1 };
+    runs[3].page = {
+      ...runs[3].page!,
+      viewport: { width: 800, height: 600, dpr: 1 },
+      crossOriginIsolated: false,
+      timerResolutionMs: 0.1,
+    };
     const v = validateResults(config(), runs, [node()]);
-    expect(v.errors).toEqual(expect.arrayContaining(["the runs used different browser builds: 141.0, 140.0", "some runs were cross-origin isolated and some were not"]));
+    expect(v.errors).toEqual(
+      expect.arrayContaining([
+        "the runs used different browser builds: 141.0, 140.0",
+        "some runs were cross-origin isolated and some were not",
+      ]),
+    );
     expect(v.errors.some((e) => e.startsWith("the runs used different viewports"))).toBe(true);
     expect(v.warnings.some((w) => /coarser than 20 microseconds/.test(w))).toBe(true);
-    const onlyTs = validateResults(config({ reps: 1 }), [processRun(0, "ts"), { ...processRun(0, "wasm"), ok: false, error: "x" }], [node()]);
+    const onlyTs = validateResults(
+      config({ reps: 1 }),
+      [processRun(0, "ts"), { ...processRun(0, "wasm"), ok: false, error: "x" }],
+      [node()],
+    );
     expect(onlyTs.errors).toContain("no successful wasm process: the configurations cannot be compared");
   });
 
@@ -180,10 +275,14 @@ describe("validateResults", () => {
   it("fails when the browser runs and the Node check disagree on the state", () => {
     const n = node();
     n.end.state = "z";
-    expect(validateResults(config(), good(), [n]).errors).toContain("small: the browser runs ended in b, not the Node check's z");
+    expect(validateResults(config(), good(), [n]).errors).toContain(
+      "small: the browser runs ended in b, not the Node check's z",
+    );
     const m = node();
     m.start.state = "y";
-    expect(validateResults(config(), good(), [m]).errors).toContain("small: the browser runs started from a, not the Node check's y");
+    expect(validateResults(config(), good(), [m]).errors).toContain(
+      "small: the browser runs started from a, not the Node check's y",
+    );
   });
 
   it("fails on host errors and engine page errors, and warns on other page errors", () => {
@@ -193,7 +292,12 @@ describe("validateResults", () => {
     runs[1].pageErrors = ["console: [wasm] not hosting this tower"];
     runs[0].pageErrors = ["console: 404"];
     const v = validateResults(config(), runs, [node()]);
-    expect(v.errors).toEqual(expect.arrayContaining(["rep 0 wasm: small hosted at 1x: the host reported trap", "rep 0 wasm: small frames at 1x: the host reported trap"]));
+    expect(v.errors).toEqual(
+      expect.arrayContaining([
+        "rep 0 wasm: small hosted at 1x: the host reported trap",
+        "rep 0 wasm: small frames at 1x: the host reported trap",
+      ]),
+    );
     expect(v.errors.some((e) => e.startsWith("rep 0 wasm: engine or frame errors in the page"))).toBe(true);
     expect(v.warnings.some((w) => w.startsWith("rep 0 ts: 1 page error(s)"))).toBe(true);
   });
@@ -221,10 +325,28 @@ describe("validateResults", () => {
     const runs = good();
     runs[0].audio = { started: false, muted: false, contexts: [] };
     runs[0].scenarios.small.framesAudio = {};
-    runs[1].firstVisitWithServiceWorker = { served: [], swActive: false, onlineEngineActive: null, offlineEngineActive: null, onlinePageErrors: [], offlinePageErrors: [], error: null };
-    runs[2].firstVisitWithServiceWorker = { served: [], swActive: false, onlineEngineActive: null, offlineEngineActive: null, onlinePageErrors: [], offlinePageErrors: [], error: "boom" };
+    runs[1].firstVisitWithServiceWorker = {
+      served: [],
+      swActive: false,
+      onlineEngineActive: null,
+      offlineEngineActive: null,
+      onlinePageErrors: [],
+      offlinePageErrors: [],
+      error: null,
+    };
+    runs[2].firstVisitWithServiceWorker = {
+      served: [],
+      swActive: false,
+      onlineEngineActive: null,
+      offlineEngineActive: null,
+      onlinePageErrors: [],
+      offlinePageErrors: [],
+      error: "boom",
+    };
     const v = validateResults(config(), runs, [node()]);
-    expect(v.errors).toEqual(["rep 0 ts: audio did not start (contexts: none), so the audio-on rows have no sample from it"]);
+    expect(v.errors).toEqual([
+      "rep 0 ts: audio did not start (contexts: none), so the audio-on rows have no sample from it",
+    ]);
     expect(v.warnings).toEqual(
       expect.arrayContaining([
         "rep 0 wasm: the service worker first visit never activated; its transfer and offline rows have no sample from it",
@@ -236,18 +358,35 @@ describe("validateResults", () => {
   it("names a fallback at the throttled cold start, and needs none without a throttle", () => {
     const runs = good();
     runs[1].cold4x = { ...runs[1].cold4x!, engineActive: "ts" };
-    for (const r of runs) r.cpuProbe = { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: { "small:4": 200, "frames-off:4": 200, "frames-on:4": 200 } };
-    expect(validateResults(config({ throttles: [1, 4] }), runs, [node()]).errors).toContain("rep 0 wasm: 4x cold start: the WASM engine did not initialize; the page fell back to TypeScript");
+    for (const r of runs)
+      r.cpuProbe = {
+        unthrottledMs: 50,
+        throttledMs: 200,
+        rate: 4,
+        timed: { "small:4": 200, "frames-off:4": 200, "frames-on:4": 200 },
+      };
+    expect(validateResults(config({ throttles: [1, 4] }), runs, [node()]).errors).toContain(
+      "rep 0 wasm: 4x cold start: the WASM engine did not initialize; the page fell back to TypeScript",
+    );
     const none = good().map((r) => ({ ...r, cold4x: null }));
     expect(validateResults(config({ throttles: [1] }), none, [node()]).errors).toEqual([]);
   });
 
   it("warns on a first visit that ran on the other engine or logged errors", () => {
     const runs = good();
-    runs[1].firstVisitWithServiceWorker = { ...runs[1].firstVisitWithServiceWorker!, onlineEngineActive: "ts", onlinePageErrors: ["console: [wasm] the engine package did not load"] };
+    runs[1].firstVisitWithServiceWorker = {
+      ...runs[1].firstVisitWithServiceWorker!,
+      onlineEngineActive: "ts",
+      onlinePageErrors: ["console: [wasm] the engine package did not load"],
+    };
     const v = validateResults(config(), runs, [node()]);
     expect(v.errors).toEqual([]);
-    expect(v.warnings).toEqual(expect.arrayContaining(["rep 0 wasm: the service worker first visit ran on ts; its bytes are left out", "rep 0 wasm: the service worker first visit logged 1 page error(s), first: console: [wasm] the engine package did not load"]));
+    expect(v.warnings).toEqual(
+      expect.arrayContaining([
+        "rep 0 wasm: the service worker first visit ran on ts; its bytes are left out",
+        "rep 0 wasm: the service worker first visit logged 1 page error(s), first: console: [wasm] the engine package did not load",
+      ]),
+    );
   });
 
   it("fails a frame window where the simulation did not advance, and a late WASM host", () => {
@@ -257,22 +396,61 @@ describe("validateResults", () => {
     runs[2].warm = { ...runs[2].warm!, engineHostedMs: null };
     const v = validateResults(config(), runs, [node()]);
     expect(v.errors).toEqual(
-      expect.arrayContaining(["rep 0 ts: small frames at 1x: the simulation did not advance during the window (0 ticks)", "rep 0 wasm: cold start: the engine was not hosted by the time the game was ready (hosted 400, ready 300)", "rep 1 wasm: warm start: the engine was not hosted by the time the game was ready (hosted never, ready 300)"]),
+      expect.arrayContaining([
+        "rep 0 ts: small frames at 1x: the simulation did not advance during the window (0 ticks)",
+        "rep 0 wasm: cold start: the engine was not hosted by the time the game was ready (hosted 400, ready 300)",
+        "rep 1 wasm: warm start: the engine was not hosted by the time the game was ready (hosted never, ready 300)",
+      ]),
     );
   });
 
   it("fails audio-on frames without a running context, an attribution pass with no export call, and a throttle that did not hold", () => {
     const runs = good();
     runs[1].audio = { started: true, muted: false, contexts: ["suspended"] };
-    runs[2].scenarios.small.hosted["1"].attribution = { engineTickMs: 1, engineExportMs: 0, hostJsMs: 1, wrappedTotalMs: 2, merges: 1, engineTicks: 10, exportCalls: 0, exportsWrapped: 40, byExport: {}, parseMs: 0, parseCalls: 0 };
+    runs[2].scenarios.small.hosted["1"].attribution = {
+      engineTickMs: 1,
+      engineExportMs: 0,
+      hostJsMs: 1,
+      wrappedTotalMs: 2,
+      merges: 1,
+      engineTicks: 10,
+      exportCalls: 0,
+      exportsWrapped: 40,
+      byExport: {},
+      parseMs: 0,
+      parseCalls: 0,
+    };
     runs[0].cpuProbe = { unthrottledMs: 50, throttledMs: 60, rate: 4, timed: {} };
     const v = validateResults(config(), runs, [node()]);
-    expect(v.errors).toEqual(expect.arrayContaining(["rep 0 wasm: audio-on frames ran with no running AudioContext (suspended)", "rep 1 wasm: small 1x: the attribution pass saw no export call, so its host JS share would include engine time"]));
-    expect(v.errors.some((w) => w.startsWith("rep 0 ts: the CPU probe ran 60 ms under the 4x throttle against 50 ms without it; the throttled cold start"))).toBe(true);
+    expect(v.errors).toEqual(
+      expect.arrayContaining([
+        "rep 0 wasm: audio-on frames ran with no running AudioContext (suspended)",
+        "rep 1 wasm: small 1x: the attribution pass saw no export call, so its host JS share would include engine time",
+      ]),
+    );
+    expect(
+      v.errors.some((w) =>
+        w.startsWith(
+          "rep 0 ts: the CPU probe ran 60 ms under the 4x throttle against 50 ms without it; the throttled cold start",
+        ),
+      ),
+    ).toBe(true);
     const throttled = good();
-    throttled[1].cpuProbe = { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: { "small:4": 70, "frames-off:4": 200 } };
+    throttled[1].cpuProbe = {
+      unthrottledMs: 50,
+      throttledMs: 200,
+      rate: 4,
+      timed: { "small:4": 70, "frames-off:4": 200 },
+    };
     const t = validateResults(config({ throttles: [1, 4] }), throttled, [node()]);
-    expect(t.errors.some((e) => e.startsWith("rep 0 wasm: the CPU probe ran 70 ms under the 4x throttle of small"))).toBe(true);
-    expect(t.errors).toEqual(expect.arrayContaining(["rep 0 ts: no CPU probe confirms the 4x throttle of small", "rep 0 wasm: no CPU probe confirms the 4x throttle of frames-on"]));
+    expect(
+      t.errors.some((e) => e.startsWith("rep 0 wasm: the CPU probe ran 70 ms under the 4x throttle of small")),
+    ).toBe(true);
+    expect(t.errors).toEqual(
+      expect.arrayContaining([
+        "rep 0 ts: no CPU probe confirms the 4x throttle of small",
+        "rep 0 wasm: no CPU probe confirms the 4x throttle of frames-on",
+      ]),
+    );
   });
 });

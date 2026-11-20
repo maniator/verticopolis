@@ -21,7 +21,8 @@ let shown: { cell: HTMLElement; name: string; mode: GameMode } | undefined;
 
 /** Show the tower's name and rules, writing only on a change. */
 export function showTowerInStatusBar(name: string, mode: GameMode, doc: Document = document): void {
-  if (shown && shown.name === name && shown.mode === mode && shown.cell.ownerDocument === doc && shown.cell.isConnected) return;
+  if (shown && shown.name === name && shown.mode === mode && shown.cell.ownerDocument === doc && shown.cell.isConnected)
+    return;
   const cell = doc.getElementById("sb-tower");
   if (!cell) return;
   const text = `${name} · ${RULE_SET_NAME[mode]}`;

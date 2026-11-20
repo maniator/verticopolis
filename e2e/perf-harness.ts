@@ -59,7 +59,13 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
   // p/100 * length would bias p95 toward the 96th percentile and skew an
   // even-count median high.
   const pct = (p: number): number => samples[Math.floor((p / 100) * (samples.length - 1))];
-  return { n: iters * batch, batch, medianMs: pct(50), p95Ms: pct(95), meanMs: samples.reduce((s, x) => s + x, 0) / samples.length };
+  return {
+    n: iters * batch,
+    batch,
+    medianMs: pct(50),
+    p95Ms: pct(95),
+    meanMs: samples.reduce((s, x) => s + x, 0) / samples.length,
+  };
 }
 
 /**
@@ -117,7 +123,14 @@ export function checkNodeIdentity(pumps: number): {
 } {
   const g = (window as any).game;
   const el = g.ui.el;
-  const before = { money: el.money, pop: el.pop, star: el.star, time: el.time, date: el.date, towerStats: el.towerStats };
+  const before = {
+    money: el.money,
+    pop: el.pop,
+    star: el.star,
+    time: el.time,
+    date: el.date,
+    towerStats: el.towerStats,
+  };
   const beforeChild = el.towerStats.firstElementChild;
   for (let i = 0; i < pumps; i++) {
     // One minute per pump: enough to change the time leaf (the change path)

@@ -120,7 +120,10 @@ export function summarize(values: readonly number[]): Summary {
 }
 
 /** The differences a minus b, paired by repetition number: a repetition missing from either side drops out, so a thin or reordered row cannot shift a pair. */
-export function pairedDifferences(a: { reps: readonly number[]; values: readonly number[] }, b: { reps: readonly number[]; values: readonly number[] }): number[] {
+export function pairedDifferences(
+  a: { reps: readonly number[]; values: readonly number[] },
+  b: { reps: readonly number[]; values: readonly number[] },
+): number[] {
   const diffs: number[] = [];
   a.reps.forEach((rep, i) => {
     const j = b.reps.indexOf(rep);
@@ -144,7 +147,10 @@ export interface PairedDifference {
 }
 
 /** The median of a minus b, paired by repetition number, with the 95% order-statistic interval of the median; null when nothing pairs or a difference is not a finite number. The one definition the M4 and M5 gates and their report cells read. */
-export function pairedDifference(a: { reps: readonly number[]; values: readonly number[] }, b: { reps: readonly number[]; values: readonly number[] }): PairedDifference | null {
+export function pairedDifference(
+  a: { reps: readonly number[]; values: readonly number[] },
+  b: { reps: readonly number[]; values: readonly number[] },
+): PairedDifference | null {
   const diffs = pairedDifferences(a, b);
   // A damaged value (a JSON null) leaves the row without a statistic, thin or not.
   if (!diffs.length || !diffs.every(Number.isFinite)) return null;
@@ -181,7 +187,10 @@ export function frameStats(intervalsMs: readonly number[]): FrameStats {
 }
 
 /** How to describe a ratio of medians whose interval may straddle 1. */
-export function verdict(r: { ratio: number; ciLow: number | null; ciHigh: number | null }, equivalenceBand = 0.05): "higher" | "lower" | "equivalent" | "inconclusive" {
+export function verdict(
+  r: { ratio: number; ciLow: number | null; ciHigh: number | null },
+  equivalenceBand = 0.05,
+): "higher" | "lower" | "equivalent" | "inconclusive" {
   if (r.ciLow === null || r.ciHigh === null) return "inconclusive";
   if (r.ciLow > 1 + equivalenceBand) return "higher";
   if (r.ciHigh < 1 - equivalenceBand) return "lower";
@@ -197,7 +206,12 @@ export function verdict(r: { ratio: number; ciLow: number | null; ciHigh: number
  * resampling, so the interval does not depend on a seed and does not
  * undercover the way a percentile bootstrap does at this sample size.
  */
-export function pairedRatio(pairs: readonly (readonly [number, number])[]): { ratio: number; ciLow: number | null; ciHigh: number | null; n: number } {
+export function pairedRatio(pairs: readonly (readonly [number, number])[]): {
+  ratio: number;
+  ciLow: number | null;
+  ciHigh: number | null;
+  n: number;
+} {
   const ratios = pairs.map(([a, b]) => {
     if (b === 0) throw new Error("a paired ratio against zero");
     return a / b;

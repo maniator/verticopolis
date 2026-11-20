@@ -32,16 +32,48 @@ function spyCtx() {
   const grad = { addColorStop: (...a: unknown[]) => log.push("stop:" + JSON.stringify(a)) };
   const ctx: Record<string, unknown> = {};
   const methods = [
-    "save", "restore", "beginPath", "closePath", "moveTo", "lineTo", "arc", "arcTo",
-    "quadraticCurveTo", "bezierCurveTo", "rect", "roundRect", "ellipse", "fill", "stroke",
-    "fillRect", "strokeRect", "clearRect", "fillText", "strokeText", "translate", "scale",
-    "rotate", "clip", "setLineDash", "drawImage",
+    "save",
+    "restore",
+    "beginPath",
+    "closePath",
+    "moveTo",
+    "lineTo",
+    "arc",
+    "arcTo",
+    "quadraticCurveTo",
+    "bezierCurveTo",
+    "rect",
+    "roundRect",
+    "ellipse",
+    "fill",
+    "stroke",
+    "fillRect",
+    "strokeRect",
+    "clearRect",
+    "fillText",
+    "strokeText",
+    "translate",
+    "scale",
+    "rotate",
+    "clip",
+    "setLineDash",
+    "drawImage",
   ];
   for (const m of methods) ctx[m] = (...a: unknown[]) => log.push(`${m}:${JSON.stringify(a)}`);
   ctx.createLinearGradient = (...a: unknown[]) => (log.push(`grad:${JSON.stringify(a)}`), grad);
   ctx.createRadialGradient = (...a: unknown[]) => (log.push(`rgrad:${JSON.stringify(a)}`), grad);
   ctx.measureText = () => ({ width: 10 });
-  for (const p of ["fillStyle", "strokeStyle", "lineWidth", "globalAlpha", "font", "textAlign", "textBaseline", "lineCap", "lineJoin"]) {
+  for (const p of [
+    "fillStyle",
+    "strokeStyle",
+    "lineWidth",
+    "globalAlpha",
+    "font",
+    "textAlign",
+    "textBaseline",
+    "lineCap",
+    "lineJoin",
+  ]) {
     let v: unknown = "";
     Object.defineProperty(ctx, p, { get: () => v, set: (nv) => (log.push(`${p}=${String(nv)}`), void (v = nv)) });
   }
@@ -76,9 +108,27 @@ describe.skipIf(noEngine)("save round-trip paints identical pixels (.vctower ser
     for (let x = 0; x < 120; x++) sim.tower.place("lobby", 1, x);
     for (let f = 2; f <= 14; f++) for (let x = 0; x < 120; x++) sim.tower.place("floor", f, x);
     // Offices and condos at varied positions (layout + mirror coverage).
-    for (const [f, x] of [[2, 0], [2, 12], [2, 24], [3, 5], [3, 40], [4, 9]] as const) sim.tower.place("office", f, x);
-    for (const [f, x] of [[5, 0], [5, 14], [6, 3], [6, 30]] as const) sim.tower.place("condo", f, x);
-    for (const [f, x, k] of [[7, 0, "hotelSingle"], [7, 10, "hotelDouble"], [7, 30, "hotelSuite"]] as const) {
+    for (const [f, x] of [
+      [2, 0],
+      [2, 12],
+      [2, 24],
+      [3, 5],
+      [3, 40],
+      [4, 9],
+    ] as const)
+      sim.tower.place("office", f, x);
+    for (const [f, x] of [
+      [5, 0],
+      [5, 14],
+      [6, 3],
+      [6, 30],
+    ] as const)
+      sim.tower.place("condo", f, x);
+    for (const [f, x, k] of [
+      [7, 0, "hotelSingle"],
+      [7, 10, "hotelDouble"],
+      [7, 30, "hotelSuite"],
+    ] as const) {
       sim.tower.place(k as FacilityKind, f, x);
     }
     // Every canon retail variety, one unit each.
@@ -187,9 +237,10 @@ describeWithCodec("TDT round-trip preserves the retail varieties' paint (geometr
       // Pin the transient inputs so only the persisted ones drive the compare.
       const a = { ...orig, id: 1, occupants: 3 } as Unit;
       const b = { ...(imported as unknown as Unit), id: 1, occupants: 3, state: "occupied" } as Unit;
-      expect(paint(b, hourFor(spot.kind)), `${spot.kind} "${spot.subtype}" paints differently after TDT round-trip`).toBe(
-        paint(a, hourFor(spot.kind)),
-      );
+      expect(
+        paint(b, hourFor(spot.kind)),
+        `${spot.kind} "${spot.subtype}" paints differently after TDT round-trip`,
+      ).toBe(paint(a, hourFor(spot.kind)));
     }
   });
 });

@@ -38,10 +38,14 @@ afterEach(() => {
 });
 
 const bars = (): HTMLButtonElement[] => Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-bar"));
-const selected = (): string[] => Array.from(dialog().querySelectorAll(".es-bar.sel")).map((b) => b.getAttribute("aria-label")!);
-const stepper = (label: string, nth = 0): HTMLButtonElement => dialog().querySelectorAll<HTMLButtonElement>(`button[aria-label="${label}"]`)[nth];
-const key = (el: Element, k: string): void => void el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
-const pointer = (el: Element, type: string, buttonNo = 0): void => void el.dispatchEvent(new MouseEvent(type, { button: buttonNo, bubbles: true }));
+const selected = (): string[] =>
+  Array.from(dialog().querySelectorAll(".es-bar.sel")).map((b) => b.getAttribute("aria-label")!);
+const stepper = (label: string, nth = 0): HTMLButtonElement =>
+  dialog().querySelectorAll<HTMLButtonElement>(`button[aria-label="${label}"]`)[nth];
+const key = (el: Element, k: string): void =>
+  void el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+const pointer = (el: Element, type: string, buttonNo = 0): void =>
+  void el.dispatchEvent(new MouseEvent(type, { button: buttonNo, bubbles: true }));
 const toggleServe = async (floor: number | string, serve: boolean): Promise<void> => {
   const box = dialog().querySelector<HTMLInputElement>(`input[aria-label="Serve floor ${floor}"]`)!;
   box.checked = serve;
@@ -49,13 +53,17 @@ const toggleServe = async (floor: number | string, serve: boolean): Promise<void
   await flush();
 };
 const rowOf = (floor: string): Element =>
-  Array.from(dialog().querySelectorAll(".es-grid-row")).find((r) => r.querySelector(".es-cell-floor")?.textContent?.replace(/[◎L▲]/g, "") === floor)!;
+  Array.from(dialog().querySelectorAll(".es-grid-row")).find(
+    (r) => r.querySelector(".es-cell-floor")?.textContent?.replace(/[◎L▲]/g, "") === floor,
+  )!;
 
 describe("the count strip", () => {
   it("selects the evening hour on a weekday open and edits it with the docked stepper", () => {
     const { ctx, apply } = open({ ux: CLASSIC_UX });
     expect(selected()).toEqual(["weekday 17:00, 4 of 4 cars"]);
-    expect(text(".es-fleet"), "on shift at the hour apart from the installed fleet (#1546)").toBe("4 on shift at 17:00, 4 installed");
+    expect(text(".es-fleet"), "on shift at the hour apart from the installed fleet (#1546)").toBe(
+      "4 on shift at 17:00, 4 installed",
+    );
     expect(stepper("more cars").disabled).toBe(true);
     stepper("fewer cars").click();
     expect(selected()).toEqual(["weekday 17:00, 3 of 4 cars"]);
@@ -246,7 +254,9 @@ describe("the response steppers", () => {
     expect(stepper("lower").disabled).toBe(true);
     stepper("raise").click();
     expect(lastAnnounce(ctx)).toBe("Waiting Car Response set to 1. Higher holds idle cars in place longer.");
-    expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain("Higher holds idle cars in place longer.");
+    expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain(
+      "Higher holds idle cars in place longer.",
+    );
     stepper("lower").click();
     expect(lastAnnounce(ctx)).toBe("Waiting Car Response: 0. Idle cars answer the nearest call.");
     open({ current: { waitingCarResponse: 30 } });
@@ -273,10 +283,9 @@ describe("live stop edits", () => {
   it("renders endpoints as fixed stops and the middle floors as toggles", () => {
     open();
     expect(dialog().querySelectorAll(".es-always")).toHaveLength(2);
-    expect(Array.from(dialog().querySelectorAll(".es-grid input[type=checkbox]")).map((i) => i.getAttribute("aria-label"))).toEqual([
-      "Serve floor 3",
-      "Serve floor 2",
-    ]);
+    expect(
+      Array.from(dialog().querySelectorAll(".es-grid input[type=checkbox]")).map((i) => i.getAttribute("aria-label")),
+    ).toEqual(["Serve floor 3", "Serve floor 2"]);
     expect(rowOf("1").querySelector(".es-lobby-mark")).not.toBeNull();
     expect(rowOf("1").querySelector(".es-base")).not.toBeNull();
   });
@@ -348,11 +357,15 @@ describe("live stop edits", () => {
 
   it("shows an express shaft's stops above ground as a fact, with no toggles", () => {
     open({ isExpress: true });
-    expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain("Serves all lobbies and sky lobbies");
+    expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain(
+      "Serves all lobbies and sky lobbies",
+    );
     expect(q(".es-grid input[type=checkbox]")).toBeNull();
     // Its endpoints and lobbies show the fixed check instead.
     expect(q(".es-always")).not.toBeNull();
-    expect(Array.from(dialog().querySelectorAll("button")).some((b) => b.textContent === "Express (lobbies)")).toBe(false);
+    expect(Array.from(dialog().querySelectorAll("button")).some((b) => b.textContent === "Express (lobbies)")).toBe(
+      false,
+    );
   });
 });
 
@@ -381,7 +394,13 @@ describe("OK and Cancel", () => {
     ok();
     ok();
     expect(apply).toHaveBeenCalledTimes(1);
-    expect(saved(apply)).toEqual({ activeCars: { weekday: row(CARS), weekend: row(CARS) }, homeFloors: [1, 1, 1, 1], waitingCarResponse: 0, standardFloorDeparture: 48, autoTune: false });
+    expect(saved(apply)).toEqual({
+      activeCars: { weekday: row(CARS), weekend: row(CARS) },
+      homeFloors: [1, 1, 1, 1],
+      waitingCarResponse: 0,
+      standardFloorDeparture: 48,
+      autoTune: false,
+    });
     await flush();
     expect(dialog().open).toBe(false);
     expect(q(".es-body")).toBeNull();

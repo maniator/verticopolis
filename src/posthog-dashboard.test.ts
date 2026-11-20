@@ -1,16 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  planAdditions,
-  runSteps,
-  bottomRow,
-  buildInsights,
-} from "../scripts/posthog-dashboard.mjs";
+import { planAdditions, runSteps, bottomRow, buildInsights } from "../scripts/posthog-dashboard.mjs";
 
-const tile = (
-  name: string,
-  sm?: { x: number; y: number; w: number; h: number },
-  extra: object = {},
-) => ({
+const tile = (name: string, sm?: { x: number; y: number; w: number; h: number }, extra: object = {}) => ({
   insight: { name },
   layouts: sm ? { sm } : {},
   ...extra,
@@ -49,11 +40,7 @@ describe("posthog-dashboard planAdditions (add-only sync)", () => {
       { name: "First", overview: true, height: 6, query: null },
       { name: "Second", overview: true, query: null },
     ];
-    const plan = planAdditions(
-      specs,
-      [tile("His", { x: 0, y: 0, w: 12, h: 2 })],
-      new Set(),
-    );
+    const plan = planAdditions(specs, [tile("His", { x: 0, y: 0, w: 12, h: 2 })], new Set());
     expect(plan.add.map((a) => a.layout)).toEqual([
       { x: 0, y: 2, w: 12, h: 6 },
       { x: 0, y: 8, w: 12, h: 5 },
@@ -97,27 +84,15 @@ describe("posthog-dashboard planAdditions (add-only sync)", () => {
     const overview = all.filter((s) => s.overview);
     expect(overview.length).toBeLessThan(all.length);
     const fresh = overview.map((s) => ({ ...s, shortId: undefined }));
-    const plan = planAdditions(
-      [...all.filter((s) => !s.overview), ...fresh],
-      [],
-      new Set(),
-    );
-    expect(plan.add.map((a) => a.spec.name)).toEqual(
-      overview.map((s) => s.name),
-    );
-    expect(plan.add.map((a) => a.spec.name)).toContain(
-      "Session FPS by tower size and speed",
-    );
-    expect(plan.add.map((a) => a.spec.name)).toContain(
-      "Engine cost per game hour by version, tower size and speed",
-    );
+    const plan = planAdditions([...all.filter((s) => !s.overview), ...fresh], [], new Set());
+    expect(plan.add.map((a) => a.spec.name)).toEqual(overview.map((s) => s.name));
+    expect(plan.add.map((a) => a.spec.name)).toContain("Session FPS by tower size and speed");
+    expect(plan.add.map((a) => a.spec.name)).toContain("Engine cost per game hour by version, tower size and speed");
   });
 
   it("adds only the sky bridge looks tile for the real spec list today, because the other overview tiles carry the short id of the insight a run made", () => {
     const plan = planAdditions(buildInsights({ newGame: 1 }), [], new Set());
-    expect(plan.add.map((a) => a.spec.name)).toEqual([
-      "Sky bridge looks (Modern)",
-    ]);
+    expect(plan.add.map((a) => a.spec.name)).toEqual(["Sky bridge looks (Modern)"]);
     expect(plan.added).toEqual([
       "Session FPS by tower size and speed",
       "Engine cost per game hour by version, tower size and speed",
@@ -125,9 +100,7 @@ describe("posthog-dashboard planAdditions (add-only sync)", () => {
   });
 
   it("lets --update-view rewrite the view on a run with no tile to add, and writes no tile or action then", () => {
-    const recorded = buildInsights({ newGame: 1 }).filter(
-      (s) => !s.overview || s.shortId,
-    );
+    const recorded = buildInsights({ newGame: 1 }).filter((s) => !s.overview || s.shortId);
     const plan = planAdditions(recorded, [], new Set());
     expect(plan.add).toEqual([]);
     expect(runSteps(plan, true)).toEqual({
@@ -143,11 +116,7 @@ describe("posthog-dashboard planAdditions (add-only sync)", () => {
   });
 
   it("checks the action and the view whenever there is a tile to add", () => {
-    const plan = planAdditions(
-      [{ name: "New table", overview: true, query: null }],
-      [],
-      new Set(),
-    );
+    const plan = planAdditions([{ name: "New table", overview: true, query: null }], [], new Set());
     expect(runSteps(plan, false)).toEqual({
       tiles: true,
       action: true,

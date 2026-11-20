@@ -14,7 +14,10 @@ const run = hasWasmPackage();
 describe.runIf(run)("a refused bomb ransom through the WASM binding", () => {
   for (const mode of ["classic", "modern"] as const) {
     it(`${mode}: starts a search the game can draw, with no outcome yet`, () => {
-      const w = startWasmHandle({ fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone-star4.vctower", mode });
+      const w = startWasmHandle({
+        fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone-star4.vctower",
+        mode,
+      });
       try {
         let hours = 0;
         while (!(w.pendingChoice() ?? "").includes("bombThreat")) {
@@ -26,7 +29,10 @@ describe.runIf(run)("a refused bomb ransom through the WASM binding", () => {
         w.resolveChoice(false);
         const after = decodeHeader(w.frameView());
         expect(after.counts.bombs).toBe(before.counts.bombs);
-        const view = JSON.parse(w.bombSearch() ?? "null") as { deadline: number; sweeping: { floor: number; left: number; right: number }[] };
+        const view = JSON.parse(w.bombSearch() ?? "null") as {
+          deadline: number;
+          sweeping: { floor: number; left: number; right: number }[];
+        };
         expect(view.deadline).toBeGreaterThan(after.minutes);
         expect(view.sweeping.length).toBeGreaterThan(0);
         expect(view.sweeping.every((g) => g.left < g.right)).toBe(true);

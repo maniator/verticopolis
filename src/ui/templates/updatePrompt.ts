@@ -52,9 +52,9 @@ function skippedLog(info: UpdateInfo | null | undefined): TemplateResult | undef
       tabindex="0"
       role="region"
       aria-labelledby="whatsnew-title"
-    >${releases.map((r) => html`<h4 class="whatsnew-ver">${r.version}</h4><ul>${r.notes.map((n) => html`<li>${n}</li>`)}</ul>`)}${info?.more
-      ? html`<p class="whatsnew-more">Earlier updates are not listed here.</p>`
-      : nothing}</div></div>`;
+    >${releases.map((r) => html`<h4 class="whatsnew-ver">${r.version}</h4><ul>${r.notes.map((n) => html`<li>${n}</li>`)}</ul>`)}${
+      info?.more ? html`<p class="whatsnew-more">Earlier updates are not listed here.</p>` : nothing
+    }</div></div>`;
 }
 
 /**
@@ -66,7 +66,8 @@ function skippedLog(info: UpdateInfo | null | undefined): TemplateResult | undef
 function incomingNotes(notes: readonly string[]): TemplateResult | typeof nothing {
   if (notes.length === 0) return nothing;
   const list = html`<ul>${notes.map((n) => html`<li>${n}</li>`)}</ul>`;
-  if (notes.length <= SHORT_NOTES) return html`<div class="whatsnew"><h3 class="win-title sm">What's new</h3>${list}</div>`;
+  if (notes.length <= SHORT_NOTES)
+    return html`<div class="whatsnew"><h3 class="win-title sm">What's new</h3>${list}</div>`;
   return html`<div class="whatsnew"><h3 class="win-title sm" id="whatsnew-title">What's new</h3><div
       class="well whatsnew-log"
       tabindex="0"
@@ -86,7 +87,10 @@ export interface UpdatePromptOptions {
  *  one. `from=game` tells the page a running game opened it, so its "Back to
  *  game" closes the tab instead of loading a second game (src/ui/fromGame.ts). */
 export function releaseNotesHref(version: string | undefined): string {
-  return fromGameHref(helpUrl(version ? `/help/changelog#${encodeURIComponent(version)}` : "/help/changelog"), "update_prompt");
+  return fromGameHref(
+    helpUrl(version ? `/help/changelog#${encodeURIComponent(version)}` : "/help/changelog"),
+    "update_prompt",
+  );
 }
 
 /** The "All release notes" link: opens the release notes page in a new tab,

@@ -43,12 +43,18 @@ function main() {
       const rooms = (save.units || []).filter((u) => u.kind !== "floor" && u.kind !== "lobby");
       const byKind: Record<string, number> = {};
       for (const u of rooms) byKind[u.kind] = (byKind[u.kind] || 0) + 1;
-      console.log(`  imported: mode=${save.mode ?? "classic"} star=${save.star} money=${save.money} minutes=${save.minutes}`);
-      console.log(`  rooms=${rooms.length} transports=${(save.transports || []).length} byKind=${JSON.stringify(byKind)}`);
+      console.log(
+        `  imported: mode=${save.mode ?? "classic"} star=${save.star} money=${save.money} minutes=${save.minutes}`,
+      );
+      console.log(
+        `  rooms=${rooms.length} transports=${(save.transports || []).length} byKind=${JSON.stringify(byKind)}`,
+      );
       // The ImportReport carries broughtOver + couldNotBring (both string[]);
       // the fidelity gaps are couldNotBring.
       const notes = report?.couldNotBring ?? [];
-      console.log(`  import report: ${notes.length} fidelity note(s)${notes.length ? " -> " + notes.slice(0, 6).join(" | ") : ""}`);
+      console.log(
+        `  import report: ${notes.length} fidelity note(s)${notes.length ? " -> " + notes.slice(0, 6).join(" | ") : ""}`,
+      );
       const out = input.replace(/\.tdt$/i, "") + ".imported.vctower";
       writeFileSync(out, toVctower(save));
       console.log(`  -> ${basename(out)}`);
@@ -64,18 +70,35 @@ function main() {
     // engine's current version and defaults, with a starter's fields pinned.
     const emptySave: SerializedGame = {
       ...draftTower(1, "classic").serialize(),
-      money: 2_000_000, star: 1, minutes: 0, units: [], transports: [], nextId: 1,
-      towerName: "Empty", builtWeddingHall: false, evaluatedTower: false,
+      money: 2_000_000,
+      star: 1,
+      minutes: 0,
+      units: [],
+      transports: [],
+      nextId: 1,
+      towerName: "Empty",
+      builtWeddingHall: false,
+      evaluatedTower: false,
     };
     const ours = buildTDT(emptySave).bytes;
     const real = new Uint8Array(readFileSync(inputs[0]));
-    console.log(`  our export: ${ours.length} bytes | real: ${real.length} bytes | delta: ${ours.length - real.length}`);
+    console.log(
+      `  our export: ${ours.length} bytes | real: ${real.length} bytes | delta: ${ours.length - real.length}`,
+    );
     const n = Math.min(ours.length, real.length);
-    let firstDiff = -1, diffs = 0;
-    for (let i = 0; i < n; i++) if (ours[i] !== real[i]) { if (firstDiff < 0) firstDiff = i; diffs++; }
-    console.log(`  first differing byte: ${firstDiff >= 0 ? "0x" + firstDiff.toString(16) + " (" + firstDiff + ")" : "none in overlap"}; total differing bytes in overlap: ${diffs}`);
+    let firstDiff = -1,
+      diffs = 0;
+    for (let i = 0; i < n; i++)
+      if (ours[i] !== real[i]) {
+        if (firstDiff < 0) firstDiff = i;
+        diffs++;
+      }
+    console.log(
+      `  first differing byte: ${firstDiff >= 0 ? "0x" + firstDiff.toString(16) + " (" + firstDiff + ")" : "none in overlap"}; total differing bytes in overlap: ${diffs}`,
+    );
     if (firstDiff >= 0) {
-      const a = Math.max(0, firstDiff - 4), b = Math.min(n, firstDiff + 12);
+      const a = Math.max(0, firstDiff - 4),
+        b = Math.min(n, firstDiff + 12);
       const hex = (arr: Uint8Array) => [...arr.slice(a, b)].map((x) => x.toString(16).padStart(2, "0")).join(" ");
       console.log(`  @0x${a.toString(16)}  ours: ${hex(ours)}`);
       console.log(`  @0x${a.toString(16)}  real: ${hex(real)}`);

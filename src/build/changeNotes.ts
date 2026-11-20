@@ -56,7 +56,8 @@ const SECTIONS = new Map<string, Section>([
   ["## Contributors", "contributors"],
 ]);
 /** Where a note's engine change goes now. */
-const ENGINE_HOME = "the engine is versioned in Verticopolis/engine: write its change there, and raise @verticopolis/engine here once it is released";
+const ENGINE_HOME =
+  "the engine is versioned in Verticopolis/engine: write its change there, and raise @verticopolis/engine here once it is released";
 const EM_DASH = "—";
 
 export function isNoteFile(name: string): boolean {
@@ -110,7 +111,8 @@ export function parseNote(text: string, file: string): ChangeNote {
     note[section as Section].push(bullet);
   }
   if (note.app === "none" && note.player.length > 0) fail("Player lines need an app level other than none");
-  if (note.app !== "none" && note.player.length === 0) fail("an app level needs at least one Player line for CHANGELOG.md and the update prompt");
+  if (note.app !== "none" && note.player.length === 0)
+    fail("an app level needs at least one Player line for CHANGELOG.md and the update prompt");
   return note;
 }
 
@@ -191,7 +193,12 @@ export function contributorLines(notes: readonly ChangeNote[]): string[] {
  * go under a `### Contributors` heading after the bullets, so the update
  * prompt, which reads only the section's first list, never shows them.
  */
-export function insertSection(changelog: string, heading: string, bullets: readonly string[], credits: readonly string[] = []): string {
+export function insertSection(
+  changelog: string,
+  heading: string,
+  bullets: readonly string[],
+  credits: readonly string[] = [],
+): string {
   const version = /^\d+\.\d+\.\d+/.exec(heading)?.[0];
   if (!version) throw new Error(`"${heading}" does not start with a version`);
   if (changelogVersions(changelog).includes(version)) throw new Error(`the changelog already has a ${version} section`);

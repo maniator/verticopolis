@@ -33,11 +33,15 @@ describe("a tower swap hands the replaced tower's gameplay events on", () => {
     expect(main.match(/\.take\(/g) ?? []).toHaveLength(0);
     // The harnesses' tower reaches the engine as a load of its save, never a take.
     expect(tooling.match(/\.take\(/g) ?? []).toHaveLength(0);
-    expect(tooling).toMatch(/^ {2}if \(!\(import\.meta\.env\.DEV \|\| __TOOLING_BUILD__\)\) throw new Error\("adoptSim is for tooling builds only"\);$/m);
+    expect(tooling).toMatch(
+      /^ {2}if \(!\(import\.meta\.env\.DEV \|\| __TOOLING_BUILD__\)\) throw new Error\("adoptSim is for tooling builds only"\);$/m,
+    );
     // No other module swaps the app's tower behind the engine's back.
     const elsewhere = shellFiles(src)
       .filter((file) => ![resolve(src, "main.ts"), resolve(src, "game/toolingSim.ts")].includes(file))
-      .filter((file) => /\bapp\.(sim|enginePort)\s*(\?\?|\|\||&&)?=(?!=)|\benginePort\.take\(/.test(readFileSync(file, "utf8")));
+      .filter((file) =>
+        /\bapp\.(sim|enginePort)\s*(\?\?|\|\||&&)?=(?!=)|\benginePort\.take\(/.test(readFileSync(file, "utf8")),
+      );
     expect(elsewhere).toEqual([]);
   });
 });

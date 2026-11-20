@@ -72,7 +72,10 @@ export function syncToolingSim(app: ToolingApp): void {
  *  steps: they belong to the tower it replaced. */
 export function adoptToolingSim(app: ToolingApp, built: ToolingTower, keepCamera: boolean): void {
   if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("adoptSim is for tooling builds only");
-  if (!(built instanceof ToolingTower)) throw new Error("adoptSim takes a tower from game.sim, game.sim.constructor.newGame or game.sim.constructor.deserialize");
+  if (!(built instanceof ToolingTower))
+    throw new Error(
+      "adoptSim takes a tower from game.sim, game.sim.constructor.newGame or game.sim.constructor.deserialize",
+    );
   const port = engineOf(app);
   const from = built.port;
   const live = towers.get(app);

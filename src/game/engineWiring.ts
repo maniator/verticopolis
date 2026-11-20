@@ -5,7 +5,14 @@ import { TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngi
 import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
 import { snapX } from "../ui/placement";
 import { classifyGesture, isPaintKind } from "./gesture";
-import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors, clearBuildRefusal } from "./buildPreview";
+import {
+  placeSimpleBuild,
+  isTransportTool,
+  isPaintTool,
+  updateBuildPreview,
+  touchBuildLiftFloors,
+  clearBuildRefusal,
+} from "./buildPreview";
 import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
 import { catalogOf, isUnlocked, quoteShaft } from "./portAccess";
@@ -110,7 +117,9 @@ export function wireEngine(app: GameApp): void {
     if (app.tool.type === "skyBridge") return tapSkyBridge(app, tile, floor);
     // A mode that refuses building while paused (Classic, #1936) places nothing.
     if (app.tool.type === "build" && refuseAppPlacementWhilePaused(app)) return;
-    app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
+    app.captureUndo(
+      app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`,
+    );
     if (app.tool.type === "bulldoze") app.build.bulldozePicked(picked);
     else if (app.tool.type === "build") {
       // Touch taps land here for every simple placement, including the
@@ -148,7 +157,9 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (app.tool.type === "bulldoze" || app.tool.type === "build") {
-      app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
+      app.captureUndo(
+        app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`,
+      );
       drag = { gesture: app.undoGesture(), generation: app.enginePort.generation() };
     }
     if (app.tool.type === "bulldoze") {
@@ -197,7 +208,8 @@ export function wireEngine(app: GameApp): void {
       // A drag removes only the kind it first touched (#644), unless the
       // player picked Everything on the Bulldoze card.
       drag.bulldozes ??= picked.kind;
-      if (dragRemoves(app.bulldozeDrag.clears, drag.bulldozes, picked.kind)) app.build.bulldozePicked(picked, holdRefusal(drag));
+      if (dragRemoves(app.bulldozeDrag.clears, drag.bulldozes, picked.kind))
+        app.build.bulldozePicked(picked, holdRefusal(drag));
       return;
     }
     if (app.tool.type !== "build") return;
@@ -245,9 +257,12 @@ export function wireEngine(app: GameApp): void {
     // A drag begun while the clock ran and released after a pause commits
     // nothing in a mode that refuses building while paused (#1936); the
     // release says why once.
-    const pending = app.tool.type === "build" && (app.paintAnchor !== null || app.buildAnchor !== null || app.transportStart !== null);
+    const pending =
+      app.tool.type === "build" &&
+      (app.paintAnchor !== null || app.buildAnchor !== null || app.transportStart !== null);
     // A drag whose moves already said why stays refused without a second note.
-    const refused = pending && dragActs() && (drag?.pausedNoted ? appPlacementPaused(app) : refuseAppPlacementWhilePaused(app));
+    const refused =
+      pending && dragActs() && (drag?.pausedNoted ? appPlacementPaused(app) : refuseAppPlacementWhilePaused(app));
     const acts = dragActs() && !refused;
     // Another gesture opened over the drag is that gesture's to close.
     const closes = drag === null || app.undoGesture() === drag.gesture;
@@ -257,7 +272,8 @@ export function wireEngine(app: GameApp): void {
     // strip a desktop click lays (a drag already laid its run via
     // onActionMove and cleared the anchor).
     if (app.paintAnchor) {
-      if (acts && app.tool.type === "build") app.build.seedPaint(app.tool.kind, app.paintAnchor.tile, app.paintAnchor.floor);
+      if (acts && app.tool.type === "build")
+        app.build.seedPaint(app.tool.kind, app.paintAnchor.tile, app.paintAnchor.floor);
       app.paintAnchor = null;
     }
     // Touch room-build release: commit the room where the ghost sits (the lifted
@@ -275,7 +291,11 @@ export function wireEngine(app: GameApp): void {
     // escalators already placed on the DOWN event, and their hover ghost
     // also lives in transportPreview, treating it as a drag commit here
     // would double-place on every desktop click.
-    if (app.tool.type === "build" && isTransportTool(app) && !catalogFacility(catalogOf(app), app.tool.kind).fixedSpan) {
+    if (
+      app.tool.type === "build" &&
+      isTransportTool(app) &&
+      !catalogFacility(catalogOf(app), app.tool.kind).fixedSpan
+    ) {
       const tp = app.engine.transportPreview;
       if (tp) {
         // The helper explains failures (invalid spot, not enough money)
@@ -284,7 +304,10 @@ export function wireEngine(app: GameApp): void {
         app.engine.transportPreview = null;
       } else if (app.transportStart && !refused) {
         // Pressed without dragging, teach the drag-to-size gesture.
-        app.ui.toast(`Drag up or down to set the ${catalogFacility(catalogOf(app), app.tool.kind).name.toLowerCase()}'s height.`, "info");
+        app.ui.toast(
+          `Drag up or down to set the ${catalogFacility(catalogOf(app), app.tool.kind).name.toLowerCase()}'s height.`,
+          "info",
+        );
       }
     }
     app.transportStart = null;

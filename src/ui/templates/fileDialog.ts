@@ -131,7 +131,12 @@ export function fileSizeText(bytes: number): string {
 
 /** When a file was written, short: month/day and the time. */
 export function fileWhenText(ms: number): string {
-  return new Date(ms).toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(ms).toLocaleString(undefined, {
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /** "12 towers, 2.1 MB". */
@@ -143,7 +148,8 @@ export function usageText(usage: { count: number; bytes: number }): string {
 /** The row element's id, for the list's active descendant. A file in the
  *  linked folder is named by its file name, so any character an element id
  *  can't hold is spelled out. */
-export const rowDomId = (id: string): string => `fd-row-${id.replace(/[^A-Za-z0-9-]/g, (c) => `_${c.codePointAt(0)!.toString(16)}_`)}`;
+export const rowDomId = (id: string): string =>
+  `fd-row-${id.replace(/[^A-Za-z0-9-]/g, (c) => `_${c.codePointAt(0)!.toString(16)}_`)}`;
 
 /** The header's count, or why there is none yet. */
 function usageLine(v: FileDialogView): string {
@@ -189,12 +195,14 @@ export function fileDialogTemplate(v: FileDialogView, h: FileDialogHandlers): Te
           }} />
         <button type="button" class="btn primary fd-primary" ?disabled=${v.busy || v.loading || waitingForOk(v)} @click=${h.primary}>${opening ? "Open" : "Save"}</button>
         <label class="fd-label" for="fd-type">${opening ? "Files of type:" : "Save as type:"}</label>
-        ${opening
-          ? html`<select id="fd-type" class="field fd-type" .value=${v.filter}
+        ${
+          opening
+            ? html`<select id="fd-type" class="field fd-type" .value=${v.filter}
               @change=${(e: Event) => h.filter((e.target as HTMLSelectElement).value as FileFilter)}>
               ${(Object.keys(FILTER_LABEL) as FileFilter[]).map((f) => html`<option value=${f} ?selected=${v.filter === f}>${FILTER_LABEL[f]}</option>`)}
             </select>`
-          : html`<select id="fd-type" class="field fd-type"><option>${FILTER_LABEL.tower}</option></select>`}
+            : html`<select id="fd-type" class="field fd-type"><option>${FILTER_LABEL.tower}</option></select>`
+        }
         <button type="button" class="btn fd-cancel" @click=${h.cancel}>Cancel</button>
       </div>
       ${v.line ? html`<p class=${`fd-line fd-line-${v.line.kind}`} role="alert">${v.line.text}</p>` : nothing}
@@ -294,7 +302,11 @@ function tools(opening: boolean, fileSelected: boolean, v: FileDialogView, h: Fi
 function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
   const replacing = ask.kind === "replace";
   const [title, line1, line2] = replacing
-    ? ["Save As", `"${ask.name}" already exists.`, ask.alt ? `Save this tower as "${ask.alt}", or replace it?` : "Do you want to replace it?"]
+    ? [
+        "Save As",
+        `"${ask.name}" already exists.`,
+        ask.alt ? `Save this tower as "${ask.alt}", or replace it?` : "Do you want to replace it?",
+      ]
     : ["Confirm File Delete", `Are you sure you want to delete "${ask.name}"?`, "It can't be undone."];
   const button = (choice: FileAnswer, label: string) =>
     html`<button type="button" class="btn" data-fd-ask=${choice} @click=${() => h.answer(choice)}>${label}</button>`;
@@ -306,9 +318,11 @@ function askBox(ask: FileAsk, h: FileDialogHandlers): TemplateResult {
         <p id="fd-ask-text">${line1}<br />${line2}</p>
       </div>
       <div class="fd-ask-buttons">
-        ${replacing && ask.alt
-          ? html`${button("alt", `Save as "${ask.alt}"`)}${button("yes", "Replace")}${button("no", "Cancel")}`
-          : html`${button("yes", "Yes")}${button("no", "No")}`}
+        ${
+          replacing && ask.alt
+            ? html`${button("alt", `Save as "${ask.alt}"`)}${button("yes", "Replace")}${button("no", "Cancel")}`
+            : html`${button("yes", "Yes")}${button("no", "No")}`
+        }
       </div>
     </div>
   </div>`;

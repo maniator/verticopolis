@@ -114,7 +114,8 @@ describe.skipIf(noEngine)("the schedule review on split-tower-4 (#1548)", () => 
 
 describe.skipIf(noEngine)("what the player is told, and what they decide (#1548)", () => {
   /** The same tower under another founding seed: a different tower to the browser's memory. */
-  const reseeded = (name: string, seed: number): SerializedGame => ({ ...load(name), initialSeed: seed }) as SerializedGame;
+  const reseeded = (name: string, seed: number): SerializedGame =>
+    ({ ...load(name), initialSeed: seed }) as SerializedGame;
 
   it("mentions flat schedules once per tower, then never again, even after a reload", () => {
     const store = memory();
@@ -226,7 +227,8 @@ describe.skipIf(noEngine)("what the player is told, and what they decide (#1548)
     keep.review.open();
     keep.dialog().handlers[keepAct(1139)]!();
 
-    const shaftOf = () => look(keep.port).tower.transports.find((t) => t.id === 1139)! as unknown as { bottom: number; top: number };
+    const shaftOf = () =>
+      look(keep.port).tower.transports.find((t) => t.id === 1139)! as unknown as { bottom: number; top: number };
     const before = { ...shaftOf() };
     expect(before.bottom).toBe(15);
     // The top comes down first, so the span stays within the 30-floor limit.
@@ -331,7 +333,9 @@ describe.skipIf(noEngine)("the review's notices, focus and copy (#1548)", () => 
     g.review.open();
     g.dialog().handlers[keepAct(1735)]!();
     expect(g.dialog().focus).toBe(recoverAct(1735));
-    expect(g.announced[g.announced.length - 1]).toMatch(/^Kept the schedule of the elevator on floors .+ to .+ as it is\.$/);
+    expect(g.announced[g.announced.length - 1]).toMatch(
+      /^Kept the schedule of the elevator on floors .+ to .+ as it is\.$/,
+    );
   });
 
   it("says so, inside the redrawn dialog, when Review schedule names an elevator that is gone", () => {
@@ -374,12 +378,22 @@ describe.skipIf(noEngine)("the review's notices, focus and copy (#1548)", () => 
     expect(g.toasts[0]).toBe(
       "An elevator has more cars than its schedule puts on shift. Choose Tower > Statistics… to review it. Nothing changes unless you choose it.",
     );
-    g.port.scheduleShaft(1735, scheduleSlots({ activeCars: { weekday: Array(24).fill(0), weekend: Array(24).fill(0) } }));
+    g.port.scheduleShaft(
+      1735,
+      scheduleSlots({ activeCars: { weekday: Array(24).fill(0), weekend: Array(24).fill(0) } }),
+    );
     g.review.open();
-    expect(g.dialog().rows.find((r) => r.id === 1735)!.facts).toBe("3 cars installed. No cars are on shift at any hour.");
-    g.port.scheduleShaft(1735, scheduleSlots({ activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } }));
+    expect(g.dialog().rows.find((r) => r.id === 1735)!.facts).toBe(
+      "3 cars installed. No cars are on shift at any hour.",
+    );
+    g.port.scheduleShaft(
+      1735,
+      scheduleSlots({ activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } }),
+    );
     g.review.open();
-    expect(g.dialog().rows.find((r) => r.id === 1735)!.facts).toBe("3 cars installed. 1 is on shift in every hour, weekdays and weekends.");
+    expect(g.dialog().rows.find((r) => r.id === 1735)!.facts).toBe(
+      "3 cars installed. 1 is on shift in every hour, weekdays and weekends.",
+    );
   });
 
   it("recovers and undoes on split-tower's 5-car shaft too, and leaves both fixtures' bytes alone", async () => {
@@ -390,6 +404,8 @@ describe.skipIf(noEngine)("the review's notices, focus and copy (#1548)", () => 
     expect(g.scheduleOf(1139)!.activeCars).toEqual({ weekday: Array(24).fill(5), weekend: Array(24).fill(5) });
     await g.history.undo();
     expect(diffPaths(saved, g.saved())).toEqual([]);
-    expect(readFileSync("node_modules/@verticopolis/engine/conformance/fixtures/split-tower.vctower").equals(before)).toBe(true);
+    expect(
+      readFileSync("node_modules/@verticopolis/engine/conformance/fixtures/split-tower.vctower").equals(before),
+    ).toBe(true);
   });
 });

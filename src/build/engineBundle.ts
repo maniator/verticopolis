@@ -18,7 +18,10 @@
 export const TOOLING_SIM = "src/game/toolingSim.ts";
 
 /** The engine package files the precache must carry. */
-export const ENGINE_PACKAGE_FILES: readonly string[] = ["engine/verticopolis_engine.js", "engine/verticopolis_engine_bg.wasm"];
+export const ENGINE_PACKAGE_FILES: readonly string[] = [
+  "engine/verticopolis_engine.js",
+  "engine/verticopolis_engine_bg.wasm",
+];
 
 /** One emitted JavaScript file and the repository-relative sources its
  *  sourcemap lists (`src/...`, `node_modules/...`), with any query suffix
@@ -51,30 +54,44 @@ export interface EngineBundleResult {
 }
 
 const isTestSource = (s: string): boolean =>
-  s.startsWith("src/tests/") || s.startsWith("e2e/") || s.includes("/__mocks__/") || /\.(test|spec)\.[mc]?[jt]sx?$/.test(s);
+  s.startsWith("src/tests/") ||
+  s.startsWith("e2e/") ||
+  s.includes("/__mocks__/") ||
+  /\.(test|spec)\.[mc]?[jt]sx?$/.test(s);
 
 /** Check the emitted bundle. Pure: the script reads the files and passes them
  *  in. */
 export function checkEngineBundle(input: EngineBundleInput): EngineBundleResult {
   const errors: string[] = [];
-  if (input.chunks.length === 0) errors.push("no emitted JavaScript with a sourcemap was found, so the bundle cannot be checked");
+  if (input.chunks.length === 0)
+    errors.push("no emitted JavaScript with a sourcemap was found, so the bundle cannot be checked");
   for (const chunk of input.chunks) {
     for (const s of chunk.sources) {
       if (isTestSource(s)) errors.push(`${chunk.file} carries test code (${s})`);
-      if (!input.tooling && s === TOOLING_SIM) errors.push(`${chunk.file} carries the tooling harnesses' tower (${s}), which only a VC_TOOLING=1 build may ship`);
+      if (!input.tooling && s === TOOLING_SIM)
+        errors.push(
+          `${chunk.file} carries the tooling harnesses' tower (${s}), which only a VC_TOOLING=1 build may ship`,
+        );
     }
   }
   const pre = new Set(input.precache);
   const absent = input.enginePackageBuilt ? ENGINE_PACKAGE_FILES.filter((f) => !pre.has(f)) : [];
-  if (absent.length > 0) errors.push(`the build does not precache the engine package (${absent.join(", ")}), so it could not start offline`);
+  if (absent.length > 0)
+    errors.push(`the build does not precache the engine package (${absent.join(", ")}), so it could not start offline`);
   if (input.engineGlue !== null) {
     const methods = glueMethods(input.engineGlue);
     if (input.tooling) {
       const missing = input.toolingMethods.filter((m) => !methods.has(m));
-      if (missing.length > 0) errors.push(`a tooling build ships the player engine package: its glue lacks ${missing.join(", ")}, which the tooling tower calls (the web build of @verticopolis/engine/tooling should replace src/public/engine/)`);
+      if (missing.length > 0)
+        errors.push(
+          `a tooling build ships the player engine package: its glue lacks ${missing.join(", ")}, which the tooling tower calls (the web build of @verticopolis/engine/tooling should replace src/public/engine/)`,
+        );
     } else {
       const shipped = input.toolingMethods.filter((m) => methods.has(m));
-      if (shipped.length > 0) errors.push(`the engine package ships tier 3 ops only the tooling build may carry (${shipped.join(", ")}); src/public/engine/ must hold the player build (npm install)`);
+      if (shipped.length > 0)
+        errors.push(
+          `the engine package ships tier 3 ops only the tooling build may carry (${shipped.join(", ")}); src/public/engine/ must hold the player build (npm install)`,
+        );
     }
   }
   return { errors };
@@ -109,7 +126,9 @@ export function precacheManifest(sw: string): string[] | null {
   for (let i = open; i < sw.length; i++) {
     if (sw[i] === "[") depth++;
     else if (sw[i] === "]" && --depth === 0) {
-      return [...sw.slice(open, i + 1).matchAll(/["']?url["']?\s*:\s*(["'])(.*?)\1/g)].map((m) => m[2].replace(/^\.?\//, ""));
+      return [...sw.slice(open, i + 1).matchAll(/["']?url["']?\s*:\s*(["'])(.*?)\1/g)].map((m) =>
+        m[2].replace(/^\.?\//, ""),
+      );
     }
   }
   return null;

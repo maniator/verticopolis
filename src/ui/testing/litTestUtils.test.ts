@@ -64,7 +64,9 @@ describe("event-dispatch helpers", () => {
 
   it("a @change handler can read the value the test sets before firing", () => {
     let seen = "";
-    const frag = renderToFragment(html`<input @change=${(e: Event) => (seen = (e.target as HTMLInputElement).value)} />`);
+    const frag = renderToFragment(
+      html`<input @change=${(e: Event) => (seen = (e.target as HTMLInputElement).value)} />`,
+    );
     const el = frag.querySelector("input")!;
     el.value = "typed";
     change(el);

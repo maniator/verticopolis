@@ -26,7 +26,8 @@ function windowWith(clientHeight: number, heights: Heights): HTMLElement {
   return win;
 }
 
-const fitClasses = (win: HTMLElement) => [PALETTE_FIT.compact, PALETTE_FIT.columns].filter((c) => win.classList.contains(c));
+const fitClasses = (win: HTMLElement) =>
+  [PALETTE_FIT.compact, PALETTE_FIT.columns].filter((c) => win.classList.contains(c));
 
 // A full Modern list: 1355px of normal rows, 1100 compact, two columns of
 // 720 and 600 (heights from a real 1920-wide desktop run).
@@ -126,7 +127,8 @@ describe("watchPaletteFit", () => {
     );
   }
   const resize = (width: number, height: number) => {
-    for (const o of observers) o.callback([{ contentRect: { width, height } } as ResizeObserverEntry], {} as ResizeObserver);
+    for (const o of observers)
+      o.callback([{ contentRect: { width, height } } as ResizeObserverEntry], {} as ResizeObserver);
   };
 
   afterEach(() => {
@@ -205,7 +207,8 @@ describe("watchPaletteFit", () => {
     const open = win.querySelector<HTMLElement>('[data-kind="lobby"]')!;
     // The list is too tall for normal rows whenever any tool is chosen or
     // pulsed, so a refit at such a moment picks compact rows.
-    const shownExtra = () => [folded, open].some((n) => n.classList.contains("active") || n.classList.contains("tt-pulse"));
+    const shownExtra = () =>
+      [folded, open].some((n) => n.classList.contains("active") || n.classList.contains("tt-pulse"));
     Object.defineProperty(win, "scrollHeight", {
       configurable: true,
       get: () => (!win.classList.contains(PALETTE_FIT.compact) && shownExtra() ? 1300 : 1100),

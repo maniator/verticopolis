@@ -45,7 +45,12 @@ describe("Night Shift", () => {
     const scene = nightShift(80, 60, tower, seq(0.5));
     scene.draw(asCtx(c));
     expect(c.drawImage).not.toHaveBeenCalled();
-    expect(c.fillRect).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number));
+    expect(c.fillRect).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+    );
   });
 
   it("makes a tower up for a player with no rooms yet", () => {

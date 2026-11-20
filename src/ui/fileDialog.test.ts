@@ -9,12 +9,20 @@ import { clearFileClipboardForTests, fileRows, showFileDialog, type FileDialogCt
 import { ROW_HOLD_MS } from "./fileDialogPress";
 import type { FileRow } from "./templates/fileDialog";
 
-const entry = (id: string, name: string, modified: number, kind: TowerFileEntry["kind"] = "tower", size = 100): TowerFileEntry => ({ id, name, kind, size, modified });
+const entry = (
+  id: string,
+  name: string,
+  modified: number,
+  kind: TowerFileEntry["kind"] = "tower",
+  size = 100,
+): TowerFileEntry => ({ id, name, kind, size, modified });
 const AUTO: FileRow = { id: "auto", name: "Auto-save (Sky)", type: "auto", modified: 50 };
 
 let files: TowerFileEntry[];
 let listeners: (() => void)[];
-let ctx: FileDialogCtx & { [K in "open" | "save" | "rename" | "duplicate" | "remove" | "add" | "fromComputer"]: ReturnType<typeof vi.fn> };
+let ctx: FileDialogCtx & {
+  [K in "open" | "save" | "rename" | "duplicate" | "remove" | "add" | "fromComputer"]: ReturnType<typeof vi.fn>;
+};
 let ui: { openModalTemplate: ReturnType<typeof vi.fn>; closeModal: ReturnType<typeof vi.fn> };
 let box: HTMLElement | null;
 
@@ -45,11 +53,14 @@ function makeCtx(mode: "open" | "saveAs", over: Partial<FileDialogCtx> = {}) {
   return ctx;
 }
 
-const show = (mode: "open" | "saveAs", over: Partial<FileDialogCtx> = {}) => showFileDialog(ui as never, makeCtx(mode, over));
+const show = (mode: "open" | "saveAs", over: Partial<FileDialogCtx> = {}) =>
+  showFileDialog(ui as never, makeCtx(mode, over));
 const q = <T extends HTMLElement = HTMLElement>(sel: string) => box!.querySelector<T>(sel)!;
 const rowNames = () => [...box!.querySelectorAll(".fd-row .fd-name-cell")].map((e) => e.textContent);
-const key = (el: Element, k: string, init: KeyboardEventInit = {}) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
-const button = (text: string) => [...box!.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.trim() === text)!;
+const key = (el: Element, k: string, init: KeyboardEventInit = {}) =>
+  el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
+const button = (text: string) =>
+  [...box!.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.trim() === text)!;
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
@@ -75,13 +86,28 @@ afterEach(() => {
 
 describe("the rows a window lists", () => {
   it("puts the Auto-save first, then the files newest first", () => {
-    expect(fileRows(AUTO, files, "all", { key: "modified", down: true }).map((r) => r.id)).toEqual(["auto", "b", "c", "a"]);
+    expect(fileRows(AUTO, files, "all", { key: "modified", down: true }).map((r) => r.id)).toEqual([
+      "auto",
+      "b",
+      "c",
+      "a",
+    ]);
   });
 
   it("sorts by name the way a person reads numbers, either way round", () => {
     const more = [...files, entry("d", "charlie 9", 1)];
-    expect(fileRows(null, more, "all", { key: "name", down: false }).map((r) => r.name)).toEqual(["Alpha", "Bravo", "charlie 9", "charlie 10"]);
-    expect(fileRows(null, more, "all", { key: "name", down: true }).map((r) => r.name)).toEqual(["charlie 10", "charlie 9", "Bravo", "Alpha"]);
+    expect(fileRows(null, more, "all", { key: "name", down: false }).map((r) => r.name)).toEqual([
+      "Alpha",
+      "Bravo",
+      "charlie 9",
+      "charlie 10",
+    ]);
+    expect(fileRows(null, more, "all", { key: "name", down: true }).map((r) => r.name)).toEqual([
+      "charlie 10",
+      "charlie 9",
+      "Bravo",
+      "Alpha",
+    ]);
   });
 
   it("shows only the filtered type, and the Auto-save only under All towers", () => {
@@ -96,7 +122,9 @@ describe("the Open window", () => {
     expect(rowNames()).toEqual(["Auto-save (Sky)", "Bravo", "charlie 10", "Alpha"]);
     q("#fd-row-c").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     expect(ui.closeModal).toHaveBeenCalledOnce();
-    expect(ctx.open).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: "c", name: "charlie 10", type: "tower" }));
+    expect(ctx.open).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: "c", name: "charlie 10", type: "tower" }),
+    );
     expect(ui.closeModal.mock.invocationCallOrder[0]).toBeLessThan(ctx.open.mock.invocationCallOrder[0]);
   });
 
@@ -174,19 +202,43 @@ describe("the Open window", () => {
 
   it("keeps the right-click menu inside the window near its right and bottom edges", () => {
     show("open");
-    q(".fd").getBoundingClientRect = () => ({ left: 10, top: 20, width: 300, height: 400, right: 310, bottom: 420, x: 10, y: 20, toJSON: () => ({}) });
+    q(".fd").getBoundingClientRect = () => ({
+      left: 10,
+      top: 20,
+      width: 300,
+      height: 400,
+      right: 310,
+      bottom: 420,
+      x: 10,
+      y: 20,
+      toJSON: () => ({}),
+    });
     const proto = HTMLElement.prototype;
     const width = Object.getOwnPropertyDescriptor(proto, "offsetWidth")!;
     const height = Object.getOwnPropertyDescriptor(proto, "offsetHeight")!;
-    const menuSize = (size: number) => ({ configurable: true, get(this: HTMLElement) { return this.classList.contains("fd-menu") ? size : 0; } });
+    const menuSize = (size: number) => ({
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.classList.contains("fd-menu") ? size : 0;
+      },
+    });
     Object.defineProperty(proto, "offsetWidth", menuSize(140));
     Object.defineProperty(proto, "offsetHeight", menuSize(150));
     try {
-      const press = (x: number, y: number) => q(".fd-row").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+      const press = (x: number, y: number) =>
+        q(".fd-row").dispatchEvent(
+          new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }),
+        );
       press(300, 400);
-      expect([q(".fd-menu").style.left, q(".fd-menu").style.top], "moved left and up to fit").toEqual(["160px", "250px"]);
+      expect([q(".fd-menu").style.left, q(".fd-menu").style.top], "moved left and up to fit").toEqual([
+        "160px",
+        "250px",
+      ]);
       press(50, 60);
-      expect([q(".fd-menu").style.left, q(".fd-menu").style.top], "a menu that fits stays at the pointer").toEqual(["40px", "40px"]);
+      expect([q(".fd-menu").style.left, q(".fd-menu").style.top], "a menu that fits stays at the pointer").toEqual([
+        "40px",
+        "40px",
+      ]);
     } finally {
       Object.defineProperty(proto, "offsetWidth", width);
       Object.defineProperty(proto, "offsetHeight", height);
@@ -275,7 +327,9 @@ describe("the Open window", () => {
 
   it("opens a right-click menu on a row whose items act on that row, and Esc closes it first", () => {
     show("open");
-    q("#fd-row-a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 40, clientY: 60 }));
+    q("#fd-row-a").dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 40, clientY: 60 }),
+    );
     const items = () => [...box!.querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")];
     expect(items().map((b) => [b.textContent, b.getAttribute("aria-disabled")])).toEqual([
       ["Open", "false"],
@@ -303,12 +357,23 @@ describe("the Open window", () => {
     const versions = vi.fn();
     show("open", { versions });
     m.track.mockClear();
-    const touch = (type: string) => new PointerEvent(type, { pointerType: "touch", pointerId: 3, isPrimary: true, clientX: 30, clientY: 40, bubbles: true, cancelable: true });
+    const touch = (type: string) =>
+      new PointerEvent(type, {
+        pointerType: "touch",
+        pointerId: 3,
+        isPrimary: true,
+        clientX: 30,
+        clientY: 40,
+        bubbles: true,
+        cancelable: true,
+      });
     q("#fd-row-a").dispatchEvent(touch("pointerdown"));
     vi.advanceTimersByTime(ROW_HOLD_MS);
     expect(q<HTMLInputElement>("#fd-name").value).toBe("Alpha");
     // Android's own hold arrives too; the menu is not opened again.
-    q("#fd-row-a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }));
+    q("#fd-row-a").dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }),
+    );
     q("#fd-row-a").dispatchEvent(touch("pointerup"));
     q(".fd-menu .mb-item").dispatchEvent(new MouseEvent("click", { detail: 1, bubbles: true, cancelable: true }));
     expect(ctx.open, "the lift's click pressed nothing").not.toHaveBeenCalled();
@@ -325,7 +390,15 @@ describe("the Open window", () => {
     q("#fd-row-a").click();
     key(q(".fd-rows"), "F2");
     const field = q(".fd-rename");
-    field.dispatchEvent(new PointerEvent("pointerdown", { pointerType: "touch", pointerId: 4, isPrimary: true, bubbles: true, cancelable: true }));
+    field.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        pointerType: "touch",
+        pointerId: 4,
+        isPrimary: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
     vi.advanceTimersByTime(ROW_HOLD_MS * 2);
     const native = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
     field.dispatchEvent(native);
@@ -345,7 +418,8 @@ describe("the Open window", () => {
 
   it("deletes and renames from the menu, and a click on the list closes it", () => {
     show("open");
-    const menuItem = (text: string) => [...box!.querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")].find((b) => b.textContent === text)!;
+    const menuItem = (text: string) =>
+      [...box!.querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")].find((b) => b.textContent === text)!;
     q("#fd-row-c").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     q(".fd-list").click();
     expect(box!.querySelector(".fd-menu")).toBeNull();

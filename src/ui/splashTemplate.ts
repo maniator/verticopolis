@@ -3,7 +3,13 @@ import { iconTemplate } from "@verticopolis/components/windows/icons";
 import { versionLine } from "@verticopolis/components/host/engineLabel";
 import { platformLabel } from "../analyticsEnrichment";
 import { trackAppAction } from "../analytics";
-import { SKYLINE_BUILDINGS, SKYLINE_VIEWBOX, SKYLINE_WINDOWS, SKYLINE_WINDOW_COLOR, SKYLINE_WINDOW_SIZE } from "./splashSkyline";
+import {
+  SKYLINE_BUILDINGS,
+  SKYLINE_VIEWBOX,
+  SKYLINE_WINDOWS,
+  SKYLINE_WINDOW_COLOR,
+  SKYLINE_WINDOW_SIZE,
+} from "./splashSkyline";
 
 /**
  * The "Metropolis Dusk" splash/title-screen body, split out of the onboarding
@@ -101,7 +107,14 @@ export interface SplashHandlers {
  *  inline/inline-block. No whitespace is added inside any `<text>`/`<tspan>` (it
  *  would shift the `textLength`-fitted glyphs) or inside a glyph button (it would
  *  change its `textContent`). */
-export function splashTemplate(hasSave: boolean, premise: string, muted: boolean, installOffered: boolean, founder: boolean, h: SplashHandlers): TemplateResult {
+export function splashTemplate(
+  hasSave: boolean,
+  premise: string,
+  muted: boolean,
+  installOffered: boolean,
+  founder: boolean,
+  h: SplashHandlers,
+): TemplateResult {
   return html`<div class="splash-stars" aria-hidden="true"></div>
     <div class="splash-sun" aria-hidden="true"></div>
     <svg class="splash-skyline" aria-hidden="true" viewBox=${SKYLINE_VIEWBOX} preserveAspectRatio="xMidYMax slice">
@@ -143,9 +156,7 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
          No title tooltip: .splash-founder is pointer-events:none so it never
          hit-tests, and a tooltip that can never open is worse than none. The
          one-time welcome toast carries the explanation instead. -->
-    ${founder
-      ? html`<p class="splash-founder">★ Ground floor</p>`
-      : nothing}
+    ${founder ? html`<p class="splash-founder">★ Ground floor</p>` : nothing}
     <!-- The mute toggle renders LAST so the reading and Tab order run
          title -> premise -> actions -> utility; it is pinned visually to the
          top-right corner by .splash-mute (absolute), un-unified per the design
@@ -163,15 +174,19 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
          empty splash): recognizable, and matching the in-game chip's wording. Copy
          promises an outcome (title), never "one-tap"; a tap degrades to an honest
          how-to in the shared activation. -->
-    ${installOffered && h.onInstall
-      ? html`<button class="splash-install" data-splash="install" aria-label="Install Verticopolis" title="Install Verticopolis: play offline, fullscreen, from your home screen." @click=${h.onInstall}>${iconTemplate("install", { size: 14 })}Install</button>`
-      : nothing}
+    ${
+      installOffered && h.onInstall
+        ? html`<button class="splash-install" data-splash="install" aria-label="Install Verticopolis" title="Install Verticopolis: play offline, fullscreen, from your home screen." @click=${h.onInstall}>${iconTemplate("install", { size: 14 })}Install</button>`
+        : nothing
+    }
     <!-- The Sponsor link (owner, 2026-11-13): a quiet tip jar pinned to the
          top-left corner, opposite the mute and install cluster. A plain link
          that opens GitHub Sponsors in a new tab; it never blocks play, never
          nags, and unlocks nothing. Rendered last so it ends the Tab order, and
          left out of the Android app (see sponsorOffered). -->
-    ${sponsorOffered()
-      ? html`<a class="splash-sponsor" data-splash="sponsor" href=${SPONSOR_URL} target="_blank" rel="noopener noreferrer" title="Verticopolis is free. Sponsoring helps keep it going." @click=${noteSponsorClick} @auxclick=${noteSponsorClick}>${iconTemplate("heart", { size: 14 })}Sponsor</a>`
-      : nothing}`;
+    ${
+      sponsorOffered()
+        ? html`<a class="splash-sponsor" data-splash="sponsor" href=${SPONSOR_URL} target="_blank" rel="noopener noreferrer" title="Verticopolis is free. Sponsoring helps keep it going." @click=${noteSponsorClick} @auxclick=${noteSponsorClick}>${iconTemplate("heart", { size: 14 })}Sponsor</a>`
+        : nothing
+    }`;
 }

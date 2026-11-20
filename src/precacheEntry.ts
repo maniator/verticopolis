@@ -25,7 +25,8 @@ export function precacheFile(dist: string, url: string): string {
     throw new Error(`precache entry ${url} is not a valid URL path`);
   }
   // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u001f\u007f]/.test(decoded)) throw new Error(`precache entry ${url} has a control character in its path`);
+  if (/[\u0000-\u001f\u007f]/.test(decoded))
+    throw new Error(`precache entry ${url} has a control character in its path`);
   if (decoded === "" || /^[a-z][a-z0-9+.-]*:/i.test(decoded) || /^[\\/]/.test(decoded) || decoded.includes("\\")) {
     throw new Error(`precache entry ${url} is not a relative path inside dist/`);
   }
@@ -56,6 +57,9 @@ export function missingEngine(env: Record<string, string | undefined>, builtEngi
     return `this deploy has no engine package in dist/, and a deploy must ship the WASM engine (${ALLOW_NO_ENGINE} does not apply to one); ${how}`;
   }
   if (env[ALLOW_NO_ENGINE] === "1") return null;
-  const seen = env[ALLOW_NO_ENGINE] === undefined ? "" : ` (${ALLOW_NO_ENGINE} is ${JSON.stringify(env[ALLOW_NO_ENGINE])}, and only "1" opts in)`;
+  const seen =
+    env[ALLOW_NO_ENGINE] === undefined
+      ? ""
+      : ` (${ALLOW_NO_ENGINE} is ${JSON.stringify(env[ALLOW_NO_ENGINE])}, and only "1" opts in)`;
   return `this build has no engine package in dist/, so it would ship without the WASM engine; ${how}, or set ${ALLOW_NO_ENGINE}=1 for a deliberate build without the engine, which cannot run the game${seen}`;
 }

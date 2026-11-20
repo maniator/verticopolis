@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 const files = vi.hoisted(() => ({ saveCurrentFile: vi.fn(), keepOpenedFile: vi.fn(), trackAppAction: vi.fn() }));
-vi.mock("../analytics", async (importOriginal) => ({ ...(await importOriginal<typeof import("../analytics")>()), trackAppAction: files.trackAppAction }));
+vi.mock("../analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../analytics")>()),
+  trackAppAction: files.trackAppAction,
+}));
 vi.mock("./fileSpaceCommands", () => ({ saveCurrentFile: files.saveCurrentFile }));
 vi.mock("./fileKeep", () => ({ keepOpenedFile: files.keepOpenedFile }));
 import { catalogFor } from "../tests/catalogFixture";
@@ -131,7 +134,9 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(files.keepOpenedFile).not.toHaveBeenCalled();
     generation.mockReturnValueOnce(1).mockReturnValueOnce(2);
     cb.onImport("opened", from);
-    await vi.waitFor(() => expect(files.keepOpenedFile).toHaveBeenCalledExactlyOnceWith("Spire.vctower", from.bytes, "tower"));
+    await vi.waitFor(() =>
+      expect(files.keepOpenedFile).toHaveBeenCalledExactlyOnceWith("Spire.vctower", from.bytes, "tower"),
+    );
   });
 
   it("getMode reads the reader's header per call, so an adoptSim-style swap is seen", () => {
@@ -197,7 +202,10 @@ describe("createUICallbacks delegates every callback to its port", () => {
     // The passers-by fakes answer false, so a callback that ignored the port
     // and answered the default (on) would fail here.
     expect([cb.onTogglePassersBy(), cb.isPassersBy()]).toEqual([false, false]);
-    expect([vi.mocked(ports.togglePassersBy).mock.calls.length, vi.mocked(ports.isPassersBy).mock.calls.length]).toEqual([1, 1]);
+    expect([
+      vi.mocked(ports.togglePassersBy).mock.calls.length,
+      vi.mocked(ports.isPassersBy).mock.calls.length,
+    ]).toEqual([1, 1]);
   });
 
   it("the bridging switch is an engine port command that resolves to the engine's answer", async () => {

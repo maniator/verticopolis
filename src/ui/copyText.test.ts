@@ -21,9 +21,7 @@ describe("copyText", () => {
   it("falls back to a selection copy when the page has no Clipboard API", async () => {
     const exec = vi.fn(() => true);
     document.execCommand = exec;
-    expect(
-      await copyText("hello", { clipboard: undefined as unknown as Clipboard }),
-    ).toBe(true);
+    expect(await copyText("hello", { clipboard: undefined as unknown as Clipboard })).toBe(true);
     expect(exec).toHaveBeenCalledWith("copy");
     expect(document.querySelector("textarea")).toBeNull();
   });
@@ -46,9 +44,7 @@ describe("copyText", () => {
     document.execCommand = vi.fn(() => {
       throw new Error("no");
     });
-    expect(
-      await copyText("hello", { clipboard: undefined as unknown as Clipboard }),
-    ).toBe(false);
+    expect(await copyText("hello", { clipboard: undefined as unknown as Clipboard })).toBe(false);
     expect(document.querySelector("textarea")).toBeNull();
   });
 

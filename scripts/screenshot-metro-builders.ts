@@ -41,7 +41,7 @@ export function buildMetroLineTower(): void {
     if (!t.ok) throw new Error(`metro line platform elevator at ${x} failed: ${t.reason}`);
   }
   for (let f = 2; f <= 5; f++) {
-    for (let x = left; x + 1 <= right; ) {
+    for (let x = left; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);

@@ -43,7 +43,10 @@ const menu = () => document.getElementById("btn-install-menu") as HTMLButtonElem
 
 /** Dispatch a fake beforeinstallprompt so the seam becomes installable. */
 function makeInstallable(): void {
-  const e = new Event("beforeinstallprompt") as Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+  const e = new Event("beforeinstallprompt") as Event & {
+    prompt: () => Promise<void>;
+    userChoice: Promise<{ outcome: string }>;
+  };
   e.prompt = vi.fn(() => Promise.resolve());
   e.userChoice = Promise.resolve({ outcome: "accepted" });
   e.preventDefault = vi.fn();
@@ -86,7 +89,10 @@ describe("passive menu entry (CAP-1)", () => {
   });
 
   it("shows for iOS (the how-to path is still an offer)", () => {
-    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)", configurable: true });
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)",
+      configurable: true,
+    });
     initInstallAffordance(makeApp());
     expect(menu().hidden).toBe(false);
   });
@@ -163,7 +169,10 @@ describe("play-gated chip, once ever (CAP-1)", () => {
 
 describe("iOS activation (CAP-3)", () => {
   it("opens the Add-to-Home-Screen how-to, never a prompt", () => {
-    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)", configurable: true });
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)",
+      configurable: true,
+    });
     const app = makeApp();
     initInstallAffordance(app);
     // No beforeinstallprompt on iOS, so no native prompt is even possible: the
@@ -213,7 +222,10 @@ describe("splash front door (CAP-5)", () => {
   });
 
   it("activateInstall routes an iOS session to the iOS how-to variant, not the browser one", async () => {
-    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)", configurable: true });
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)",
+      configurable: true,
+    });
     const app = makeApp();
     initInstallAffordance(app);
     expect(canPromptInstall()).toBe(false); // iOS never fires beforeinstallprompt

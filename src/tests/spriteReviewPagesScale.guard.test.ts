@@ -61,7 +61,11 @@ vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
 vi.mock("@verticopolis/components/host/rustEngine", async () => {
   const { readFileSync } = await import("node:fs");
   const { catalogFixturePath } = await import("./catalogFixture");
-  return { loadWasmEngine: async () => ({ catalog: (mode: "classic" | "modern") => readFileSync(catalogFixturePath(mode), "utf8") }) };
+  return {
+    loadWasmEngine: async () => ({
+      catalog: (mode: "classic" | "modern") => readFileSync(catalogFixturePath(mode), "utf8"),
+    }),
+  };
 });
 
 /** The world's floor pitch, in tiles. Both pages must reproduce this whatever

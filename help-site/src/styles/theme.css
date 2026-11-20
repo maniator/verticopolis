@@ -284,7 +284,10 @@ mobile-starlight-toc .toggle,
   text-decoration: none;
   background: var(--splash-cream);
   border: 2px solid var(--splash-ink);
-  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.75), inset -2px -2px 0 rgba(0, 0, 0, 0.2), 3px 3px 0 rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.75),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.2),
+    3px 3px 0 rgba(0, 0, 0, 0.4);
 }
 .ts-btn:hover {
   color: var(--splash-plate-ink);

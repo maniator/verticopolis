@@ -14,10 +14,31 @@ const SCRIPT = join(ROOT, "scripts/gen-third-party-notices.ts");
 const dirs: string[] = [];
 afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
-const crate = { name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", hasLicenseFile: true, kind: "crate" };
-const std = { name: "Rust standard library", version: "1.97.0", license: "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib", licenseText: "std text", hasLicenseFile: true, kind: "crate" };
+const crate = {
+  name: "serde",
+  version: "1.0.229",
+  license: "MIT OR Apache-2.0",
+  licenseText: "MIT text",
+  hasLicenseFile: true,
+  kind: "crate",
+};
+const std = {
+  name: "Rust standard library",
+  version: "1.97.0",
+  license: "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib",
+  licenseText: "std text",
+  hasLicenseFile: true,
+  kind: "crate",
+};
 // The engine ports fflate's deflate (engine-rs/src/fflate.rs), so its record carries fflate's notice (#1356).
-const port = { name: "fflate", version: "0.8.3", license: "MIT", licenseText: "fflate MIT text", hasLicenseFile: true, kind: "port" };
+const port = {
+  name: "fflate",
+  version: "0.8.3",
+  license: "MIT",
+  licenseText: "fflate MIT text",
+  hasLicenseFile: true,
+  kind: "port",
+};
 
 /** A built tree: one bundle of the game's own code, plus the engine package as given. */
 function build(engine: Record<string, string | object> | null, sources = [join(ROOT, "src/main.ts")]): string {
@@ -27,7 +48,8 @@ function build(engine: Record<string, string | object> | null, sources = [join(R
   writeFileSync(join(dist, "app.js.map"), JSON.stringify({ version: 3, sources, mappings: "" }));
   if (engine) {
     mkdirSync(join(dist, "engine"));
-    for (const [file, body] of Object.entries(engine)) writeFileSync(join(dist, "engine", file), typeof body === "string" ? body : JSON.stringify(body));
+    for (const [file, body] of Object.entries(engine))
+      writeFileSync(join(dist, "engine", file), typeof body === "string" ? body : JSON.stringify(body));
   }
   return dist;
 }
@@ -46,7 +68,11 @@ function run(dist: string): { status: number | null; stderr: string; notices: st
 const WASM = "\0asm";
 const WASM_SHA = createHash("sha256").update(WASM).digest("hex");
 /** The engine package files; an object record gets the shipped .wasm's hash unless it names one. */
-const engineFiles = (record: string | object | null, sources = "abc", wasm = WASM): Record<string, string | object> => ({
+const engineFiles = (
+  record: string | object | null,
+  sources = "abc",
+  wasm = WASM,
+): Record<string, string | object> => ({
   "verticopolis_engine.js": "module.exports = {};\n",
   "verticopolis_engine_bg.wasm": wasm,
   "BUILD.json": { sources },
@@ -65,19 +91,63 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
 
   it("fails closed on a missing, stale, malformed or incomplete record", () => {
     const cases: [string, Record<string, string | object>, RegExp][] = [
-      ["no record", (({ "THIRD-PARTY.json": _, ...rest }) => rest)(engineFiles(null)), /THIRD-PARTY\.json is missing or not valid JSON/],
-      ["no BUILD.json", (({ "BUILD.json": _, ...rest }) => rest)(engineFiles({ sources: "abc", crates: [crate, std, port] })), /BUILD\.json is missing or not valid JSON/],
-      ["record from another build", engineFiles({ sources: "old", crates: [crate, std, port] }), /source hash differs from BUILD\.json/],
-      ["a .wasm from another build", engineFiles({ sources: "abc", crates: [crate, std, port] }, "abc", "\0asm-other"), /SHA-256 differs/],
+      [
+        "no record",
+        (({ "THIRD-PARTY.json": _, ...rest }) => rest)(engineFiles(null)),
+        /THIRD-PARTY\.json is missing or not valid JSON/,
+      ],
+      [
+        "no BUILD.json",
+        (({ "BUILD.json": _, ...rest }) => rest)(engineFiles({ sources: "abc", crates: [crate, std, port] })),
+        /BUILD\.json is missing or not valid JSON/,
+      ],
+      [
+        "record from another build",
+        engineFiles({ sources: "old", crates: [crate, std, port] }),
+        /source hash differs from BUILD\.json/,
+      ],
+      [
+        "a .wasm from another build",
+        engineFiles({ sources: "abc", crates: [crate, std, port] }, "abc", "\0asm-other"),
+        /SHA-256 differs/,
+      ],
       ["invalid JSON", engineFiles("{ not json"), /THIRD-PARTY\.json is missing or not valid JSON/],
-      ["no standard library", engineFiles({ sources: "abc", crates: [crate, port] }), /does not list the Rust standard library/],
-      ["standard library alone", engineFiles({ sources: "abc", crates: [std, port] }), /no crate besides the Rust standard library/],
-      ["standard library with another license", engineFiles({ sources: "abc", crates: [crate, { ...std, license: "MIT" }, port] }), /declares MIT, not/],
+      [
+        "no standard library",
+        engineFiles({ sources: "abc", crates: [crate, port] }),
+        /does not list the Rust standard library/,
+      ],
+      [
+        "standard library alone",
+        engineFiles({ sources: "abc", crates: [std, port] }),
+        /no crate besides the Rust standard library/,
+      ],
+      [
+        "standard library with another license",
+        engineFiles({ sources: "abc", crates: [crate, { ...std, license: "MIT" }, port] }),
+        /declares MIT, not/,
+      ],
       ["standard library twice", engineFiles({ sources: "abc", crates: [crate, std, std, port] }), /more than once/],
-      ["a license off the allowlist", engineFiles({ sources: "abc", crates: [{ ...crate, license: "GPL-3.0-only" }, std, port] }), /not on the allowlist/],
-      ["another file beside the package", { ...engineFiles({ sources: "abc", crates: [crate, std, port] }), "other.wasm": "\0asm" }, /ships other\.wasm/],
-      ["no notice for the fflate port", engineFiles({ sources: "abc", crates: [crate, std] }), /does not list fflate, whose code the engine ports/],
-      ["blank license text", engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std, port] }), /no license file/],
+      [
+        "a license off the allowlist",
+        engineFiles({ sources: "abc", crates: [{ ...crate, license: "GPL-3.0-only" }, std, port] }),
+        /not on the allowlist/,
+      ],
+      [
+        "another file beside the package",
+        { ...engineFiles({ sources: "abc", crates: [crate, std, port] }), "other.wasm": "\0asm" },
+        /ships other\.wasm/,
+      ],
+      [
+        "no notice for the fflate port",
+        engineFiles({ sources: "abc", crates: [crate, std] }),
+        /does not list fflate, whose code the engine ports/,
+      ],
+      [
+        "blank license text",
+        engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std, port] }),
+        /no license file/,
+      ],
     ];
     for (const [name, files, message] of cases) {
       const r = run(build(files));

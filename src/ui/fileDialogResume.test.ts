@@ -12,7 +12,13 @@ import { showFileDialog, type FileDialogCtx } from "./fileDialog";
  * (Naftali, 2026-11-17). The rest of the window is `fileDialog.test.ts`.
  */
 
-const entry = (id: string, name: string, modified: number): TowerFileEntry => ({ id, name, kind: "tower", size: 100, modified });
+const entry = (id: string, name: string, modified: number): TowerFileEntry => ({
+  id,
+  name,
+  kind: "tower",
+  size: 100,
+  modified,
+});
 const files = [entry("a", "Alpha", 10), entry("c", "Charlie", 20), entry("b", "Bravo", 30)];
 
 let boxes: HTMLElement[] = [];
@@ -57,7 +63,9 @@ const names = () => [...live().querySelectorAll(".fd-row .fd-name-cell")].map((e
 /** Right-click row `id` and pick Previous versions…; answers the `back` it got. */
 function versionsOf(id: string, versions: ReturnType<typeof vi.fn>): () => void {
   q(`#fd-row-${id}`).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
-  [...live().querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")].find((b) => b.textContent === "Previous versions…")!.click();
+  [...live().querySelectorAll<HTMLButtonElement>(".fd-menu .mb-item")]
+    .find((b) => b.textContent === "Previous versions…")!
+    .click();
   return versions.mock.calls[versions.mock.calls.length - 1][1] as () => void;
 }
 

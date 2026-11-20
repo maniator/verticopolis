@@ -76,8 +76,15 @@ describe("runFrame freeze path", () => {
     const { app, raw } = makeApp({ accMinutes: 0 });
     raw.engine.cam.zoom = CROWD_CULL_ZOOM / 2;
     runFrame(app, 16);
-    expect(raw.enginePort.setPeopleWindow).toHaveBeenCalledExactlyOnceWith(NO_PEOPLE.floorLo, NO_PEOPLE.floorHi, NO_PEOPLE.xLo, NO_PEOPLE.xHi);
-    expect(raw.enginePort.setPeopleWindow.mock.invocationCallOrder[0]).toBeLessThan(raw.reader.update.mock.invocationCallOrder[0]);
+    expect(raw.enginePort.setPeopleWindow).toHaveBeenCalledExactlyOnceWith(
+      NO_PEOPLE.floorLo,
+      NO_PEOPLE.floorHi,
+      NO_PEOPLE.xLo,
+      NO_PEOPLE.xHi,
+    );
+    expect(raw.enginePort.setPeopleWindow.mock.invocationCallOrder[0]).toBeLessThan(
+      raw.reader.update.mock.invocationCallOrder[0],
+    );
   });
 
   it("stops time for good once a wasm-only build has stopped on its engine, whatever the speed", () => {
@@ -183,7 +190,13 @@ describe("runFrame simulation stepping", () => {
     applySpeed(app, 3);
     expect(raw.accMinutes).toBe(0);
     runFrame(app, 0);
-    expect(raw.enginePort.advance, "the seam already dropped the carry").toHaveBeenCalledExactlyOnceWith(0, 0, SPEEDS[3], true, true);
+    expect(raw.enginePort.advance, "the seam already dropped the carry").toHaveBeenCalledExactlyOnceWith(
+      0,
+      0,
+      SPEEDS[3],
+      true,
+      true,
+    );
   });
 
   it("keeps the carry when the speed is set to the one already running", () => {
@@ -208,7 +221,9 @@ describe("runFrame simulation stepping", () => {
     runFrame(app, 1000 / 60);
     expect(raw.enginePort.advance).toHaveBeenCalledTimes(2);
     expect(raw.reader.update).toHaveBeenCalledTimes(2);
-    expect(raw.reader.update.mock.invocationCallOrder[0]).toBeGreaterThan(raw.enginePort.advance.mock.invocationCallOrder[0]);
+    expect(raw.reader.update.mock.invocationCallOrder[0]).toBeGreaterThan(
+      raw.enginePort.advance.mock.invocationCallOrder[0],
+    );
   });
 
   it("sends the camera's people window before it reads the view", () => {
@@ -217,7 +232,9 @@ describe("runFrame simulation stepping", () => {
     // The fixture's camera shows tiles 0 to 100 and floors 10 to 40; the
     // window adds two tiles and one floor on each side.
     expect(raw.enginePort.setPeopleWindow).toHaveBeenCalledExactlyOnceWith(9, 41, -2, 102);
-    expect(raw.enginePort.setPeopleWindow.mock.invocationCallOrder[0]).toBeLessThan(raw.reader.update.mock.invocationCallOrder[0]);
+    expect(raw.enginePort.setPeopleWindow.mock.invocationCallOrder[0]).toBeLessThan(
+      raw.reader.update.mock.invocationCallOrder[0],
+    );
   });
 
   it("hands the engine a non-finite frame as it came, and keeps the carry it answers (#541)", () => {
@@ -328,7 +345,9 @@ describe("runFrame auto-surfaced emergency choice", () => {
     // Answered through the port at once: the latch clears, then the header is read again.
     (cb as (opt: unknown) => void)("accept");
     expect(sim.resolveChoice).toHaveBeenCalledWith("accept");
-    expect(Math.max(...vi.mocked(app.reader.update).mock.invocationCallOrder)).toBeGreaterThan(vi.mocked(sim.resolveChoice).mock.invocationCallOrder[0]);
+    expect(Math.max(...vi.mocked(app.reader.update).mock.invocationCallOrder)).toBeGreaterThan(
+      vi.mocked(sim.resolveChoice).mock.invocationCallOrder[0],
+    );
     expect(raw.shownChoice).toBe(false);
   });
 

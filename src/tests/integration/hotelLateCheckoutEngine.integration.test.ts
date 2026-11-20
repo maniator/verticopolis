@@ -116,7 +116,10 @@ describeEngines("understaffed housekeeping: late-checkout rooms behave like ordi
     // per evening hour, 17 to 20 (`churn.ts:267`), so a seed or RNG-stream change
     // is unlikely to leave all four unlet.
     const CLEANED = 4;
-    const ids = sim.state.tower.units.filter((u) => u.kind === HOTEL_KIND).slice(0, CLEANED).map((u) => u.id);
+    const ids = sim.state.tower.units
+      .filter((u) => u.kind === HOTEL_KIND)
+      .slice(0, CLEANED)
+      .map((u) => u.id);
     const allEmpty = ids.map(() => "empty");
     for (const id of ids) sim.setUnitState(id, "empty");
     const cleanedStates = () => ids.map((id) => hotelStates(sim).get(id));
@@ -128,7 +131,10 @@ describeEngines("understaffed housekeeping: late-checkout rooms behave like ordi
     // The evening fill runs on this stepping, so in the case above it is the dirt
     // that keeps the rooms from being re-let.
     const states = hotelStates(sim);
-    expect(ids.some((id) => states.get(id) === "asleep"), "a clean room was re-let").toBe(true);
+    expect(
+      ids.some((id) => states.get(id) === "asleep"),
+      "a clean room was re-let",
+    ).toBe(true);
     const others = [...states].filter(([id]) => !ids.includes(id)).map(([, state]) => state);
     expect(others, "every room left dirty is still dirty").toEqual(others.map(() => "dirty"));
     expect(others).toHaveLength(ROOMS - CLEANED);

@@ -16,19 +16,15 @@ import { describe, expect, it } from "vitest";
 const ROOT = resolve(__dirname, "../..");
 const SRC = join(ROOT, "src");
 // The engine's own record, from the player build the game pins.
-const engine = createRequire(import.meta.url)(join(ENGINE_ROOT, "node/verticopolis_engine.js")) as { engineIdentity(): string };
+const engine = createRequire(import.meta.url)(join(ENGINE_ROOT, "node/verticopolis_engine.js")) as {
+  engineIdentity(): string;
+};
 const record = JSON.parse(engine.engineIdentity()) as { crate: { name: string; version: string }; lockDigest: string };
 const cargoName = record.crate.name;
 
 const FORBIDDEN: [string, RegExp][] = [
-  [
-    "the crate name",
-    new RegExp(cargoName.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")),
-  ],
-  [
-    "the crate version",
-    new RegExp(`["'\`]${record.crate.version.replace(/\./g, "\\.")}["'\`]`),
-  ],
+  ["the crate name", new RegExp(cargoName.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"))],
+  ["the crate version", new RegExp(`["'\`]${record.crate.version.replace(/\./g, "\\.")}["'\`]`)],
   ["the lock digest", new RegExp(record.lockDigest)],
 ];
 
@@ -51,13 +47,8 @@ describe("engine identity literals", () => {
     const found: string[] = [];
     for (const file of sources(SRC)) {
       const text = readFileSync(file, "utf8");
-      for (const [what, re] of FORBIDDEN)
-        if (re.test(text))
-          found.push(`${file.slice(ROOT.length + 1)}: ${what}`);
+      for (const [what, re] of FORBIDDEN) if (re.test(text)) found.push(`${file.slice(ROOT.length + 1)}: ${what}`);
     }
-    expect(
-      found,
-      "read the engine's record (engineIdentity()) or BUILD.json instead of spelling a value",
-    ).toEqual([]);
+    expect(found, "read the engine's record (engineIdentity()) or BUILD.json instead of spelling a value").toEqual([]);
   });
 });

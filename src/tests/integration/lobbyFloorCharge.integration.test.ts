@@ -75,7 +75,13 @@ const prices = (t: Tower) => ({
 });
 
 /** The `tool` brush preview at `(tile, floor)` with `amount` to spend. */
-function previewWith(t: Tower, tool: string, tile: number, floor: number, amount: number): { valid: boolean; reason?: string } {
+function previewWith(
+  t: Tower,
+  tool: string,
+  tile: number,
+  floor: number,
+  amount: number,
+): { valid: boolean; reason?: string } {
   const engine = { preview: null as unknown, transportPreview: null as unknown };
   const app = {
     enginePort: t.port,
@@ -132,7 +138,11 @@ const buildActions = (t: Tower, toasts: string[] = []) =>
  *  how many tiles it laid. */
 function paintWith(t: Tower, tool: "floor" | "lobby", tile: number, floor: number, amount: number): number {
   t.setMoney(amount);
-  const rec = must(t.s, (p) => p.paintTiles(kind(tool), floor, Float64Array.from(brushTiles(tile))), `the ${tool} brush`);
+  const rec = must(
+    t.s,
+    (p) => p.paintTiles(kind(tool), floor, Float64Array.from(brushTiles(tile))),
+    `the ${tool} brush`,
+  );
   t.reader.update();
   return slot("paintTiles", rec, "placed");
 }
@@ -188,7 +198,11 @@ describe.skipIf(!hasWasmPackage())("the lobby floor charge on the Rust engine", 
     for (const mode of MODES) {
       for (const tool of ["floor", "lobby"] as const) {
         for (const bridging of mode === "modern" ? [true, false] : [true]) {
-          for (const [at, bare] of [[LOBBY_LEFT, 4], [LOBBY_RIGHT + 2, 6], [LOBBY_RIGHT + 3, 7]] as const) {
+          for (const [at, bare] of [
+            [LOBBY_LEFT, 4],
+            [LOBBY_RIGHT + 2, 6],
+            [LOBBY_RIGHT + 3, 7],
+          ] as const) {
             const label = `${mode} ${tool} at ${at}, bridging ${bridging}`;
             const t = tower(mode);
             if (t.engine.autoBridge() !== bridging) t.engine.toggleAutoBridge();
@@ -249,7 +263,9 @@ describe.skipIf(!hasWasmPackage())("the lobby floor charge on the Rust engine", 
         expect(validAtAndBelow(t, "floor", LOBBY_LEFT + 6, 3, strip), label).toEqual([true, false]);
         paintWith(t, "floor", LOBBY_LEFT + 6, 3, strip);
         expect(money(t.s), label).toBe(0);
-        const floor3 = range(LOBBY_LEFT + 1, LOBBY_LEFT + 6).filter((x) => t.reader.tower.structureKindAt(3, x) !== undefined);
+        const floor3 = range(LOBBY_LEFT + 1, LOBBY_LEFT + 6).filter(
+          (x) => t.reader.tower.structureKindAt(3, x) !== undefined,
+        );
         expect(floor3.length, label).toBe(bare);
       }
       if (mode !== "modern") continue;
@@ -317,7 +333,12 @@ describe.skipIf(!hasWasmPackage())("the lobby floor charge on the Rust engine", 
     // under it).
     const t = tower("modern");
     if (t.engine.autoBridge()) t.engine.toggleAutoBridge();
-    lay(t, "floor", 2, range(LOBBY_LEFT, LOBBY_RIGHT).filter((x) => x !== LOBBY_LEFT + 6));
+    lay(
+      t,
+      "floor",
+      2,
+      range(LOBBY_LEFT, LOBBY_RIGHT).filter((x) => x !== LOBBY_LEFT + 6),
+    );
     lay(t, "floor", 3, [LOBBY_LEFT, LOBBY_LEFT + 7]);
     t.engine.toggleAutoBridge();
     const strip = 9 * prices(t).floor;
@@ -358,12 +379,28 @@ describe.skipIf(!hasWasmPackage())("the lobby floor charge on the Rust engine", 
     // Only an old save holds a room on the ground floor: lobby at 170..181 and
     // plain floor under an office at 182..190. The click turns none of that
     // floor into lobby and lays the empty tiles past it, each with its floor.
-    const json = decodeVctower(tower("modern").port.exportVctower("2.66.0", 0) ?? "") as { units: Record<string, unknown>[]; nextId: number };
-    const tiles = range(LOBBY_LEFT + 12, LOBBY_RIGHT + 1).map((x, i) => ({ id: json.nextId + i, kind: "floor", floor: 1, x }));
+    const json = decodeVctower(tower("modern").port.exportVctower("2.66.0", 0) ?? "") as {
+      units: Record<string, unknown>[];
+      nextId: number;
+    };
+    const tiles = range(LOBBY_LEFT + 12, LOBBY_RIGHT + 1).map((x, i) => ({
+      id: json.nextId + i,
+      kind: "floor",
+      floor: 1,
+      x,
+    }));
     const office = { id: json.nextId + tiles.length, kind: "office", floor: 1, x: LOBBY_LEFT + 12, width: 9 };
-    const units = [...json.units.filter((u) => !(u.floor === 1 && (u.x as number) >= LOBBY_LEFT + 12)), ...tiles, office];
+    const units = [
+      ...json.units.filter((u) => !(u.floor === 1 && (u.x as number) >= LOBBY_LEFT + 12)),
+      ...tiles,
+      office,
+    ];
     const save = JSON.stringify({ ...json, units, nextId: office.id + 1 });
-    for (const [at, laid, bridging] of [[LOBBY_RIGHT, 3, true], [LOBBY_RIGHT + 1, 4, true], [LOBBY_RIGHT + 1, 4, false]] as const) {
+    for (const [at, laid, bridging] of [
+      [LOBBY_RIGHT, 3, true],
+      [LOBBY_RIGHT + 1, 4, true],
+      [LOBBY_RIGHT + 1, 4, false],
+    ] as const) {
       const label = `brush at ${at}, bridging ${bridging}`;
       const t = tower("modern", save);
       expect(t.reader.roomAt(1, LOBBY_RIGHT)?.kind, label).toBe("office");
@@ -450,7 +487,10 @@ describe.skipIf(!hasWasmPackage())("the lobby floor charge on the Rust engine", 
     for (const mode of MODES) {
       // Floor 2 spans six tiles. On floor 3 the brush at +4 lays six of its
       // tiles; at +6 its anchor is over open air and four lay.
-      for (const [offset, laid] of [[4, 6], [6, 4]] as const) {
+      for (const [offset, laid] of [
+        [4, 6],
+        [6, 4],
+      ] as const) {
         const t = tower(mode);
         lay(t, "floor", 2, range(LOBBY_LEFT, LOBBY_LEFT + 6));
         const strip = laid * prices(t).floor;
@@ -494,7 +534,9 @@ describe.skipIf(!hasWasmPackage())("the lobby floor charge on the Rust engine", 
       const build = buildActions(t, toasts);
       expect(build.paintBrush("floor", LOBBY_RIGHT, 1).placed, mode).toBe(4);
       expect(money(t.s), mode).toBe(1_000_000 - 4 * (lobby + floor));
-      expect(toasts, mode).toEqual([`The ground floor is a lobby, so a lobby ($${groupDigits(lobby + floor)}/tile) went here.`]);
+      expect(toasts, mode).toEqual([
+        `The ground floor is a lobby, so a lobby ($${groupDigits(lobby + floor)}/tile) went here.`,
+      ]);
     }
   });
 });

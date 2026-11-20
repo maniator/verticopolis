@@ -57,7 +57,6 @@ describe("exportConfirmTemplate: the .TDT gate", () => {
     expect(legacy.disabled).toBe(true);
     expect(legacy.getAttribute("title")).toBe("Classic towers only");
   });
-
 });
 
 describe("importReportTemplate: the fact line and lists", () => {
@@ -112,7 +111,6 @@ describe("importReportTemplate: the fact line and lists", () => {
     const frag = renderToFragment(importReportTemplate(importReport({ money: 100.6 })));
     expect(frag.querySelector(".import-facts")!.textContent).toContain("$101");
   });
-
 });
 
 describe("exportReportTemplate: the reverse fidelity report", () => {
@@ -151,5 +149,4 @@ describe("exportReportTemplate: the reverse fidelity report", () => {
     expect(frag.querySelectorAll("img")).toHaveLength(0);
     expect(frag.textContent).toContain(hostile);
   });
-
 });

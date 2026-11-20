@@ -30,12 +30,21 @@ const wasmAtBoot = args.includes("--wasm-at-boot");
 const report = analyzeBundle(dir);
 const html = readFileSync(join(dir, "index.html"), "utf8");
 const initialPaths = new Set<string>();
-for (const m of html.matchAll(/<script[^>]*type="module"[^>]*src="([^"]+)"/g)) initialPaths.add(m[1].replace(/^\.?\//, ""));
-for (const m of html.matchAll(/<link[^>]*rel="modulepreload"[^>]*href="([^"]+)"/g)) initialPaths.add(m[1].replace(/^\.?\//, ""));
+for (const m of html.matchAll(/<script[^>]*type="module"[^>]*src="([^"]+)"/g))
+  initialPaths.add(m[1].replace(/^\.?\//, ""));
+for (const m of html.matchAll(/<link[^>]*rel="modulepreload"[^>]*href="([^"]+)"/g))
+  initialPaths.add(m[1].replace(/^\.?\//, ""));
 
-if (initialPaths.size === 0) throw new Error(`found no module script or modulepreload link in ${join(dir, "index.html")}; the report would call every chunk lazy`);
+if (initialPaths.size === 0)
+  throw new Error(
+    `found no module script or modulepreload link in ${join(dir, "index.html")}; the report would call every chunk lazy`,
+  );
 
-const isGameJs = (f: FileSize) => f.path.endsWith(".js") && !NOT_GAME.includes(f.category) && f.category !== "service-worker" && f.category !== "wasm-glue";
+const isGameJs = (f: FileSize) =>
+  f.path.endsWith(".js") &&
+  !NOT_GAME.includes(f.category) &&
+  f.category !== "service-worker" &&
+  f.category !== "wasm-glue";
 const gameJs = report.files.filter(isGameJs);
 const initial = gameJs.filter((f) => initialPaths.has(f.path));
 const lazy = gameJs.filter((f) => !initialPaths.has(f.path));
@@ -52,7 +61,10 @@ const engineSpans: string[] = [];
 for (const f of gameJs) {
   const mapPath = join(dir, `${f.path}.map`);
   if (!existsSync(mapPath)) throw new Error(`${f.path} has no sourcemap; cannot attribute its bytes`);
-  const { bytes, text } = bytesBySource(readFileSync(join(dir, f.path), "utf8"), JSON.parse(readFileSync(mapPath, "utf8")) as { sources: string[]; mappings: string });
+  const { bytes, text } = bytesBySource(
+    readFileSync(join(dir, f.path), "utf8"),
+    JSON.parse(readFileSync(mapPath, "utf8")) as { sources: string[]; mappings: string },
+  );
   for (const [source, n] of bytes) {
     mappedJs += n;
     if (ENGINE_SOURCE.test(source) && !PACKAGE_SOURCE.test(source)) {
@@ -61,7 +73,9 @@ for (const f of gameJs) {
     }
   }
 }
-const engineBrotli = brotliCompressSync(Buffer.from(engineSpans.join("")), { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length;
+const engineBrotli = brotliCompressSync(Buffer.from(engineSpans.join("")), {
+  params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
+}).length;
 
 const out = {
   dir,
@@ -71,7 +85,12 @@ const out = {
   enginePackage: { files: engine.map((f) => f.path), ...sum(engine) },
   firstVisitBeforePlay: { wasmAtBoot, ...sum(atBoot) },
   precache: report.precache,
-  tsEngine: { minified: engineJs, ofGameJs: mappedJs, share: mappedJs ? engineJs / mappedJs : 0, brotliOnItsOwn: engineBrotli },
+  tsEngine: {
+    minified: engineJs,
+    ofGameJs: mappedJs,
+    share: mappedJs ? engineJs / mappedJs : 0,
+    brotliOnItsOwn: engineBrotli,
+  },
   everythingButMaps: totalOf(report.files, (f) => f.category !== "sourcemaps"),
 };
 
@@ -87,5 +106,7 @@ if (args.includes("--json")) {
   console.log(row("WASM engine package (glue + binary)", out.enginePackage));
   console.log(row(`Fetched before play${wasmAtBoot ? " (with the engine)" : ""}`, out.firstVisitBeforePlay));
   console.log(row(`Precache (${report.precache.entries} entries)`, report.precache));
-  console.log(`| TypeScript engine in game JS | ${engineJs.toLocaleString("en-US")} B (${((100 * engineJs) / (mappedJs || 1)).toFixed(1)}%) | ${(engineBrotli / 1024).toFixed(1)} KiB on its own |`);
+  console.log(
+    `| TypeScript engine in game JS | ${engineJs.toLocaleString("en-US")} B (${((100 * engineJs) / (mappedJs || 1)).toFixed(1)}%) | ${(engineBrotli / 1024).toFixed(1)} KiB on its own |`,
+  );
 }

@@ -39,7 +39,6 @@ function makeStub(): AnalyticsAdapter & {
   };
 }
 
-
 /** The first-tower funnel's tower fields (#2392): tower `n` of this page life. */
 const tw = (n: number) => ({ tower_n: n, page_life: expect.any(String) });
 describe("analytics adapter seam", () => {

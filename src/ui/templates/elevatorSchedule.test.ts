@@ -105,7 +105,11 @@ describe("elevatorScheduleTemplate: Classic vs Modern shape", () => {
 
   it("Modern renders the strip once Advanced is open, and shows the advice line", () => {
     const frag = renderToFragment(
-      elevatorScheduleTemplate(ctx(), state({ advancedOpen: true, adviceMsg: "This shaft is short at 08:00 on weekdays." }), noop),
+      elevatorScheduleTemplate(
+        ctx(),
+        state({ advancedOpen: true, adviceMsg: "This shaft is short at 08:00 on weekdays." }),
+        noop,
+      ),
     );
     expect(frag.querySelector(".es-strip")).not.toBeNull();
     expect(frag.querySelectorAll(".es-bar")).toHaveLength(24);
@@ -114,7 +118,11 @@ describe("elevatorScheduleTemplate: Classic vs Modern shape", () => {
 
   it("marks the recommended preset and disables Auto-tune before the shaft warms up", () => {
     const frag = renderToFragment(
-      elevatorScheduleTemplate(ctx({ hasMeasured: false, canTune: false, tuneStatus: "insufficient-data", recommended: "feeder" }), state(), noop),
+      elevatorScheduleTemplate(
+        ctx({ hasMeasured: false, canTune: false, tuneStatus: "insufficient-data", recommended: "feeder" }),
+        state(),
+        noop,
+      ),
     );
     const rec = frag.querySelector(".es-presets .es-rec")!;
     expect(rec.textContent).toBe("Feeder");
@@ -124,7 +132,11 @@ describe("elevatorScheduleTemplate: Classic vs Modern shape", () => {
 
   it("gives the wait hint only for the reason waiting fixes", () => {
     const hint = (tuneStatus: SchedCtx["tuneStatus"]): string =>
-      Array.from(renderToFragment(elevatorScheduleTemplate(ctx({ canTune: false, tuneStatus }), state(), noop)).querySelectorAll(".es-hint"))
+      Array.from(
+        renderToFragment(elevatorScheduleTemplate(ctx({ canTune: false, tuneStatus }), state(), noop)).querySelectorAll(
+          ".es-hint",
+        ),
+      )
         .map((el) => el.textContent ?? "")
         .filter((text) => /Auto-tune|no cars/.test(text))
         .join("");
@@ -154,7 +166,10 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
   it("marks each car's home with a pressed numbered chip and wires chip presses", () => {
     const onHomeSet = vi.fn();
     const frag = renderToFragment(
-      elevatorScheduleTemplate(ctx(), state({ schedule: { ...state().schedule, homeFloors: [1, 1, 4, 4] } }), { ...noop, onHomeSet }),
+      elevatorScheduleTemplate(ctx(), state({ schedule: { ...state().schedule, homeFloors: [1, 1, 4, 4] } }), {
+        ...noop,
+        onHomeSet,
+      }),
     );
     const rows = frag.querySelectorAll(".es-grid-row:not(.es-grid-head)");
     const topChips = rows[0].querySelectorAll<HTMLButtonElement>(".es-chip");
@@ -169,8 +184,12 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
     const onServe = vi.fn();
     const onExpressStops = vi.fn();
     const onAllStops = vi.fn();
-    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), state(), { ...noop, onServe, onExpressStops, onAllStops }));
-    const serve = frag.querySelectorAll(".es-grid-row:not(.es-grid-head)")[0].querySelector<HTMLInputElement>("input[type=checkbox]")!;
+    const frag = renderToFragment(
+      elevatorScheduleTemplate(ctx(), state(), { ...noop, onServe, onExpressStops, onAllStops }),
+    );
+    const serve = frag
+      .querySelectorAll(".es-grid-row:not(.es-grid-head)")[0]
+      .querySelector<HTMLInputElement>("input[type=checkbox]")!;
     serve.checked = false;
     change(serve);
     expect(onServe).toHaveBeenCalledWith(4, false);
@@ -211,7 +230,9 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
       { floor: -1, served: true, lobby: false, toggles: true },
       { floor: -2, served: true, lobby: false, endpoint: true, toggles: false },
     ];
-    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ isExpress: true }), state({ floors }), { ...noop, onServe }));
+    const frag = renderToFragment(
+      elevatorScheduleTemplate(ctx({ isExpress: true }), state({ floors }), { ...noop, onServe }),
+    );
     expect(frag.textContent).toContain("Stops at every lobby and basement floor; a basement stop can be turned off");
     const boxes = Array.from(frag.querySelectorAll<HTMLInputElement>(".es-grid input[type=checkbox]"));
     expect(boxes.map((b) => b.getAttribute("aria-label"))).toEqual(["Serve floor B1", "Serve floor B2"]);
@@ -221,7 +242,11 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
     expect(onServe).toHaveBeenCalledWith(0, true);
     // A lobby a legacy save skipped gets its toggle back.
     const legacy = renderToFragment(
-      elevatorScheduleTemplate(ctx({ isExpress: true }), state({ floors: [{ floor: 15, served: false, lobby: true, toggles: true }] }), noop),
+      elevatorScheduleTemplate(
+        ctx({ isExpress: true }),
+        state({ floors: [{ floor: 15, served: false, lobby: true, toggles: true }] }),
+        noop,
+      ),
     );
     expect(legacy.querySelector(".es-grid input[type=checkbox]")!.getAttribute("aria-label")).toBe("Serve floor 15");
   });
@@ -251,9 +276,15 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
       elevatorScheduleTemplate(ctx({ isExpress: true, classicExpress: true }), state({ floors }), { ...noop, onServe }),
     );
     const caption = Array.from(frag.querySelectorAll(".es-hint")).map((p) => p.textContent);
-    expect(caption).toContain("Stops at the ground floor, every 15th floor and every basement; any of those stops can be turned off");
+    expect(caption).toContain(
+      "Stops at the ground floor, every 15th floor and every basement; any of those stops can be turned off",
+    );
     const boxes = Array.from(frag.querySelectorAll<HTMLInputElement>(".es-grid input[type=checkbox]"));
-    expect(boxes.map((b) => b.getAttribute("aria-label"))).toEqual(["Serve floor 15", "Serve floor 1", "Serve floor B1"]);
+    expect(boxes.map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Serve floor 15",
+      "Serve floor 1",
+      "Serve floor B1",
+    ]);
     expect(boxes.map((b) => b.checked)).toEqual([true, true, false]);
     boxes[0].checked = false;
     boxes[0].dispatchEvent(new Event("change"));
@@ -293,7 +324,9 @@ describe("elevatorScheduleTemplate: ghost series", () => {
   });
 
   it("renders no ghost machinery before the shaft warms up", () => {
-    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ hourly: undefined }), state({ advancedOpen: true }), noop));
+    const frag = renderToFragment(
+      elevatorScheduleTemplate(ctx({ hourly: undefined }), state({ advancedOpen: true }), noop),
+    );
     expect(frag.querySelector(".es-bar-demand")).toBeNull();
     expect(frag.querySelector(".es-bar-over")).toBeNull();
   });

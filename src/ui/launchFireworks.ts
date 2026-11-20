@@ -211,7 +211,12 @@ function steadyRand(seed: number): () => number {
 /** The still frame reduced motion shows: four bursts, laid out by hand. */
 export function stillSky(width: number, height: number): Sky {
   const sky = newSky(width, height);
-  const spots: Array<[number, number]> = [[0.2, 0.3], [0.45, 0.18], [0.7, 0.32], [0.86, 0.16]];
+  const spots: Array<[number, number]> = [
+    [0.2, 0.3],
+    [0.45, 0.18],
+    [0.7, 0.32],
+    [0.86, 0.16],
+  ];
   spots.forEach(([fx, fy], i) => {
     const color = FIREWORK_COLORS[i % FIREWORK_COLORS.length] ?? FIREWORK_COLORS[0];
     burst(sky, width * fx, height * fy, color, steadyRand(i + 1));
@@ -375,7 +380,11 @@ export function showLaunchFireworks(deps: ShowDeps): void {
  * save skips it, leaving the latch for a later boot. Reads the page once;
  * never throws.
  */
-export function maybeLaunchFireworks(ui: WelcomeModalPort, reducedMotion: () => boolean, saveWasUnreadable = false): void {
+export function maybeLaunchFireworks(
+  ui: WelcomeModalPort,
+  reducedMotion: () => boolean,
+  saveWasUnreadable = false,
+): void {
   // Never on top of the unreadable-save warning; a later boot plays it.
   if (saveWasUnreadable) return;
   try {

@@ -18,7 +18,9 @@ const PHONE = { width: 390, height: 844 };
 
 async function onGame(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, {
+    timeout: 30_000,
+  });
 }
 
 /** WCAG relative luminance of a computed `rgb()`/`rgba()` color. */

@@ -27,7 +27,11 @@ test.afterAll(async () => {
   await deployments?.close();
 });
 
-const FILES = { glue: "engine/verticopolis_engine.js", wasm: "engine/verticopolis_engine_bg.wasm", record: "engine/BUILD.json" } as const;
+const FILES = {
+  glue: "engine/verticopolis_engine.js",
+  wasm: "engine/verticopolis_engine_bg.wasm",
+  record: "engine/BUILD.json",
+} as const;
 type Which = keyof typeof FILES;
 
 /** Drop one engine entry from the precache, as the browser does under storage pressure. */
@@ -58,7 +62,11 @@ async function installedFirst(page: Page): Promise<void> {
 }
 
 const bootFailure = (page: Page) =>
-  page.evaluate(() => (window as any).__vcEngineBoot?.failure as { stage: string; reason: string; package?: { kind: string; controlled: boolean } } | null | undefined);
+  page.evaluate(
+    () =>
+      (window as any).__vcEngineBoot?.failure as
+        { stage: string; reason: string; package?: { kind: string; controlled: boolean } } | null | undefined,
+  );
 
 /** Where each stored precache entry lives, as paths. */
 const storedPaths = (page: Page): Promise<string[]> =>
@@ -106,7 +114,9 @@ test("an evicted engine file is fetched again with its integrity and stored unde
   }
 });
 
-test("an evicted binary with no network fails to load with its own reason, and the next online reload fills the key", async ({ browser }) => {
+test("an evicted binary with no network fails to load with its own reason, and the next online reload fills the key", async ({
+  browser,
+}) => {
   const context = await newContext(browser, deployments);
   try {
     const page = await context.newPage();
@@ -116,9 +126,18 @@ test("an evicted binary with no network fails to load with its own reason, and t
     const before = deployments.requests.length;
     await page.reload();
     await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
-    expect(await bootFailure(page)).toMatchObject({ stage: "load", package: { kind: "load-failed", controlled: true } });
-    expect(deployments.requests.slice(before).some((r) => r.path === `/${FILES.wasm}`), "the worker tried the network for the missing binary").toBe(true);
-    expect(Object.keys(await engineEntries(page)).filter((k) => k.includes("_bg.wasm")), "nothing was stored for the missing binary").toEqual([]);
+    expect(await bootFailure(page)).toMatchObject({
+      stage: "load",
+      package: { kind: "load-failed", controlled: true },
+    });
+    expect(
+      deployments.requests.slice(before).some((r) => r.path === `/${FILES.wasm}`),
+      "the worker tried the network for the missing binary",
+    ).toBe(true);
+    expect(
+      Object.keys(await engineEntries(page)).filter((k) => k.includes("_bg.wasm")),
+      "nothing was stored for the missing binary",
+    ).toEqual([]);
 
     deployments.failNetwork(null);
     await page.reload();
@@ -130,7 +149,9 @@ test("an evicted binary with no network fails to load with its own reason, and t
   }
 });
 
-test("an evicted binary is never refilled with another build's bytes while the first build's worker controls the page", async ({ browser }) => {
+test("an evicted binary is never refilled with another build's bytes while the first build's worker controls the page", async ({
+  browser,
+}) => {
   const context = await newContext(browser, deployments);
   try {
     const page = await context.newPage();
@@ -141,14 +162,18 @@ test("an evicted binary is never refilled with another build's bytes while the f
     const before = deployments.requests.length;
     await page.reload();
     await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
-    expect(await bootFailure(page), "the first build's worker refuses the other build's binary").toMatchObject({ stage: "load", package: { kind: "load-failed" } });
+    expect(await bootFailure(page), "the first build's worker refuses the other build's binary").toMatchObject({
+      stage: "load",
+      package: { kind: "load-failed" },
+    });
     expect(
       deployments.requests.slice(before).some((r) => r.path === `/${FILES.wasm}` && r.from === "B"),
       "the other build's binary reached the worker, which refused it",
     ).toBe(true);
     const held = await engineEntries(page);
     const mine = engineEntriesOf(deployments, "A");
-    for (const [key, digest] of Object.entries(held)) expect(digest, `${key} holds only the first build's bytes`).toBe(mine[key]);
+    for (const [key, digest] of Object.entries(held))
+      expect(digest, `${key} holds only the first build's bytes`).toBe(mine[key]);
     expect(Object.keys(held).filter((k) => k.includes("_bg.wasm"))).toEqual([]);
 
     deployments.engineFrom(null);
@@ -160,7 +185,10 @@ test("an evicted binary is never refilled with another build's bytes while the f
   }
 });
 
-test("with the whole precache gone and no network the page does not load, and an online visit recovers", async ({ browser, browserName }) => {
+test("with the whole precache gone and no network the page does not load, and an online visit recovers", async ({
+  browser,
+  browserName,
+}) => {
   const context = await newContext(browser, deployments);
   try {
     const page = await context.newPage();
@@ -176,8 +204,14 @@ test("with the whole precache gone and no network the page does not load, and an
     // The page did not load. Each engine words that its own way, so each one's
     // text is pinned, and a timeout, a crash or a closed target never passes.
     expect(outcome, "the reload fails on the network").toMatch(/^page\.reload: /);
-    expect(outcome, "the reload failed for a reason other than a hang or a dead page").not.toMatch(/Timeout \d+ms exceeded|crashed|closed/);
-    const unavailable = { chromium: /^page\.reload: net::ERR_/, firefox: /^page\.reload: NS_ERROR_/, webkit: /^page\.reload: FetchEvent\.respondWith/ }[browserName];
+    expect(outcome, "the reload failed for a reason other than a hang or a dead page").not.toMatch(
+      /Timeout \d+ms exceeded|crashed|closed/,
+    );
+    const unavailable = {
+      chromium: /^page\.reload: net::ERR_/,
+      firefox: /^page\.reload: NS_ERROR_/,
+      webkit: /^page\.reload: FetchEvent\.respondWith/,
+    }[browserName];
     expect(outcome, "the browser's unavailable-page outcome").toMatch(unavailable);
 
     deployments.failNetwork(null);
@@ -192,7 +226,10 @@ test("with the whole precache gone and no network the page does not load, and an
     // next cold start works with no network at all.
     const stored = await storedPaths(revisit);
     expect(stored, "the shell page was stored again").toContain("/index.html");
-    expect(stored.some((p) => /^\/assets\/main-.*\.js$/.test(p)), "the game's entry chunk was stored again").toBe(true);
+    expect(
+      stored.some((p) => /^\/assets\/main-.*\.js$/.test(p)),
+      "the game's entry chunk was stored again",
+    ).toBe(true);
     deployments.failNetwork("all");
     await revisit.close();
     const offline = await context.newPage();
@@ -205,7 +242,9 @@ test("with the whole precache gone and no network the page does not load, and an
   }
 });
 
-test("a navigation that fails its integrity after the cache was lost still loads online, and stores nothing from the other build", async ({ browser }) => {
+test("a navigation that fails its integrity after the cache was lost still loads online, and stores nothing from the other build", async ({
+  browser,
+}) => {
   const context = await newContext(browser, deployments);
   try {
     const page = await context.newPage();
@@ -219,7 +258,9 @@ test("a navigation that fails its integrity after the cache was lost still loads
     const response = await page.goto("/");
     expect(response?.status(), "the navigation is answered").toBe(200);
     expect(await response!.text(), "with the server's own page").not.toBe(firstShell);
-    expect(deployments.requests.slice(before).some((r) => (r.path === "/" || r.path === "/index.html") && r.from === "B")).toBe(true);
+    expect(
+      deployments.requests.slice(before).some((r) => (r.path === "/" || r.path === "/index.html") && r.from === "B"),
+    ).toBe(true);
     expect(await storedPaths(page), "the other build's page was not stored").not.toContain("/index.html");
 
     // Back on the first build, the miss stores its page.

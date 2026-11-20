@@ -291,7 +291,7 @@ export interface GameplayEvents {
   /** Where the page life came from, once at boot (approved 2026-11-13): the
    *  referrer's host (`$direct` for none), the landing path and the link's
    *  UTM tags. Never the referrer's path or query. `analyticsPageView.ts`. */
-  "$pageview": PageViewProps;
+  $pageview: PageViewProps;
   /** The reliability instrument (`analyticsEngineStatus.ts`, issue #1081):
    *  which engine this page life runs, whether it fell back and why, and
    *  whether the engine save writer turned itself off. Every value is a code

@@ -52,8 +52,16 @@ const NONE: [number, number] = [0, 0];
 
 function cases(lift: number, office: number, stairs: number): Call[] {
   const list: Call[] = [];
-  list.push({ name: "extendTransport(stairs, end sideways)", rust: (e) => e.extendTransport(stairs, "sideways", 3), ends: SHAFT });
-  list.push({ name: "extendTransport(a unit's id, a fractional floor)", rust: (e) => e.extendTransport(office, "up", 3.5), ends: NONE });
+  list.push({
+    name: "extendTransport(stairs, end sideways)",
+    rust: (e) => e.extendTransport(stairs, "sideways", 3),
+    ends: SHAFT,
+  });
+  list.push({
+    name: "extendTransport(a unit's id, a fractional floor)",
+    rust: (e) => e.extendTransport(office, "up", 3.5),
+    ends: NONE,
+  });
   const ids: [string, unknown][] = [
     ["a numeric string", String(lift)],
     ["null", null],
@@ -88,11 +96,33 @@ function cases(lift: number, office: number, stairs: number): Call[] {
   list.push({ name: "extendTransport(id)", rust: (e) => e.extendTransport(lift), ends: SHAFT });
   list.push({ name: "extendTransport(id, up)", rust: (e) => e.extendTransport(lift, "up"), ends: SHAFT });
   // Enums: only the exact strings.
-  const ends: [string, unknown][] = [["UP", "UP"], ["Down", "Down"], ["empty", ""], ["padded", " up"], ["null", null], ["undefined", undefined], ["5", 5], ["true", true], ["an object", {}], ["a boxed String", new String("up")]];
+  const ends: [string, unknown][] = [
+    ["UP", "UP"],
+    ["Down", "Down"],
+    ["empty", ""],
+    ["padded", " up"],
+    ["null", null],
+    ["undefined", undefined],
+    ["5", 5],
+    ["true", true],
+    ["an object", {}],
+    ["a boxed String", new String("up")],
+  ];
   for (const [what, end] of ends) {
     list.push({ name: `extendTransport(end ${what})`, rust: (e) => e.extendTransport(lift, end, 3), ends: SHAFT });
   }
-  const methods: [string, unknown][] = [["Sell", "Sell"], ["BULLDOZE", "BULLDOZE"], ["empty", ""], ["burn", "burn"], ["null", null], ["undefined", undefined], ["7", 7], ["false", false], ["an array", ["sell"]], ["a boxed String", new String("sell")]];
+  const methods: [string, unknown][] = [
+    ["Sell", "Sell"],
+    ["BULLDOZE", "BULLDOZE"],
+    ["empty", ""],
+    ["burn", "burn"],
+    ["null", null],
+    ["undefined", undefined],
+    ["7", 7],
+    ["false", false],
+    ["an array", ["sell"]],
+    ["a boxed String", new String("sell")],
+  ];
   for (const [what, method] of methods) {
     list.push({ name: `removeFacility(method ${what})`, rust: (e) => e.removeFacility(office, method) });
   }
@@ -109,12 +139,25 @@ function acceptedEdges(lift: number): Call[] {
     { name: "extendTransport(down to -(2^53 - 1))", rust: (e) => e.extendTransport(lift, "down", -max), ends: SHAFT },
     // Floor 3 plus or minus 2^32 was floor 3 to the old i32 binding.
     { name: "extendTransport(up to 3 + 2^32)", rust: (e) => e.extendTransport(lift, "up", 3 + 2 ** 32), ends: SHAFT },
-    { name: "extendTransport(down to 3 - 2^32)", rust: (e) => e.extendTransport(lift, "down", 3 - 2 ** 32), ends: SHAFT },
+    {
+      name: "extendTransport(down to 3 - 2^32)",
+      rust: (e) => e.extendTransport(lift, "down", 3 - 2 ** 32),
+      ends: SHAFT,
+    },
   ];
   // The shaft's id plus or minus 2^32 named the shaft itself when the binding
   // truncated to i32; now each names nothing.
-  const aliases = [["the id + 2^32", lift + 2 ** 32], ["the id - 2^32", lift - 2 ** 32]] as const;
-  for (const [what, id] of [["-0", -0], ["-1", -1], ["2^53 - 1", Number.MAX_SAFE_INTEGER], ["-(2^53 - 1)", -Number.MAX_SAFE_INTEGER], ...aliases] as const) {
+  const aliases = [
+    ["the id + 2^32", lift + 2 ** 32],
+    ["the id - 2^32", lift - 2 ** 32],
+  ] as const;
+  for (const [what, id] of [
+    ["-0", -0],
+    ["-1", -1],
+    ["2^53 - 1", Number.MAX_SAFE_INTEGER],
+    ["-(2^53 - 1)", -Number.MAX_SAFE_INTEGER],
+    ...aliases,
+  ] as const) {
     list.push({ name: `addCar(${what})`, rust: (e) => e.addCar(id) });
     list.push({ name: `removeCar(${what})`, rust: (e) => e.removeCar(id) });
     list.push({ name: `removeFacility(${what}, sell)`, rust: (e) => e.removeFacility(id, "sell") });
@@ -134,7 +177,9 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
       const run = (list: Call[], malformed: boolean) => {
         for (const c of list) {
           let raw = "";
-          expect(() => { raw = c.rust(engine); }, `${c.name}: the binding threw`).not.toThrow();
+          expect(() => {
+            raw = c.rust(engine);
+          }, `${c.name}: the binding threw`).not.toThrow();
           const answer = JSON.parse(raw) as Answer;
           expect(answer.ok, `${c.name}: accepted`).toBe(false);
           if (malformed) expect(answer.reason, c.name).toBe(INVALID_COMMAND);
@@ -156,9 +201,26 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
       // beginExtend takes its id raw too: anything but a whole JS number
       // naming an elevator opens no gesture, and moves nothing.
       const begin = (...a: unknown[]) => loose<(...b: unknown[]) => boolean>(engine.beginExtend).apply(engine, a);
-      const badIds: unknown[][] = [[String(lift)], [null], [undefined], [true], [lift + 0.5], [Number.NaN], [Infinity], [2 ** 53], [BigInt(lift)], [{ id: lift }], [new Number(lift)], [], [office], [stairs], [lift + 2 ** 32], [-0]];
+      const badIds: unknown[][] = [
+        [String(lift)],
+        [null],
+        [undefined],
+        [true],
+        [lift + 0.5],
+        [Number.NaN],
+        [Infinity],
+        [2 ** 53],
+        [BigInt(lift)],
+        [{ id: lift }],
+        [new Number(lift)],
+        [],
+        [office],
+        [stairs],
+        [lift + 2 ** 32],
+        [-0],
+      ];
       for (const args of badIds) {
-        const name = `beginExtend(${args.map((v) => typeof v === "bigint" ? `${v}n` : String(v)).join(", ")})`;
+        const name = `beginExtend(${args.map((v) => (typeof v === "bigint" ? `${v}n` : String(v))).join(", ")})`;
         expect(begin(...args), name).toBe(false);
       }
       expect(engine.stateDigest(), "beginExtend moved the tower").toBe(start);
@@ -175,7 +237,10 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
         { name: "extendTransport back inside the mark", rust: (e) => e.extendTransport(lift, "up", 3) },
         { name: "extendTransport regrown inside the mark", rust: (e) => e.extendTransport(lift, "up", 4) },
         { name: "endExtend, then a shrink", rust: (e) => (e.endExtend(), e.extendTransport(lift, "up", 3)) },
-        { name: "extendTransport with an inflated caller mark", rust: () => extend(lift, "up", 5, '{"bottom":1,"top":50}') },
+        {
+          name: "extendTransport with an inflated caller mark",
+          rust: () => extend(lift, "up", 5, '{"bottom":1,"top":50}'),
+        },
         { name: "addCar", rust: (e) => e.addCar(lift) },
         { name: "removeCar", rust: (e) => e.removeCar(lift) },
         { name: "removeFacility", rust: (e) => e.removeFacility(office, "sell") },
@@ -199,7 +264,10 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
         expect(JSON.parse(engine.extendTransport(lift, "up", 6))).toMatchObject({ ok: true });
         expect(JSON.parse(engine.extendTransport(lift, "up", 5))).toMatchObject({ ok: true });
         expect(begin(...bad)).toBe(false);
-        expect(JSON.parse(engine.extendTransport(lift, "up", 6)), `regrow after beginExtend(${String(bad[0])})`).toMatchObject({ ok: true, added: 1 });
+        expect(
+          JSON.parse(engine.extendTransport(lift, "up", 6)),
+          `regrow after beginExtend(${String(bad[0])})`,
+        ).toMatchObject({ ok: true, added: 1 });
         expect(JSON.parse(engine.extendTransport(lift, "up", 5)).ok).toBe(true);
       }
     } finally {

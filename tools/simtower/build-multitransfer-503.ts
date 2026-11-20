@@ -101,7 +101,9 @@ save.star = 3; // let the loaded tower behave like an established building
 // viewport at 0x26). Without this the serialized default camera sat at tile
 // ~178, far right of this 36-wide tower, so the game opened on empty sky.
 save.view = { tile: 16, floor: 6 };
-console.log(`Marked ${occupied} office units occupied; camera centered at tile ${save.view.tile}, floor ${save.view.floor}.`);
+console.log(
+  `Marked ${occupied} office units occupied; camera centered at tile ${save.view.tile}, floor ${save.view.floor}.`,
+);
 
 const built = buildTDT(save);
 mkdirSync(SAVES, { recursive: true });

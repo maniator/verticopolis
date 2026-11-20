@@ -3,7 +3,20 @@ import { iconTemplate } from "@verticopolis/components/windows/icons";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "@verticopolis/components/shared/unitState";
 import { isCommercialKind, isHotelKind } from "@verticopolis/components/presentation/viewKinds";
-import { catalogFacility, catalogFilmRebook, catalogTicketPrice, filmEditAction, filmPolicyEditAction, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog, type CatalogCalendar, type CatalogRentCadence } from "@verticopolis/components/catalog/catalogTypes";
+import {
+  catalogFacility,
+  catalogFilmRebook,
+  catalogTicketPrice,
+  filmEditAction,
+  filmPolicyEditAction,
+  catalogHouseholdPrice,
+  catalogOpenAt,
+  catalogResidents,
+  rungFor,
+  type Catalog,
+  type CatalogCalendar,
+  type CatalogRentCadence,
+} from "@verticopolis/components/catalog/catalogTypes";
 import type { ScreenDetail, TransportDetail, UnitDetail } from "@verticopolis/components/port/panels";
 import { catalogCalendar, priceOptionsFor, rentPerCollection } from "../catalogPricing";
 import type { CalendarKind } from "@verticopolis/components/shared/engineTypes";
@@ -83,7 +96,10 @@ function rentLine(cadence: CatalogRentCadence, price: number, calendar: CatalogC
   const paid = rentPerCollection(cadence, price, calendar);
   if (paid === price) return `$${groupDigits(price)}`;
   const leaseUnit = leaseLandsMonthly(calendar) ? "month" : "quarter";
-  const period = cadence === "quarterly" ? `${calendar.leasePeriodDays}-day ${leaseUnit}` : `${calendar.maintenancePeriodDays}-day month`;
+  const period =
+    cadence === "quarterly"
+      ? `${calendar.leasePeriodDays}-day ${leaseUnit}`
+      : `${calendar.maintenancePeriodDays}-day month`;
   return `$${groupDigits(paid)} (the $${groupDigits(price)} rate scaled to a ${period})`;
 }
 
@@ -112,7 +128,9 @@ export function unitEditorTemplate(
     const closed = isTenanted(u) && !catalogOpenAt(f, hour);
     rows.push(kv("Customers", `${u.customersIn ?? 0}${closed ? " (closed)" : ""}`, "customers"));
   } else if (f.population) {
-    rows.push(kv("Occupants", occupantsText(u.occupants, catalogResidents(f, u.residents), u.workersComing), "occupants"));
+    rows.push(
+      kv("Occupants", occupantsText(u.occupants, catalogResidents(f, u.residents), u.workersComing), "occupants"),
+    );
   }
   // On mobile the folded-in diagnostics carry the richer access reachability
   // line, so the plain Yes/No row would duplicate it: drop it there. But keep
@@ -140,14 +158,13 @@ export function unitEditorTemplate(
     );
   }
   const evalPct = Math.round(u.satisfaction * 100);
-  rows.push(
-    kv("Eval", html`<span class="evalbar"><span style="width:${evalPct}%"></span></span> ${evalPct}%`, "eval"),
-  );
+  rows.push(kv("Eval", html`<span class="evalbar"><span style="width:${evalPct}%"></span></span> ${evalPct}%`, "eval"));
   if (rcfg) {
     let label = "Quarterly rent";
     if (u.kind === "condo") label = "Sale price";
     else if (isHotelKind(u.kind)) label = "Room rate";
-    else if (rcfg.cadence === "maintenancePeriod" || leaseLandsMonthly(catalogCalendar(catalog, calendar))) label = "Monthly rent";
+    else if (rcfg.cadence === "maintenancePeriod" || leaseLandsMonthly(catalogCalendar(catalog, calendar)))
+      label = "Monthly rent";
     // For a SOLD condo the "Sale price" is what it actually fetched, the
     // household-scaled amount (and exactly what the buy-back will reclaim), not
     // the base asking. householdPrice falls back to the base when there's no
@@ -170,7 +187,9 @@ export function unitEditorTemplate(
     if (screens.length > 1) {
       screens.forEach((screen, i) => {
         const days = screen.filmDays === 1 ? "1 day" : `${screen.filmDays} days`;
-        rows.push(kv(`Screen ${i + 1}`, `${filmLabel(screen.filmTier)}, ${days}`, i === 0 ? "showing" : `showing${i + 1}`));
+        rows.push(
+          kv(`Screen ${i + 1}`, `${filmLabel(screen.filmTier)}, ${days}`, i === 0 ? "showing" : `showing${i + 1}`),
+        );
       });
     } else {
       rows.push(kv("Now showing", filmLabel(u.filmTier), "showing"));
@@ -183,7 +202,9 @@ export function unitEditorTemplate(
     // message rail, so no emoji mapper runs on it, and a bare U+26A0 shows as
     // a missing-glyph box on a system without symbol fonts (#794). The icon is
     // hidden from screen readers, so a hidden word keeps the spoken cue.
-    rows.push(kv(html`${iconTemplate("warning")}<span class="visually-hidden">Warning</span>`, "Gutted: bulldoze and rebuild."));
+    rows.push(
+      kv(html`${iconTemplate("warning")}<span class="visually-hidden">Warning</span>`, "Gutted: bulldoze and rebuild."),
+    );
   } else {
     rows.push(kv("Resale value", `$${groupDigits(f.resaleRefund)}`));
   }
@@ -237,9 +258,7 @@ export function unitEditorTemplate(
       ),
     );
     // Batch-price every unit of this kind at once (no per-room grind).
-    actions.push(
-      edRow(html`<button class="btn" data-edit="batchKind">Set all ${f.name.toLowerCase()}s…</button>`),
-    );
+    actions.push(edRow(html`<button class="btn" data-edit="batchKind">Set all ${f.name.toLowerCase()}s…</button>`));
   }
   // Each screen's films to book, then the film it books again once its film
   // is spent, where the mode rebooks (#1950). Only an open theater shows a
@@ -248,7 +267,8 @@ export function unitEditorTemplate(
     const named = screens.length > 1;
     if (isOperational(u)) {
       const book = films.map(
-        (film) => html`<button class="btn" data-edit=${filmEditAction(film.key, i)}>${film.label} ($${groupDigits(film.price)})</button>`,
+        (film) =>
+          html`<button class="btn" data-edit=${filmEditAction(film.key, i)}>${film.label} ($${groupDigits(film.price)})</button>`,
       );
       if (named) actions.push(html`<div class="ed-screen">Book a film on screen ${i + 1}</div>`);
       actions.push(edRow(html`${book}`));
@@ -286,7 +306,11 @@ export function unitEditorTemplate(
   return editorShell(`unit:${u.id}`, u.subtype ?? f.name, rows, actions, diagnostics);
 }
 
-export function transportEditorTemplate(t: TransportDetail, catalog: Catalog, tdiag: TemplateResult[] = []): TemplateResult {
+export function transportEditorTemplate(
+  t: TransportDetail,
+  catalog: Catalog,
+  tdiag: TemplateResult[] = [],
+): TemplateResult {
   const f = catalogFacility(catalog, t.kind);
   // The catalog lists a car limit for elevators and no other kind.
   const maxCars = f.maxCars;
@@ -305,7 +329,9 @@ export function transportEditorTemplate(t: TransportDetail, catalog: Catalog, td
     // Standard/service keep their configurable stop readout.
     let stops: string;
     if (t.kind === "elevatorExpress") {
-      const policy = t.stops.some((row) => isBasementFloor(row.floor)) ? "lobbies and basements" : "lobbies and sky lobbies";
+      const policy = t.stops.some((row) => isBasementFloor(row.floor))
+        ? "lobbies and basements"
+        : "lobbies and sky lobbies";
       const skipped = t.stops.filter((row) => !row.served && (row.lobby || isBasementFloor(row.floor))).length;
       stops = skipped ? `${policy} (${skipped} skipped)` : policy;
     } else {
@@ -340,6 +366,8 @@ export function transportEditorTemplate(t: TransportDetail, catalog: Catalog, td
   actions.push(edRow(html`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
 
   // Desktop leaves the diagnostics to the hover card; its caller passes none.
-  const diagnostics = tdiag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${tdiag}</div>` : nothing;
+  const diagnostics = tdiag.length
+    ? html`<div class="ed-diagnostics" data-field="diagnostics">${tdiag}</div>`
+    : nothing;
   return editorShell(`transport:${t.id}`, f.name, rows, actions, diagnostics);
 }

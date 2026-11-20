@@ -17,12 +17,20 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock("../analytics", () => ({ trackAppAction: m.track }));
 vi.mock("../ui/fileDialog", () => ({ showFileDialog: m.dialog }));
-vi.mock("../ui/uiImport", async (actual) => ({ ...(await actual<typeof import("../ui/uiImport")>()), openImport: m.openImport, readPickedFile: m.readPickedFile }));
+vi.mock("../ui/uiImport", async (actual) => ({
+  ...(await actual<typeof import("../ui/uiImport")>()),
+  openImport: m.openImport,
+  readPickedFile: m.readPickedFile,
+}));
 vi.mock("./portLifecycle", () => ({ exportFile: m.exportFile }));
 vi.mock("./loadMenu", () => ({ openLive: m.openLive }));
 vi.mock("./keepOutgoing", () => ({ openingFile: m.openingFile, keptSettled: m.keptSettled }));
 vi.mock("../storage/fileSpaceMigrate", () => ({ copySlotsOnce: m.copySlots }));
-vi.mock("./interactionState", () => ({ isDialogOpen: () => m.dialogOpen, isEngineStopped: () => m.stopped, isSplashUp: () => m.splash }));
+vi.mock("./interactionState", () => ({
+  isDialogOpen: () => m.dialogOpen,
+  isEngineStopped: () => m.stopped,
+  isSplashUp: () => m.splash,
+}));
 
 import type { GameApp } from "../main";
 import { closeFileSpaceForTests, fileSpace } from "../storage/fileSpace";
@@ -32,7 +40,17 @@ import type { SlotInfo } from "../storage/slotInfo";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import { currentFileId, setCurrentFile } from "./currentFile";
 import { REF_KEY } from "./towerDocument";
-import { openFile, openFileSpace, openTowersFile, saveCurrentFile, saveFile, showOpenDialog, showSaveAsDialog, towerFileKind, wireTowerDrop } from "./fileSpaceCommands";
+import {
+  openFile,
+  openFileSpace,
+  openTowersFile,
+  saveCurrentFile,
+  saveFile,
+  showOpenDialog,
+  showSaveAsDialog,
+  towerFileKind,
+  wireTowerDrop,
+} from "./fileSpaceCommands";
 
 const text = (s: string) => new TextEncoder().encode(s);
 const TDT = Uint8Array.of(0x00, 0x24, 1, 2);
@@ -174,7 +192,10 @@ describe("File > Open…", () => {
   it("adds dropped tower files and names the ones it refused", async () => {
     showOpenDialog(app as unknown as GameApp, "menu");
     const note = await lastCtx().add([new File([BINARY], "Spire.vctower"), new File(["hi"], "notes.txt")]);
-    expect(note).toEqual({ text: `"notes.txt" isn't a tower file (.vctower or .TDT). Added the other 1.`, kind: "bad" });
+    expect(note).toEqual({
+      text: `"notes.txt" isn't a tower file (.vctower or .TDT). Added the other 1.`,
+      kind: "bad",
+    });
     expect(fileSpace.list().map((f) => [f.name, f.kind])).toEqual([["Spire", "tower"]]);
     expect(m.track).toHaveBeenCalledWith("file_add", "drop");
   });
@@ -184,15 +205,26 @@ describe("File > Open…", () => {
     const other = await fileSpace.save("Old", "tower", BINARY);
     setCurrentFile(saved.id);
     showOpenDialog(app as unknown as GameApp, "menu");
-    expect(await lastCtx().remove(saved.id)).toEqual({ text: `You're playing "Mine", so it can't be deleted. Open or start another tower first.`, kind: "bad" });
+    expect(await lastCtx().remove(saved.id)).toEqual({
+      text: `You're playing "Mine", so it can't be deleted. Open or start another tower first.`,
+      kind: "bad",
+    });
     m.splash = true;
     // Behind the title screen the tower is the Auto-save's, by the ref beside it.
-    vi.spyOn(SaveGame, "listSlots").mockReturnValue([{ slot: "auto", exists: true, present: true, towerName: "Mine", savedAt: 7 } as SlotInfo]);
+    vi.spyOn(SaveGame, "listSlots").mockReturnValue([
+      { slot: "auto", exists: true, present: true, towerName: "Mine", savedAt: 7 } as SlotInfo,
+    ]);
     localStorage.setItem(REF_KEY, JSON.stringify({ file: other.id, savedAt: 7 }));
-    expect(await lastCtx().remove(other.id)).toEqual({ text: `"Old" is the tower Continue opens, so it can't be deleted. Open or start another tower first.`, kind: "bad" });
+    expect(await lastCtx().remove(other.id)).toEqual({
+      text: `"Old" is the tower Continue opens, so it can't be deleted. Open or start another tower first.`,
+      kind: "bad",
+    });
     expect(fileSpace.get(other.id), "still there").toBeDefined();
     localStorage.setItem(REF_KEY, JSON.stringify({ file: saved.id, savedAt: 7 }));
-    expect(await lastCtx().remove(saved.id)).toEqual({ text: `"Mine" is the tower Continue opens, so it can't be deleted. Open or start another tower first.`, kind: "bad" });
+    expect(await lastCtx().remove(saved.id)).toEqual({
+      text: `"Mine" is the tower Continue opens, so it can't be deleted. Open or start another tower first.`,
+      kind: "bad",
+    });
     expect(fileSpace.get(saved.id), "still there").toBeDefined();
     expect(currentFileId()).toBe(saved.id);
     expect(m.track).not.toHaveBeenCalledWith("file_delete");
@@ -213,7 +245,10 @@ describe("File > Save over a file another window wrote", () => {
     const db = fake.lastDb!;
     db.store("bodies").set(made.id, Uint8Array.of(5));
     const index = db.store("meta").get("index") as { id: string; modified: number }[];
-    db.store("meta").set("index", index.map((e) => ({ ...e, modified: e.modified + 1 })));
+    db.store("meta").set(
+      "index",
+      index.map((e) => ({ ...e, modified: e.modified + 1 })),
+    );
     m.exportFile.mockReturnValueOnce(Uint8Array.of(9));
     await saveCurrentFile();
     expect(await fileSpace.read(made.id), "the other window's save stays").toEqual(Uint8Array.of(5));
@@ -221,7 +256,10 @@ describe("File > Save over a file another window wrote", () => {
     expect(await fileSpace.read(fork.id)).toEqual(Uint8Array.of(9));
     expect(currentFileId()).toBe(fork.id);
     expect(m.track).toHaveBeenLastCalledWith("file_save", "forked");
-    expect(app.ui.toast).toHaveBeenLastCalledWith(`Another window saved "Sky Hotel" too, so this tower is saved as "Sky Hotel (2)".`, "good");
+    expect(app.ui.toast).toHaveBeenLastCalledWith(
+      `Another window saved "Sky Hotel" too, so this tower is saved as "Sky Hotel (2)".`,
+      "good",
+    );
   });
 });
 
@@ -248,7 +286,9 @@ describe("opening a My Towers file", () => {
     expect(app.saveLoad.importGame).toHaveBeenCalledExactlyOnceWith("VCTOWER1\nabc\n");
     // Named before the swap, so a tower reopening its own file keeps the minutes since as a new file.
     expect(m.openingFile).toHaveBeenCalledExactlyOnceWith(f.id);
-    expect(m.openingFile.mock.invocationCallOrder[0]).toBeLessThan(app.saveLoad.importGame.mock.invocationCallOrder[0]!);
+    expect(m.openingFile.mock.invocationCallOrder[0]).toBeLessThan(
+      app.saveLoad.importGame.mock.invocationCallOrder[0]!,
+    );
     expect(currentFileId()).toBe(f.id);
     expect(fileSpace.list()).toHaveLength(1);
     expect(recentTowers()).toEqual([{ place: "towers", id: f.id, name: "Spire", kind: "tower" }]);
@@ -320,7 +360,10 @@ describe("saving into My Towers", () => {
   it("a new name another tab took meanwhile is refused, and replaced once asked", async () => {
     showSaveAsDialog(app as unknown as GameApp);
     const other = await fileSpace.save("Spire", "tower", BINARY);
-    expect(await lastCtx().save("spire", false)).toEqual({ text: `A tower named "Spire" already exists.`, kind: "bad" });
+    expect(await lastCtx().save("spire", false)).toEqual({
+      text: `A tower named "Spire" already exists.`,
+      kind: "bad",
+    });
     expect(await fileSpace.read(other.id)).toEqual(BINARY);
     expect(await lastCtx().save("spire", true)).toBeNull();
     expect(await fileSpace.read(other.id)).toEqual(Uint8Array.of(7, 7, 7));
@@ -351,13 +394,18 @@ describe("saving into My Towers", () => {
     expect(app.ui.toast).toHaveBeenLastCalledWith(`Saved "Sky Hotel" in My Towers.`, "good");
     m.exportFile.mockReturnValueOnce(Uint8Array.of(9));
     await saveCurrentFile();
-    expect(fileSpace.list().map((f) => f.id), "the same file, no second one").toEqual([made.id]);
+    expect(
+      fileSpace.list().map((f) => f.id),
+      "the same file, no second one",
+    ).toEqual([made.id]);
     expect(await fileSpace.read(made.id)).toEqual(Uint8Array.of(9));
     expect(m.track).toHaveBeenLastCalledWith("file_save", "current");
     const versions = await fileSpace.versions(made.id);
     expect(versions).toHaveLength(2);
     expect(await fileSpace.readVersion(versions.find((v) => v.manual)!.key)).toEqual(Uint8Array.of(9));
-    expect(await fileSpace.readVersion(versions.find((v) => v.original)!.key), "the file as it was made").toEqual(Uint8Array.of(7, 7, 7));
+    expect(await fileSpace.readVersion(versions.find((v) => v.original)!.key), "the file as it was made").toEqual(
+      Uint8Array.of(7, 7, 7),
+    );
   });
 
   it("File > Save of a tower whose file was deleted in another tab gives it a new one", async () => {

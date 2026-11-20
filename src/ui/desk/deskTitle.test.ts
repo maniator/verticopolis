@@ -57,7 +57,9 @@ describe("DeskTitle", () => {
     expect((close.previousElementSibling as HTMLElement).hidden).toBe(true);
     expect(document.querySelector<HTMLElement>('.desk-start-menu [data-item="btn-about"]')!.hidden).toBe(false);
     // The arrow keys skip it: up from the first item wraps to the last one shown.
-    document.getElementById("desk-start-menu")!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    document
+      .getElementById("desk-start-menu")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
     expect(document.activeElement).not.toBe(close);
     expect((document.activeElement as HTMLElement).dataset.item).toBe("btn-about");
     title.hide();

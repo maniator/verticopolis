@@ -18,7 +18,12 @@ describe.skipIf(noEngine)("following an undo or redo step", () => {
     const reader = new ViewReader(enginePort, floorsOfPort(enginePort));
     reader.update();
     const renderSim = newRenderSim(enginePort, reader);
-    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => reader.update(), showSteps: () => {} });
+    const hist = createAppHistory({
+      enginePort,
+      ui: { toast: () => {} },
+      followSwap: () => reader.update(),
+      showSteps: () => {},
+    });
     const office = reader.rooms.find((r) => r.kind === "office");
     if (!office) throw new Error("no office in the view");
     return { enginePort, reader, renderSim, hist, office };

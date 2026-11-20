@@ -30,7 +30,9 @@ export const CHARGE_OPS: Record<ChargeCommand["op"], Spec> = {
 };
 
 /** A charge command's result as the scenario reads it. */
-export interface ChargeOutcome extends Outcome { delta: number }
+export interface ChargeOutcome extends Outcome {
+  delta: number;
+}
 
 /** The engine-owned charges (#914) a scenario engine runs; each moves the
  *  money itself. */
@@ -69,16 +71,21 @@ export function applyCharge(e: ScenarioEngine, c: ChargeCommand): void {
   const r = run(e, c);
   // Same order as the Rust runner's `expect_charge`: the money first.
   const moved = e.money() - before;
-  if (moved !== r.delta) throw new Error(`${c.op} ${at}: the balance moved ${moved} but the command reported ${r.delta}`);
+  if (moved !== r.delta)
+    throw new Error(`${c.op} ${at}: the balance moved ${moved} but the command reported ${r.delta}`);
   if (!r.ok && r.delta !== 0) throw new Error(`${c.op} ${at}: refused but reported a delta of ${r.delta}`);
   expectCharge(r, c.reason, `${c.op} ${at}`);
 }
 
 function run(e: ScenarioEngine, c: Exclude<ChargeCommand, { op: "beginExtend" | "endExtend" }>): ChargeOutcome {
   switch (c.op) {
-    case "addCar": return e.addCar(idAt(e, c, true));
-    case "removeCar": return e.removeCar(idAt(e, c, true));
-    case "extendTransport": return e.extendTransport(idAt(e, c, true), c.end, c.targetFloor);
-    case "removeFacility": return e.removeFacility(idAt(e, c, c.shaft ?? false), c.method);
+    case "addCar":
+      return e.addCar(idAt(e, c, true));
+    case "removeCar":
+      return e.removeCar(idAt(e, c, true));
+    case "extendTransport":
+      return e.extendTransport(idAt(e, c, true), c.end, c.targetFloor);
+    case "removeFacility":
+      return e.removeFacility(idAt(e, c, c.shaft ?? false), c.method);
   }
 }

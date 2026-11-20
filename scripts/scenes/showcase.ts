@@ -244,7 +244,9 @@ export const SHOWCASE_SCENES: Scene[] = [
             g.refreshEditor();
           });
           await page.waitForTimeout(150);
-          await page.evaluate(() => (document.querySelector('#editor [data-edit="batchKind"]') as HTMLElement | null)?.click());
+          await page.evaluate(() =>
+            (document.querySelector('#editor [data-edit="batchKind"]') as HTMLElement | null)?.click(),
+          );
           // The Classic dialog is the rung-picker variant (no #bp-price number
           // input exists here); capture it at its defaults, live preview line
           // included.
@@ -298,7 +300,7 @@ export const SHOWCASE_SCENES: Scene[] = [
       for (let f = 2; f <= 8; f++) for (let x = left; x < left + 44; x++) s.tower.place("floor", f, x);
       s.buildTransport("elevatorStandard", left, 1, 8);
       for (let f = 2; f <= 8; f++)
-        for (let x = left + 6; x + 1 <= left + 44; ) {
+        for (let x = left + 6; x + 1 <= left + 44;) {
           const before = s.tower.units.length;
           s.build("office", f, x); // s.build keeps the construction state this shot wants
           if (s.tower.units.length > before) x += s.tower.units[s.tower.units.length - 1].width;
@@ -323,12 +325,19 @@ export const SHOWCASE_SCENES: Scene[] = [
         // would otherwise yield a blank/half-drawn frame (the old shot-game.mjs
         // waited on the same currentScene guard).
         setup: async (page) => {
-          await page.waitForFunction(() => !!(window as any).game?.engine?.engine?.currentScene, null, { timeout: 8000 });
+          await page.waitForFunction(() => !!(window as any).game?.engine?.engine?.currentScene, null, {
+            timeout: 8000,
+          });
         },
         wait: 900,
       },
       // drawSettle: a live TowerEngine demo whose pixels advance in the draw path.
-      { name: "11-game-tower", setup: async (page) => void (await page.evaluate(buildEngineTower)), wait: 1200, drawSettle: true },
+      {
+        name: "11-game-tower",
+        setup: async (page) => void (await page.evaluate(buildEngineTower)),
+        wait: 1200,
+        drawSettle: true,
+      },
       {
         name: "12-game-zoom",
         setup: async (page) => void (await page.evaluate(() => (window as any).game.engine.zoomAt(1.6, 640, 400))),
@@ -340,7 +349,10 @@ export const SHOWCASE_SCENES: Scene[] = [
           // 23:00 the same day: pgSetClock only moves forward, so a clock
           // already past 23:00 would land a day later. Fail instead.
           const minute = await page.evaluate(() => (window as any).game.sim.clock.minuteOfDay as number);
-          if (minute > 23 * 60) throw new Error(`the clock is already at minute ${minute} of the day, past 23:00; shorten the waits (or the speed) of the shots before it in this scene so it starts before 23:00`);
+          if (minute > 23 * 60)
+            throw new Error(
+              `the clock is already at minute ${minute} of the day, past 23:00; shorten the waits (or the speed) of the shots before it in this scene so it starts before 23:00`,
+            );
           await page.evaluate(pgSetClock, 23);
           await page.evaluate(() => (window as any).game.engine.zoomAt(1 / 1.6, 640, 400));
         },
@@ -403,7 +415,9 @@ export const SHOWCASE_SCENES: Scene[] = [
             // under the card is frozen exactly as in a real crash.
             const clock = engine.engine?.clock;
             if (typeof clock?.stop !== "function") {
-              throw new Error("game.engine.engine.clock is unavailable; the crash-screen scene needs to freeze the frame");
+              throw new Error(
+                "game.engine.engine.clock is unavailable; the crash-screen scene needs to freeze the frame",
+              );
             }
             clock.stop();
             engine.onContextLost(); // first loss: recovers in place, no card
@@ -430,7 +444,10 @@ export const SHOWCASE_SCENES: Scene[] = [
     shots: [
       {
         name: "09-mobile",
-        setup: async (page) => void (await page.evaluate(() => (window as any).game.engine.setCamera(Math.floor((window as any).game.grid.width / 2), 18, 0.32))),
+        setup: async (page) =>
+          void (await page.evaluate(() =>
+            (window as any).game.engine.setCamera(Math.floor((window as any).game.grid.width / 2), 18, 0.32),
+          )),
         clock: 12,
         wait: 1000,
       },
@@ -446,7 +463,11 @@ export const SHOWCASE_SCENES: Scene[] = [
         // The phone's menu bar with its logo, the Tower menu open.
         name: "19-mobile-menu",
         setup: async (page) => {
-          await page.evaluate(() => document.querySelector('#modal [data-act="close"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+          await page.evaluate(() =>
+            document
+              .querySelector('#modal [data-act="close"]')
+              ?.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+          );
           await page.evaluate(() => document.getElementById("mb-tower")?.click());
           await page.waitForSelector("#mb-tower-menu:not([hidden])", { timeout: 4000 });
         },

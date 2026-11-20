@@ -32,8 +32,13 @@ describe("third-party notices hardening (#974)", () => {
     expect(isKnownOutsideRepoSource("/elsewhere/xee960543882c65087dd93d10ef853802/sw.js")).toBe(false);
     // A matching pattern without the flag excuses nothing.
     expect(isKnownOutsideRepoSource("/tmp/a.js", [{ pkg: "x", sourcePattern: /a\.js$/ }])).toBe(false);
-    expect(isKnownOutsideRepoSource("/tmp/a.js", [{ pkg: "x", sourcePattern: /a\.js$/, outsideRepo: true }])).toBe(true);
-    expect(INJECTED_CODE.filter((inj) => inj.outsideRepo).map((inj) => inj.pkg)).toEqual(["vite-plugin-pwa", "workbox-build"]);
+    expect(isKnownOutsideRepoSource("/tmp/a.js", [{ pkg: "x", sourcePattern: /a\.js$/, outsideRepo: true }])).toBe(
+      true,
+    );
+    expect(INJECTED_CODE.filter((inj) => inj.outsideRepo).map((inj) => inj.pkg)).toEqual([
+      "vite-plugin-pwa",
+      "workbox-build",
+    ]);
   });
 
   it("accepts a sourceless chunk only when it is the modulepreload polyfill alone", () => {
@@ -77,23 +82,49 @@ describe("third-party notices hardening (#974)", () => {
 
   it("finds a package stylesheet's extension at the end of the path or of any query part", () => {
     // The plugin's test: the path's extension, or the whole id's.
-    const refused = (id: string): boolean => isPackagePath(id, PACKAGE_STYLESHEET) || (isPackagePath(id) && PACKAGE_STYLESHEET.test(id));
-    for (const id of ["/r/node_modules/x/a.css", "/r/node_modules/x/a.scss?inline", "/r/node_modules/x/A.vue?vue&type=style&lang.css", "/r/node_modules/x/A.vue?vue&type=style&lang.css&inline", "/r/node_modules/x/A.vue?lang.less#x"]) {
+    const refused = (id: string): boolean =>
+      isPackagePath(id, PACKAGE_STYLESHEET) || (isPackagePath(id) && PACKAGE_STYLESHEET.test(id));
+    for (const id of [
+      "/r/node_modules/x/a.css",
+      "/r/node_modules/x/a.scss?inline",
+      "/r/node_modules/x/A.vue?vue&type=style&lang.css",
+      "/r/node_modules/x/A.vue?vue&type=style&lang.css&inline",
+      "/r/node_modules/x/A.vue?lang.less#x",
+    ]) {
       expect(refused(id), id).toBe(true);
     }
-    for (const id of ["/r/node_modules/x/a.js", "/r/node_modules/x/a.cssx.js", "/r/node_modules/x/a.js?lang.cssx", "/r/src/a.css?lang.css"]) expect(refused(id), id).toBe(false);
+    for (const id of [
+      "/r/node_modules/x/a.js",
+      "/r/node_modules/x/a.cssx.js",
+      "/r/node_modules/x/a.js?lang.cssx",
+      "/r/src/a.css?lang.css",
+    ])
+      expect(refused(id), id).toBe(false);
   });
 
   it("refuses a lockfile that installs any package as a link", () => {
-    expect(lockfileLinkProblems({ packages: { "": { name: "x" }, "node_modules/a": { version: "1.0.0" } } })).toEqual([]);
-    expect(lockfileLinkProblems({ packages: { "node_modules/a": { resolved: "../a", link: true }, "node_modules/b/node_modules/c": { link: true } } })).toEqual([
+    expect(lockfileLinkProblems({ packages: { "": { name: "x" }, "node_modules/a": { version: "1.0.0" } } })).toEqual(
+      [],
+    );
+    expect(
+      lockfileLinkProblems({
+        packages: {
+          "node_modules/a": { resolved: "../a", link: true },
+          "node_modules/b/node_modules/c": { link: true },
+        },
+      }),
+    ).toEqual([
       "package-lock.json installs node_modules/a as a link",
       "package-lock.json installs node_modules/b/node_modules/c as a link",
     ]);
-    expect(lockfileLinkProblems({ packages: { "node_modules/a": { link: true } } }, "node_modules/.package-lock.json")).toEqual(["node_modules/.package-lock.json installs node_modules/a as a link"]);
+    expect(
+      lockfileLinkProblems({ packages: { "node_modules/a": { link: true } } }, "node_modules/.package-lock.json"),
+    ).toEqual(["node_modules/.package-lock.json installs node_modules/a as a link"]);
     expect(lockfileLinkProblems(null)).toEqual([]);
     // The real lockfile links nothing.
-    expect(lockfileLinkProblems(JSON.parse(readFileSync(join(__dirname, "..", "..", "package-lock.json"), "utf8")))).toEqual([]);
+    expect(
+      lockfileLinkProblems(JSON.parse(readFileSync(join(__dirname, "..", "..", "package-lock.json"), "utf8"))),
+    ).toEqual([]);
   });
 
   it("refuses a package.json that links a local package", () => {
@@ -108,15 +139,20 @@ describe("third-party notices hardening (#974)", () => {
     expect(linked).toHaveLength(8);
     expect(linked[0]).toBe("package.json dependencies links a (file:../a)");
     expect(linkedDependencyProblems({ workspaces: ["packages/*"] })).toEqual(["package.json declares workspaces"]);
-    expect(linkedDependencyProblems({ dependencies: ["file:x"] })).toEqual(["package.json dependencies is not an object"]);
+    expect(linkedDependencyProblems({ dependencies: ["file:x"] })).toEqual([
+      "package.json dependencies is not an object",
+    ]);
     // A drive path, and the same specs in overrides and resolutions at any depth.
-    expect(linkedDependencyProblems({ dependencies: { w: "C:/pkg/w" } })).toEqual(["package.json dependencies links w (C:/pkg/w)"]);
+    expect(linkedDependencyProblems({ dependencies: { w: "C:/pkg/w" } })).toEqual([
+      "package.json dependencies links w (C:/pkg/w)",
+    ]);
     // A local tarball is unpacked into node_modules as a copy, so it is not a link.
     expect(linkedDependencyProblems({ dependencies: { t: "./vendor/t-1.0.0.tgz", u: "file:u.tar.gz" } })).toEqual([]);
-    expect(linkedDependencyProblems({ overrides: { foo: { bar: "file:../bar" }, ok: "^1.0.0" } })).toEqual(["package.json overrides links foo > bar (file:../bar)"]);
-    expect(linkedDependencyProblems({ resolutions: { baz: "link:./baz" }, pnpm: { overrides: { qux: "./qux" } } })).toEqual([
-      "package.json resolutions links baz (link:./baz)",
-      "package.json pnpm.overrides links qux (./qux)",
+    expect(linkedDependencyProblems({ overrides: { foo: { bar: "file:../bar" }, ok: "^1.0.0" } })).toEqual([
+      "package.json overrides links foo > bar (file:../bar)",
     ]);
+    expect(
+      linkedDependencyProblems({ resolutions: { baz: "link:./baz" }, pnpm: { overrides: { qux: "./qux" } } }),
+    ).toEqual(["package.json resolutions links baz (link:./baz)", "package.json pnpm.overrides links qux (./qux)"]);
   });
 });

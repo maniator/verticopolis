@@ -23,7 +23,14 @@ const byLabel = (sel: string, label: string): HTMLButtonElement =>
   Array.from(dialog().querySelectorAll<HTMLButtonElement>(sel)).find((b) => b.textContent === label)!;
 
 const stops = () => ({
-  read: () => [4, 3, 2, 1].map((floor) => ({ floor, served: true, lobby: floor === 1, endpoint: floor === 1 || floor === 4, toggles: floor !== 1 && floor !== 4 })),
+  read: () =>
+    [4, 3, 2, 1].map((floor) => ({
+      floor,
+      served: true,
+      lobby: floor === 1,
+      endpoint: floor === 1 || floor === 4,
+      toggles: floor !== 1 && floor !== 4,
+    })),
   setServe: vi.fn(async () => {}),
   expressStops: vi.fn(async () => {}),
   allStops: vi.fn(async () => {}),
@@ -95,7 +102,10 @@ describe.skipIf(noEngine)("the dialog's advice comes from the engine's facts", (
   });
 
   it("shows no advice where the mode withholds it, whatever the engine says", () => {
-    open({ ux: scheduleDialogUX(catalogFor("classic").rules), facts: () => ({ ...FACTS, advice: { status: "ready", over: [9], short: [] } }) });
+    open({
+      ux: scheduleDialogUX(catalogFor("classic").rules),
+      facts: () => ({ ...FACTS, advice: { status: "ready", over: [9], short: [] } }),
+    });
     expect(dialog().querySelector(".es-advice")).toBeNull();
   });
 
@@ -115,12 +125,21 @@ describe.skipIf(noEngine)("the dialog's advice comes from the engine's facts", (
 describe.skipIf(noEngine)("the dialog's staging sentence comes from the engine's summary", () => {
   it("leads with the measured busiest hour and the engine's counts", () => {
     open();
-    expect(text(".es-sim")).toBe("Busiest weekday hour 08:00: 1 staged up-tower, 3 at the lobby, 4 of 4 cars on shift.");
+    expect(text(".es-sim")).toBe(
+      "Busiest weekday hour 08:00: 1 staged up-tower, 3 at the lobby, 4 of 4 cars on shift.",
+    );
   });
 
   it("names the assumed down-rush when the engine says the peak is not measured", () => {
-    open({ facts: () => ({ ...FACTS, staging: { ...FACTS.staging!, measured: false, peakHour: 17, activeAtPeak: 2, upTowerCars: 0, lobbyCars: 2 } }) });
-    expect(text(".es-sim")).toBe("No measured weekday peak yet; at the 17:00 down-rush: 0 staged up-tower, 2 at the lobby, 2 of 4 cars on shift.");
+    open({
+      facts: () => ({
+        ...FACTS,
+        staging: { ...FACTS.staging!, measured: false, peakHour: 17, activeAtPeak: 2, upTowerCars: 0, lobbyCars: 2 },
+      }),
+    });
+    expect(text(".es-sim")).toBe(
+      "No measured weekday peak yet; at the 17:00 down-rush: 0 staged up-tower, 2 at the lobby, 2 of 4 cars on shift.",
+    );
   });
 
   it("writes nothing when the engine has no summary", () => {
@@ -155,7 +174,9 @@ describe.skipIf(noEngine)("the dialog's presets come from the engine", () => {
   });
 
   it("applies nothing, quietly, when the engine refuses the preset", () => {
-    const { apply, announce } = open({ preset: () => ({ status: "unavailable-in-mode", weekday: null, weekend: null, homeFloors: [] }) });
+    const { apply, announce } = open({
+      preset: () => ({ status: "unavailable-in-mode", weekday: null, weekend: null, homeFloors: [] }),
+    });
     byLabel(".es-presets .btn", "Rush").click();
     expect(announce).not.toHaveBeenCalled();
     press('[data-act="apply"]');
@@ -164,7 +185,12 @@ describe.skipIf(noEngine)("the dialog's presets come from the engine", () => {
   });
 
   it("stages up-tower from the engine's staging play, in either mode", () => {
-    const preset = vi.fn((): PresetProposal => ({ status: "available", weekday: null, weekend: null, homeFloors: [1, 1, 4, 4] }));
+    const preset = vi.fn((): PresetProposal => ({
+      status: "available",
+      weekday: null,
+      weekend: null,
+      homeFloors: [1, 1, 4, 4],
+    }));
     const { apply } = open({ ux: scheduleDialogUX(catalogFor("classic").rules), preset });
     byLabel("button", "Stage upper half up-tower").click();
     expect(preset).toHaveBeenCalledWith("stage-up-tower");
@@ -173,7 +199,9 @@ describe.skipIf(noEngine)("the dialog's presets come from the engine", () => {
   });
 
   it("leaves the staging alone when the engine has no staging play to give", () => {
-    const { apply } = open({ preset: () => ({ status: "missing-shaft", weekday: null, weekend: null, homeFloors: [] }) });
+    const { apply } = open({
+      preset: () => ({ status: "missing-shaft", weekday: null, weekend: null, homeFloors: [] }),
+    });
     byLabel("button", "Stage upper half up-tower").click();
     press('[data-act="apply"]');
     expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 1, 1]);
@@ -182,8 +210,14 @@ describe.skipIf(noEngine)("the dialog's presets come from the engine", () => {
 
 describe.skipIf(noEngine)("the dialog's staging comes from the engine's homes and base", () => {
   it("opens on the homes the engine answers for the saved schedule", () => {
-    const facts = vi.fn((draft: { homeFloors?: number[] }) => ({ ...FACTS, homeFloors: draft.homeFloors ? [2, 2, 3, 4] : [1, 1, 1, 1] }));
-    const { apply } = open({ current: { homeFloors: [9, 9, 9, 9] }, facts: facts as unknown as ScheduleDialogCtx["facts"] });
+    const facts = vi.fn((draft: { homeFloors?: number[] }) => ({
+      ...FACTS,
+      homeFloors: draft.homeFloors ? [2, 2, 3, 4] : [1, 1, 1, 1],
+    }));
+    const { apply } = open({
+      current: { homeFloors: [9, 9, 9, 9] },
+      facts: facts as unknown as ScheduleDialogCtx["facts"],
+    });
     // The saved homes went to the engine, which put them on served floors.
     expect(facts.mock.calls[0][0].homeFloors).toEqual([9, 9, 9, 9]);
     press('[data-act="apply"]');
@@ -218,14 +252,26 @@ describe.skipIf(noEngine)("the dialog's staging comes from the engine's homes an
   });
 
   it("keeps the stored homes when the engine refuses the opening query", () => {
-    const refused: ScheduleDialogCtx["facts"] = () => ({ ...FACTS, status: "invalid-draft", staging: null, homeFloors: [], recommended: null });
+    const refused: ScheduleDialogCtx["facts"] = () => ({
+      ...FACTS,
+      status: "invalid-draft",
+      staging: null,
+      homeFloors: [],
+      recommended: null,
+    });
     const { apply } = open({ current: { homeFloors: [2, 3, 4, 1] }, facts: refused });
     press('[data-act="apply"]');
     expect(apply.mock.calls[0][0].homeFloors).toEqual([2, 3, 4, 1]);
   });
 
   it("repoints every car at the engine's base floor", () => {
-    const { apply } = open({ facts: (draft) => ({ ...FACTS, staging: { ...FACTS.staging!, baseLobby: 3 }, homeFloors: draft.homeFloors ?? [3, 3, 3, 3] }) });
+    const { apply } = open({
+      facts: (draft) => ({
+        ...FACTS,
+        staging: { ...FACTS.staging!, baseLobby: 3 },
+        homeFloors: draft.homeFloors ?? [3, 3, 3, 3],
+      }),
+    });
     byLabel("button", "Home all cars at Floor 3").click();
     press('[data-act="apply"]');
     expect(apply.mock.calls[0][0].homeFloors).toEqual([3, 3, 3, 3]);

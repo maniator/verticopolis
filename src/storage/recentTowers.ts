@@ -51,7 +51,8 @@ function entryOf(v: unknown): RecentTower | null {
   const e = v as Record<string, unknown>;
   if (e.place !== "towers" && e.place !== "folder") return null;
   if (!text(e.id) || !text(e.name) || (e.kind !== "tower" && e.kind !== "tdt")) return null;
-  if (e.place === "folder") return text(e.link) ? { place: "folder", id: e.id, name: e.name, kind: e.kind, link: e.link } : null;
+  if (e.place === "folder")
+    return text(e.link) ? { place: "folder", id: e.id, name: e.name, kind: e.kind, link: e.link } : null;
   return { place: "towers", id: e.id, name: e.name, kind: e.kind };
 }
 
@@ -121,7 +122,11 @@ export function keepRecentTowers(list: readonly RecentTower[]): void {
 }
 
 /** Note a My Towers file the live tower came from or was saved as. */
-export function noteTowersFile(file: { readonly id: string; readonly name: string; readonly kind: TowerFileKind }): void {
+export function noteTowersFile(file: {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: TowerFileKind;
+}): void {
   noteRecentTower({ place: "towers", id: file.id, name: file.name, kind: file.kind });
 }
 

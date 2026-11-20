@@ -40,7 +40,10 @@ afterEach(() => {
 
 const WEEKDAY_SIM = "Busiest weekday hour 08:00: 1 staged up-tower, 3 at the lobby, 4 of 4 cars on shift.";
 
-const withAdvice = (over: number[], short: number[]): ScheduleFacts => ({ ...FACTS, advice: { status: "ready", over, short } });
+const withAdvice = (over: number[], short: number[]): ScheduleFacts => ({
+  ...FACTS,
+  advice: { status: "ready", over, short },
+});
 const REFUSED_FACTS: ScheduleFacts = {
   status: "missing-shaft",
   recommended: null,
@@ -83,7 +86,9 @@ describe("opening the dialog", () => {
     expect(ctx.facts.mock.calls.map((c) => c[1])).toEqual([true, true]);
     expect(q(".es-day .es-on")?.textContent).toBe("Weekend");
     expect(q(".es-bar.sel")?.getAttribute("aria-label")).toBe("weekend 12:00, 4 of 4 cars");
-    expect(text(".es-sim")).toBe("Busiest weekend hour 08:00: 1 staged up-tower, 3 at the lobby, 4 of 4 cars on shift.");
+    expect(text(".es-sim")).toBe(
+      "Busiest weekend hour 08:00: 1 staged up-tower, 3 at the lobby, 4 of 4 cars on shift.",
+    );
   });
 
   it("seeds the working copy from the stored schedule, clamping counts and keeping its tunables", () => {
@@ -139,11 +144,14 @@ describe("the advice line", () => {
     expect(text(".es-advice")).toBe("This shaft is short at 07:00 on weekends.");
   });
 
-  it.each(["insufficient-data", "no-cars", "unavailable-in-mode", "refused"] as const)("shows no advice while it is %s", (status) => {
-    open({ facts: { ...FACTS, advice: { status, over: [], short: [] } } });
-    expect(q(".es-advice")).toBeNull();
-    expect(q("details.es-adv")?.hasAttribute("open")).toBe(false);
-  });
+  it.each(["insufficient-data", "no-cars", "unavailable-in-mode", "refused"] as const)(
+    "shows no advice while it is %s",
+    (status) => {
+      open({ facts: { ...FACTS, advice: { status, over: [], short: [] } } });
+      expect(q(".es-advice")).toBeNull();
+      expect(q("details.es-adv")?.hasAttribute("open")).toBe(false);
+    },
+  );
 
   it("withholds advice in Classic, which shows the raw grid outright", () => {
     open({ ux: CLASSIC_UX, facts: withAdvice([9], []) });
@@ -162,13 +170,17 @@ describe("the staging sentence", () => {
 
   it("names the assumed down-rush on a day with no measured peak", () => {
     open({ facts: { ...FACTS, staging: { ...FACTS.staging!, measured: false, peakHour: 17 } } });
-    expect(text(".es-sim")).toBe("No measured weekday peak yet; at the 17:00 down-rush: 1 staged up-tower, 3 at the lobby, 4 of 4 cars on shift.");
+    expect(text(".es-sim")).toBe(
+      "No measured weekday peak yet; at the 17:00 down-rush: 1 staged up-tower, 3 at the lobby, 4 of 4 cars on shift.",
+    );
   });
 
   it("names a basement base with the B-n grammar and homes unhomed cars there", () => {
-    const facts = ({ ...FACTS, staging: { ...FACTS.staging!, baseLobby: 0 } });
+    const facts = { ...FACTS, staging: { ...FACTS.staging!, baseLobby: 0 } };
     open({ facts, bottom: -1, stops: stopsPort(2, [0], [], -1) });
-    expect(text(".es-sim")).toBe("Busiest weekday hour 08:00: 1 staged up-tower, 3 at Floor B1 (the base), 4 of 4 cars on shift.");
+    expect(text(".es-sim")).toBe(
+      "Busiest weekday hour 08:00: 1 staged up-tower, 3 at Floor B1 (the base), 4 of 4 cars on shift.",
+    );
     expect(homesShown()).toEqual(["B1:1", "B1:2", "B1:3", "B1:4"]);
     expect(button("Home all cars at Floor B1")).toBeDefined();
     const baseRow = q(".es-base")!.closest(".es-grid-row")!;
@@ -200,11 +212,28 @@ describe("origin hotspots", () => {
   });
 
   it("reads a contiguous band as a range and scattered floors as a list", () => {
-    open({ autoTune: TUNE_WEEKDAY, origins: origins(new Map([[2, 50], [3, 40], [4, 10]])) });
+    open({
+      autoTune: TUNE_WEEKDAY,
+      origins: origins(
+        new Map([
+          [2, 50],
+          [3, 40],
+          [4, 10],
+        ]),
+      ),
+    });
     expect(text(".es-sim")).toBe(`${WEEKDAY_SIM} Most riders board on floors 2–3.`);
     expect(dialog().querySelectorAll(".es-origin")).toHaveLength(2);
     document.body.innerHTML = "";
-    open({ autoTune: TUNE_WEEKDAY, origins: origins(new Map([[1, 50], [4, 50]])) });
+    open({
+      autoTune: TUNE_WEEKDAY,
+      origins: origins(
+        new Map([
+          [1, 50],
+          [4, 50],
+        ]),
+      ),
+    });
     expect(text(".es-sim")).toBe(`${WEEKDAY_SIM} Most riders board on floors 1, 4.`);
   });
 
@@ -215,7 +244,15 @@ describe("origin hotspots", () => {
   });
 
   it("ranks only served floors, so a skipped floor's mass does not hide the rest", async () => {
-    open({ autoTune: TUNE_WEEKDAY, origins: origins(new Map([[3, 90], [2, 10]])) });
+    open({
+      autoTune: TUNE_WEEKDAY,
+      origins: origins(
+        new Map([
+          [3, 90],
+          [2, 10],
+        ]),
+      ),
+    });
     expect(text(".es-sim")).toBe(`${WEEKDAY_SIM} Most riders board at Floor 3.`);
     const box = q<HTMLInputElement>('input[aria-label="Serve floor 3"]')!;
     box.checked = false;
@@ -242,7 +279,13 @@ describe("presets", () => {
     expect(homesShown()).toEqual(["4:1", "4:2", "4:3", "4:4"]);
     expect(q(".modal-warn")?.textContent).toBe("You have unsaved changes.");
     ok();
-    expect(saved(apply)).toEqual({ activeCars: { weekday: row(2), weekend: row(3) }, homeFloors: [4, 4, 4, 4], waitingCarResponse: 0, standardFloorDeparture: 48, autoTune: false });
+    expect(saved(apply)).toEqual({
+      activeCars: { weekday: row(2), weekend: row(3) },
+      homeFloors: [4, 4, 4, 4],
+      waitingCarResponse: 0,
+      standardFloorDeparture: 48,
+      autoTune: false,
+    });
   });
 
   it("fills a day the preset leaves out with the whole fleet", () => {
@@ -292,13 +335,17 @@ describe("Auto-tune", () => {
   it("is disabled with a hint while no day is warm", () => {
     open();
     expect(q<HTMLButtonElement>(".es-autotune")?.disabled).toBe(true);
-    expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain("Auto-tune needs a day or two of measured traffic first.");
+    expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain(
+      "Auto-tune needs a day or two of measured traffic first.",
+    );
   });
 
   it("explains a shaft with no cars", () => {
     open({ autoTune: { ...TUNE_COLD, status: "no-cars" } });
     expect(q<HTMLButtonElement>(".es-autotune")?.disabled).toBe(true);
-    expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain("This shaft has no cars to tune.");
+    expect(Array.from(dialog().querySelectorAll(".es-hint")).map((p) => p.textContent)).toContain(
+      "This shaft has no cars to tune.",
+    );
   });
 
   it("is not offered in Classic", () => {

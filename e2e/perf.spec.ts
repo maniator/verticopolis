@@ -93,7 +93,8 @@ test.describe("E5-S0 perf gate @perf", () => {
 
     // (A) isolated render cost (batched, change-path).
     const uiRuns = [];
-    for (let i = 0; i < A_RUNS; i++) uiRuns.push(await page.evaluate(benchmarkUiUpdate, { n: N_PUMPS, batch: A_BATCH }));
+    for (let i = 0; i < A_RUNS; i++)
+      uiRuns.push(await page.evaluate(benchmarkUiUpdate, { n: N_PUMPS, batch: A_BATCH }));
     const uiUpdate = {
       n: uiRuns[0]!.n,
       batch: uiRuns[0]!.batch,
@@ -119,19 +120,21 @@ test.describe("E5-S0 perf gate @perf", () => {
       // huge tower cannot perturb the measurement, and unpause the engine at the
       // fastest speed.
       await page.evaluate((s) => {
-        const g = (window as unknown as {
-          game: {
-            speed: number;
-            engine: { paused: boolean };
-            sim: { events: { pending: unknown } };
-            ui: { showEventChoice: (m: string, c: string, onResolve: (opt: "accept" | "decline") => void) => void };
-            prefs: { steadyClock: boolean };
-            saveLoad?: { autosave: () => void };
-            shownWin: boolean;
-            shownChoice: boolean;
-            shownUpdate: boolean;
-          };
-        }).game;
+        const g = (
+          window as unknown as {
+            game: {
+              speed: number;
+              engine: { paused: boolean };
+              sim: { events: { pending: unknown } };
+              ui: { showEventChoice: (m: string, c: string, onResolve: (opt: "accept" | "decline") => void) => void };
+              prefs: { steadyClock: boolean };
+              saveLoad?: { autosave: () => void };
+              shownWin: boolean;
+              shownChoice: boolean;
+              shownUpdate: boolean;
+            };
+          }
+        ).game;
         document.getElementById("splash")?.remove();
         if (g.sim.events.pending) g.sim.events.pending = null;
         g.ui.showEventChoice = (_m, _c, onResolve) => onResolve("decline");
@@ -156,7 +159,13 @@ test.describe("E5-S0 perf gate @perf", () => {
 
     const current: Baseline = {
       uiUpdate,
-      simSpeed: { simMinutesPerRealSecond, cpuThrottle: CPU_THROTTLE, speed: SPEED_MINUTES_PER_SEC, windowMs: SPEED_WINDOW_MS, windows: SPEED_WINDOWS },
+      simSpeed: {
+        simMinutesPerRealSecond,
+        cpuThrottle: CPU_THROTTLE,
+        speed: SPEED_MINUTES_PER_SEC,
+        windowMs: SPEED_WINDOW_MS,
+        windows: SPEED_WINDOWS,
+      },
     };
 
     // The status leaf spans are textContent writes and must never be replaced;
@@ -166,7 +175,9 @@ test.describe("E5-S0 perf gate @perf", () => {
     // Since E5-S1 the grid renders through lit, which patches text in place, so
     // the grid's child nodes must also keep their identity across pumps (the
     // pre-E5 innerHTML reparse rebuilt them; that regression now fails here).
-    expect(nodeIdentity.towerStatsChildStable, "the tower-stats grid children keep their identity across pumps").toBe(true);
+    expect(nodeIdentity.towerStatsChildStable, "the tower-stats grid children keep their identity across pumps").toBe(
+      true,
+    );
 
     if (CAPTURE || !fs.existsSync(BASELINE_PATH)) {
       // In enforce mode a missing baseline is a hard failure, not a bootstrap:

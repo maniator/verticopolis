@@ -16,7 +16,10 @@ import { engineFromSave } from "../portKit/rustEngine";
  * `scheduleReview.integration.test.ts` and `scheduleReviewClassic.integration.test.ts`.
  */
 
-export const load = (name: string) => decodeVctower(readFileSync(`node_modules/@verticopolis/engine/conformance/fixtures/${name}.vctower`, "utf8")) as SerializedGame;
+export const load = (name: string) =>
+  decodeVctower(
+    readFileSync(`node_modules/@verticopolis/engine/conformance/fixtures/${name}.vctower`, "utf8"),
+  ) as SerializedGame;
 export const memory = () => {
   const data = new Map<string, string>();
   return {
@@ -30,7 +33,9 @@ export function diffPaths(a: unknown, b: unknown, path = ""): string[] {
   if (a === b) return [];
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return [path];
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  return [...keys].flatMap((k) => diffPaths((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}/${k}`));
+  return [...keys].flatMap((k) =>
+    diffPaths((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}/${k}`),
+  );
 }
 
 /** The game's own pieces around one tower: the port, the view, the card kit, real Undo, and the review. */

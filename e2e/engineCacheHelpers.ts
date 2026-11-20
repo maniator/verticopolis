@@ -13,7 +13,11 @@ export async function installed(page: Page): Promise<void> {
 }
 
 export type Which = "glue" | "wasm" | "record";
-export const ENGINE_PATH: Record<Which, string> = { glue: "engine/verticopolis_engine.js", wasm: "engine/verticopolis_engine_bg.wasm", record: "engine/BUILD.json" };
+export const ENGINE_PATH: Record<Which, string> = {
+  glue: "engine/verticopolis_engine.js",
+  wasm: "engine/verticopolis_engine_bg.wasm",
+  record: "engine/BUILD.json",
+};
 
 /** Replace one cached engine response under its own key. `how` is a source:
  *  `salt` appends (a valid module, or a trailing comment), `flip` changes the
@@ -27,9 +31,17 @@ export async function tamperCache(page: Page, which: Which, how: "salt" | "flip"
           if (new URL(request.url).pathname !== `/${path}`) continue;
           const old = await cache.match(request);
           let bytes = new Uint8Array(await old!.arrayBuffer());
-          if (how === "salt") bytes = kind === "wasm" ? new Uint8Array([...bytes, ...salt]) : new Uint8Array([...bytes, ...new TextEncoder().encode("\n// salt\n")]);
-          else if (how === "flip") bytes = bytes.map((b, i) => (i === bytes.length - 1 ? (b === 0x20 ? 0x0a : 0x20) : b));
-          else bytes = new TextEncoder().encode(JSON.stringify({ ...JSON.parse(new TextDecoder().decode(bytes)), package: "e".repeat(64) }));
+          if (how === "salt")
+            bytes =
+              kind === "wasm"
+                ? new Uint8Array([...bytes, ...salt])
+                : new Uint8Array([...bytes, ...new TextEncoder().encode("\n// salt\n")]);
+          else if (how === "flip")
+            bytes = bytes.map((b, i) => (i === bytes.length - 1 ? (b === 0x20 ? 0x0a : 0x20) : b));
+          else
+            bytes = new TextEncoder().encode(
+              JSON.stringify({ ...JSON.parse(new TextDecoder().decode(bytes)), package: "e".repeat(64) }),
+            );
           // A body of another length must not keep the old Content-Length, or
           // the entry would read as a cut-off download rather than a mismatch.
           const headers = new Headers(old!.headers);
@@ -44,4 +56,3 @@ export async function tamperCache(page: Page, which: Which, how: "salt" | "flip"
   );
   expect(done, `${ENGINE_PATH[which]} is in the precache`).toBe(true);
 }
-

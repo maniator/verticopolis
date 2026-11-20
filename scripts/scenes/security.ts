@@ -86,7 +86,9 @@ function expectClimbingAndWalking(read: SearchRead, where: string): void {
   const climbing = s.sweeping.filter((g) => read.minutes < g.arrive).length;
   const walking = s.sweeping.filter((g) => read.minutes >= g.arrive && read.minutes < g.done).length;
   if (climbing === 0 || walking === 0) {
-    throw new Error(`${where}: wanted guards both climbing and walking, got ${climbing} climbing and ${walking} walking at minute ${read.minutes}`);
+    throw new Error(
+      `${where}: wanted guards both climbing and walking, got ${climbing} climbing and ${walking} walking at minute ${read.minutes}`,
+    );
   }
 }
 
@@ -121,18 +123,26 @@ function climbingTiles(read: SearchRead): number[] {
  *  reached down to the shared lobby and back up. */
 async function searchOnBothTowers(page: Page): Promise<void> {
   await declineRansom(page);
-  const towers = await page.evaluate(() => (window as unknown as { __vcShotSecuritySplit?: [number, number][] }).__vcShotSecuritySplit);
+  const towers = await page.evaluate(
+    () => (window as unknown as { __vcShotSecuritySplit?: [number, number][] }).__vcShotSecuritySplit,
+  );
   if (!towers || towers.length !== 2) throw new Error("security-search-split: the builder left no split towers");
   const inTower = (x: number, [lo, hi]: [number, number]): boolean => x >= lo && x <= hi;
   for (let i = 0; i < 170; i++) {
     const read = await page.evaluate(pgReadSearch);
-    if (!read.search) throw new Error(`security-search-split: the search ended at minute ${read.minutes} before a guard reached the right tower's stairs`);
+    if (!read.search)
+      throw new Error(
+        `security-search-split: the search ended at minute ${read.minutes} before a guard reached the right tower's stairs`,
+      );
     const tiles = climbingTiles(read);
     if (tiles.some((x) => inTower(x, towers[0]!)) && tiles.some((x) => inTower(x, towers[1]!))) {
       // Center a little right of the lot so the towers clear the Map.
-      await page.evaluate(([lo, hi]) => {
-        (window as unknown as { game: any }).game.engine.setCamera(Math.round((lo + hi) / 2) + 11, 6.5, 0.9);
-      }, [towers[0]![0], towers[1]![1]] as const);
+      await page.evaluate(
+        ([lo, hi]) => {
+          (window as unknown as { game: any }).game.engine.setCamera(Math.round((lo + hi) / 2) + 11, 6.5, 0.9);
+        },
+        [towers[0]![0], towers[1]![1]] as const,
+      );
       return;
     }
     await page.evaluate(pgRunEngine, 1);
@@ -151,7 +161,11 @@ export const SECURITY_SCENES: Scene[] = [
     id: "security-search-classic",
     outDir: "features",
     initScript: () => {
-      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = { mode: "classic", hour: 10, ransom: true };
+      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = {
+        mode: "classic",
+        hour: 10,
+        ransom: true,
+      };
     },
     build: buildSecurityTower,
     assertUnits: 40,
@@ -180,10 +194,18 @@ export const SECURITY_SCENES: Scene[] = [
             const g = (window as unknown as { game: any }).game;
             // The engine's own log says how the search ended.
             const log = JSON.stringify(JSON.parse(g.enginePort.serialize()).log ?? []);
-            return { running: g.enginePort.bombSearch?.() !== undefined, found: log.includes("Security found the bomb"), blew: log.includes("the bomb went off on") };
+            return {
+              running: g.enginePort.bombSearch?.() !== undefined,
+              found: log.includes("Security found the bomb"),
+              blew: log.includes("the bomb went off on"),
+            };
           });
-          if (end.running) throw new Error("security-search-over: the search was still running four hours after the refusal");
-          if (!end.found || end.blew) throw new Error("security-search-over: the guards did not find the bomb; this shot wants the search that finds it");
+          if (end.running)
+            throw new Error("security-search-over: the search was still running four hours after the refusal");
+          if (!end.found || end.blew)
+            throw new Error(
+              "security-search-over: the guards did not find the bomb; this shot wants the search that finds it",
+            );
         },
         wait: 400,
       },
@@ -193,7 +215,11 @@ export const SECURITY_SCENES: Scene[] = [
     id: "security-search-modern",
     outDir: "features",
     initScript: () => {
-      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = { mode: "modern", hour: 10, ransom: true };
+      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = {
+        mode: "modern",
+        hour: 10,
+        ransom: true,
+      };
     },
     build: buildSecurityTower,
     assertUnits: 40,
@@ -211,7 +237,12 @@ export const SECURITY_SCENES: Scene[] = [
     id: "security-search-joins",
     outDir: "features",
     initScript: () => {
-      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = { mode: "modern", hour: 8, ransom: true, gap: true };
+      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = {
+        mode: "modern",
+        hour: 8,
+        ransom: true,
+        gap: true,
+      };
     },
     build: buildSecurityTower,
     assertUnits: 40,
@@ -233,7 +264,10 @@ export const SECURITY_SCENES: Scene[] = [
             const at = (window as unknown as { __vcShotSecurityGapAt?: number }).__vcShotSecurityGapAt;
             if (at === undefined) throw new Error("the builder left no gap on floor 11");
             const r = port.buildAt(g.portCodes.kind("security"), 11, at);
-            if (r[0] !== 1) throw new Error(`the second Security office did not place on floor 11: ${port.lastReason() ?? "no reason given"}`);
+            if (r[0] !== 1)
+              throw new Error(
+                `the second Security office did not place on floor 11: ${port.lastReason() ?? "no reason given"}`,
+              );
             const office = JSON.parse(port.serialize()).units.find((u: any) => u.kind === "security" && u.floor === 11);
             const done = office?.completeAt;
             if (typeof done !== "number") throw new Error("the second Security office is not under construction");
@@ -241,14 +275,18 @@ export const SECURITY_SCENES: Scene[] = [
           });
           // Ten minutes before it opens, refuse the ransom.
           const now = (await page.evaluate(pgReadSearch)).minutes;
-          if (opens - 10 <= now) throw new Error(`security-search-joins: the second office opens at minute ${opens}, too soon after minute ${now} to refuse the ransom ten minutes before it`);
+          if (opens - 10 <= now)
+            throw new Error(
+              `security-search-joins: the second office opens at minute ${opens}, too soon after minute ${now} to refuse the ransom ten minutes before it`,
+            );
           await page.evaluate(pgRunEngine, opens - 10 - now);
           await declineRansom(page);
           // One step across the opening.
           await page.evaluate(pgRunEngine, 13);
           const read = await page.evaluate(pgReadSearch);
           const late = read.search?.sweeping.filter((g) => g.from === 11 && Math.abs(g.start - opens) < 1e-6) ?? [];
-          if (late.length === 0) throw new Error(`security-search-joins: no guard set out from floor 11 at minute ${opens}`);
+          if (late.length === 0)
+            throw new Error(`security-search-joins: no guard set out from floor 11 at minute ${opens}`);
           expectClimbingAndWalking(read, "security-search-joins");
         },
         wait: 400,
@@ -261,7 +299,13 @@ export const SECURITY_SCENES: Scene[] = [
     initScript: () => {
       // The seed hides the bomb where the search lasts until guards reach
       // the right tower (the builder's default seed finds it in minutes).
-      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = { mode: "modern", hour: 10, ransom: true, split: true, seed: 6101 };
+      (window as unknown as { __vcShotSecurity: unknown }).__vcShotSecurity = {
+        mode: "modern",
+        hour: 10,
+        ransom: true,
+        split: true,
+        seed: 6101,
+      };
     },
     build: buildSecurityTower,
     assertUnits: 40,
@@ -316,11 +360,17 @@ export const SECURITY_SCENES: Scene[] = [
             // Fail loudly if the overlay renamed its thief fields, rather
             // than capture a frame with no thief in it.
             for (const field of ["thiefStart", "thiefCaught", "thiefFloor", "thiefSpan"]) {
-              if (!(field in e)) throw new Error(`security-thief-caught: the tower overlay has no ${field} field any more`);
+              if (!(field in e))
+                throw new Error(`security-thief-caught: the tower overlay has no ${field} field any more`);
             }
-            const rooms = e.sim.tower.units.filter((u: any) => u.floor === 4 && u.kind !== "floor" && u.kind !== "lobby");
+            const rooms = e.sim.tower.units.filter(
+              (u: any) => u.floor === 4 && u.kind !== "floor" && u.kind !== "lobby",
+            );
             if (rooms.length === 0) throw new Error("security-thief-caught: floor 4 has no rooms to run");
-            e.thiefSpan = { left: Math.min(...rooms.map((u: any) => u.x)), right: Math.max(...rooms.map((u: any) => u.x + u.width)) };
+            e.thiefSpan = {
+              left: Math.min(...rooms.map((u: any) => u.x)),
+              right: Math.max(...rooms.map((u: any) => u.x + u.width)),
+            };
             e.thiefStart = e.d.anim;
             e.thiefCaught = true;
             e.thiefFloor = 4;

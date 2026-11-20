@@ -16,9 +16,9 @@ const catalog = GAMEPLAY_EVENT_RULES;
  *  must be one the catalog describes, so a payload that drifts from the
  *  contract fails here by name, before it shows up as a moved hash. */
 export function drainChecked(e: ScenarioEngine): unknown[] {
-  if (e.eventsDropped() > 0) throw new Error("more than the ring's worth of gameplay events between two checkpoints; checkpoint more often");
+  if (e.eventsDropped() > 0)
+    throw new Error("more than the ring's worth of gameplay events between two checkpoints; checkpoint more often");
   const events = e.drainEvents();
   for (const ev of events) checkEvent(catalog, ev);
   return events;
 }
-

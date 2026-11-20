@@ -19,7 +19,15 @@ function report(over: Partial<StatsReport> = {}): StatsReport {
     report: {
       functionalParking: 3,
       parkingDemand: { officePop: 72, offices: 12, suites: 0, homes: 0, total: 12, coverage: 0.25, short: true },
-      nextStar: { star: 4, isTower: false, popHave: 1_234, popNeed: 5_000, popMet: false, gates: [{ id: "medical", met: false }], allMet: false },
+      nextStar: {
+        star: 4,
+        isTower: false,
+        popHave: 1_234,
+        popNeed: 5_000,
+        popMet: false,
+        gates: [{ id: "medical", met: false }],
+        allMet: false,
+      },
       ...over,
     },
   }).report;
@@ -46,7 +54,9 @@ describe("starUpScreen", () => {
     const screen = starUpScreen(1, 3, modern, () => report());
     const want = modern.facilities.filter((f) => f.available && f.minStar > 1 && f.minStar <= 3).map((f) => f.name);
     expect(screen.rooms).toEqual(want);
-    expect(screen.headsUp!.duties).toEqual(modern.rules.starDuties.filter((d) => d.star === 2 || d.star === 3).map((d) => d.id));
+    expect(screen.headsUp!.duties).toEqual(
+      modern.rules.starDuties.filter((d) => d.star === 2 || d.star === 3).map((d) => d.id),
+    );
   });
 
   it("adds the Modern heads-up: the duties, the parking as it stands and the next rating", () => {
@@ -70,7 +80,9 @@ describe("starUpScreen", () => {
 describe("starUpTemplate", () => {
   it("names the rating and the new rooms, with an OK button that dispatches onOk", () => {
     const onOk = vi.fn();
-    const frag = renderToFragment(starUpTemplate({ star: 2, rooms: ["Hotel Single Room", "Security"], headsUp: null, topFloor: 100 }, onOk));
+    const frag = renderToFragment(
+      starUpTemplate({ star: 2, rooms: ["Hotel Single Room", "Security"], headsUp: null, topFloor: 100 }, onOk),
+    );
     expect(frag.querySelector("h2")!.textContent).toContain("Star Rating");
     expect(frag.querySelector(".star-up-rating")!.textContent).toBe("★★");
     expect(text(frag)).toContain("Your tower is now rated 2 stars.");
@@ -96,8 +108,16 @@ describe("starUpTemplate", () => {
   });
 
   it("leaves the parking line plain when the tower has enough", () => {
-    const enough = report({ functionalParking: 1, parkingDemand: { officePop: 6, offices: 1, suites: 0, homes: 0, total: 1, coverage: null, short: false } });
-    const frag = renderToFragment(starUpTemplate(starUpScreen(2, 3, catalogFor("modern"), () => enough), () => {}));
+    const enough = report({
+      functionalParking: 1,
+      parkingDemand: { officePop: 6, offices: 1, suites: 0, homes: 0, total: 1, coverage: null, short: false },
+    });
+    const frag = renderToFragment(
+      starUpTemplate(
+        starUpScreen(2, 3, catalogFor("modern"), () => enough),
+        () => {},
+      ),
+    );
     const parking = frag.querySelector(".star-up-parking")!;
     expect(parking.textContent).toContain("needs 1 space and has 1 working");
     expect(parking.classList.contains("short")).toBe(false);

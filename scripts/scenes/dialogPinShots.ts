@@ -57,8 +57,10 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         // Same floor as the schedule shots: enough content must remain below
         // the fold that an unpinned footer would be off screen here.
         const left = box.scrollHeight - box.clientHeight - box.scrollTop;
-        if (left <= strip.offsetHeight) throw new Error("Help did not overflow enough for the pin to be doing anything");
-        if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Help footer is not pinned; this shot would prove nothing");
+        if (left <= strip.offsetHeight)
+          throw new Error("Help did not overflow enough for the pin to be doing anything");
+        if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1)
+          throw new Error("the Help footer is not pinned; this shot would prove nothing");
       });
     },
     wait: 300,
@@ -79,7 +81,10 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         // The premise of this shot: the action row is the box's last child
         // (the build line sits above it), so the full downward cover applies
         // and scrolled text cannot show in the band under Close on a phone.
-        if (strip.nextElementSibling !== null) throw new Error("Settings renders something after its action row again; scrolled text can show under the Close button");
+        if (strip.nextElementSibling !== null)
+          throw new Error(
+            "Settings renders something after its action row again; scrolled text can show under the Close button",
+          );
         // Leave enough content below the fold to prove the sticky footer rule.
         box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - strip.offsetHeight * 3);
         // The build line sits just above the pinned row, so that scroll can leave
@@ -92,8 +97,10 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         const boxBottom = box.getBoundingClientRect().bottom;
         if (lineTop < boxBottom + 1) box.scrollTop -= Math.ceil(boxBottom + 1 - lineTop);
         const left = box.scrollHeight - box.clientHeight - box.scrollTop;
-        if (left <= strip.offsetHeight) throw new Error("Settings did not overflow enough for the pin to be doing anything");
-        if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Settings footer is not pinned; this shot would prove nothing");
+        if (left <= strip.offsetHeight)
+          throw new Error("Settings did not overflow enough for the pin to be doing anything");
+        if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1)
+          throw new Error("the Settings footer is not pinned; this shot would prove nothing");
       });
       await page.evaluate(pgAssertSettingsContentVisible, "visible-only" as const);
     },
@@ -141,7 +148,8 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         const found = document.querySelectorAll("#modal .modal-notice");
         if (found.length !== 1) throw new Error(`expected one notice, found ${found.length}`);
         const text = found[0].textContent || "";
-        if (!text.includes("dropped") || !text.includes("Try again")) throw new Error(`the notice lost its message: ${text}`);
+        if (!text.includes("dropped") || !text.includes("Try again"))
+          throw new Error(`the notice lost its message: ${text}`);
       });
     },
     wait: 300,
@@ -183,8 +191,10 @@ export const CRASH_PIN_SHOTS: Shot[] = [
         if (!card || !strip) throw new Error("the crash card did not mount its buttons");
         card.scrollTop = 0;
         const left = card.scrollHeight - card.clientHeight;
-        if (left <= strip.offsetHeight) throw new Error("the crash card did not overflow enough for the pin to be doing anything");
-        if (strip.getBoundingClientRect().bottom > card.getBoundingClientRect().bottom + 1) throw new Error("the crash card's buttons are not pinned; this shot would prove nothing");
+        if (left <= strip.offsetHeight)
+          throw new Error("the crash card did not overflow enough for the pin to be doing anything");
+        if (strip.getBoundingClientRect().bottom > card.getBoundingClientRect().bottom + 1)
+          throw new Error("the crash card's buttons are not pinned; this shot would prove nothing");
       });
     },
     wait: 0,

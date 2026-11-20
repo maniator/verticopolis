@@ -17,7 +17,13 @@ const press = (sel: string): void => dialog().querySelector<HTMLButtonElement>(s
 
 const stops = () => ({
   read: () =>
-    [4, 3, 2, 1].map((floor) => ({ floor, served: true, lobby: floor === 1, endpoint: floor === 1 || floor === 4, toggles: floor !== 1 && floor !== 4 })),
+    [4, 3, 2, 1].map((floor) => ({
+      floor,
+      served: true,
+      lobby: floor === 1,
+      endpoint: floor === 1 || floor === 4,
+      toggles: floor !== 1 && floor !== 4,
+    })),
   setServe: vi.fn(async () => {}),
   expressStops: vi.fn(async () => {}),
   allStops: vi.fn(async () => {}),
@@ -57,10 +63,9 @@ describe.skipIf(noEngine)("schedule dialog: run all cars", () => {
   it("a reopen from the saved rows shows the full fleet and the button changes nothing", async () => {
     const { ui } = makeUI();
     const apply = vi.fn(async (_s: any) => {});
-    ui.showElevatorScheduleDialog(
-      ctx({ activeCars: { weekday: Array(24).fill(4), weekend: Array(24).fill(4) } }),
-      { apply },
-    );
+    ui.showElevatorScheduleDialog(ctx({ activeCars: { weekday: Array(24).fill(4), weekend: Array(24).fill(4) } }), {
+      apply,
+    });
     press(".es-allcars");
     press('[data-act="apply"]');
     expect(apply.mock.calls[0][0].activeCars).toEqual({ weekday: Array(24).fill(4), weekend: Array(24).fill(4) });

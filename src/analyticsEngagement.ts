@@ -97,7 +97,10 @@ const DONE = 1;
 /** Route every gameplay command on `port` past the detector. The port keeps
  *  its identity, so every caller and every later tower swap goes through the
  *  wrapped members; the record is returned untouched. */
-export function watchGameplayCommands(port: EnginePortCommands, detector: Pick<EngagementDetector, "commandAnswered">): void {
+export function watchGameplayCommands(
+  port: EnginePortCommands,
+  detector: Pick<EngagementDetector, "commandAnswered">,
+): void {
   const members = port as unknown as Record<string, (...args: unknown[]) => PortRecord>;
   for (const name of GAMEPLAY_COMMANDS) {
     // A port without the member (a test double) has nothing to watch there.

@@ -5,7 +5,14 @@ import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import type { FrameDayStart } from "../goldens/frameDays";
 import { BULLDOZE, PORT_EDIT_CASES, runPortEditCase, type PortEditCase } from "../goldens/portEditCases";
-import { firstPortEditDifference, portEditProblems, readPortEdits, writePortEdits, type PortEditGolden, type PortEditLine } from "../goldens/portEditLines";
+import {
+  firstPortEditDifference,
+  portEditProblems,
+  readPortEdits,
+  writePortEdits,
+  type PortEditGolden,
+  type PortEditLine,
+} from "../goldens/portEditLines";
 import { PortEditSession, type PortEditLeg } from "../goldens/portEdits";
 import { PORT_EDITS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/updateGate";
 
@@ -23,7 +30,10 @@ import { PORT_EDITS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/up
  * passed, and it refuses to run in CI.
  */
 
-if (UPDATE && !hasWasmPackage()) throw new Error("the port-edit golden needs the engine package (VC_PORT_EDITS_UPDATE=1), and @verticopolis/engine/tooling is not installed; run npm install");
+if (UPDATE && !hasWasmPackage())
+  throw new Error(
+    "the port-edit golden needs the engine package (VC_PORT_EDITS_UPDATE=1), and @verticopolis/engine/tooling is not installed; run npm install",
+  );
 
 /** A fresh Rust engine; the case loads or founds its own tower over the
  *  placeholder it starts with. */
@@ -115,16 +125,20 @@ describe.skipIf(!hasWasmPackage())("the port-edit golden on the Rust engine", ()
   });
 
   for (const c of PORT_EDIT_CASES) {
-    it(c.id, () => {
-      const got = run(c);
-      // Checked before a refresh writes it, too.
-      expect(portEditProblems(c.start, got)).toEqual([]);
-      if (UPDATE) {
-        fresh[c.id] = got;
-        return;
-      }
-      expect(firstPortEditDifference(got, pinned.cases[c.id])).toBeNull();
-    }, 120_000);
+    it(
+      c.id,
+      () => {
+        const got = run(c);
+        // Checked before a refresh writes it, too.
+        expect(portEditProblems(c.start, got)).toEqual([]);
+        if (UPDATE) {
+          fresh[c.id] = got;
+          return;
+        }
+        expect(firstPortEditDifference(got, pinned.cases[c.id])).toBeNull();
+      },
+      120_000,
+    );
   }
 
   it("runs a case the same way twice in one process", () => {
@@ -140,7 +154,9 @@ describe.skipIf(!hasWasmPackage())("the port-edit golden on the Rust engine", ()
     const c = PORT_EDIT_CASES.find((x) => x.id === "the floor and lobby brush")!;
     const plain = run(c);
     const changed = run(c, (port) => port.nameTower("Drifted"));
-    expect(firstPortEditDifference(changed, plain)).toMatch(/^line 1 \(set money to 1000000000\): state "[0-9a-f]{16}" != pinned "[0-9a-f]{16}"$/);
+    expect(firstPortEditDifference(changed, plain)).toMatch(
+      /^line 1 \(set money to 1000000000\): state "[0-9a-f]{16}" != pinned "[0-9a-f]{16}"$/,
+    );
   });
 
   it("reads the crowd after a play's first frame that moves the clock", () => {

@@ -66,7 +66,8 @@ type Methods = { [K in keyof EnginePort]?: EnginePort[K] };
  *  when called. `viewLayout` answers the layout fixture unless overridden. */
 export function mockPort(answers: Methods = {}): EnginePort {
   const spies = new Map<string, unknown>();
-  for (const [name, impl] of Object.entries({ viewLayout: () => LAYOUT_TEXT, ...answers })) spies.set(name, vi.fn(impl as (...a: unknown[]) => unknown));
+  for (const [name, impl] of Object.entries({ viewLayout: () => LAYOUT_TEXT, ...answers }))
+    spies.set(name, vi.fn(impl as (...a: unknown[]) => unknown));
   return new Proxy({} as EnginePort, {
     get(_, name) {
       // Not a thenable, so a port passed through a promise stays a port.
@@ -82,7 +83,24 @@ export function mockPort(answers: Methods = {}): EnginePort {
 }
 
 /** `name`'s code in a layout table; throws for a name the table lacks. */
-export function code(table: keyof Pick<Layout, "kinds" | "unitStates" | "personStates" | "weather" | "modes" | "calendars" | "filmPolicies" | "filmTiers" | "ticketPrices" | "vacateReasons" | "heatModes" | "heatTints">, name: string): number {
+export function code(
+  table: keyof Pick<
+    Layout,
+    | "kinds"
+    | "unitStates"
+    | "personStates"
+    | "weather"
+    | "modes"
+    | "calendars"
+    | "filmPolicies"
+    | "filmTiers"
+    | "ticketPrices"
+    | "vacateReasons"
+    | "heatModes"
+    | "heatTints"
+  >,
+  name: string,
+): number {
   const at = LAYOUT[table].indexOf(name);
   if (at < 0) throw new Error(`${table} has no ${name}`);
   return at;
@@ -108,12 +126,22 @@ export interface Car {
 
 /** A `viewFrame` answer: the header (counts filled in), then people, units and
  *  each shaft's cars. */
-export function frame(spec: { header?: Fields; people?: Fields[]; units?: Fields[]; transports?: { id: number; cars: Car[] }[] }): Float64Array {
+export function frame(spec: {
+  header?: Fields;
+  people?: Fields[];
+  units?: Fields[];
+  transports?: { id: number; cars: Car[] }[];
+}): Float64Array {
   const l = LAYOUT;
   const people = spec.people ?? [];
   const units = spec.units ?? [];
   const transports = spec.transports ?? [];
-  const out = row(l.header, l.headerWidth, { ...spec.header, people: people.length, units: units.length, transports: transports.length });
+  const out = row(l.header, l.headerWidth, {
+    ...spec.header,
+    people: people.length,
+    units: units.length,
+    transports: transports.length,
+  });
   for (const p of people) out.push(...row(l.person, l.personWidth, p));
   for (const u of units) out.push(...row(l.unit, l.unitWidth, u));
   for (const t of transports) {
@@ -154,7 +182,14 @@ export interface ShaftSpec {
 
 /** A `viewStructure` answer: the scalars (counts filled in), then rooms, runs
  *  and shafts, kinds and states passed by name. */
-export function structure(spec: { header?: Fields; mode?: string; calendar?: string; rooms?: RoomSpec[]; runs?: RunSpec[]; shafts?: ShaftSpec[] }): Float64Array {
+export function structure(spec: {
+  header?: Fields;
+  mode?: string;
+  calendar?: string;
+  rooms?: RoomSpec[];
+  runs?: RunSpec[];
+  shafts?: ShaftSpec[];
+}): Float64Array {
   const l = LAYOUT;
   const rooms = spec.rooms ?? [];
   const runs = spec.runs ?? [];
@@ -170,12 +205,31 @@ export function structure(spec: { header?: Fields; mode?: string; calendar?: str
   for (const r of rooms) out.push(...row(l.room, l.roomWidth, { ...r, kind: code("kinds", r.kind) }));
   for (const r of runs) {
     const counters = { customersIn: -1, hotelCustomersIn: -1, outForMeal: -1 };
-    const fields = { kind: code("kinds", r.kind), floor: r.floor, x: r.x, width: r.width ?? 1, count: r.count, state: code("unitStates", r.state ?? "empty"), occupants: r.occupants ?? 0 };
+    const fields = {
+      kind: code("kinds", r.kind),
+      floor: r.floor,
+      x: r.x,
+      width: r.width ?? 1,
+      count: r.count,
+      state: code("unitStates", r.state ?? "empty"),
+      occupants: r.occupants ?? 0,
+    };
     out.push(...row(l.run, l.runWidth, { ...counters, ...fields }));
   }
   for (const s of shafts) {
     const skips = s.skips ?? [];
-    out.push(...row(l.shaft, l.shaftFixed, { id: s.id, kind: code("kinds", s.kind), x: s.x, width: s.width ?? 4, bottom: s.bottom, top: s.top, cars: s.cars, skips: skips.length }));
+    out.push(
+      ...row(l.shaft, l.shaftFixed, {
+        id: s.id,
+        kind: code("kinds", s.kind),
+        x: s.x,
+        width: s.width ?? 4,
+        bottom: s.bottom,
+        top: s.top,
+        cars: s.cars,
+        skips: skips.length,
+      }),
+    );
     out.push(...skips);
   }
   return Float64Array.from(out);

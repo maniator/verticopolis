@@ -1,5 +1,10 @@
 import { vi } from "vitest";
-import type { AutoTuneDay, AutoTuneProposal, PresetProposal, ScheduleFacts } from "@verticopolis/components/port/enginePort";
+import type {
+  AutoTuneDay,
+  AutoTuneProposal,
+  PresetProposal,
+  ScheduleFacts,
+} from "@verticopolis/components/port/enginePort";
 import { SCHEDULE_HOURS } from "@verticopolis/components/port/scheduleSlots";
 import { makeUI, mountAppDom } from "../tests/uiFixture";
 import type { FloorRow } from "./templates/elevatorSchedule";
@@ -27,16 +32,30 @@ export const row = (n: number): number[] => Array<number>(SCHEDULE_HOURS).fill(n
 
 export const COLD_DAY: AutoTuneDay = { warm: false, sampledHours: 0, curve: null };
 /** A warm day whose measured curve peaks at 08:00. */
-export const WARM_DAY: AutoTuneDay = { warm: true, sampledHours: SCHEDULE_HOURS, curve: row(0.2).map((v, h) => (h === 8 ? 1 : v)) };
+export const WARM_DAY: AutoTuneDay = {
+  warm: true,
+  sampledHours: SCHEDULE_HOURS,
+  curve: row(0.2).map((v, h) => (h === 8 ? 1 : v)),
+};
 
 /** No day warm yet: Auto-tune is not offered. */
-export const TUNE_COLD: AutoTuneProposal = { status: "insufficient-data", weekday: COLD_DAY, weekend: COLD_DAY, proposal: null };
+export const TUNE_COLD: AutoTuneProposal = {
+  status: "insufficient-data",
+  weekday: COLD_DAY,
+  weekend: COLD_DAY,
+  proposal: null,
+};
 /** A warm weekday: Auto-tune proposes a weekday row and split homes. */
 export const TUNE_WEEKDAY: AutoTuneProposal = {
   status: "available",
   weekday: WARM_DAY,
   weekend: COLD_DAY,
-  proposal: { weekday: row(2).map((v, h) => (h === 8 ? CARS : v)), weekend: null, homeFloors: [1, 1, 4, 4], homesSeeded: true },
+  proposal: {
+    weekday: row(2).map((v, h) => (h === 8 ? CARS : v)),
+    weekend: null,
+    homeFloors: [1, 1, 4, 4],
+    homesSeeded: true,
+  },
 };
 
 /** Ready advice with nothing off, a measured 08:00 peak, and no homes of its
@@ -45,17 +64,36 @@ export const FACTS: ScheduleFacts = {
   status: "available",
   recommended: "rush",
   advice: { status: "ready", over: [], short: [] },
-  staging: { measured: true, peakHour: 8, activeAtPeak: CARS, upTowerCars: 1, lobbyCars: 3, topLobby: TOP, baseLobby: 1 },
+  staging: {
+    measured: true,
+    peakHour: 8,
+    activeAtPeak: CARS,
+    upTowerCars: 1,
+    lobbyCars: 3,
+    topLobby: TOP,
+    baseLobby: 1,
+  },
   homeFloors: [],
 };
 
-export const PRESET: PresetProposal = { status: "available", weekday: row(2), weekend: row(3), homeFloors: [4, 4, 4, 4] };
+export const PRESET: PresetProposal = {
+  status: "available",
+  weekday: row(2),
+  weekend: row(3),
+  homeFloors: [4, 4, 4, 4],
+};
 
 /** Live stop rows for floors `bottom` to `top`, descending, with spies for the
  *  edits. `refuse` lists floors whose toggle the port ignores. `express` marks
  *  the rows the way the engine marks a Modern express's: a toggle on a
  *  basement, or on a lobby only while it is skipped. */
-export function stopsPort(top = TOP, lobbies: readonly number[] = [1], refuse: readonly number[] = [], bottom = 1, express = false) {
+export function stopsPort(
+  top = TOP,
+  lobbies: readonly number[] = [1],
+  refuse: readonly number[] = [],
+  bottom = 1,
+  express = false,
+) {
   const span = top - bottom + 1;
   const every = (): Set<number> => new Set(Array.from({ length: span }, (_, i) => bottom + i));
   let served = every();
@@ -66,9 +104,7 @@ export function stopsPort(top = TOP, lobbies: readonly number[] = [1], refuse: r
       lobby: lobbies.includes(floor),
       endpoint: floor === bottom || floor === top,
       toggles:
-        floor !== bottom &&
-        floor !== top &&
-        (!express || floor < 1 || (lobbies.includes(floor) && !served.has(floor))),
+        floor !== bottom && floor !== top && (!express || floor < 1 || (lobbies.includes(floor) && !served.has(floor))),
     })),
   );
   return {
@@ -129,7 +165,8 @@ export function open(over: Partial<Omit<ScheduleDialogCtx, keyof Answers>> & Ans
 }
 
 export const dialog = (): HTMLDialogElement => document.getElementById("modal") as HTMLDialogElement;
-export const q = <T extends Element = HTMLElement>(sel: string): T | null => dialog().querySelector<T>(sel as never) as T | null;
+export const q = <T extends Element = HTMLElement>(sel: string): T | null =>
+  dialog().querySelector<T>(sel as never) as T | null;
 export const press = (sel: string): void => q<HTMLButtonElement>(sel)!.click();
 export const text = (sel: string): string | undefined => q(sel)?.textContent ?? undefined;
 export const button = (label: string): HTMLButtonElement =>
@@ -154,4 +191,6 @@ export const lastAnnounce = (ctx: Spied): string | undefined => ctx.announce.moc
 export const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 /** The chips marked as a car's home, as `floor:car` pairs. */
 export const homesShown = (): string[] =>
-  Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-chip.on")).map((b) => b.getAttribute("aria-label")!.replace(/^Home car (\d+) at floor (\S+)$/, "$2:$1"));
+  Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-chip.on")).map((b) =>
+    b.getAttribute("aria-label")!.replace(/^Home car (\d+) at floor (\S+)$/, "$2:$1"),
+  );

@@ -58,9 +58,13 @@ function lineCount(absPath: string): number {
   return n;
 }
 
+/** Test files are exempt from the ceiling (owner, 2026-11-20). */
+const isTestFile = (rel: string) => /\.test\.tsx?$/.test(rel);
+
 function scanFiles(): { rel: string; lines: number }[] {
   return SCANNED_DIRS.flatMap(({ dir, exts }) => sourceFiles(dir, exts))
     .map((p) => ({ rel: repoRel(p), lines: lineCount(p) }))
+    .filter((f) => !isTestFile(f.rel))
     .sort((a, b) => a.rel.localeCompare(b.rel));
 }
 
@@ -77,7 +81,10 @@ describe("file-size guard", () => {
     const offenders = files
       .filter((f) => f.lines > MAX_LINES && !LEGACY_OVERSIZED.has(f.rel))
       .map((f) => `${f.rel} (${f.lines} lines)`);
-    expect(offenders, `Files over ${MAX_LINES} lines must be split or added to the ratchet:\n${offenders.join("\n")}`).toEqual([]);
+    expect(
+      offenders,
+      `Files over ${MAX_LINES} lines must be split or added to the ratchet:\n${offenders.join("\n")}`,
+    ).toEqual([]);
   });
 
   it("the ratchet has no stale entries", () => {

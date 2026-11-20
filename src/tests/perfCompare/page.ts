@@ -91,7 +91,9 @@ export function installProbes(): void {
             marks.wasmInstantiateEnd = performance.now();
             // The app's own instance (the loader imports the glue from a Blob,
             // so the harness cannot import it by URL to reach the instance).
-            const inst = (r as { instance?: { exports?: { memory?: unknown } } }).instance ?? (r as { exports?: { memory?: unknown } });
+            const inst =
+              (r as { instance?: { exports?: { memory?: unknown } } }).instance ??
+              (r as { exports?: { memory?: unknown } });
             w.__perfWasmMemory = inst.exports?.memory;
           },
           () => (marks.wasmInstantiateEnd = -1),
@@ -127,7 +129,12 @@ export function watchContextLoss(): void {
     (e: Event) => {
       const c = e.target as { id?: string; width?: number; height?: number } | null;
       try {
-        w.__perfContextLost?.({ at: Math.round(performance.now()), id: String(c?.id ?? ""), width: Number(c?.width ?? 0), height: Number(c?.height ?? 0) });
+        w.__perfContextLost?.({
+          at: Math.round(performance.now()),
+          id: String(c?.id ?? ""),
+          width: Number(c?.width ?? 0),
+          height: Number(c?.height ?? 0),
+        });
       } catch {
         /* the binding goes away with the page */
       }
@@ -143,7 +150,14 @@ export interface PageInfo {
   host: { present: boolean; hosted: boolean; starts: number; errors: string[]; liveSimHosted: boolean };
   marks: Record<string, number>;
   navigation: { responseEnd: number; domContentLoaded: number; loadEventEnd: number; transferSize: number } | null;
-  resources: { name: string; startTime: number; responseEnd: number; transferSize: number; encodedBodySize: number; decodedBodySize: number }[];
+  resources: {
+    name: string;
+    startTime: number;
+    responseEnd: number;
+    transferSize: number;
+    encodedBodySize: number;
+    decodedBodySize: number;
+  }[];
   crossOriginIsolated: boolean;
   timerResolutionMs: number;
   userAgent: string;
@@ -179,7 +193,14 @@ export function pageInfo(): PageInfo {
     engineActive,
     host,
     marks: { ...(w.__perfMarks ?? {}) },
-    navigation: nav ? { responseEnd: nav.responseEnd, domContentLoaded: nav.domContentLoadedEventEnd, loadEventEnd: nav.loadEventEnd, transferSize: nav.transferSize } : null,
+    navigation: nav
+      ? {
+          responseEnd: nav.responseEnd,
+          domContentLoaded: nav.domContentLoadedEventEnd,
+          loadEventEnd: nav.loadEventEnd,
+          transferSize: nav.transferSize,
+        }
+      : null,
     resources: (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).map((r) => ({
       name: new URL(r.name).pathname,
       startTime: r.startTime,
@@ -240,10 +261,17 @@ export async function digestStashed(key: string): Promise<string> {
     if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
     if (Array.isArray(v)) return `[${v.map((x) => (x === undefined ? "null" : stable(x))).join(",")}]`;
     const o = v as Record<string, unknown>;
-    const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort();
+    const keys = Object.keys(o)
+      .filter((k) => o[k] !== undefined)
+      .sort();
     return `{${keys.map((k) => `${JSON.stringify(k)}:${stable(o[k])}`).join(",")}}`;
   };
-  const { crowd: _crowd, dispatch: _dispatch, housekeeping: _housekeeping, ...data } = (typeof save === "string" ? JSON.parse(save) : save) as Record<string, unknown>;
+  const {
+    crowd: _crowd,
+    dispatch: _dispatch,
+    housekeeping: _housekeeping,
+    ...data
+  } = (typeof save === "string" ? JSON.parse(save) : save) as Record<string, unknown>;
   if (Array.isArray(data.log)) data.log = (data.log as Record<string, unknown>[]).map(({ text: _t, ...rest }) => rest);
   const ev = data.events as { pending?: Record<string, unknown> | null } | undefined;
   if (ev?.pending) {
@@ -252,7 +280,9 @@ export async function digestStashed(key: string): Promise<string> {
   }
   const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stable(data))));
   delete w.__perfStash[key];
-  return Array.from(hash, (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  return Array.from(hash, (b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 16);
 }
 
 /** Calm the live app for scripted measurement, the way e2e/perf.spec.ts
@@ -264,7 +294,8 @@ export async function digestStashed(key: string): Promise<string> {
 export function prepareLiveApp(): void {
   const g = (window as any).game;
   document.getElementById("splash")?.remove();
-  g.ui.showEventChoice = (_m: string, _c: string, onResolve: (opt: "accept" | "decline") => void) => onResolve("decline");
+  g.ui.showEventChoice = (_m: string, _c: string, onResolve: (opt: "accept" | "decline") => void) =>
+    onResolve("decline");
   g.shownWin = true;
   g.shownChoice = false;
   g.shownUpdate = false;
@@ -297,7 +328,12 @@ export function adoptScenario(name: string): AdoptResult {
   g.speed = 0;
   g.engine.paused = true;
   const hosted = Boolean(h?.status?.hosted) && h.port === g.enginePort;
-  return { adoptMs, engineActive: hosted ? "wasm" : "ts", starts: hosted ? 1 : 0, population: g.reader.header.population };
+  return {
+    adoptMs,
+    engineActive: hosted ? "wasm" : "ts",
+    starts: hosted ? 1 : 0,
+    population: g.reader.header.population,
+  };
 }
 
 /** Size of the engine's linear memory, when the page hosts the tower on it:
@@ -401,7 +437,8 @@ export function webglRenderer(): { renderer: string; vendor: string } | null {
   try {
     const canvas = document.createElement("canvas");
     // The game asks for the high-performance adapter, so a machine with two GPUs names the one the game uses.
-    const gl = (canvas.getContext("webgl2", { powerPreference: "high-performance" }) ?? canvas.getContext("webgl", { powerPreference: "high-performance" })) as WebGLRenderingContext | null;
+    const gl = (canvas.getContext("webgl2", { powerPreference: "high-performance" }) ??
+      canvas.getContext("webgl", { powerPreference: "high-performance" })) as WebGLRenderingContext | null;
     if (!gl) return null;
     const ext = gl.getExtension("WEBGL_debug_renderer_info");
     const renderer = gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER);

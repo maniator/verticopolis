@@ -6,7 +6,19 @@ import { DetailError, requireDetail } from "./checkpointDetail";
 describe("checkpoint detail", () => {
   it("turns a missing or failing detail into a DetailError", () => {
     expect(() => requireDetail({})).toThrow(DetailError);
-    expect(() => requireDetail({ detail: () => { throw new Error("boom"); } })).toThrow(/boom/);
-    expect(() => requireDetail({ detail: () => { throw new Error("boom"); } })).toThrow(DetailError);
+    expect(() =>
+      requireDetail({
+        detail: () => {
+          throw new Error("boom");
+        },
+      }),
+    ).toThrow(/boom/);
+    expect(() =>
+      requireDetail({
+        detail: () => {
+          throw new Error("boom");
+        },
+      }),
+    ).toThrow(DetailError);
   });
 });

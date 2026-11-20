@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createEngagementDetector,
-  watchGameplayCommands,
-} from "../analyticsEngagement";
+import { createEngagementDetector, watchGameplayCommands } from "../analyticsEngagement";
 import { noteEngineEngaged } from "../analyticsEngineStatus";
 import { startEngagementWatch } from "./engagementWatch";
 
@@ -27,17 +24,11 @@ describe("startEngagementWatch", () => {
     const sample = vi.fn();
     let engaged: (by: string) => void = () => {};
     vi.mocked(createEngagementDetector).mockImplementation(
-      ((onEngaged: (by: string) => void) => (
-        (engaged = onEngaged),
-        { sample }
-      )) as never,
+      ((onEngaged: (by: string) => void) => ((engaged = onEngaged), { sample })) as never,
     );
     const port = {} as never;
     startEngagementWatch(port, () => 600);
-    expect(watchGameplayCommands).toHaveBeenCalledExactlyOnceWith(
-      port,
-      expect.objectContaining({ sample }),
-    );
+    expect(watchGameplayCommands).toHaveBeenCalledExactlyOnceWith(port, expect.objectContaining({ sample }));
     vi.advanceTimersByTime(2000);
     expect(sample).toHaveBeenCalledTimes(2);
     expect(sample).toHaveBeenLastCalledWith({

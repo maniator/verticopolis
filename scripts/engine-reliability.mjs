@@ -126,7 +126,22 @@ export const HOSTS = ["wasm", "wasm-frame", "wasm-worker"];
 export const BUILDS = ["switchable", "wasm-only"];
 /** Every `engine` value the game sends (`src/analyticsEngineStatus.ts`). */
 export const ENGINE_KINDS_SENT = ["ts", "wasm", "wasm-frame", "wasm-worker", "ts-fallback", "none"];
-export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "trap-save", "trap-census", "other", "unclean-exit", "marker-blocked"];
+export const REASONS = [
+  "none",
+  "boot-timeout",
+  "boot-error",
+  "package-mismatch",
+  "unverifiable",
+  "attach-refused",
+  "trap-command",
+  "trap-tick",
+  "trap-undo",
+  "trap-save",
+  "trap-census",
+  "other",
+  "unclean-exit",
+  "marker-blocked",
+];
 
 /** A build's commit (`git rev-parse --short`, or `unknown` outside a checkout)
  *  and version, as the game sends them. */
@@ -227,7 +242,13 @@ export function pageLivesFromRows(rows) {
     sizeGated: truthy(r.size_gated),
     fallbacks: count(r.fallbacks),
     settleFallbacks: count(r.settle_fallbacks),
-    reasons: [...new Set((Array.isArray(r.reasons) ? r.reasons : []).filter((x) => typeof x === "string" && x !== "" && x !== "none").map((x) => value(x, "unknown")))],
+    reasons: [
+      ...new Set(
+        (Array.isArray(r.reasons) ? r.reasons : [])
+          .filter((x) => typeof x === "string" && x !== "" && x !== "none")
+          .map((x) => value(x, "unknown")),
+      ),
+    ],
     writerLatched: truthy(r.writer_latched),
     // A row from before the `attempt` row existed always settled.
     settled: r.settled == null ? true : truthy(r.settled),
@@ -275,7 +296,8 @@ export function upperBound(k, n, confidence = 0.95) {
 /** Whether a page life's commit is one of `shas`: one is a prefix of the
  *  other, so short commits of different lengths still match. Both sides are
  *  checked commits, so a forged one-letter commit matches nothing. */
-export const shaMatches = (sha, shas) => SHA.test(sha) && shas.some((s) => SHA.test(s) && (sha.startsWith(s) || s.startsWith(sha)));
+export const shaMatches = (sha, shas) =>
+  SHA.test(sha) && shas.some((s) => SHA.test(s) && (sha.startsWith(s) || s.startsWith(sha)));
 
 /** The values the retired cohort and #1090 sent for their fields. Old rows
  *  still carry them, and a value outside these lists is left out. */
@@ -318,7 +340,9 @@ const isSuppressed = (pl) => pl.safetySuppressed || SAFETY_SELECTIONS.includes(p
  *  that detected a crash loop reported `unclean-exit` on a page life that then
  *  ran TypeScript, so the fault belongs to the engine. A fallback whose reason
  *  rows were lost counts too. */
-const suppressedFault = (pl) => isSuppressed(pl) && ((pl.fallbacks > 0 && pl.reasons.length === 0) || pl.reasons.some((r) => !NON_ENGINE_REASONS.includes(r)));
+const suppressedFault = (pl) =>
+  isSuppressed(pl) &&
+  ((pl.fallbacks > 0 && pl.reasons.length === 0) || pl.reasons.some((r) => !NON_ENGINE_REASONS.includes(r)));
 
 /** The arm a page life is counted under: `override` when a setting or the
  *  URL chose its engine, its assigned arm otherwise. */
@@ -346,7 +370,23 @@ export function summarizeReliability(pageLives, opts = {}) {
   const byArm = new Map();
   const byStage = new Map();
   const reasons = new Map();
-  const totals = { unsettledPageLives: 0, safetySuppressedPageLives: 0, crashLoopPageLives: 0, pageLives: 0, faultPageLives: 0, mismatchPageLives: 0, mismatchNeverRan: 0, unverifiablePageLives: 0, unverifiableNeverRan: 0, latchedPageLives: 0, sizeGatedPageLives: 0, markerBlockedPageLives: 0, unrecognizedPageLives: 0, totalFallbacks: 0, maxFallbacks: 0 };
+  const totals = {
+    unsettledPageLives: 0,
+    safetySuppressedPageLives: 0,
+    crashLoopPageLives: 0,
+    pageLives: 0,
+    faultPageLives: 0,
+    mismatchPageLives: 0,
+    mismatchNeverRan: 0,
+    unverifiablePageLives: 0,
+    unverifiableNeverRan: 0,
+    latchedPageLives: 0,
+    sizeGatedPageLives: 0,
+    markerBlockedPageLives: 0,
+    unrecognizedPageLives: 0,
+    totalFallbacks: 0,
+    maxFallbacks: 0,
+  };
   const bucket = (map, key) => {
     if (!map.has(key)) map.set(key, { sessions: new Set(), faults: new Set(), pageLives: 0, faultPageLives: 0 });
     return map.get(key);
@@ -380,7 +420,13 @@ export function summarizeReliability(pageLives, opts = {}) {
     const mismatch = pl.reasons.includes("package-mismatch");
     const unverifiable = pl.reasons.includes("unverifiable");
     const fault = fellBack && (faultReasons.length > 0 || pl.reasons.length === 0);
-    const s = sessions.get(pl.session) ?? { ran: false, fault: false, mismatch: false, unverifiable: false, latched: false };
+    const s = sessions.get(pl.session) ?? {
+      ran: false,
+      fault: false,
+      mismatch: false,
+      unverifiable: false,
+      latched: false,
+    };
     sessions.set(pl.session, s);
     if (mismatch) {
       s.mismatch = true;
@@ -404,7 +450,11 @@ export function summarizeReliability(pageLives, opts = {}) {
     totals.totalFallbacks += pl.fallbacks;
     totals.maxFallbacks = Math.max(totals.maxFallbacks, pl.fallbacks);
     if (fault) for (const r of faultReasons) reasons.set(r, (reasons.get(r) ?? 0) + 1);
-    const groups = [bucket(byBuild, `${pl.version} (${pl.sha}, ${pl.build})`), bucket(byArm, armOf(pl)), bucket(byStage, pl.stage)];
+    const groups = [
+      bucket(byBuild, `${pl.version} (${pl.sha}, ${pl.build})`),
+      bucket(byArm, armOf(pl)),
+      bucket(byStage, pl.stage),
+    ];
     for (const g of groups) {
       g.sessions.add(pl.session);
       g.pageLives++;
@@ -424,7 +474,14 @@ export function summarizeReliability(pageLives, opts = {}) {
   const faults = all.filter((s) => s.fault).length;
   const rows = (map, name) =>
     [...map.entries()]
-      .map(([key, b]) => ({ [name]: key, sessions: b.sessions.size, faults: b.faults.size, pageLives: b.pageLives, faultPageLives: b.faultPageLives, upper95: upperBound(b.faults.size, b.sessions.size) }))
+      .map(([key, b]) => ({
+        [name]: key,
+        sessions: b.sessions.size,
+        faults: b.faults.size,
+        pageLives: b.pageLives,
+        faultPageLives: b.faultPageLives,
+        upper95: upperBound(b.faults.size, b.sessions.size),
+      }))
       .sort((a, b) => a[name].localeCompare(b[name]));
   return {
     n,
@@ -438,7 +495,9 @@ export function summarizeReliability(pageLives, opts = {}) {
     byBuild: rows(byBuild, "build"),
     byArm: rows(byArm, "arm"),
     byStage: rows(byStage, "stage"),
-    byReason: [...reasons.entries()].map(([reason, pageLives]) => ({ reason, pageLives })).sort((a, b) => b.pageLives - a.pageLives || a.reason.localeCompare(b.reason)),
+    byReason: [...reasons.entries()]
+      .map(([reason, pageLives]) => ({ reason, pageLives }))
+      .sort((a, b) => b.pageLives - a.pageLives || a.reason.localeCompare(b.reason)),
   };
 }
 
@@ -455,7 +514,10 @@ function groupTable(title, label, key, rows) {
     "",
     `| ${label} | Sessions | Faults | 95% upper bound | Page lives | Fault page lives |`,
     "| --- | --- | --- | --- | --- | --- |",
-    ...rows.map((b) => `| ${code(b[key])} | ${b.sessions} | ${b.faults} | ${pct(b.upper95)} | ${b.pageLives} | ${b.faultPageLives} |`),
+    ...rows.map(
+      (b) =>
+        `| ${code(b[key])} | ${b.sessions} | ${b.faults} | ${pct(b.upper95)} | ${b.pageLives} | ${b.faultPageLives} |`,
+    ),
   ];
 }
 
@@ -472,8 +534,14 @@ export function renderReliabilityMarkdown(summary, meta) {
     "> **This overall rate is early telemetry** (plan 4.1, OD-2): it is never release evidence, so triage each failure, and do not publish it as a reliability figure. The Rust engine is now the only engine the shipped game runs, so the staged cohort and its arm comparison are gone and old rows are counted as they were sent.",
     "> **Coverage-limited.** The fault count is a lower bound: the relay is best-effort, with no offline queue and a per-IP rate limit, so a fallback in an offline session, a tab closed while the engine loads, a tab killed before it reports (or after a capped drop with no later hide) and a boot whose game never started after its engine failed never count. The fault rate is not a lower bound. It is observed over the sessions that reported, with unknown bias: sessions that never report can sit in the numerator or the denominator, so the true rate can be higher or lower. The exact bound below holds for the observed sample only, and assumes independent sessions, which these are not (a device that traps once may trap every time), so it is optimistic. Runtime traps are not reported before #874. Outcomes are as of this run, so a page life that settled near the end of the window can still fall back. Background tabs that were never seen still count.",
   ];
-  if (meta.hosts.includes("wasm-worker")) lines.push("> **The worker host** reports only its first tower, so its later fallbacks are missing, and its `other` is a boot step outside the engine, counted as a fault.");
-  if (meta.truncated) lines.push(`> **Truncated:** the query hit a row limit (${ROW_LIMIT.toLocaleString("en-US")} asked for), so these counts are short. Narrow the window.`);
+  if (meta.hosts.includes("wasm-worker"))
+    lines.push(
+      "> **The worker host** reports only its first tower, so its later fallbacks are missing, and its `other` is a boot step outside the engine, counted as a fault.",
+    );
+  if (meta.truncated)
+    lines.push(
+      `> **Truncated:** the query hit a row limit (${ROW_LIMIT.toLocaleString("en-US")} asked for), so these counts are short. Narrow the window.`,
+    );
   lines.push(
     "",
     "| Measure | Value |",
@@ -537,7 +605,8 @@ export function parseArgs(argv) {
     if (!a.startsWith("--")) throw new Error(`unexpected argument "${a}"`);
     const eq = a.indexOf("=");
     const name = a.slice(2, eq === -1 ? undefined : eq);
-    if (!FLAGS.includes(name)) throw new Error(`unknown flag --${name} (the flags are ${FLAGS.map((f) => `--${f}`).join(", ")})`);
+    if (!FLAGS.includes(name))
+      throw new Error(`unknown flag --${name} (the flags are ${FLAGS.map((f) => `--${f}`).join(", ")})`);
     let v;
     if (eq !== -1) v = a.slice(eq + 1);
     else {
@@ -550,7 +619,11 @@ export function parseArgs(argv) {
   }
   const list = (name) => {
     if (!raw.has(name)) return null;
-    const items = raw.get(name).split(",").map((x) => x.trim()).filter(Boolean);
+    const items = raw
+      .get(name)
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
     if (!items.length) throw new Error(`--${name} needs a comma list`);
     const bad = items.find((x) => !FLAG_VALUES[name](x));
     if (bad !== undefined) throw new Error(`--${name} cannot hold "${bad}" (it takes ${FLAG_HELP[name]})`);
@@ -568,7 +641,8 @@ export function parseArgs(argv) {
  *  window. `truncated` is true when the page is full or the API says there is
  *  more. */
 export function responseRows(json) {
-  if (!Array.isArray(json?.results) || !Array.isArray(json?.columns)) throw new Error("the query returned no results table");
+  if (!Array.isArray(json?.results) || !Array.isArray(json?.columns))
+    throw new Error("the query returned no results table");
   const rows = rowsToObjects(json);
   return { rows, truncated: rows.length >= ROW_LIMIT || json.hasMore === true };
 }
@@ -582,7 +656,9 @@ async function main() {
     process.exit(1);
   }
   if (!process.env.POSTHOG_PERSONAL_API_KEY) {
-    console.error("POSTHOG_PERSONAL_API_KEY is not set (a phx_... personal key with query:read; see scripts/posthog-report.mjs).");
+    console.error(
+      "POSTHOG_PERSONAL_API_KEY is not set (a phx_... personal key with query:read; see scripts/posthog-report.mjs).",
+    );
     process.exit(1);
   }
   const { window: span, opts } = args;
@@ -595,7 +671,14 @@ async function main() {
   const lives = pageLivesFromRows(rows);
   const summary = summarizeReliability(lives, opts);
   const each = (xs) => xs.map(code).join(", ");
-  const builds = [opts.shas && `commits ${each(opts.shas)}`, opts.versions && `versions ${each(opts.versions)}`, opts.builds && `bundles ${each(opts.builds)}`].filter(Boolean).join("; ") || "all";
+  const builds =
+    [
+      opts.shas && `commits ${each(opts.shas)}`,
+      opts.versions && `versions ${each(opts.versions)}`,
+      opts.builds && `bundles ${each(opts.builds)}`,
+    ]
+      .filter(Boolean)
+      .join("; ") || "all";
   const md = renderReliabilityMarkdown(summary, {
     windowLabel: `last ${span.label}`,
     until: new Date().toISOString().slice(0, 16).replace("T", " "),

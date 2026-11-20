@@ -6,16 +6,12 @@ import { InspectorController, type InspectorDeps } from "./inspector";
 
 vi.mock("@verticopolis/components/port/headerClock", () => ({ clockOf: () => ({ hour: 14 }) }));
 vi.mock("../ui/templates/inspector", () => ({
-  unitInspectorTemplate: vi.fn(
-    (u: { id: number }, _c: unknown, hour: number, diag: unknown) => ({
-      unit: u.id,
-      hour,
-      diag,
-    }),
-  ),
-  transportInspectorTemplate: vi.fn(
-    (t: { id: number }, _c: unknown, diag: unknown) => ({ shaft: t.id, diag }),
-  ),
+  unitInspectorTemplate: vi.fn((u: { id: number }, _c: unknown, hour: number, diag: unknown) => ({
+    unit: u.id,
+    hour,
+    diag,
+  })),
+  transportInspectorTemplate: vi.fn((t: { id: number }, _c: unknown, diag: unknown) => ({ shaft: t.id, diag })),
 }));
 
 /**
@@ -101,12 +97,7 @@ describe("InspectorController", () => {
     inspector.inspectPicked({ type: "unit", id: 0, kind: "floor" });
     inspector.inspectPicked({ type: "unit", id: 99, kind: "office" });
     inspector.inspectPicked({ type: "transport", id: 99, kind: "stairs" });
-    expect(deps.ui.showInspector.mock.calls).toEqual([
-      [null],
-      [null],
-      [null],
-      [null],
-    ]);
+    expect(deps.ui.showInspector.mock.calls).toEqual([[null], [null], [null], [null]]);
     expect(deps.setAnchor.mock.calls).toEqual([[null], [null], [null], [null]]);
   });
 
@@ -116,15 +107,12 @@ describe("InspectorController", () => {
     inspector.dismiss();
     inspector.inspectPicked(null);
     inspector.inspectPicked(onCondo);
-    expect(
-      deps.ui.showInspector.mock.calls.filter(([c]) => c !== null),
-    ).toHaveLength(1);
+    expect(deps.ui.showInspector.mock.calls.filter(([c]) => c !== null)).toHaveLength(1);
   });
 
   it("a different facility, a tap or a reset re-arms the card", () => {
     const { inspector, deps } = setup();
-    const shown = () =>
-      deps.ui.showInspector.mock.calls.filter(([c]) => c !== null).length;
+    const shown = () => deps.ui.showInspector.mock.calls.filter(([c]) => c !== null).length;
     inspector.inspectPicked(onCondo);
     inspector.dismiss();
     inspector.inspectPicked(onLift);

@@ -27,6 +27,12 @@ export interface PersistenceMeasure {
   attempts: number | null;
   rate: PersistenceRate;
 }
-export function summarizePersistence(tally: Map<string, { events: number; sessions: number }>, presence: PersistencePresence): PersistenceMeasure[];
-export function renderPersistenceMarkdown(measures: PersistenceMeasure[], meta: { windowLabel: string; truncated: boolean }): string;
+export function summarizePersistence(
+  tally: Map<string, { events: number; sessions: number }>,
+  presence: PersistencePresence,
+): PersistenceMeasure[];
+export function renderPersistenceMarkdown(
+  measures: PersistenceMeasure[],
+  meta: { windowLabel: string; truncated: boolean },
+): string;
 export function persistenceSection(hours: number, windowLabel: string): Promise<string>;

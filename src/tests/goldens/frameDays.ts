@@ -50,7 +50,18 @@ export const FRAME_DAYS_FILE = resolve(ROOT, "src/tests/goldens/frame-days.json"
  *  frame over 200 ms into 1 ms (`frameLoop.ts` notes it). The engine takes
  *  them as it would any frame, and they reach the catch-up cap, so they stay
  *  as the dual run had them. */
-export const FRAME_TIMES_MS: readonly number[] = [1000 / 60, 1000 / 60, 1000 / 30, 1000 / 120, 1000 / 60, 400, 1000 / 60, 1000 / 60, 3000, 1000 / 60];
+export const FRAME_TIMES_MS: readonly number[] = [
+  1000 / 60,
+  1000 / 60,
+  1000 / 30,
+  1000 / 120,
+  1000 / 60,
+  400,
+  1000 / 60,
+  1000 / 60,
+  3000,
+  1000 / 60,
+];
 
 const DAY = 24 * 60;
 
@@ -89,7 +100,13 @@ const STEP_OWED_MINUTES = true;
  *  changes it or moves the clock. */
 export type FrameDayStart =
   | { readonly kind: "fixture"; readonly file: string; readonly calendar?: "canon"; readonly minutes?: number }
-  | { readonly kind: "found"; readonly seed: number; readonly mode: "classic" | "modern"; readonly calendar: "realWorld" | "canon"; readonly unbridged: boolean };
+  | {
+      readonly kind: "found";
+      readonly seed: number;
+      readonly mode: "classic" | "modern";
+      readonly calendar: "realWorld" | "canon";
+      readonly unbridged: boolean;
+    };
 
 export interface FrameDayCase {
   readonly id: string;
@@ -149,19 +166,53 @@ const fixtureCase = (file: string, speed: number): FrameDayCase => ({
   frameTimes: FRAME_TIMES_MS,
 });
 
-const found = (seed: number, mode: "classic" | "modern", calendar: "realWorld" | "canon" = "realWorld", unbridged = false) =>
-  ({ kind: "found", seed, mode, calendar, unbridged }) as const;
+const found = (
+  seed: number,
+  mode: "classic" | "modern",
+  calendar: "realWorld" | "canon" = "realWorld",
+  unbridged = false,
+) => ({ kind: "found", seed, mode, calendar, unbridged }) as const;
 
 /** The dual run's day gate, case for case: every fixture at each speed, a
  *  new game of each mode, the canon calendar founded unbridged, one steady
  *  reference frame rate and the steady clock. */
 export const FRAME_DAY_CASES: readonly FrameDayCase[] = [
   ...FRAME_DAY_FIXTURES.flatMap((file) => [1, 2, 3].map((speed) => fixtureCase(file, speed))),
-  { id: "new Classic game at speed 3", start: found(4242, "classic"), speed: 3, steadyClock: false, frameTimes: FRAME_TIMES_MS },
-  { id: "new Modern game at speed 3", start: found(4242, "modern"), speed: 3, steadyClock: false, frameTimes: FRAME_TIMES_MS },
-  { id: "new Modern game on the canon calendar, unbridged, at speed 2", start: found(99, "modern", "canon", true), speed: 2, steadyClock: false, frameTimes: FRAME_TIMES_MS },
-  { id: "split-tower at speed 3, one steady frame rate", start: { kind: "fixture", file: "split-tower.vctower" }, speed: 3, steadyClock: false, frameTimes: [1000 / 60] },
-  { id: "towerone_6 at speed 3 on the steady clock", start: { kind: "fixture", file: "towerone_6.vctower" }, speed: 3, steadyClock: true, frameTimes: FRAME_TIMES_MS },
+  {
+    id: "new Classic game at speed 3",
+    start: found(4242, "classic"),
+    speed: 3,
+    steadyClock: false,
+    frameTimes: FRAME_TIMES_MS,
+  },
+  {
+    id: "new Modern game at speed 3",
+    start: found(4242, "modern"),
+    speed: 3,
+    steadyClock: false,
+    frameTimes: FRAME_TIMES_MS,
+  },
+  {
+    id: "new Modern game on the canon calendar, unbridged, at speed 2",
+    start: found(99, "modern", "canon", true),
+    speed: 2,
+    steadyClock: false,
+    frameTimes: FRAME_TIMES_MS,
+  },
+  {
+    id: "split-tower at speed 3, one steady frame rate",
+    start: { kind: "fixture", file: "split-tower.vctower" },
+    speed: 3,
+    steadyClock: false,
+    frameTimes: [1000 / 60],
+  },
+  {
+    id: "towerone_6 at speed 3 on the steady clock",
+    start: { kind: "fixture", file: "towerone_6.vctower" },
+    speed: 3,
+    steadyClock: true,
+    frameTimes: FRAME_TIMES_MS,
+  },
   // A built Modern tower on the real-world calendar, its clock moved to the
   // day before day 270, which ends a 90-day quarter and a 30-day
   // maintenance period.
@@ -174,7 +225,14 @@ export const FRAME_DAY_CASES: readonly FrameDayCase[] = [
   },
   // A reload at midday while the host still owes minutes from the long
   // frames, so the step debt carries across the load.
-  { id: "towerone_6 at speed 2, reloaded at midday with minutes owed", start: { kind: "fixture", file: "towerone_6.vctower" }, speed: 2, steadyClock: false, frameTimes: FRAME_TIMES_MS, reloadAfterMinutes: 5 * 60 },
+  {
+    id: "towerone_6 at speed 2, reloaded at midday with minutes owed",
+    start: { kind: "fixture", file: "towerone_6.vctower" },
+    speed: 2,
+    steadyClock: false,
+    frameTimes: FRAME_TIMES_MS,
+    reloadAfterMinutes: 5 * 60,
+  },
   // A built Modern tower on the canon calendar (three-day quarters) for four
   // days, so it crosses a quarter's end; the founded canon case above runs
   // one empty day. The dual run's day suite had it beside its day gate.
@@ -227,18 +285,31 @@ export function startTower(port: EnginePort, start: FrameDayStart): void {
       return;
     }
     const save = decodeVctower(text, start.file) as Record<string, unknown>;
-    const edits = { ...(start.calendar === undefined ? {} : { modernCalendar: start.calendar }), ...(start.minutes === undefined ? {} : { minutes: start.minutes }) };
+    const edits = {
+      ...(start.calendar === undefined ? {} : { modernCalendar: start.calendar }),
+      ...(start.minutes === undefined ? {} : { minutes: start.minutes }),
+    };
     swapDone(port, port.loadSave(JSON.stringify({ ...save, ...edits })));
     return;
   }
   const codes = new PortCodes(port);
-  swapDone(port, port.foundTower(start.seed, codes.code("modes", start.mode), codes.code("calendars", start.calendar), start.unbridged));
+  swapDone(
+    port,
+    port.foundTower(
+      start.seed,
+      codes.code("modes", start.mode),
+      codes.code("calendars", start.calendar),
+      start.unbridged,
+    ),
+  );
 }
 
 const dumpDir = dumpRoot(process.env.VC_FRAME_DAYS_DUMP);
 const dumpCase = process.env.VC_FRAME_DAYS_CASE;
 if (dumpDir && !FRAME_DAY_CASES.some((c) => c.id === dumpCase)) {
-  throw new Error(`VC_FRAME_DAYS_DUMP needs VC_FRAME_DAYS_CASE set to a case id; ${JSON.stringify(dumpCase)} names none`);
+  throw new Error(
+    `VC_FRAME_DAYS_DUMP needs VC_FRAME_DAYS_CASE set to a case id; ${JSON.stringify(dumpCase)} names none`,
+  );
 }
 
 /** Play one case on one engine and return its checkpoints. `afterStart`
@@ -273,16 +344,28 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
   // The port answers with the choice's text while one is open.
   const choiceOpen = () => typeof port.pendingChoice() === "string";
   if (choiceOpen()) throw new Error(`${c.id}: the tower starts with a choice open; the golden plays no choices`);
-  const dumpTo = dumpDir !== undefined && dumpCase === c.id && afterStart === undefined ? freshDumpDir(dumpDir, leg.name) : undefined;
+  const dumpTo =
+    dumpDir !== undefined && dumpCase === c.id && afterStart === undefined
+      ? freshDumpDir(dumpDir, leg.name)
+      : undefined;
   const out: FrameDayCheckpoint[] = [];
   let batch: unknown[] = [];
   const checkpoint = (minute: number) => {
     const state = leg.stateView();
     const crowd = leg.crowdView();
     if (dumpTo !== undefined) {
-      writeFileSync(resolve(dumpTo, `${String(out.length).padStart(2, "0")}-${minute}.json`), `${JSON.stringify({ state: JSON.parse(state), crowd: JSON.parse(crowd), events: batch }, null, 1)}\n`);
+      writeFileSync(
+        resolve(dumpTo, `${String(out.length).padStart(2, "0")}-${minute}.json`),
+        `${JSON.stringify({ state: JSON.parse(state), crowd: JSON.parse(crowd), events: batch }, null, 1)}\n`,
+      );
     }
-    out.push({ minute, state: digestText(state), crowd: digestText(crowd), events: digestText(canonicalJson(batch)), count: batch.length });
+    out.push({
+      minute,
+      state: digestText(state),
+      crowd: digestText(crowd),
+      events: digestText(canonicalJson(batch)),
+      count: batch.length,
+    });
     batch = [];
   };
   drain(batch);
@@ -312,7 +395,8 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
     if (choiceOpen()) throw new Error(`${c.id}: a choice opened at minute ${now}; the golden plays no choices`);
     if (!(now >= before)) throw new Error(`${c.id}: the clock went from minute ${before} to ${now}`);
     still = now === before ? still + 1 : 0;
-    if (still > MAX_STILL_FRAMES) throw new Error(`${c.id}: the clock stood still for ${still} frames at minute ${now}`);
+    if (still > MAX_STILL_FRAMES)
+      throw new Error(`${c.id}: the clock stood still for ${still} frames at minute ${now}`);
     const nowHour = Math.floor(now / 60);
     // The catch-up cap keeps a frame inside one hour boundary; two would merge
     // two hours into one checkpoint.
@@ -324,7 +408,10 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
   // The day rarely ends on the hour, so the minutes after the last hour get
   // their own checkpoint.
   if (!tookCheckpoint) checkpoint(now);
-  if (!reloaded) throw new Error(`${c.id}: no frame after minute ${c.reloadAfterMinutes} of play left minutes owed, so the tower never reloaded`);
+  if (!reloaded)
+    throw new Error(
+      `${c.id}: no frame after minute ${c.reloadAfterMinutes} of play left minutes owed, so the tower never reloaded`,
+    );
   return out;
 }
 
@@ -342,9 +429,13 @@ export function frameDayProblems(c: FrameDayCase, points: readonly FrameDayCheck
   if (c.start.kind === "fixture") {
     for (const view of ["state", "crowd"] as const) {
       const distinct = new Set(points.map((p) => p[view])).size;
-      if (distinct <= points.length / 2) problems.push(`the ${view} view has only ${distinct} distinct ${distinct === 1 ? "hash" : "hashes"} over ${points.length} checkpoints`);
+      if (distinct <= points.length / 2)
+        problems.push(
+          `the ${view} view has only ${distinct} distinct ${distinct === 1 ? "hash" : "hashes"} over ${points.length} checkpoints`,
+        );
     }
-    if (EVENT_DAY_FIXTURES.includes(c.start.file) && !points.slice(SETUP_CHECKPOINTS).some((p) => p.count > 0)) problems.push("no event during play");
+    if (EVENT_DAY_FIXTURES.includes(c.start.file) && !points.slice(SETUP_CHECKPOINTS).some((p) => p.count > 0))
+      problems.push("no event during play");
   }
   return problems;
 }
@@ -361,14 +452,22 @@ export function readFrameDays(): FrameDayGolden {
  *  them, so a refresh diffs by the hour that moved. */
 export function writeFrameDays(cases: Record<string, FrameDayCheckpoint[]>): void {
   const body = FRAME_DAY_CASES.map((c) => {
-    const rows = cases[c.id].map((p) => `      ${JSON.stringify({ minute: p.minute, state: p.state, crowd: p.crowd, events: p.events, count: p.count })}`).join(",\n");
+    const rows = cases[c.id]
+      .map(
+        (p) =>
+          `      ${JSON.stringify({ minute: p.minute, state: p.state, crowd: p.crowd, events: p.events, count: p.count })}`,
+      )
+      .join(",\n");
     return `    ${JSON.stringify(c.id)}: [\n${rows}\n    ]`;
   });
   writeGoldenFile(FRAME_DAYS_FILE, `{\n  "cases": {\n${body.join(",\n")}\n  }\n}\n`);
 }
 
 /** The first checkpoint where `got` departs from `want`, described, or null. */
-export function firstFrameDayDifference(got: readonly FrameDayCheckpoint[], want: readonly FrameDayCheckpoint[] | undefined): string | null {
+export function firstFrameDayDifference(
+  got: readonly FrameDayCheckpoint[],
+  want: readonly FrameDayCheckpoint[] | undefined,
+): string | null {
   if (!want) return "the golden has no entry for this case";
   const n = Math.max(got.length, want.length);
   for (let i = 0; i < n; i++) {
@@ -376,7 +475,8 @@ export function firstFrameDayDifference(got: readonly FrameDayCheckpoint[], want
     const w = want[i];
     if (!g || !w) return `checkpoint ${i}: ${g ? "extra" : "missing"} (ran ${got.length}, pinned ${want.length})`;
     const moved = (["minute", "state", "crowd", "events", "count"] as const).filter((k) => g[k] !== w[k]);
-    if (moved.length > 0) return `checkpoint ${i} (minute ${w.minute}): ${moved.map((k) => `${k} ${String(g[k])} != pinned ${String(w[k])}`).join(", ")}`;
+    if (moved.length > 0)
+      return `checkpoint ${i} (minute ${w.minute}): ${moved.map((k) => `${k} ${String(g[k])} != pinned ${String(w[k])}`).join(", ")}`;
   }
   return null;
 }

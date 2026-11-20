@@ -100,13 +100,22 @@ const GEOMETRY = new Set(["id", "kind", "floor", "x", "width", "bottom", "top"])
 /** What a unit's save record leaves out when it holds the default
  *  (`Unit::serialize`): a view reads the default back, as the TypeScript
  *  unit held it. A structure tile one wide leaves out its width. */
-const UNIT_DEFAULTS: Readonly<Record<string, unknown>> = { width: 1, state: "empty", satisfaction: 1, occupants: 0, everOccupied: false, pendingIncome: 0, noRate: false };
+const UNIT_DEFAULTS: Readonly<Record<string, unknown>> = {
+  width: 1,
+  state: "empty",
+  satisfaction: 1,
+  occupants: 0,
+  everOccupied: false,
+  pendingIncome: 0,
+  noRate: false,
+};
 
 /** A record key in the patch table: a unit's or a shaft's, by id. */
 const unitKey = (id: number): string => `u${id}`;
 const shaftKey = (id: number): string => `t${id}`;
 
-const parsed = <T>(text: string | undefined): T | undefined => (text === undefined ? undefined : (JSON.parse(text) as T));
+const parsed = <T>(text: string | undefined): T | undefined =>
+  text === undefined ? undefined : (JSON.parse(text) as T);
 
 export class ToolingTower {
   /** Field writes the engine has not loaded yet: per record (`u<id>`,
@@ -115,7 +124,8 @@ export class ToolingTower {
   /** A bare edit ran since the engine last loaded its tower. */
   private bare = false;
   /** The engine's save with the patches over it, read once per task. */
-  private cached: { save: SerializedGame; units: Map<number, SaveRecord>; shafts: Map<number, SaveRecord> } | null = null;
+  private cached: { save: SerializedGame; units: Map<number, SaveRecord>; shafts: Map<number, SaveRecord> } | null =
+    null;
   private queued = false;
   /** The tower's parts, in the old `Simulation` shape. */
   readonly tower: ToolingTowerParts;
@@ -131,7 +141,11 @@ export class ToolingTower {
     this.tower = new ToolingTowerParts(this);
     this.clock = clockOf(this);
     this.events = eventsOf(this);
-    this.crowd = { get people() { return (JSON.parse(engineOf().crowdView()) as { people: unknown[] }).people; } };
+    this.crowd = {
+      get people() {
+        return (JSON.parse(engineOf().crowdView()) as { people: unknown[] }).people;
+      },
+    };
     this.elevatorHourly = hourlyOf(engineOf);
     // `game.sim.constructor`: a tower made off the app, on an engine of its
     // own, which the app takes with `adoptSim`.
@@ -140,7 +154,8 @@ export class ToolingTower {
     Object.defineProperty(this, "constructor", {
       value: {
         newGame: (seed = 12345, mode = "classic") => detached(Engine().newGame(seed, mode)),
-        deserialize: (save: unknown, markers?: unknown) => detached(Engine().fromSave(JSON.stringify(save), markers === undefined ? null : JSON.stringify(markers))),
+        deserialize: (save: unknown, markers?: unknown) =>
+          detached(Engine().fromSave(JSON.stringify(save), markers === undefined ? null : JSON.stringify(markers))),
       } satisfies ToolingTowerClass,
     });
   }
@@ -151,23 +166,47 @@ export class ToolingTower {
 
   // ---- the save's fields -------------------------------------------------
 
-  get money(): number { return this.port.money(); }
+  get money(): number {
+    return this.port.money();
+  }
   set money(amount: number) {
     this.port.setMoney(amount);
     this.cached = null;
     this.host?.afterCommand();
   }
-  get star(): number { return this.save().star; }
-  set star(v: number) { this.write("top", "star", v); }
-  get evaluatedTower(): boolean { return this.save().evaluatedTower; }
-  set evaluatedTower(v: boolean) { this.write("top", "evaluatedTower", v); }
-  get vipFavorable(): boolean | undefined { return this.save().vipFavorable; }
-  set vipFavorable(v: boolean | undefined) { this.write("top", "vipFavorable", v); }
-  get vipVisitDay(): number | undefined { return this.save().vipVisitDay; }
-  set vipVisitDay(v: number | undefined) { this.write("top", "vipVisitDay", v); }
-  get log(): SerializedGame["log"] { return this.save().log ?? []; }
-  get mode(): string { return this.port.mode(); }
-  get founder(): boolean { return this.port.founder(); }
+  get star(): number {
+    return this.save().star;
+  }
+  set star(v: number) {
+    this.write("top", "star", v);
+  }
+  get evaluatedTower(): boolean {
+    return this.save().evaluatedTower;
+  }
+  set evaluatedTower(v: boolean) {
+    this.write("top", "evaluatedTower", v);
+  }
+  get vipFavorable(): boolean | undefined {
+    return this.save().vipFavorable;
+  }
+  set vipFavorable(v: boolean | undefined) {
+    this.write("top", "vipFavorable", v);
+  }
+  get vipVisitDay(): number | undefined {
+    return this.save().vipVisitDay;
+  }
+  set vipVisitDay(v: number | undefined) {
+    this.write("top", "vipVisitDay", v);
+  }
+  get log(): SerializedGame["log"] {
+    return this.save().log ?? [];
+  }
+  get mode(): string {
+    return this.port.mode();
+  }
+  get founder(): boolean {
+    return this.port.founder();
+  }
   get pendingChoice(): unknown {
     const top = this.patches.get("top");
     if (top?.has("events.pending")) return top.get("events.pending");
@@ -184,16 +223,24 @@ export class ToolingTower {
     return this.command(() => JSON.parse(this.port.build(kind, floor, x)) as { ok: boolean; reason?: string });
   }
   buildTransport(kind: string, x: number, bottom: number, top: number): { ok: boolean; reason?: string } {
-    return this.command(() => JSON.parse(this.port.buildTransport(kind, x, bottom, top)) as { ok: boolean; reason?: string });
+    return this.command(
+      () => JSON.parse(this.port.buildTransport(kind, x, bottom, top)) as { ok: boolean; reason?: string },
+    );
   }
   canBuild(kind: string, floor: number, x: number): { ok: boolean; reason?: string; cost: number } {
     this.settle();
     return JSON.parse(this.port.canBuild(kind, floor, x)) as { ok: boolean; reason?: string; cost: number };
   }
-  evaluateStar(): void { this.command(() => this.port.evaluateStar()); }
-  tick(dtMinutes: number): void { this.command(() => this.port.tick(dtMinutes)); }
+  evaluateStar(): void {
+    this.command(() => this.port.evaluateStar());
+  }
+  tick(dtMinutes: number): void {
+    this.command(() => this.port.tick(dtMinutes));
+  }
   /** The save, with every pending patch in it. */
-  serialize(): SerializedGame { return JSON.parse(this.saveText()) as SerializedGame; }
+  serialize(): SerializedGame {
+    return JSON.parse(this.saveText()) as SerializedGame;
+  }
 
   // ---- loads -------------------------------------------------------------
 
@@ -227,7 +274,8 @@ export class ToolingTower {
     const [hour, day, month, quarter] = from.loopMemos();
     const own = target === this.port;
     if (own) this.host?.beforeLoad();
-    if (target.restore(text)[0] !== 1) throw new Error(`the engine refused the harness's tower: ${target.lastReason() ?? "no reason given"}`);
+    if (target.restore(text)[0] !== 1)
+      throw new Error(`the engine refused the harness's tower: ${target.lastReason() ?? "no reason given"}`);
     target.seedElevatorTelemetry(telemetry);
     target.seedLoopMemos(hour, day, month, quarter);
     if (own) this.discard();
@@ -253,7 +301,8 @@ export class ToolingTower {
       const shafts = new Map((save.transports as unknown as SaveRecord[]).map((t) => [t.id, t]));
       for (const [key, fields] of this.patches) {
         if (key === "top") for (const [path, v] of fields) setPath(save as unknown as Record<string, unknown>, path, v);
-        else Object.assign((key[0] === "u" ? units : shafts).get(Number(key.slice(1))) ?? {}, Object.fromEntries(fields));
+        else
+          Object.assign((key[0] === "u" ? units : shafts).get(Number(key.slice(1))) ?? {}, Object.fromEntries(fields));
       }
       this.cached = { save, units, shafts };
       // The app moves the engine between the harness's tasks (a tick, a
@@ -271,7 +320,10 @@ export class ToolingTower {
   record(kind: "unit" | "shaft", text: string | undefined): SaveRecord | undefined {
     const rec = parsed<SaveRecord>(text);
     if (!rec) return undefined;
-    Object.assign(rec, Object.fromEntries(this.patches.get(kind === "unit" ? unitKey(rec.id) : shaftKey(rec.id)) ?? []));
+    Object.assign(
+      rec,
+      Object.fromEntries(this.patches.get(kind === "unit" ? unitKey(rec.id) : shaftKey(rec.id)) ?? []),
+    );
     return this.view(kind, rec);
   }
 
@@ -321,7 +373,12 @@ export class ToolingTower {
   /** Load the pending patches when one moves a unit or a shaft, so a
    *  placement or a lookup by tile sees the tower where its records say. */
   settleGeometry(): void {
-    if ([...this.patches.entries()].some(([key, fields]) => key !== "top" && [...fields.keys()].some((f) => GEOMETRY.has(f)))) this.settle();
+    if (
+      [...this.patches.entries()].some(
+        ([key, fields]) => key !== "top" && [...fields.keys()].some((f) => GEOMETRY.has(f)),
+      )
+    )
+      this.settle();
   }
 
   /** Drop a pending patch on a record's field that a bare setter is about to
@@ -375,10 +432,24 @@ export class ToolingTowerParts {
   }
 
   place(kind: string, floor: number, x: number): { ok: boolean; reason?: string; unitId?: number } {
-    return this.sim.bareEdit(() => JSON.parse(this.port.placeBare(kind, floor, x)) as { ok: boolean; reason?: string; unitId?: number });
+    return this.sim.bareEdit(
+      () => JSON.parse(this.port.placeBare(kind, floor, x)) as { ok: boolean; reason?: string; unitId?: number },
+    );
   }
-  placeTransport(kind: string, x: number, bottom: number, top: number): { ok: boolean; reason?: string; transportId?: number } {
-    return this.sim.bareEdit(() => JSON.parse(this.port.placeTransportBare(kind, x, bottom, top)) as { ok: boolean; reason?: string; transportId?: number });
+  placeTransport(
+    kind: string,
+    x: number,
+    bottom: number,
+    top: number,
+  ): { ok: boolean; reason?: string; transportId?: number } {
+    return this.sim.bareEdit(
+      () =>
+        JSON.parse(this.port.placeTransportBare(kind, x, bottom, top)) as {
+          ok: boolean;
+          reason?: string;
+          transportId?: number;
+        },
+    );
   }
   removeUnit(id: number): SaveRecord | undefined {
     const rec = this.getUnit(id);
@@ -399,19 +470,41 @@ export class ToolingTowerParts {
     return ok;
   }
 
-  get units(): SaveRecord[] { return this.sim.records("unit"); }
-  get transports(): SaveRecord[] { return this.sim.records("shaft"); }
-  getUnit(id: number): SaveRecord | undefined { return this.sim.record("unit", this.port.unitRecord(id)); }
-  getTransport(id: number): SaveRecord | undefined { return this.sim.record("shaft", this.port.transportRecord(id)); }
+  get units(): SaveRecord[] {
+    return this.sim.records("unit");
+  }
+  get transports(): SaveRecord[] {
+    return this.sim.records("shaft");
+  }
+  getUnit(id: number): SaveRecord | undefined {
+    return this.sim.record("unit", this.port.unitRecord(id));
+  }
+  getTransport(id: number): SaveRecord | undefined {
+    return this.sim.record("shaft", this.port.transportRecord(id));
+  }
   // The lookups by tile and floor read the engine's own geometry, so a
   // pending patch that moves something is loaded first.
-  unitAt(floor: number, x: number): SaveRecord | undefined { return this.sim.record("unit", this.geometry().unitAt(floor, x)); }
-  roomAt(floor: number, x: number): SaveRecord | undefined { return this.sim.record("unit", this.geometry().roomAt(floor, x)); }
-  transportAt(floor: number, x: number): SaveRecord | undefined { return this.sim.record("shaft", this.geometry().transportAt(floor, x)); }
-  structureKindAt(floor: number, x: number): string | undefined { return this.geometry().structureKindAt(floor, x); }
-  floorHasLobby(floor: number): boolean { return this.geometry().floorHasLobby(floor); }
-  isFloorServed(floor: number): boolean { return this.geometry().isFloorServed(floor); }
-  get highestFloor(): number { return this.geometry().highestFloor(); }
+  unitAt(floor: number, x: number): SaveRecord | undefined {
+    return this.sim.record("unit", this.geometry().unitAt(floor, x));
+  }
+  roomAt(floor: number, x: number): SaveRecord | undefined {
+    return this.sim.record("unit", this.geometry().roomAt(floor, x));
+  }
+  transportAt(floor: number, x: number): SaveRecord | undefined {
+    return this.sim.record("shaft", this.geometry().transportAt(floor, x));
+  }
+  structureKindAt(floor: number, x: number): string | undefined {
+    return this.geometry().structureKindAt(floor, x);
+  }
+  floorHasLobby(floor: number): boolean {
+    return this.geometry().floorHasLobby(floor);
+  }
+  isFloorServed(floor: number): boolean {
+    return this.geometry().isFloorServed(floor);
+  }
+  get highestFloor(): number {
+    return this.geometry().highestFloor();
+  }
 
   private geometry(): ToolingEngine {
     this.sim.settleGeometry();
@@ -423,10 +516,18 @@ export class ToolingTowerParts {
  *  read from them as the clock reads them. */
 function clockOf(sim: ToolingTower): ToolingTower["clock"] {
   return {
-    get minutes() { return sim.save().minutes; },
-    set minutes(v: number) { sim.write("top", "minutes", v); },
-    get day() { return Math.floor(sim.save().minutes / 1440); },
-    get minuteOfDay() { return ((sim.save().minutes % 1440) + 1440) % 1440; },
+    get minutes() {
+      return sim.save().minutes;
+    },
+    set minutes(v: number) {
+      sim.write("top", "minutes", v);
+    },
+    get day() {
+      return Math.floor(sim.save().minutes / 1440);
+    },
+    get minuteOfDay() {
+      return ((sim.save().minutes % 1440) + 1440) % 1440;
+    },
   };
 }
 
@@ -437,7 +538,9 @@ function eventsOf(sim: ToolingTower): ToolingTower["events"] {
       const pending = sim.save().events?.pending ?? null;
       return tracked(pending, () => sim.write("top", "events.pending", pending));
     },
-    set pending(v: unknown) { sim.write("top", "events.pending", v); },
+    set pending(v: unknown) {
+      sim.write("top", "events.pending", v);
+    },
   };
 }
 
@@ -448,7 +551,10 @@ function hourlyOf(engineOf: () => ToolingEngine): ToolingTower["elevatorHourly"]
     set(id, rows) {
       const engine = engineOf();
       const doc = JSON.parse(engine.elevatorTelemetry()) as { hourly: [number, unknown][] };
-      doc.hourly = [...doc.hourly.filter(([at]) => at !== id), [id, { weekday: [...rows.weekday], weekend: [...rows.weekend] }]];
+      doc.hourly = [
+        ...doc.hourly.filter(([at]) => at !== id),
+        [id, { weekday: [...rows.weekday], weekend: [...rows.weekend] }],
+      ];
       engine.seedElevatorTelemetry(JSON.stringify(doc));
     },
   };

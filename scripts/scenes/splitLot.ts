@@ -26,7 +26,9 @@ function pgUntilSomeoneWalksTheStreet(max: number): number {
   if (!towers) throw new Error("the split lot was not built");
   const [gapFrom, gapTo] = [towers[0][1] + 1, towers[1][0]];
   const onStreet = (): boolean =>
-    (g.sim.crowd.people as { x: number; floor: number }[]).some((p) => p.floor === 1 && p.x >= gapFrom + 2 && p.x <= gapTo - 2);
+    (g.sim.crowd.people as { x: number; floor: number }[]).some(
+      (p) => p.floor === 1 && p.x >= gapFrom + 2 && p.x <= gapTo - 2,
+    );
   for (let m = 1; m <= max; m++) {
     g.enginePort.tick(1);
     if (onStreet()) {

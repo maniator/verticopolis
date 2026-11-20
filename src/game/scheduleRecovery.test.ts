@@ -3,13 +3,7 @@ import { catalogFor } from "../tests/catalogFixture";
 import { SCHEDULE_HOURS, scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
 import { LAYOUT } from "../tests/portKit/mockPort";
 import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
-import {
-  acknowledgementKey,
-  isElevator,
-  recoveredSchedule,
-  shortFleets,
-  type ShaftFacts,
-} from "./scheduleRecovery";
+import { acknowledgementKey, isElevator, recoveredSchedule, shortFleets, type ShaftFacts } from "./scheduleRecovery";
 
 /**
  * The schedule review's rules on hand-built shafts and schedules. The review
@@ -127,6 +121,8 @@ describe("the constants kept here instead of imported from the engine", () => {
     }
     expect(flat(1)).toHaveLength(SCHEDULE_HOURS);
     // The hours sit in the schedule record the engine's layout publishes.
-    expect(scheduleSlots({ activeCars: { weekday: flat(1) } })).toHaveLength((LAYOUT as unknown as { scheduleSlots: number }).scheduleSlots);
+    expect(scheduleSlots({ activeCars: { weekday: flat(1) } })).toHaveLength(
+      (LAYOUT as unknown as { scheduleSlots: number }).scheduleSlots,
+    );
   });
 });

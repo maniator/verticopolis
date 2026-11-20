@@ -28,7 +28,9 @@ const PHONE = { width: 390, height: 844 };
 async function onGame(page: Page, viewport = SHORT): Promise<void> {
   await page.setViewportSize(viewport);
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => document.getElementById("splash")?.remove());
 }
 
@@ -84,7 +86,10 @@ test("the update prompt's notes log is its one inner scroller", async ({ page })
   await page.evaluate(() => {
     const releases = ["9.0.3", "9.0.2", "9.0.1", "9.0.0"].map((version) => ({
       version,
-      notes: Array.from({ length: 6 }, (_, i) => `A change in ${version}, number ${i + 1}, described in a full sentence.`),
+      notes: Array.from(
+        { length: 6 },
+        (_, i) => `A change in ${version}, number ${i + 1}, described in a full sentence.`,
+      ),
     }));
     (window as any).game.ui.showUpdatePrompt(
       () => {},
@@ -119,7 +124,10 @@ test.describe("on a phone", () => {
   test.setTimeout(120_000);
 
   test("the Elevator Schedule's floor grid is its one inner scroller", async ({ page }) => {
-    const tower = readFileSync(new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower-4.vctower", import.meta.url), "utf8");
+    const tower = readFileSync(
+      new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower-4.vctower", import.meta.url),
+      "utf8",
+    );
     await onGame(page, PHONE);
     await page.evaluate((text) => {
       const g = (window as any).game;

@@ -13,10 +13,7 @@ import {
 } from "./prTemplate";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const realTemplate = readFileSync(
-  resolve(root, ".github/PULL_REQUEST_TEMPLATE.md"),
-  "utf8",
-);
+const realTemplate = readFileSync(resolve(root, ".github/PULL_REQUEST_TEMPLATE.md"), "utf8");
 
 const TEMPLATE = `<!-- intro -->
 
@@ -46,8 +43,7 @@ const filled = (overrides: Partial<Record<string, string>> = {}): string => {
   const parts: Record<string, string> = {
     "What & why": "Adds a check.\n\nCloses #12",
     "Type of change": "- [ ] Bug fix\n- [x] Docs / tooling",
-    Complexity:
-      "n/a: tooling.\n\nHot-path record (section 6): no hot-path surface",
+    Complexity: "n/a: tooling.\n\nHot-path record (section 6): no hot-path surface",
     "Notes for reviewers": "None.",
     ...overrides,
   };
@@ -66,40 +62,29 @@ describe("stripComments", () => {
 
 describe("headings", () => {
   it("lists ## headings in order, skipping comments and code fences", () => {
-    const text =
-      "## One\n<!--\n## Hidden\n-->\n```md\n## Fenced\n```\n### Sub\n## Two\n";
+    const text = "## One\n<!--\n## Hidden\n-->\n```md\n## Fenced\n```\n### Sub\n## Two\n";
     expect(headings(text)).toEqual(["One", "Two"]);
   });
 
   it("finds the sections and the record line the rules name in the real template", () => {
-    expect(headings(realTemplate)).toEqual(
-      expect.arrayContaining([TYPE_OF_CHANGE, COMPLEXITY]),
-    );
-    expect(sections(realTemplate).get(COMPLEXITY)).toContain(
-      HOT_PATH_RECORD_LINE,
-    );
+    expect(headings(realTemplate)).toEqual(expect.arrayContaining([TYPE_OF_CHANGE, COMPLEXITY]));
+    expect(sections(realTemplate).get(COMPLEXITY)).toContain(HOT_PATH_RECORD_LINE);
   });
 });
 
 describe("sections", () => {
   it("ends the last section at the footer rule", () => {
-    expect(sections("## Notes\n\n---\n_Generated_").get("Notes")?.trim()).toBe(
-      "",
-    );
+    expect(sections("## Notes\n\n---\n_Generated_").get("Notes")?.trim()).toBe("");
   });
 
   it("keeps a fenced --- rule inside the section", () => {
-    const body = sections(
-      "## Versioning\n\n```\n---\napp: none\n---\n```\n\nafter",
-    ).get("Versioning");
+    const body = sections("## Versioning\n\n```\n---\napp: none\n---\n```\n\nafter").get("Versioning");
     expect(body).toContain("app: none");
     expect(body).toContain("after");
   });
 
   it("keeps the first body of a repeated heading", () => {
-    expect(sections("## A\nfirst\n## A\nsecond").get("A")?.trim()).toBe(
-      "first",
-    );
+    expect(sections("## A\nfirst\n## A\nsecond").get("A")?.trim()).toBe("first");
   });
 });
 
@@ -120,37 +105,26 @@ describe("checkPrBody", () => {
   });
 
   it("flags a section that holds only the template's comment", () => {
-    const problems = checkPrBody(
-      filled({ "Notes for reviewers": "<!-- anything -->" }),
-      TEMPLATE,
-    );
+    const problems = checkPrBody(filled({ "Notes for reviewers": "<!-- anything -->" }), TEMPLATE);
     expect(problems).toEqual([
       'section "## Notes for reviewers" is empty (write "None" or "n/a: <reason>" if it does not apply)',
     ]);
   });
 
   it("flags a Type of change with no ticked box", () => {
-    expect(
-      checkPrBody(
-        filled({ "Type of change": "- [ ] Bug fix\n- [ ] Docs / tooling" }),
-        TEMPLATE,
-      ),
-    ).toEqual(['"## Type of change" ticks no box']);
+    expect(checkPrBody(filled({ "Type of change": "- [ ] Bug fix\n- [ ] Docs / tooling" }), TEMPLATE)).toEqual([
+      '"## Type of change" ticks no box',
+    ]);
   });
 
   it("accepts an upper-case X and a * bullet", () => {
-    expect(
-      checkPrBody(
-        filled({ "Type of change": "* [X] Docs / tooling" }),
-        TEMPLATE,
-      ),
-    ).toEqual([]);
+    expect(checkPrBody(filled({ "Type of change": "* [X] Docs / tooling" }), TEMPLATE)).toEqual([]);
   });
 
   it("flags a missing or unfilled hot-path record line", () => {
-    expect(
-      checkPrBody(filled({ Complexity: "n/a: tooling." }), TEMPLATE),
-    ).toEqual(['"## Complexity" has no "Hot-path record (section 6):" line']);
+    expect(checkPrBody(filled({ Complexity: "n/a: tooling." }), TEMPLATE)).toEqual([
+      '"## Complexity" has no "Hot-path record (section 6):" line',
+    ]);
     for (const value of ["", "link"]) {
       expect(
         checkPrBody(
@@ -159,19 +133,12 @@ describe("checkPrBody", () => {
           }),
           TEMPLATE,
         ),
-      ).toEqual([
-        '"Hot-path record (section 6):" is not filled in (link the record, or say "no hot-path surface")',
-      ]);
+      ).toEqual(['"Hot-path record (section 6):" is not filled in (link the record, or say "no hot-path surface")']);
     }
   });
 
   it("flags the bare Closes # placeholder", () => {
-    expect(
-      checkPrBody(
-        filled({ "What & why": "Adds a check.\n\nCloses #" }),
-        TEMPLATE,
-      ),
-    ).toEqual([
+    expect(checkPrBody(filled({ "What & why": "Adds a check.\n\nCloses #" }), TEMPLATE)).toEqual([
       '"Closes #" has no issue number (name the issue, or remove the line)',
     ]);
   });
@@ -194,33 +161,22 @@ describe("checkPrBody", () => {
       "**Hot-path record (section 6):** no hot-path surface",
       "- Hot-path record (section 6): https://example.test/r",
     ]) {
-      expect(
-        checkPrBody(filled({ Complexity: `n/a.\n\n${line}` }), TEMPLATE),
-      ).toEqual([]);
+      expect(checkPrBody(filled({ Complexity: `n/a.\n\n${line}` }), TEMPLATE)).toEqual([]);
     }
-    expect(
-      checkPrBody(
-        filled({ Complexity: "n/a.\n\n**Hot-path record (section 6):** link" }),
-        TEMPLATE,
-      ),
-    ).toHaveLength(1);
+    expect(checkPrBody(filled({ Complexity: "n/a.\n\n**Hot-path record (section 6):** link" }), TEMPLATE)).toHaveLength(
+      1,
+    );
   });
 
   it("reads a description saved with Windows line endings", () => {
     expect(checkPrBody(filled().replace(/\n/g, "\r\n"), TEMPLATE)).toEqual([]);
-    expect(
-      checkPrBody(
-        filled({ "Notes for reviewers": "" }).replace(/\n/g, "\r\n"),
-        TEMPLATE,
-      ),
-    ).toHaveLength(1);
+    expect(checkPrBody(filled({ "Notes for reviewers": "" }).replace(/\n/g, "\r\n"), TEMPLATE)).toHaveLength(1);
   });
 
   it("passes the real template once each section is filled", () => {
     const fill: Record<string, string> = {
       "Type of change": "- [x] Docs / tooling",
-      Complexity:
-        "n/a: docs.\n\nHot-path record (section 6): no hot-path surface",
+      Complexity: "n/a: docs.\n\nHot-path record (section 6): no hot-path surface",
     };
     const body = headings(realTemplate)
       .map((heading) => `## ${heading}\n\n${fill[heading] ?? "None."}`)

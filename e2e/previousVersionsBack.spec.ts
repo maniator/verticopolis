@@ -12,7 +12,9 @@ test.setTimeout(90_000);
 
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => document.getElementById("splash")?.remove());
   // Two tower files, so the row the player picked is not simply the only one.
   await page.evaluate(async () => {
@@ -66,7 +68,9 @@ test.describe("on a computer", () => {
       await versionsFromMenu(page);
       await close(page);
       await expectBack(page, "Open", "Harbour Point");
-      expect(await page.locator("#modal .fd-row .fd-name-cell").allTextContents(), "the sort the player chose").toEqual(sorted);
+      expect(await page.locator("#modal .fd-row .fd-name-cell").allTextContents(), "the sort the player chose").toEqual(
+        sorted,
+      );
       // And the window still works: a second close leaves for the game.
       await page.keyboard.press("Escape");
       await expect(page.locator("#modal")).toHaveJSProperty("open", false);
@@ -97,7 +101,15 @@ test.describe("on a phone", () => {
     const at = { x: box.x + 30, y: box.y + box.height / 2 };
     await row(page, name).evaluate((el, p) => {
       const touch = (type: string) =>
-        new PointerEvent(type, { pointerType: "touch", pointerId: 7, isPrimary: true, clientX: p.x, clientY: p.y, bubbles: true, cancelable: true });
+        new PointerEvent(type, {
+          pointerType: "touch",
+          pointerId: 7,
+          isPrimary: true,
+          clientX: p.x,
+          clientY: p.y,
+          bubbles: true,
+          cancelable: true,
+        });
       el.dispatchEvent(touch("pointerdown"));
       return new Promise<void>((done) =>
         setTimeout(() => {

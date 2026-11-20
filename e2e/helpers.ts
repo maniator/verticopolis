@@ -88,56 +88,62 @@ export async function dispatchTouch(
   x: number,
   y: number,
 ): Promise<void> {
-  await page.evaluate(({ type, id, x, y }) => {
-    const ex = (window as any).game?.engine?.engine;
-    const startFrame = Number.isFinite(ex?.stats?.currFrame?.id) ? ex.stats.currFrame.id : null;
-    const canvas = document.getElementById("view") as HTMLCanvasElement;
-    const r = canvas.getBoundingClientRect();
-    canvas.dispatchEvent(
-      new PointerEvent(type, {
-        pointerId: id,
-        pointerType: "touch",
-        isPrimary: false,
-        button: 0,
-        buttons: type === "pointerup" || type === "pointercancel" ? 0 : 1,
-        clientX: r.left + x,
-        clientY: r.top + y,
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-    // Excalibur flushes pointer events in its update loop; usually two frames are enough.
-    // On overloaded CI, rAF can stall for a while, so the wait is bounded by a generous cap (a stall that long is a real failure).
-    return new Promise<void>((done, fail) => {
-      let settled = false;
-      const frameAdvanced = () => {
-        if (startFrame === null) return false;
-        const now = (window as any).game?.engine?.engine?.stats?.currFrame?.id;
-        return Number.isFinite(now) && now > startFrame;
-      };
-      const finish = (ok: boolean, reason: string) => {
-        if (settled) return;
-        settled = true;
-        if (ok) done();
-        else fail(new Error(reason));
-      };
-      // Do not treat a missing Excalibur frame as success. If the engine can
-      // not provide a stats frame, the test must fail fast rather than mask a
-      // missing input update behind a synthetic pass.
-      if (startFrame === null) {
-        finish(false, "Excalibur frame stats were unavailable before pointer dispatch");
-        return;
-      }
-      let frames = 0;
-      const onFrame = () => {
-        frames++;
-        if (frames >= 2) finish(frameAdvanced(), "pointer event dispatch finished before Excalibur advanced a frame");
-        else requestAnimationFrame(onFrame);
-      };
-      requestAnimationFrame(onFrame);
-      setTimeout(() => finish(frameAdvanced(), "pointer event dispatch timed out before Excalibur advanced a frame"), 5_000);
-    });
-  }, touchArgs(type, id, x, y));
+  await page.evaluate(
+    ({ type, id, x, y }) => {
+      const ex = (window as any).game?.engine?.engine;
+      const startFrame = Number.isFinite(ex?.stats?.currFrame?.id) ? ex.stats.currFrame.id : null;
+      const canvas = document.getElementById("view") as HTMLCanvasElement;
+      const r = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(
+        new PointerEvent(type, {
+          pointerId: id,
+          pointerType: "touch",
+          isPrimary: false,
+          button: 0,
+          buttons: type === "pointerup" || type === "pointercancel" ? 0 : 1,
+          clientX: r.left + x,
+          clientY: r.top + y,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      // Excalibur flushes pointer events in its update loop; usually two frames are enough.
+      // On overloaded CI, rAF can stall for a while, so the wait is bounded by a generous cap (a stall that long is a real failure).
+      return new Promise<void>((done, fail) => {
+        let settled = false;
+        const frameAdvanced = () => {
+          if (startFrame === null) return false;
+          const now = (window as any).game?.engine?.engine?.stats?.currFrame?.id;
+          return Number.isFinite(now) && now > startFrame;
+        };
+        const finish = (ok: boolean, reason: string) => {
+          if (settled) return;
+          settled = true;
+          if (ok) done();
+          else fail(new Error(reason));
+        };
+        // Do not treat a missing Excalibur frame as success. If the engine can
+        // not provide a stats frame, the test must fail fast rather than mask a
+        // missing input update behind a synthetic pass.
+        if (startFrame === null) {
+          finish(false, "Excalibur frame stats were unavailable before pointer dispatch");
+          return;
+        }
+        let frames = 0;
+        const onFrame = () => {
+          frames++;
+          if (frames >= 2) finish(frameAdvanced(), "pointer event dispatch finished before Excalibur advanced a frame");
+          else requestAnimationFrame(onFrame);
+        };
+        requestAnimationFrame(onFrame);
+        setTimeout(
+          () => finish(frameAdvanced(), "pointer event dispatch timed out before Excalibur advanced a frame"),
+          5_000,
+        );
+      });
+    },
+    touchArgs(type, id, x, y),
+  );
 }
 
 /** The engine's own save (null before the engine is published), for a spec that
@@ -286,7 +292,8 @@ export function buildToStar(target: number): number {
     const s2 = scratch();
     const wh = (s2.tower.units as any[]).find((u) => u.kind === "weddingHall");
     if (wh && wh.state === "construction") wh.state = "empty"; // done building
-    if (!(s2.vipVisitDay > s2.clock.day)) throw new Error(`the hall scheduled no VIP visit ahead (vipVisitDay ${s2.vipVisitDay}, day ${s2.clock.day})`);
+    if (!(s2.vipVisitDay > s2.clock.day))
+      throw new Error(`the hall scheduled no VIP visit ahead (vipVisitDay ${s2.vipVisitDay}, day ${s2.clock.day})`);
     s2.clock.minutes = s2.vipVisitDay * 24 * 60 - 1;
     g.adoptSim(s2, true);
     g.speed = 0;

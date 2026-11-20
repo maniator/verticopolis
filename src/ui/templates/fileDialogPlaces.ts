@@ -67,18 +67,27 @@ export function placesTemplate(v: PlacesView, h: PlacesHandlers): TemplateResult
       <span class="fd-look-now" id="fd-look-now">${placeLabel(v, v.place)}</span><span class="fd-look-arrow" aria-hidden="true">▼</span>
     </button>
     <span class="fd-usage">${v.usage}</span>
-    ${v.lookOpen
-      ? html`<div class="fd-look-pop well" role="menu" aria-label=${opening ? "Look in" : "Save in"} @keydown=${h.lookKey}>
+    ${
+      v.lookOpen
+        ? html`<div class="fd-look-pop well" role="menu" aria-label=${opening ? "Look in" : "Save in"} @keydown=${h.lookKey}>
           ${item(placeLabel(v, "local"), () => h.choose("local"), { selected: v.place === "local" })}
           ${v.linked ? item(placeLabel(v, "linked"), () => h.choose("linked"), { selected: v.place === "linked" }) : nothing}
           <div class="fd-look-sep" role="separator"></div>
-          ${v.canLink
-            ? html`${item(html`${linkFolderIcon()}<span>${v.linked ? "Link a different folder…" : `Link a folder on this ${v.where}…`}</span>`, h.link)}
+          ${
+            v.canLink
+              ? html`${item(html`${linkFolderIcon()}<span>${v.linked ? "Link a different folder…" : `Link a folder on this ${v.where}…`}</span>`, h.link)}
               ${v.linked ? mirrorItem(v.linked.mirror, v.busy, h.toggleMirror) : nothing}
               ${v.linked ? item(html`<span class="fd-icon-pad"></span><span>Unlink "${v.linked.name}"</span><span class="fd-look-sub">its files stay</span>`, h.unlink) : nothing}`
-            : item(html`<span class="fd-icon-pad"></span><span>This browser can't link a folder</span>`, () => {}, { quiet: true }, false)}
+              : item(
+                  html`<span class="fd-icon-pad"></span><span>This browser can't link a folder</span>`,
+                  () => {},
+                  { quiet: true },
+                  false,
+                )
+          }
         </div>`
-      : nothing}
+        : nothing
+    }
   </div>`;
 }
 

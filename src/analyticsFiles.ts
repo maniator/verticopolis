@@ -84,7 +84,11 @@ export const TDT_IMPORT_ANOMALIES = [
 ] as const satisfies readonly (keyof ImportReportFacts["counts"])[];
 
 /** The transport decode's workarounds, by the report's `decodeStats` names. */
-export const TDT_TRANSPORT_ANOMALIES = ["droppedShafts", "adjustedShafts", "droppedFlights"] as const satisfies readonly (keyof ImportReportFacts["decodeStats"])[];
+export const TDT_TRANSPORT_ANOMALIES = [
+  "droppedShafts",
+  "adjustedShafts",
+  "droppedFlights",
+] as const satisfies readonly (keyof ImportReportFacts["decodeStats"])[];
 
 type TdtAnomalyName = (typeof TDT_IMPORT_ANOMALIES)[number] | (typeof TDT_TRANSPORT_ANOMALIES)[number];
 

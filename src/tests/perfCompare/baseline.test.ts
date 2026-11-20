@@ -15,8 +15,21 @@ afterEach(() => {
 function dist(over: { stamp?: object | null; version?: object | null; engine?: boolean } = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "vc-baseline-"));
   made.push(dir);
-  if (over.stamp !== null) writeFileSync(join(dir, BASELINE_STAMP), JSON.stringify({ commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion, ...over.stamp }));
-  if (over.version !== null) writeFileSync(join(dir, "version.json"), JSON.stringify({ version: TS_BASELINE.appVersion, sha: TS_BASELINE.commit.slice(0, 8), engineBuild: "switchable", ...over.version }));
+  if (over.stamp !== null)
+    writeFileSync(
+      join(dir, BASELINE_STAMP),
+      JSON.stringify({ commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion, ...over.stamp }),
+    );
+  if (over.version !== null)
+    writeFileSync(
+      join(dir, "version.json"),
+      JSON.stringify({
+        version: TS_BASELINE.appVersion,
+        sha: TS_BASELINE.commit.slice(0, 8),
+        engineBuild: "switchable",
+        ...over.version,
+      }),
+    );
   if (over.engine) mkdirSync(join(dir, "engine"));
   return dir;
 }
@@ -36,10 +49,16 @@ describe("the pinned TypeScript baseline", () => {
   });
 
   it("refuses another commit, another version, a Rust-only build and a build that carries an engine package", () => {
-    expect(baselineErrors(dist({ stamp: { commit: "0".repeat(40) } }))).toEqual([expect.stringContaining("was built from 000")]);
+    expect(baselineErrors(dist({ stamp: { commit: "0".repeat(40) } }))).toEqual([
+      expect.stringContaining("was built from 000"),
+    ]);
     expect(baselineErrors(dist({ version: { version: "9.9.9" } }))).toEqual([expect.stringContaining("is app 9.9.9")]);
-    expect(baselineErrors(dist({ version: { sha: "deadbeef" } }))).toEqual([expect.stringContaining("names commit deadbeef")]);
-    expect(baselineErrors(dist({ version: { engineBuild: "wasm-only" } }))).toEqual([expect.stringContaining("needs the switchable build")]);
+    expect(baselineErrors(dist({ version: { sha: "deadbeef" } }))).toEqual([
+      expect.stringContaining("names commit deadbeef"),
+    ]);
+    expect(baselineErrors(dist({ version: { engineBuild: "wasm-only" } }))).toEqual([
+      expect.stringContaining("needs the switchable build"),
+    ]);
     expect(baselineErrors(dist({ engine: true }))).toEqual([expect.stringContaining("overlaid by the server")]);
   });
 
@@ -56,7 +75,9 @@ describe("the pinned TypeScript baseline", () => {
   });
 
   it("is named in the limitations of a cross-engine folder and left out of an A/A pass of WASM", () => {
-    expect(buildLimitations(null, "3.0.0", [], null, TS_BASELINE).join("\n")).toContain(baselineLimitation(TS_BASELINE));
+    expect(buildLimitations(null, "3.0.0", [], null, TS_BASELINE).join("\n")).toContain(
+      baselineLimitation(TS_BASELINE),
+    );
     expect(buildLimitations("wasm", "3.0.0", [], null, null).join("\n")).not.toContain("pinned pre-cutover build");
     expect(baselineLimitation(TS_BASELINE)).toContain(TS_BASELINE.commit.slice(0, 8));
   });

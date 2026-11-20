@@ -31,10 +31,28 @@ type Start = { label: string; seed?: number; fixture?: string; mode: GameMode; s
 const STARTS: Start[] = [
   { label: "new Classic game", seed: 7, mode: "classic" },
   { label: "new Modern game", seed: 7, mode: "modern" },
-  { label: "towerone_6 in Classic", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone_6.vctower", mode: "classic" },
-  { label: "sixseven-december in Modern", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven-december.vctower", mode: "modern" },
-  { label: "towerone_6 at TOWER rating in Classic", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone_6.vctower", mode: "classic", star: 6 },
-  { label: "towerone-star4 at TOWER rating in Modern", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone-star4.vctower", mode: "modern", star: 6 },
+  {
+    label: "towerone_6 in Classic",
+    fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone_6.vctower",
+    mode: "classic",
+  },
+  {
+    label: "sixseven-december in Modern",
+    fixture: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven-december.vctower",
+    mode: "modern",
+  },
+  {
+    label: "towerone_6 at TOWER rating in Classic",
+    fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone_6.vctower",
+    mode: "classic",
+    star: 6,
+  },
+  {
+    label: "towerone-star4 at TOWER rating in Modern",
+    fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone-star4.vctower",
+    mode: "modern",
+    star: 6,
+  },
 ];
 
 function open(start: Start): WasmEngine {

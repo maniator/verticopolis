@@ -16,7 +16,6 @@ import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
  * another catalog (a scene or a swapped-in tower binds them again).
  */
 
-
 afterEach(() => {
   bindViewKinds(catalogFor("modern"));
 });
@@ -29,7 +28,9 @@ function towerWithHall(): EnginePort {
   built.money = 1e9;
   built.star = 5;
   for (let x = HALL_X - 4; x < HALL_X + 36; x++) expect(built.tower.place("lobby", 1, x).ok).toBe(true);
-  for (let floor = 2; floor <= 100; floor++) for (let x = HALL_X - 4; x < HALL_X + 36; x++) expect(built.tower.place("floor", floor, x).ok, `floor ${floor}`).toBe(true);
+  for (let floor = 2; floor <= 100; floor++)
+    for (let x = HALL_X - 4; x < HALL_X + 36; x++)
+      expect(built.tower.place("floor", floor, x).ok, `floor ${floor}`).toBe(true);
   built.settle();
   expect(built.build("weddingHall", 100, HALL_X).ok).toBe(true);
   return portOf(built);
@@ -49,20 +50,27 @@ describe.skipIf(!hasWasmPackage())("the reader over the Rust engine's wedding ha
     // The frontend kind facts are bound from the live Rust source.
     expect(findViewKind("weddingHall")).toMatchObject({ width: 28, floors: 5 });
     const renderSim = newRenderSim(rust, reader);
-    expect(towerCatalog(renderSim).economy.garbageCollectHour).toBe(readCatalog(wasm(), "modern").economy.garbageCollectHour);
+    expect(towerCatalog(renderSim).economy.garbageCollectHour).toBe(
+      readCatalog(wasm(), "modern").economy.garbageCollectHour,
+    );
     expect(hall.floor).toBe(100);
     const check = () => {
-      for (let floor = 100; floor <= 104; floor++) expect(reader.tower.unitAt(floor, hall.x + 1), `floor ${floor}`).toBe(hall);
+      for (let floor = 100; floor <= 104; floor++)
+        expect(reader.tower.unitAt(floor, hall.x + 1), `floor ${floor}`).toBe(hall);
       for (const x of [hall.x, hall.x + hall.width - 1]) expect(reader.tower.unitAt(102, x), `edge ${x}`).toBe(hall);
       expect(reader.tower.unitAt(105, hall.x + 1)).toBeUndefined();
       expect(reader.tower.unitAt(99, hall.x + 1)).not.toBe(hall);
-      for (const x of [hall.x - 1, hall.x + hall.width]) expect(reader.tower.unitAt(102, x), `beside ${x}`).not.toBe(hall);
+      for (const x of [hall.x - 1, hall.x + hall.width])
+        expect(reader.tower.unitAt(102, x), `beside ${x}`).not.toBe(hall);
     };
     check();
     // The scene, the UI or another tower binds the view's facts to another
     // catalog, here one whose hall is a single 16-tile story.
     const classic = catalogFor("classic");
-    bindViewKinds({ ...classic, facilities: classic.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 1, width: 16 } : f)) });
+    bindViewKinds({
+      ...classic,
+      facilities: classic.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 1, width: 16 } : f)),
+    });
     expect(findViewKind("weddingHall")).toMatchObject({ width: 16, floors: 1 });
     reader.update();
     check();

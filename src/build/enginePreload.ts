@@ -1,4 +1,9 @@
-import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "@verticopolis/components/host/enginePackageNames";
+import {
+  ENGINE_BUILD_RECORD,
+  ENGINE_DIR,
+  ENGINE_GLUE,
+  ENGINE_WASM,
+} from "@verticopolis/components/host/enginePackageNames";
 
 /**
  * The game page asks the browser for the engine package's three files as soon
@@ -40,18 +45,24 @@ function attributesOf(tag: string): Record<string, string> {
  *  too, since it would download a file the loader never claims. Fetch preloads of
  *  anything else are not this check's business. */
 export function enginePreloadProblems(html: string): string[] {
-  const links = [...html.matchAll(/<link\b[^>]*>/g)].map((m) => attributesOf(m[0])).filter((a) => a.rel === "preload" && a.as === "fetch");
+  const links = [...html.matchAll(/<link\b[^>]*>/g)]
+    .map((m) => attributesOf(m[0]))
+    .filter((a) => a.rel === "preload" && a.as === "fetch");
   const problems: string[] = [];
   for (const file of ENGINE_PRELOAD_FILES) {
     const want = enginePreloadAttrs(file);
     const found = links.filter((a) => a.href === want.href);
     if (found.length === 0) problems.push(`the page does not preload ${want.href}`);
     else if (found.length > 1) problems.push(`the page preloads ${want.href} ${found.length} times`);
-    else if (found[0].crossorigin !== want.crossorigin) problems.push(`the preload of ${want.href} is not a cors request with same-origin credentials, so the loader's fetch cannot claim it`);
+    else if (found[0].crossorigin !== want.crossorigin)
+      problems.push(
+        `the preload of ${want.href} is not a cors request with same-origin credentials, so the loader's fetch cannot claim it`,
+      );
   }
   const wanted = new Set(ENGINE_PRELOAD_FILES.map((f) => enginePreloadAttrs(f).href));
   for (const a of links) {
-    if (a.href?.startsWith(`./${ENGINE_DIR}`) && !wanted.has(a.href)) problems.push(`the page preloads ${a.href}, which the loader never fetches`);
+    if (a.href?.startsWith(`./${ENGINE_DIR}`) && !wanted.has(a.href))
+      problems.push(`the page preloads ${a.href}, which the loader never fetches`);
   }
   return problems;
 }

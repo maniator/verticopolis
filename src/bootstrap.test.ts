@@ -12,7 +12,10 @@ vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The package load is stubbed so boot runs without an engine package. The
 // default package has a save writer, the one part boot requires of it.
-const wasmStub = vi.hoisted(() => ({ loadError: null as Error | null, module: { Engine: class {}, encodeVctower: () => "" } as unknown }));
+const wasmStub = vi.hoisted(() => ({
+  loadError: null as Error | null,
+  module: { Engine: class {}, encodeVctower: () => "" } as unknown,
+}));
 vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
   const real = await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>();
   return {
@@ -186,7 +189,14 @@ describe("showEngineFailure", () => {
   });
 
   it("stops the game with the stage, the reason, the steps to try and a Reload button", () => {
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "start", reason: "attach-refused", message: "CompileError: <b>bad</b>" } }, false);
+    showEngineFailure(
+      {
+        build: "wasm-only",
+        engine: "none",
+        failure: { stage: "start", reason: "attach-refused", message: "CompileError: <b>bad</b>" },
+      },
+      false,
+    );
     const box = document.getElementById("engine-failure")!;
     expect(box.dataset.stage).toBe("start");
     expect(box.textContent).toContain("could not start");
@@ -205,12 +215,34 @@ describe("showEngineFailure", () => {
   });
 
   it("shows each load cause's sentence on a stopped screen that alerts and puts focus on Reload (#985)", () => {
-    const detail = { file: "wasm" as const, expected: null, found: null, expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
+    const detail = {
+      file: "wasm" as const,
+      expected: null,
+      found: null,
+      expectedPackage: "111111111111",
+      servedPackage: "222222222222",
+      controlled: true,
+    };
     const causes: Array<[string, Parameters<typeof showEngineFailure>[0]["failure"], RegExp, RegExp]> = [
-      ["mismatch", { stage: "load", reason: "package-mismatch", message: "m", package: { ...detail, kind: "mismatch" } }, /do not match this version of the game.*expected 111111111111, found 222222222222/, /^Reload the page/],
-      ["load-failed", { stage: "load", reason: "boot-error", message: "m", package: { ...detail, kind: "load-failed" } }, /could not be loaded/, /^Reload the page/],
+      [
+        "mismatch",
+        { stage: "load", reason: "package-mismatch", message: "m", package: { ...detail, kind: "mismatch" } },
+        /do not match this version of the game.*expected 111111111111, found 222222222222/,
+        /^Reload the page/,
+      ],
+      [
+        "load-failed",
+        { stage: "load", reason: "boot-error", message: "m", package: { ...detail, kind: "load-failed" } },
+        /could not be loaded/,
+        /^Reload the page/,
+      ],
       ["timeout", { stage: "load", reason: "boot-timeout", message: "m" }, /took too long to load/, /^Reload the page/],
-      ["no save writer", { stage: "load", reason: "package-mismatch", message: "m", cause: "no-save-writer" }, /cannot save towers/, /^Reload the page/],
+      [
+        "no save writer",
+        { stage: "load", reason: "package-mismatch", message: "m", cause: "no-save-writer" },
+        /cannot save towers/,
+        /^Reload the page/,
+      ],
     ];
     for (const [name, failure, reason, firstStep] of causes) {
       document.body.innerHTML = `<div id="stage"></div>`;
@@ -227,7 +259,12 @@ describe("showEngineFailure", () => {
 
   it("offers Copy diagnostics on the stop screen, built from the page's own state", async () => {
     const g = globalThis as { __vcEngineBoot?: unknown };
-    const state = { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" }, binary: { state: "ok", sourceHash: "9".repeat(64) } };
+    const state = {
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" },
+      binary: { state: "ok", sourceHash: "9".repeat(64) },
+    };
     g.__vcEngineBoot = state;
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
@@ -248,14 +285,23 @@ describe("showEngineFailure", () => {
 
   it("shows the report to select by hand when the stop screen cannot copy it", async () => {
     const g = globalThis as { __vcEngineBoot?: unknown };
-    const state = { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" } };
+    const state = {
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" },
+    };
     g.__vcEngineBoot = state;
-    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) }, configurable: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) },
+      configurable: true,
+    });
     // The selection fallback fails too: jsdom has no execCommand.
     try {
       showEngineFailure(state as never, false);
       document.querySelector<HTMLButtonElement>('#boot-fallback button[data-act="copy-diagnostics"]')!.click();
-      await vi.waitFor(() => expect(document.querySelector(".engine-failure-copy-status")?.textContent).toContain("Could not copy"));
+      await vi.waitFor(() =>
+        expect(document.querySelector(".engine-failure-copy-status")?.textContent).toContain("Could not copy"),
+      );
       const area = document.querySelector<HTMLTextAreaElement>("#boot-fallback textarea.engine-failure-copy-text")!;
       expect(area.readOnly).toBe(true);
       expect(area.value).toContain("Verticopolis diagnostics");
@@ -274,7 +320,11 @@ describe("showEngineFailure", () => {
     document.body.innerHTML = `<div id="stage"><button id="quick-save">Quick Save</button></div><div id="splash"></div>`;
     const button = document.getElementById("quick-save") as HTMLButtonElement;
     button.focus();
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "attach-refused", message: "x" } });
+    showEngineFailure({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "host", reason: "attach-refused", message: "x" },
+    });
     expect((document.getElementById("stage") as HTMLElement).inert).toBe(true);
     expect((document.getElementById("splash") as HTMLElement).inert).toBe(true);
     expect((document.getElementById("boot-fallback-host") as HTMLElement).inert).toBeFalsy();
@@ -307,7 +357,11 @@ describe("showEngineFailure", () => {
     document.body.innerHTML = `<div id="stage"></div><dialog id="modal"></dialog>`;
     const dialog = document.getElementById("modal") as HTMLDialogElement;
     dialog.showModal();
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "attach-refused", message: "x" } });
+    showEngineFailure({
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "host", reason: "attach-refused", message: "x" },
+    });
     expect(dialog.open).toBe(false);
   });
 

@@ -51,11 +51,7 @@ function walkedCounts(sim: PortSim, codes: PortCodes): Counts {
 }
 
 /** A seeded pick from the engine's units, so the commands land on real rooms. */
-function pick(
-  sim: PortSim,
-  n: number,
-  keep: (u: Unit) => boolean,
-): Unit | undefined {
+function pick(sim: PortSim, n: number, keep: (u: Unit) => boolean): Unit | undefined {
   const rooms = sim.state.tower.units.filter(keep);
   return rooms.length === 0 ? undefined : rooms[n % rooms.length];
 }
@@ -68,19 +64,12 @@ function pick(
  * reprices, sales and builds are issued along the way, and how often each
  * count moved between reads shows the run reached them.
  */
-function run(
-  leg: Leg,
-  name: string,
-  save: string,
-): { moved: Record<keyof Counts, number>; rebuilds: number } {
+function run(leg: Leg, name: string, save: string): { moved: Record<keyof Counts, number>; rebuilds: number } {
   const sim = new PortSim(leg, decodeVctower(save));
   sim.setMoney(1e12);
   const codes = new PortCodes(sim.port);
   const fields = Object.keys(walkedCounts(sim, codes)) as (keyof Counts)[];
-  const moved = Object.fromEntries(fields.map((f) => [f, 0])) as Record<
-    keyof Counts,
-    number
-  >;
+  const moved = Object.fromEntries(fields.map((f) => [f, 0])) as Record<keyof Counts, number>;
   let rebuilds = 0;
   let last: Record<string, number> = { ...sim.statsReport().stats };
   const check = (label: string) => {
@@ -99,11 +88,7 @@ function run(
     }
     if (step % 61 === 0) {
       // A tenant leaves and the office goes off the market or back on it.
-      const office = pick(
-        sim,
-        step,
-        (u) => u.kind === "office" && u.state !== "construction",
-      );
+      const office = pick(sim, step, (u) => u.kind === "office" && u.state !== "construction");
       if (office) {
         sim.vacateUnit(office.id, "access");
         check(`vacate at ${step}`);
@@ -114,18 +99,11 @@ function run(
       // The batch takes a kind off the market and, the next time round for
       // that kind, back on at the default rate.
       const k = step / 61;
-      sim.rentBatch(
-        k % 2 === 0 ? "office" : "condo",
-        Math.floor(k / 2) % 2 === 0 ? "noRate" : "default",
-      );
+      sim.rentBatch(k % 2 === 0 ? "office" : "condo", Math.floor(k / 2) % 2 === 0 ? "noRate" : "default");
       check(`batch at ${step}`);
     }
     if (step % 113 === 0) {
-      const room = pick(
-        sim,
-        step,
-        (u) => u.kind === "office" || u.kind === "condo" || u.kind === "shop",
-      );
+      const room = pick(sim, step, (u) => u.kind === "office" || u.kind === "condo" || u.kind === "shop");
       if (room) {
         const { kind, floor, x } = room;
         const sold = sim.sellAt(floor, x);
@@ -138,36 +116,32 @@ function run(
   return { moved, rebuilds };
 }
 
-describeEngines(
-  "the HUD's kept room counts follow a running simulation",
-  (leg: Leg) => {
-    it("match the walk over every unit after every step and command", () => {
-      const totals: Record<string, number> = {};
-      let rebuilds = 0;
-      for (const [name, save] of [
-        ["sixseven_2", medium],
-        ["split-tower-4", ownersSave],
-        ["towerone-star4", starFour],
-      ] as const) {
-        const result = run(leg, name, save);
-        for (const [f, n] of Object.entries(result.moved))
-          totals[f] = (totals[f] ?? 0) + n;
-        rebuilds += result.rebuilds;
-      }
-      // What the three runs reached together: every condition count and the
-      // population moved, and a sale and a build went through.
-      for (const f of [
-        "population",
-        "occupiedOffices",
-        "vacant",
-        "vacantNoRate",
-        "soldCondos",
-        "occupiedHotel",
-        "dirty",
-      ] as const) {
-        expect(totals[f], f).toBeGreaterThan(0);
-      }
-      expect(rebuilds, "sales and builds that went through").toBeGreaterThan(0);
-    }, 300_000); // about 95 s a leg in the container: a check after every step and command
-  },
-);
+describeEngines("the HUD's kept room counts follow a running simulation", (leg: Leg) => {
+  it("match the walk over every unit after every step and command", () => {
+    const totals: Record<string, number> = {};
+    let rebuilds = 0;
+    for (const [name, save] of [
+      ["sixseven_2", medium],
+      ["split-tower-4", ownersSave],
+      ["towerone-star4", starFour],
+    ] as const) {
+      const result = run(leg, name, save);
+      for (const [f, n] of Object.entries(result.moved)) totals[f] = (totals[f] ?? 0) + n;
+      rebuilds += result.rebuilds;
+    }
+    // What the three runs reached together: every condition count and the
+    // population moved, and a sale and a build went through.
+    for (const f of [
+      "population",
+      "occupiedOffices",
+      "vacant",
+      "vacantNoRate",
+      "soldCondos",
+      "occupiedHotel",
+      "dirty",
+    ] as const) {
+      expect(totals[f], f).toBeGreaterThan(0);
+    }
+    expect(rebuilds, "sales and builds that went through").toBeGreaterThan(0);
+  }, 300_000); // about 95 s a leg in the container: a check after every step and command
+});

@@ -91,8 +91,12 @@ export function buildTallLobbyTower(): void {
   }
   if (opts.flights) {
     // A stairway and an escalator from the hall's floor to the story over it.
-    for (const [k, x] of [["stairs", cx - 14], ["escalator", cx + 4]] as const) {
-      if (port.buildShaft(kind(k), x, 1, 2)[0] !== 1) throw new Error(`the ${k} was refused: ${port.lastReason?.() ?? ""}`);
+    for (const [k, x] of [
+      ["stairs", cx - 14],
+      ["escalator", cx + 4],
+    ] as const) {
+      if (port.buildShaft(kind(k), x, 1, 2)[0] !== 1)
+        throw new Error(`the ${k} was refused: ${port.lastReason?.() ?? ""}`);
     }
   }
   g.syncSim?.();
@@ -100,11 +104,14 @@ export function buildTallLobbyTower(): void {
   // `[floor, x0, x1, height]` per hall (#2068); a floor's tallest hall.
   const heightOf = (floor: number): number => {
     let tallest = 1;
-    for (let i = 0; i + 3 < heights.length; i += 4) if (heights[i] === floor) tallest = Math.max(tallest, heights[i + 3]);
+    for (let i = 0; i + 3 < heights.length; i += 4)
+      if (heights[i] === floor) tallest = Math.max(tallest, heights[i + 3]);
     return tallest;
   };
-  if (heightOf(1) !== groundHeight) throw new Error(`the ground lobby rose ${heightOf(1)} stories, not ${groundHeight}`);
-  if (sky && heightOf(lobbyInterval) !== sky) throw new Error(`the sky lobby rose ${heightOf(lobbyInterval)} stories, not ${sky}`);
+  if (heightOf(1) !== groundHeight)
+    throw new Error(`the ground lobby rose ${heightOf(1)} stories, not ${groundHeight}`);
+  if (sky && heightOf(lobbyInterval) !== sky)
+    throw new Error(`the sky lobby rose ${heightOf(lobbyInterval)} stories, not ${sky}`);
   (window as unknown as { __vcShotTallLobbyAt?: unknown }).__vcShotTallLobbyAt = { cx, sky: sky ? lobbyInterval : 0 };
   g.engine.setCamera(cx, 2, 1.6);
 }

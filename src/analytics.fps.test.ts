@@ -63,7 +63,13 @@ describe("session frame-rate (session_fps)", () => {
     gameplaySession.end();
     // Sorted ascending, the 20 hitch frames sit in the low tail: p05 index (10)
     // lands on 10fps, p50 index (100) on 60fps. Whole-fps values.
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 10, samples: 200, population: 0, speed: 0 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", {
+      p50: 60,
+      low: 10,
+      samples: 200,
+      population: 0,
+      speed: 0,
+    });
   });
 
   it("records a real hitch as a low-fps sample, not a spike-clamped 1000fps", () => {
@@ -102,7 +108,13 @@ describe("session frame-rate (session_fps)", () => {
     for (let i = 0; i < 120; i++) frame(MS60);
     gameplaySession.end();
     // The duplicate-timestamp frame contributes nothing; only the 120 real frames.
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", {
+      p50: 60,
+      low: 60,
+      samples: 120,
+      population: 0,
+      speed: 0,
+    });
   });
 
   it("drops a loop-interruption gap (in-place graphics recovery) instead of a sub-1fps sample", () => {
@@ -117,7 +129,13 @@ describe("session frame-rate (session_fps)", () => {
     for (let i = 0; i < 20; i++) frame(MS60); // 20 more smooth samples -> 120 total
     gameplaySession.end();
     // If the 3s gap had leaked in, `low` would collapse toward 0; it stays 60.
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", {
+      p50: 60,
+      low: 60,
+      samples: 120,
+      population: 0,
+      speed: 0,
+    });
   });
 
   it("leaves paused frames out and re-anchors after them (#603)", () => {
@@ -131,7 +149,13 @@ describe("session frame-rate (session_fps)", () => {
     frame(MS30); // first running frame back: anchor only, the pause is not a sample
     for (let i = 0; i < 60; i++) frame(MS60); // 60 more -> 120
     gameplaySession.end();
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", {
+      p50: 60,
+      low: 60,
+      samples: 120,
+      population: 0,
+      speed: 0,
+    });
   });
 
   it("re-anchors within a session across a hide/resume, so the gap is not sampled", () => {
@@ -144,7 +168,13 @@ describe("session frame-rate (session_fps)", () => {
     // gap had leaked in as a ~0fps sample, `low` would collapse.
     for (let i = 0; i < 21; i++) frame(MS60);
     gameplaySession.end();
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 120, population: 0, speed: 0 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", {
+      p50: 60,
+      low: 60,
+      samples: 120,
+      population: 0,
+      speed: 0,
+    });
   });
 
   it("counts the true frame total past the reservoir cap (bounded memory)", () => {
@@ -171,7 +201,8 @@ describe("session frame-rate (session_fps)", () => {
     for (let i = 1; i <= frames; i++) frame(i % every === 0 ? 50 : MS60);
     gameplaySession.end();
     random.mockRestore();
-    return vi.mocked(sendToRelay).mock.calls.find(([name]) => name === "session_fps")?.[1] as Record<string, unknown> | undefined;
+    return vi.mocked(sendToRelay).mock.calls.find(([name]) => name === "session_fps")?.[1] as
+      Record<string, unknown> | undefined;
   }
 
   it("reads hitches in one frame in ten as the 5th-percentile low over a long window (#2391)", () => {
@@ -206,6 +237,12 @@ describe("session frame-rate (session_fps)", () => {
     for (let i = 0; i < 131; i++) frame(MS30);
     gameplaySession.end();
     // If the gap had leaked in, `low` would be ~0; it is a clean 30fps.
-    expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 30, low: 30, samples: 130, population: 0, speed: 0 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_fps", {
+      p50: 30,
+      low: 30,
+      samples: 130,
+      population: 0,
+      speed: 0,
+    });
   });
 });

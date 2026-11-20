@@ -48,7 +48,9 @@ async function cameraFloorSettles(page: Page, test: (floor: number) => boolean):
 
 /** Wait two animation frames, so a camera move the frame loop applies lands. */
 async function nextFrames(page: Page): Promise<void> {
-  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  await page.evaluate(
+    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
+  );
 }
 
 /** The camera's floor once a click on the map at `y` has moved it. */
@@ -170,7 +172,9 @@ test.describe("overview map on the desktop", () => {
     await expect.poll(cursor).not.toBeNull();
   });
 
-  test("on a narrow desktop the hint sits above the open map, clear of the Getting Started card (#1735)", async ({ page }) => {
+  test("on a narrow desktop the hint sits above the open map, clear of the Getting Started card (#1735)", async ({
+    page,
+  }) => {
     for (const size of [
       { width: 768, height: 600 },
       { width: 1050, height: 700 },
@@ -193,7 +197,8 @@ test.describe("overview map on the desktop", () => {
         return { hint: r("hint"), map: r("overview-map"), card: r("onboard"), stage: r("stage") };
       });
       const at = `${size.width}x${size.height}`;
-      const hit = (a: DOMRect, b: DOMRect) => a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
+      const hit = (a: DOMRect, b: DOMRect) =>
+        a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
       expect(box.hint.height, at).toBeGreaterThan(0);
       expect(hit(box.hint, box.card), at).toBe(false);
       expect(hit(box.hint, box.map), at).toBe(false);
@@ -233,10 +238,13 @@ test.describe("overview map on the desktop", () => {
           const r = document.getElementById(id)?.getBoundingClientRect();
           if (r && r.width > 0 && r.height > 0) others[id] = r;
         }
-        const hit = (r: DOMRect) => r.right > map.left && r.left < map.right && r.bottom > map.top && r.top < map.bottom;
+        const hit = (r: DOMRect) =>
+          r.right > map.left && r.left < map.right && r.bottom > map.top && r.top < map.bottom;
         return { checked: Object.keys(others), overlapping: Object.keys(others).filter((k) => hit(others[k])) };
       });
-      expect(overlaps.checked, `${size.width}x${size.height}`).toEqual(expect.arrayContaining(["menubar", "statusbar", "palette", "hint"]));
+      expect(overlaps.checked, `${size.width}x${size.height}`).toEqual(
+        expect.arrayContaining(["menubar", "statusbar", "palette", "hint"]),
+      );
       expect(overlaps.overlapping, `${size.width}x${size.height}`).toEqual([]);
     }
   });
@@ -338,7 +346,9 @@ test.describe("overview map on a phone", () => {
     await cameraFloorSettles(page, (f) => f > start.floor + 5);
   });
 
-  test("the open card sits at the world's top-left, about 150 px wide and at most half its height", async ({ page }) => {
+  test("the open card sits at the world's top-left, about 150 px wide and at most half its height", async ({
+    page,
+  }) => {
     // Portrait. A phone held sideways has its own sizing (the next test).
     const size = PHONE;
     await page.setViewportSize(size);
@@ -349,7 +359,13 @@ test.describe("overview map on a phone", () => {
     const card = await page.evaluate(() => {
       const map = document.getElementById("overview-map")!.getBoundingClientRect();
       const stage = document.getElementById("stage")!.getBoundingClientRect();
-      return { left: map.left - stage.left, top: map.top - stage.top, width: map.width, height: map.height, stageHeight: stage.height };
+      return {
+        left: map.left - stage.left,
+        top: map.top - stage.top,
+        width: map.width,
+        height: map.height,
+        stageHeight: stage.height,
+      };
     });
     const at = `${size.width}x${size.height}`;
     // The 8 px inset (no safe-area insets in the test browser).
@@ -362,7 +378,9 @@ test.describe("overview map on a phone", () => {
     expect(card.height, at).toBeLessThanOrEqual(card.stageHeight / 2 + 1);
   });
 
-  test("held sideways, the card keeps the map's 150:216 shape and takes at most two thirds of the view", async ({ page }) => {
+  test("held sideways, the card keeps the map's 150:216 shape and takes at most two thirds of the view", async ({
+    page,
+  }) => {
     // A short screen counts as a phone too, but half its height would leave
     // a map too thin to read, so the landscape block sizes it by shape.
     await page.setViewportSize({ width: PHONE.height, height: PHONE.width });
@@ -373,7 +391,14 @@ test.describe("overview map on a phone", () => {
       const map = document.getElementById("overview-map")!.getBoundingClientRect();
       const body = document.querySelector(".overview-map-body")!.getBoundingClientRect();
       const stage = document.getElementById("stage")!.getBoundingClientRect();
-      return { left: map.left - stage.left, top: map.top - stage.top, height: map.height, bodyWidth: body.width, bodyHeight: body.height, stageHeight: stage.height };
+      return {
+        left: map.left - stage.left,
+        top: map.top - stage.top,
+        height: map.height,
+        bodyWidth: body.width,
+        bodyHeight: body.height,
+        stageHeight: stage.height,
+      };
     });
     expect(card.left).toBeGreaterThanOrEqual(8);
     expect(card.left).toBeLessThan(16);
@@ -417,30 +442,33 @@ test.describe("overview map on a phone", () => {
         test.info().annotations.push({ type: "skipped pass", description: "DejaVu Sans is not installed" });
         continue;
       }
-      const sizes = await page.evaluate(({ values, font }) => {
-        if (font) {
-          const style = document.createElement("style");
-          style.textContent = `#status .stat .value, #status .stat .label { font-family: ${font}; }`;
-          document.head.appendChild(style);
-        }
-        const ids = ["traffic-label", "traffic-floor", "stat-time", "stat-date", "stat-money", "stat-pop"];
-        const show = (texts: string[]) => {
-          ids.forEach((id, i) => (document.getElementById(id)!.textContent = texts[i]));
-          const bar = document.getElementById("topbar")!.getBoundingClientRect();
-          const stage = document.getElementById("stage")!.getBoundingClientRect();
-          const chips = ["traffic", "stat-time", "stat-date", "stat-money", "stat-pop"].map(
-            (id) => document.getElementById(id)!.closest(".stat")!.getBoundingClientRect().width,
-          );
-          // A value cut short by its chip scrolls wider than it shows. The
-          // floor never shrinks, so the traffic chip itself stands in for it.
-          const clipped = [...ids.filter((id) => id !== "traffic-floor"), "traffic"].filter((id) => {
-            const el = document.getElementById(id)!;
-            return el.scrollWidth > el.clientWidth;
-          });
-          return { bar: bar.height, stageWidth: stage.width, stageHeight: stage.height, chips, clipped };
-        };
-        return { shortest: show(values.shortest), typical: show(values.typical), longest: show(values.longest) };
-      }, { values, font });
+      const sizes = await page.evaluate(
+        ({ values, font }) => {
+          if (font) {
+            const style = document.createElement("style");
+            style.textContent = `#status .stat .value, #status .stat .label { font-family: ${font}; }`;
+            document.head.appendChild(style);
+          }
+          const ids = ["traffic-label", "traffic-floor", "stat-time", "stat-date", "stat-money", "stat-pop"];
+          const show = (texts: string[]) => {
+            ids.forEach((id, i) => (document.getElementById(id)!.textContent = texts[i]));
+            const bar = document.getElementById("topbar")!.getBoundingClientRect();
+            const stage = document.getElementById("stage")!.getBoundingClientRect();
+            const chips = ["traffic", "stat-time", "stat-date", "stat-money", "stat-pop"].map(
+              (id) => document.getElementById(id)!.closest(".stat")!.getBoundingClientRect().width,
+            );
+            // A value cut short by its chip scrolls wider than it shows. The
+            // floor never shrinks, so the traffic chip itself stands in for it.
+            const clipped = [...ids.filter((id) => id !== "traffic-floor"), "traffic"].filter((id) => {
+              const el = document.getElementById(id)!;
+              return el.scrollWidth > el.clientWidth;
+            });
+            return { bar: bar.height, stageWidth: stage.width, stageHeight: stage.height, chips, clipped };
+          };
+          return { shortest: show(values.shortest), typical: show(values.typical), longest: show(values.longest) };
+        },
+        { values, font },
+      );
       expect(sizes.typical, font).toEqual(sizes.shortest);
       expect(sizes.longest, font).toEqual(sizes.shortest);
       expect(sizes.shortest.clipped, font).toEqual([]);
@@ -465,7 +493,8 @@ test.describe("overview map on a phone", () => {
       const width = (id: string) => el(id).getBoundingClientRect().width;
       const px = (v: string) => (v === "normal" ? 0 : parseFloat(v));
       // What `chars` characters of text need in `id`, letter-spacing included.
-      const need = (id: string, measured: number, chars: number) => measured + px(getComputedStyle(el(id)).letterSpacing) * chars;
+      const need = (id: string, measured: number, chars: number) =>
+        measured + px(getComputedStyle(el(id)).letterSpacing) * chars;
       const fontPx = (id: string) => parseFloat(getComputedStyle(el(id)).fontSize);
       const glyph = el("traffic-glyph");
       return {
@@ -479,8 +508,14 @@ test.describe("overview map on a phone", () => {
         },
         time: { width: width("stat-time"), need: need("stat-time", MEASURED_PX.time, "WD2 00:00".length) },
         date: { width: width("stat-date"), need: need("stat-date", MEASURED_PX.date, "2nd WD/4Q/122nd Year".length) },
-        money: { width: width("stat-money"), need: Math.max(need("stat-money", MEASURED_PX.money, "$-1,000,000,000".length), 9 * fontPx("stat-money")) },
-        pop: { width: width("stat-pop"), need: Math.max(need("stat-pop", MEASURED_PX.pop, "100,000".length), 4.5 * fontPx("stat-pop")) },
+        money: {
+          width: width("stat-money"),
+          need: Math.max(need("stat-money", MEASURED_PX.money, "$-1,000,000,000".length), 9 * fontPx("stat-money")),
+        },
+        pop: {
+          width: width("stat-pop"),
+          need: Math.max(need("stat-pop", MEASURED_PX.pop, "100,000".length), 4.5 * fontPx("stat-pop")),
+        },
       };
     });
     for (const [chip, { width, need }] of Object.entries(room)) expect(width, chip).toBeGreaterThanOrEqual(need - 0.01);
@@ -504,7 +539,8 @@ test.describe("overview map on a phone", () => {
         // The floor never shrinks, so only the chip can cut it: it must end
         // inside the chip, and the chip must not overflow.
         floorWhole:
-          floor.getBoundingClientRect().right <= chip.getBoundingClientRect().right + 0.5 && chip.scrollWidth <= chip.clientWidth,
+          floor.getBoundingClientRect().right <= chip.getBoundingClientRect().right + 0.5 &&
+          chip.scrollWidth <= chip.clientWidth,
       };
     });
     expect(trimmed.labelClipped).toBe(true);
@@ -528,7 +564,9 @@ test.describe("overview map on a phone", () => {
     { width: 540, height: 340 },
   ]) {
     const at = `${size.width}x${size.height}`;
-    test(`on a ${at} sideways window, every category opens in view and its last tool can be reached`, async ({ page }) => {
+    test(`on a ${at} sideways window, every category opens in view and its last tool can be reached`, async ({
+      page,
+    }) => {
       test.setTimeout(60_000);
       await page.setViewportSize(size);
       await boot(page);
@@ -536,8 +574,12 @@ test.describe("overview map on a phone", () => {
       await page.evaluate(buildToStar, 5);
       // One sideways row inside the bounds, two wide just outside them.
       const oneRow = size.height < 340 || size.width < 540;
-      expect(await page.locator("#palette-tabs").evaluate((t) => getComputedStyle(t).flexWrap), at).toBe(oneRow ? "nowrap" : "wrap");
-      const groups = await page.$$eval(".pal-tab:not([hidden])", (tabs) => tabs.map((t) => (t as HTMLElement).dataset.group!));
+      expect(await page.locator("#palette-tabs").evaluate((t) => getComputedStyle(t).flexWrap), at).toBe(
+        oneRow ? "nowrap" : "wrap",
+      );
+      const groups = await page.$$eval(".pal-tab:not([hidden])", (tabs) =>
+        tabs.map((t) => (t as HTMLElement).dataset.group!),
+      );
       expect(groups.length, at).toBeGreaterThan(4);
       for (const group of groups) {
         const list = await page.evaluate((group) => {
@@ -548,14 +590,19 @@ test.describe("overview map on a phone", () => {
           const row = document.getElementById("palette-tabs")!.getBoundingClientRect();
           const box = tab.getBoundingClientRect();
           const tabInView = box.left >= row.left - 0.5 && box.right <= row.right + 0.5;
-          const tiles = [...document.querySelectorAll<HTMLElement>(".pal-group.tab-active .pal-item")].filter((t) => t.getClientRects().length > 0);
+          const tiles = [...document.querySelectorAll<HTMLElement>(".pal-group.tab-active .pal-item")].filter(
+            (t) => t.getClientRects().length > 0,
+          );
           const last = tiles[tiles.length - 1];
           last.scrollIntoView({ block: "end" });
           const tile = last.getBoundingClientRect();
           return {
             tabInView,
             height: document.querySelector(".pal-groups")!.clientHeight,
-            reached: document.elementFromPoint(tile.left + tile.width / 2, tile.top + tile.height / 2)?.closest(".pal-item") === last,
+            reached:
+              document
+                .elementFromPoint(tile.left + tile.width / 2, tile.top + tile.height / 2)
+                ?.closest(".pal-item") === last,
           };
         }, group);
         expect(list.tabInView, `${at} ${group}`).toBe(true);
@@ -566,7 +613,9 @@ test.describe("overview map on a phone", () => {
     });
   }
 
-  test("held sideways with the Map open and no Getting Started card, a toast shows over the editor's title", async ({ page }) => {
+  test("held sideways with the Map open and no Getting Started card, a toast shows over the editor's title", async ({
+    page,
+  }) => {
     // The editor's sticky title has a z-index. With no card up the editor has
     // none of its own, and with the Map open (so no pill) neither do the
     // toasts, so without the editor's own stacking context the title would
@@ -592,13 +641,25 @@ test.describe("overview map on a phone", () => {
       wrap.appendChild(toast);
       // Move the toasts over the title, in the stage's own coordinates.
       const stage = (wrap.offsetParent ?? document.body).getBoundingClientRect();
-      Object.assign(wrap.style, { left: `${title.left - stage.left}px`, top: `${title.top - stage.top}px`, right: "auto", bottom: "auto", width: `${title.width}px`, transform: "none" });
+      Object.assign(wrap.style, {
+        left: `${title.left - stage.left}px`,
+        top: `${title.top - stage.top}px`,
+        right: "auto",
+        bottom: "auto",
+        width: `${title.width}px`,
+        transform: "none",
+      });
       const box = toast.getBoundingClientRect();
       const x = Math.max(box.left, title.left) + 4;
       const y = (Math.max(box.top, title.top) + Math.min(box.bottom, title.bottom)) / 2;
       return {
         layer: getComputedStyle(wrap).zIndex,
-        overlap: box.top < title.bottom && box.bottom > title.top && box.left < title.right && box.right > title.left && x < Math.min(box.right, title.right),
+        overlap:
+          box.top < title.bottom &&
+          box.bottom > title.top &&
+          box.left < title.right &&
+          box.right > title.left &&
+          x < Math.min(box.right, title.right),
         hit: !!document.elementFromPoint(x, y)?.closest(".toast"),
       };
     });
@@ -617,7 +678,12 @@ test.describe("overview map on a phone", () => {
         const view = document.getElementById("view")!.getBoundingClientRect();
         const stage = document.getElementById("stage")!.getBoundingClientRect();
         const palette = document.getElementById("palette")!.getBoundingClientRect();
-        const overlapsPalette = palette.width > 0 && map.left < palette.right && map.right > palette.left && map.top < palette.bottom && map.bottom > palette.top;
+        const overlapsPalette =
+          palette.width > 0 &&
+          map.left < palette.right &&
+          map.right > palette.left &&
+          map.top < palette.bottom &&
+          map.bottom > palette.top;
         return { top: map.top - view.top, bottom: map.bottom, stageBottom: stage.bottom, overlapsPalette };
       });
     // Portrait, and landscape (a short screen counts as a phone too).
@@ -711,7 +777,9 @@ test.describe("overview map on a phone", () => {
         height: pill.height,
         leftEdge: document.elementFromPoint(pill.left + 2, midY)?.id ?? null,
         rightEdge: document.elementFromPoint(pill.right - 2, midY)?.id ?? null,
-        coveredControls: controls.filter((c) => c.right > pill.left && c.left < pill.right && c.bottom > pill.top && c.top < pill.bottom).length,
+        coveredControls: controls.filter(
+          (c) => c.right > pill.left && c.left < pill.right && c.bottom > pill.top && c.top < pill.bottom,
+        ).length,
       };
     });
     expect(layout.editorSpansPill).toBe(true);
@@ -737,16 +805,18 @@ test.describe("overview map on a phone", () => {
     const card = (await page.locator("#onboard").boundingBox())!;
     expect(box.y + box.height / 2).toBeGreaterThan(card.y);
     expect(box.y + box.height / 2).toBeLessThan(card.y + card.height);
-    const onTop = await page.evaluate(
-      ({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".overview-map-close"),
-      { x: box.x + box.width / 2, y: box.y + box.height / 2 },
-    );
+    const onTop = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".overview-map-close"), {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    });
     expect(onTop).toBe(true);
     await close.tap();
     await expect(page.locator("#overview-map")).toBeHidden();
   });
 
-  test("held sideways, the Getting Started card clears the tools column, and the Map when it opens", async ({ page }) => {
+  test("held sideways, the Getting Started card clears the tools column, and the Map when it opens", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: PHONE.height, height: PHONE.width });
     await boot(page);
     await page.evaluate(() => {
@@ -773,17 +843,23 @@ test.describe("overview map on a phone", () => {
     const editorClose = page.locator("#editor .ed-close");
     const closeBox = (await editorClose.boundingBox())!;
     expect(overlaps(closeBox, (await page.locator("#onboard").boundingBox())!)).toBe(true);
-    const closeOnTop = await page.evaluate(
-      ({ x, y }) => !!document.elementFromPoint(x, y)?.closest("#editor"),
-      { x: closeBox.x + closeBox.width / 2, y: closeBox.y + closeBox.height / 2 },
-    );
+    const closeOnTop = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest("#editor"), {
+      x: closeBox.x + closeBox.width / 2,
+      y: closeBox.y + closeBox.height / 2,
+    });
     expect(closeOnTop).toBe(true);
     // With the Map pill showing beside the open editor, the inspector, the
     // toasts and the pill stay above the card too.
     await expect(page.locator("#btn-map")).toBeVisible();
     const layers = await page.evaluate(() => {
       const z = (id: string) => Number(getComputedStyle(document.getElementById(id)!).zIndex);
-      return { card: z("onboard"), editor: z("editor"), inspector: z("inspector"), toasts: z("toast-wrap"), pill: z("btn-map") };
+      return {
+        card: z("onboard"),
+        editor: z("editor"),
+        inspector: z("inspector"),
+        toasts: z("toast-wrap"),
+        pill: z("btn-map"),
+      };
     });
     expect(layers.inspector).toBeGreaterThan(layers.card);
     expect(layers.toasts).toBeGreaterThan(layers.card);

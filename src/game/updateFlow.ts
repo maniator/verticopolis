@@ -71,7 +71,13 @@ export function showUpdatePrompt(app: GameApp): void {
   // The notes were picked when the build was detected. Another tab may have
   // shown some of them since, so drop those now, then record that the notes up
   // to this version are on screen, so a later prompt starts after them (#1897).
-  const info = app.pendingUpdateInfo ? notesStillUnseen(app.pendingUpdateInfo, typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev", readNotesSeen()) : null;
+  const info = app.pendingUpdateInfo
+    ? notesStillUnseen(
+        app.pendingUpdateInfo,
+        typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev",
+        readNotesSeen(),
+      )
+    : null;
   rememberNotesSeen(info?.version);
   app.ui.showUpdatePrompt(
     // Update now: save the tower FIRST, then activate (skipWaiting + reload).

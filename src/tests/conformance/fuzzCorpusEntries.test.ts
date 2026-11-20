@@ -35,7 +35,8 @@ describe("the fuzz corpus entries", () => {
   // The corpus job holds each entry to its golden; one without a golden fails
   // there as a harness failure, so this names the missing file up front.
   it.each(entries)("%s has its golden pinned", (file) => {
-    for (const record of goldenFiles(file.replace(/\.json$/, ""))) expect(existsSync(join(goldenDir(), record)), record).toBe(true);
+    for (const record of goldenFiles(file.replace(/\.json$/, "")))
+      expect(existsSync(join(goldenDir(), record)), record).toBe(true);
   });
 
   it("keeps no golden for an entry that is gone", () => {

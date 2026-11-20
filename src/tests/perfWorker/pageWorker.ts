@@ -36,7 +36,26 @@ export interface HostedRun {
   batchMainMs: number[];
   /** The worker host's counters over the timed steps, in runs before PR 5e;
    *  null now that there is no worker host. */
-  worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; frameBytes: number; mergeBytes: number; applyMs: number; mergeMs: number; workerOpsMs: number; workerReplyMs: number; deltas?: number; deltaBytes?: number; deltaMs?: number; workerSaveMs?: number; deltasRefused?: number; approximateSaves?: number } | null;
+  worker: {
+    replies: number;
+    staleReplies: number;
+    merges: number;
+    messagesSent: number;
+    messagesReceived: number;
+    bytesReceived: number;
+    frameBytes: number;
+    mergeBytes: number;
+    applyMs: number;
+    mergeMs: number;
+    workerOpsMs: number;
+    workerReplyMs: number;
+    deltas?: number;
+    deltaBytes?: number;
+    deltaMs?: number;
+    workerSaveMs?: number;
+    deltasRefused?: number;
+    approximateSaves?: number;
+  } | null;
   startKey: string;
   endKey: string;
   hostErrorsAdded: string[];
@@ -52,12 +71,20 @@ export interface HostedRun {
  * throwaway load comes first. The start and end saves are stashed for the
  * digest.
  */
-export async function hostedRun(arg: { name: string; steps: number; warmSteps: number; dt: number; batch: number; stash: boolean }): Promise<HostedRun> {
+export async function hostedRun(arg: {
+  name: string;
+  steps: number;
+  warmSteps: number;
+  dt: number;
+  batch: number;
+  stash: boolean;
+}): Promise<HostedRun> {
   const w = window as any;
   const g = w.game;
   w.__perfStash = w.__perfStash ?? {};
   const adopt = () => {
-    if (g.enginePort.loadSave(w.__perfStoredSaves[arg.name])[0] !== 1) throw new Error(`${arg.name}: the engine refused the scenario's save`);
+    if (g.enginePort.loadSave(w.__perfStoredSaves[arg.name])[0] !== 1)
+      throw new Error(`${arg.name}: the engine refused the scenario's save`);
     g.followSwap();
     g.speed = 0;
     g.engine.paused = true;
@@ -65,7 +92,7 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
   };
   const run = (port: any, steps: number, perBatch?: number[]) => {
     let main = 0;
-    for (let i = 0; i < steps; ) {
+    for (let i = 0; i < steps;) {
       const t = performance.now();
       const n = Math.min(arg.batch, steps - i);
       for (let k = 0; k < n; k++) port.tick(arg.dt);
@@ -94,7 +121,16 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
     const mainMs = run(port, arg.steps, batchMainMs);
     const wallMs = performance.now() - t0;
     if (arg.stash) w.__perfStash[`${tag}:end`] = port.serialize();
-    return { steps: arg.steps, wallMs, mainMs, batchMainMs, worker: null, startKey: `${tag}:start`, endKey: `${tag}:end`, hostErrorsAdded: [] };
+    return {
+      steps: arg.steps,
+      wallMs,
+      mainMs,
+      batchMainMs,
+      worker: null,
+      startKey: `${tag}:start`,
+      endKey: `${tag}:end`,
+      hostErrorsAdded: [],
+    };
   } finally {
     clock.start();
   }
@@ -116,7 +152,19 @@ export interface FramesRun {
   commandToFrameMs: number[];
   commandsUnanswered: number;
   /** Worker host: the counters over the window. */
-  worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; applyMs: number; commandAckMs: number[]; deltas?: number; deltasRefused?: number; approximateSaves?: number } | null;
+  worker: {
+    replies: number;
+    staleReplies: number;
+    merges: number;
+    messagesSent: number;
+    messagesReceived: number;
+    bytesReceived: number;
+    applyMs: number;
+    commandAckMs: number[];
+    deltas?: number;
+    deltasRefused?: number;
+    approximateSaves?: number;
+  } | null;
   hostErrorsAdded: string[];
 }
 
@@ -128,7 +176,12 @@ export interface FramesRun {
  * nothing the simulation reads). The engine answers in the call, so a
  * command is timed to the first frame after it.
  */
-export function framesRun(arg: { windowMs: number; warmMs: number; speed: number; commandEveryMs: number }): Promise<FramesRun> {
+export function framesRun(arg: {
+  windowMs: number;
+  warmMs: number;
+  speed: number;
+  commandEveryMs: number;
+}): Promise<FramesRun> {
   const w = window as any;
   const g = w.game;
   const port = g.enginePort;

@@ -21,7 +21,8 @@ import { FIXTURES } from "../conformance/fixtureSim";
 const MINUTES_PER_DAY = 1440;
 const MINUTES_PER_HOUR = 60;
 
-const engineSave = (engine: WasmEngine) => JSON.parse(engine.serialize()) as SerializedGame & { log: { text: string }[] };
+const engineSave = (engine: WasmEngine) =>
+  JSON.parse(engine.serialize()) as SerializedGame & { log: { text: string }[] };
 
 function run(engine: WasmEngine, hours: number): void {
   for (let h = 0; h < hours; h++) engine.tick(MINUTES_PER_HOUR);
@@ -67,8 +68,14 @@ const COUNTED = /(\d[\d,]*) (office|condo|clinic|club|rental|hotel room)(s?)\b(?
 /** The money lines whose wording and amount format are at stake: each line
  *  that opens with `prefix` must read exactly as `pattern`. */
 const MONEY_LINES = [
-  { prefix: "Quarterly office rent collected:", pattern: /^Quarterly office rent collected: \$[\d,]+ \(\d[\d,]* offices?\)\.$/ },
-  { prefix: "Monthly office rent collected:", pattern: /^Monthly office rent collected: \$[\d,]+ \(\d[\d,]* offices?\)\.$/ },
+  {
+    prefix: "Quarterly office rent collected:",
+    pattern: /^Quarterly office rent collected: \$[\d,]+ \(\d[\d,]* offices?\)\.$/,
+  },
+  {
+    prefix: "Monthly office rent collected:",
+    pattern: /^Monthly office rent collected: \$[\d,]+ \(\d[\d,]* offices?\)\.$/,
+  },
   { prefix: "Monthly maintenance paid:", pattern: /^Monthly maintenance paid: \$[\d,]+\.$/ },
   { prefix: "Maintenance paid:", pattern: /^Maintenance paid: \$[\d,]+\.$/ },
   { prefix: "Hotel guests checked out:", pattern: /^Hotel guests checked out: \$[\d,]+ earned overnight\.$/ },
@@ -86,7 +93,10 @@ describe.skipIf(!hasWasmPackage())("log text on the Rust engine", () => {
     // The runs wrote the lines whose formatting is at stake: a grouped dollar
     // amount, the quarterly rent, the maintenance bill and the hotel checkout,
     // each worded and formatted as a player reads it.
-    expect(lines.some((t) => /\$\d{1,3}(,\d{3})+/.test(t)), "a grouped dollar amount").toBe(true);
+    expect(
+      lines.some((t) => /\$\d{1,3}(,\d{3})+/.test(t)),
+      "a grouped dollar amount",
+    ).toBe(true);
     for (const { prefix, pattern } of MONEY_LINES) {
       const written = lines.filter((t) => t.startsWith(prefix));
       expect(written.length, `a "${prefix}" line`).toBeGreaterThan(0);

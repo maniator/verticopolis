@@ -109,6 +109,12 @@ export function summarizeReliability(pageLives: PageLife[], opts?: ReliabilityOp
 export function renderReliabilityMarkdown(summary: ReliabilitySummary, meta: ReportMeta): string;
 export function parseArgs(argv: string[]): {
   window: { hours: number; label: string };
-  opts: { hosts: string[]; shas: string[] | null; versions: string[] | null; builds: string[] | null; arms: string[] | null };
+  opts: {
+    hosts: string[];
+    shas: string[] | null;
+    versions: string[] | null;
+    builds: string[] | null;
+    arms: string[] | null;
+  };
 };
 export function responseRows(json: unknown): { rows: Array<Record<string, unknown>>; truncated: boolean };

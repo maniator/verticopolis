@@ -54,6 +54,7 @@ export function importObjection(text: SaveText): string | undefined {
     return DAMAGED;
   }
   const save = data as { minutes?: unknown; units?: unknown } | null;
-  if (typeof save !== "object" || save === null || typeof save.minutes !== "number" || !Array.isArray(save.units)) return NOT_A_TOWER;
+  if (typeof save !== "object" || save === null || typeof save.minutes !== "number" || !Array.isArray(save.units))
+    return NOT_A_TOWER;
   return undefined;
 }

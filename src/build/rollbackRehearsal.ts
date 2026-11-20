@@ -158,7 +158,8 @@ export function judgeDiffs(entries: readonly DiffEntry[], allowed: readonly Allo
 /** Allowed-loss entries no rehearsal case matched: an exception that no longer happens should leave the list. */
 export function staleAllowances(allowed: readonly AllowedLoss[], cases: readonly CaseResult[]): AllowedLoss[] {
   const used = new Set<AllowedLoss>();
-  for (const c of cases) for (const step of c.steps) for (const e of step.judgement?.explained ?? []) used.add(e.allowed);
+  for (const c of cases)
+    for (const step of c.steps) for (const e of step.judgement?.explained ?? []) used.add(e.allowed);
   return allowed.filter((a) => !used.has(a));
 }
 
@@ -168,10 +169,13 @@ export function parseAllowedLosses(raw: unknown): AllowedLoss[] {
   return raw.map((item, i) => {
     const row = isRecord(item) ? item : {};
     const { id, kind, path, reason } = row;
-    if (typeof id !== "string" || !/^EX-\d+$/.test(id)) throw new Error(`allowed loss ${i}: id must be an exception register id such as EX-1`);
-    if (kind !== "dropped" && kind !== "changed") throw new Error(`allowed loss ${i} (${id}): kind must be "dropped" or "changed"`);
+    if (typeof id !== "string" || !/^EX-\d+$/.test(id))
+      throw new Error(`allowed loss ${i}: id must be an exception register id such as EX-1`);
+    if (kind !== "dropped" && kind !== "changed")
+      throw new Error(`allowed loss ${i} (${id}): kind must be "dropped" or "changed"`);
     if (typeof path !== "string" || path === "") throw new Error(`allowed loss ${i} (${id}): path is required`);
-    if (typeof reason !== "string" || reason.trim() === "") throw new Error(`allowed loss ${i} (${id}): a reason is required`);
+    if (typeof reason !== "string" || reason.trim() === "")
+      throw new Error(`allowed loss ${i} (${id}): a reason is required`);
     return { id, kind, path, reason };
   });
 }
@@ -193,17 +197,29 @@ export function preflight(previous: BuildFacts, candidate: BuildFacts): Finding[
   const p = previous.compat;
   const c = candidate.compat;
   if (!isSemverIncrease(p.crateVersion, c.crateVersion) && p.crateVersion !== c.crateVersion) {
-    out.push({ level: "fail", message: `the previous build's engine crate (${p.crateVersion}) is newer than the candidate's (${c.crateVersion}); the arguments may be swapped` });
+    out.push({
+      level: "fail",
+      message: `the previous build's engine crate (${p.crateVersion}) is newer than the candidate's (${c.crateVersion}); the arguments may be swapped`,
+    });
   }
   if (c.saveVersion > p.saveVersion) {
-    out.push({ level: "fail", message: `the candidate writes save version ${c.saveVersion} and the previous build writes ${p.saveVersion}: a save-format bump ships in this release, so a rollback loses the format` });
+    out.push({
+      level: "fail",
+      message: `the candidate writes save version ${c.saveVersion} and the previous build writes ${p.saveVersion}: a save-format bump ships in this release, so a rollback loses the format`,
+    });
   } else if (c.saveVersion < p.saveVersion) {
-    out.push({ level: "note", message: `the candidate writes save version ${c.saveVersion}, older than the previous build's ${p.saveVersion}; check the arguments` });
+    out.push({
+      level: "note",
+      message: `the candidate writes save version ${c.saveVersion}, older than the previous build's ${p.saveVersion}; check the arguments`,
+    });
   } else {
     out.push({ level: "note", message: `both builds write save version ${c.saveVersion}` });
   }
   if (c.oldestSaveVersion > p.oldestSaveVersion) {
-    out.push({ level: "note", message: `the candidate no longer loads save versions below ${c.oldestSaveVersion} (the previous build still loads from ${p.oldestSaveVersion}); only a very old save that the previous build rewrote could be affected` });
+    out.push({
+      level: "note",
+      message: `the candidate no longer loads save versions below ${c.oldestSaveVersion} (the previous build still loads from ${p.oldestSaveVersion}); only a very old save that the previous build rewrote could be affected`,
+    });
   }
   const layouts: [string, number, number][] = [
     ["frame layout", p.frameLayoutVersion, c.frameLayoutVersion],
@@ -212,10 +228,17 @@ export function preflight(previous: BuildFacts, candidate: BuildFacts): Finding[
     ["identity record", p.identitySchema, c.identitySchema],
   ];
   for (const [name, a, b] of layouts) {
-    if (a !== b) out.push({ level: "note", message: `the ${name} version differs (${a} then ${b}); each build must be served with its own engine package as a set, which the package check enforces` });
+    if (a !== b)
+      out.push({
+        level: "note",
+        message: `the ${name} version differs (${a} then ${b}); each build must be served with its own engine package as a set, which the package check enforces`,
+      });
   }
   if (previous.appVersion === candidate.appVersion) {
-    out.push({ level: "note", message: `both builds report app version ${previous.appVersion}; the browser rehearsal tells them apart by commit` });
+    out.push({
+      level: "note",
+      message: `both builds report app version ${previous.appVersion}; the browser rehearsal tells them apart by commit`,
+    });
   }
   return out;
 }
@@ -234,7 +257,8 @@ export interface EnginePackage {
   fromSave(text: string): EngineHandle;
 }
 
-export type StepName = "candidate-read" | "previous-load" | "previous-read" | "previous-play" | "roll-forward" | "case-error";
+export type StepName =
+  "candidate-read" | "previous-load" | "previous-read" | "previous-play" | "roll-forward" | "case-error";
 
 export interface StepResult {
   step: StepName;
@@ -314,16 +338,33 @@ function tryParse(text: string, where: string): { value?: unknown; error?: strin
  * 5. The candidate loads that and serializes it; the candidate must keep every
  *    field the previous build wrote.
  */
-export function rehearseCase(name: string, candidateSave: string, previous: EnginePackage, candidate: EnginePackage, opts: CaseOptions): CaseResult {
+export function rehearseCase(
+  name: string,
+  candidateSave: string,
+  previous: EnginePackage,
+  candidate: EnginePackage,
+  opts: CaseOptions,
+): CaseResult {
   try {
     return rehearseCaseUnguarded(name, candidateSave, previous, candidate, opts);
   } catch (e) {
     // Anything the steps did not catch (a trap while freeing, a save nested too deep to diff) fails this tower, never the whole run.
-    return { name, bytes: utf8Bytes(candidateSave), steps: [{ step: "case-error", ok: false, error: `the rehearsal of this tower stopped: ${reason(e)}` }], ok: false };
+    return {
+      name,
+      bytes: utf8Bytes(candidateSave),
+      steps: [{ step: "case-error", ok: false, error: `the rehearsal of this tower stopped: ${reason(e)}` }],
+      ok: false,
+    };
   }
 }
 
-function rehearseCaseUnguarded(name: string, candidateSave: string, previous: EnginePackage, candidate: EnginePackage, opts: CaseOptions): CaseResult {
+function rehearseCaseUnguarded(
+  name: string,
+  candidateSave: string,
+  previous: EnginePackage,
+  candidate: EnginePackage,
+  opts: CaseOptions,
+): CaseResult {
   const steps: StepResult[] = [];
   const finish = (): CaseResult => ({
     name,
@@ -400,7 +441,13 @@ export interface RehearsalReport {
 }
 
 /** Put the preflight, the cases and the stale-allowance check into one verdict. */
-export function buildReport(previous: BuildFacts, candidate: BuildFacts, hours: number, cases: CaseResult[], allowed: readonly AllowedLoss[]): RehearsalReport {
+export function buildReport(
+  previous: BuildFacts,
+  candidate: BuildFacts,
+  hours: number,
+  cases: CaseResult[],
+  allowed: readonly AllowedLoss[],
+): RehearsalReport {
   const findings = preflight(previous, candidate);
   const stale = staleAllowances(allowed, cases);
   const ok = findings.every((f) => f.level !== "fail") && cases.length > 0 && cases.every((c) => c.ok);
@@ -414,8 +461,12 @@ export function renderReport(r: RehearsalReport): string {
   const lines: string[] = [];
   lines.push(`# Rollback rehearsal, engine layer: ${r.ok ? "PASS" : "FAIL"}`);
   lines.push("");
-  lines.push(`- Previous build: ${r.previous.label} (app ${r.previous.appVersion}, engine crate ${r.previous.compat.crateVersion}, save version ${r.previous.compat.saveVersion})`);
-  lines.push(`- Candidate build: ${r.candidate.label} (app ${r.candidate.appVersion}, engine crate ${r.candidate.compat.crateVersion}, save version ${r.candidate.compat.saveVersion})`);
+  lines.push(
+    `- Previous build: ${r.previous.label} (app ${r.previous.appVersion}, engine crate ${r.previous.compat.crateVersion}, save version ${r.previous.compat.saveVersion})`,
+  );
+  lines.push(
+    `- Candidate build: ${r.candidate.label} (app ${r.candidate.appVersion}, engine crate ${r.candidate.compat.crateVersion}, save version ${r.candidate.compat.saveVersion})`,
+  );
   lines.push(`- The previous build plays ${r.hours} game hours of each candidate-written tower before it saves.`);
   lines.push("");
   lines.push("## Preflight");
@@ -424,7 +475,9 @@ export function renderReport(r: RehearsalReport): string {
   lines.push("");
   lines.push("## Cases");
   lines.push("");
-  lines.push("| Tower | Bytes | Candidate reads | Previous loads | Previous read | Previous plays | Roll forward | Unexplained | Accepted |");
+  lines.push(
+    "| Tower | Bytes | Candidate reads | Previous loads | Previous read | Previous plays | Roll forward | Unexplained | Accepted |",
+  );
   lines.push("| --- | ---: | --- | --- | --- | --- | --- | ---: | ---: |");
   for (const c of r.cases) {
     const mark = (s: StepName): string => {
@@ -434,7 +487,9 @@ export function renderReport(r: RehearsalReport): string {
     };
     const unexplained = c.steps.reduce((n, s) => n + (s.judgement?.unexplained.length ?? 0), 0);
     const accepted = c.steps.reduce((n, s) => n + (s.judgement?.explained.length ?? 0), 0);
-    lines.push(`| ${cell(c.name)} | ${c.bytes} | ${mark("candidate-read")} | ${mark("previous-load")} | ${mark("previous-read")} | ${mark("previous-play")} | ${mark("roll-forward")} | ${unexplained} | ${accepted} |`);
+    lines.push(
+      `| ${cell(c.name)} | ${c.bytes} | ${mark("candidate-read")} | ${mark("previous-load")} | ${mark("previous-read")} | ${mark("previous-play")} | ${mark("roll-forward")} | ${unexplained} | ${accepted} |`,
+    );
   }
   const detail = r.cases.filter((c) => !c.ok || c.steps.some((s) => (s.judgement?.explained.length ?? 0) > 0));
   if (detail.length > 0) {
@@ -445,8 +500,12 @@ export function renderReport(r: RehearsalReport): string {
       lines.push(`### ${c.name}`);
       for (const s of c.steps) {
         if (s.error) lines.push(`- ${s.step}: ${s.error}`);
-        for (const e of s.judgement?.unexplained ?? []) lines.push(`- ${s.step}: UNEXPLAINED ${e.kind} \`${e.path}\` (${e.count}), first at ${cell(e.example)}`);
-        for (const { entry, allowed } of s.judgement?.explained ?? []) lines.push(`- ${s.step}: accepted ${entry.kind} \`${entry.path}\` (${entry.count}) under ${allowed.id}: ${allowed.reason}`);
+        for (const e of s.judgement?.unexplained ?? [])
+          lines.push(`- ${s.step}: UNEXPLAINED ${e.kind} \`${e.path}\` (${e.count}), first at ${cell(e.example)}`);
+        for (const { entry, allowed } of s.judgement?.explained ?? [])
+          lines.push(
+            `- ${s.step}: accepted ${entry.kind} \`${entry.path}\` (${entry.count}) under ${allowed.id}: ${allowed.reason}`,
+          );
       }
     }
   }
@@ -454,7 +513,8 @@ export function renderReport(r: RehearsalReport): string {
     lines.push("");
     lines.push("## Allowed losses that no case hit");
     lines.push("");
-    for (const a of r.stale) lines.push(`- ${a.id} ${a.kind} \`${a.path}\`: remove it if the exception no longer applies`);
+    for (const a of r.stale)
+      lines.push(`- ${a.id} ${a.kind} \`${a.path}\`: remove it if the exception no longer applies`);
   }
   lines.push("");
   lines.push("Any UNEXPLAINED loss goes to the owner before the gate review (issue #1221, acceptance).");

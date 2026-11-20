@@ -13,10 +13,19 @@ const EXTENT = mapExtent({ lotWidth: 375, minFloor: -9, maxFloor: 100 }, SKY_HEA
 const layout = fitLayout(EXTENT, 375, extentFloors(EXTENT) * 5);
 
 type Room = MapViewRoom & { state: UnitState };
-const hotel = (x: number, state: UnitState = "asleep"): Room => ({ id: x, kind: "hotelSingle", floor: 2, x, width: 4, state });
+const hotel = (x: number, state: UnitState = "asleep"): Room => ({
+  id: x,
+  kind: "hotelSingle",
+  floor: 2,
+  x,
+  width: 4,
+  state,
+});
 
 /** A views controller over a fake tower and an injected game clock. */
-function views(rooms: Room[] = [hotel(40), hotel(50), { id: 10, kind: "office", floor: 3, x: 10, width: 9, state: "occupied" }]) {
+function views(
+  rooms: Room[] = [hotel(40), hotel(50), { id: 10, kind: "office", floor: 3, x: 10, width: 9, state: "occupied" }],
+) {
   const clock = { minutes: 7 * 60 };
   const tower = { rooms: rooms as ReadonlyArray<Room> };
   const deps = {
@@ -186,7 +195,10 @@ describe("the Hotel view's throttle", () => {
     v.due(layout, false);
     expect(legend.textContent).toBe("Dirty: 1Infested: 1");
     const swatches = [...legend.querySelectorAll<HTMLElement>(".overview-map-swatch")];
-    expect(swatches.map((s) => s.dataset.pattern)).toEqual([HOTEL_VIEW_STYLE.dirty.pattern, HOTEL_VIEW_STYLE.infested.pattern]);
+    expect(swatches.map((s) => s.dataset.pattern)).toEqual([
+      HOTEL_VIEW_STYLE.dirty.pattern,
+      HOTEL_VIEW_STYLE.infested.pattern,
+    ]);
     rooms[1].state = "empty";
     clock.minutes += MINUTES_PER_GAME_HOUR;
     v.due(layout, false);

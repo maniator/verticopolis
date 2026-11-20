@@ -111,7 +111,9 @@ export function menuNameOf(id: string): MenuName | null {
 
 /** The code an item element id reports. */
 export function menuItemCodeOf(id: string): MenuItemCode {
-  return Object.prototype.hasOwnProperty.call(MENU_ITEM_CODES, id) ? MENU_ITEM_CODES[id as keyof typeof MENU_ITEM_CODES] : "other";
+  return Object.prototype.hasOwnProperty.call(MENU_ITEM_CODES, id)
+    ? MENU_ITEM_CODES[id as keyof typeof MENU_ITEM_CODES]
+    : "other";
 }
 
 /** The last real pick this page life, for the next pick's `after`. */

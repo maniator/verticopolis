@@ -247,12 +247,7 @@ async function trueZoom(page: import("@playwright/test").Page): Promise<number> 
 
 /** Drive one pinch-OUT gesture (fingers start far apart, close toward the
  *  center) about the canvas midpoint, then lift both. */
-async function pinchOut(
-  page: import("@playwright/test").Page,
-  cx: number,
-  cy: number,
-  id: number,
-): Promise<void> {
+async function pinchOut(page: import("@playwright/test").Page, cx: number, cy: number, id: number): Promise<void> {
   await dispatchTouch(page, "pointerdown", id, cx - 130, cy);
   await dispatchTouch(page, "pointerdown", id + 1, cx + 130, cy);
   await dispatchTouch(page, "pointermove", id, cx - 30, cy);
@@ -262,9 +257,7 @@ async function pinchOut(
 }
 
 test.describe("mobile pinch: zoom out frames the whole tower", () => {
-  test("a tall tower can be pulled fully into frame, and the floor holds (no void drift)", async ({
-    page,
-  }) => {
+  test("a tall tower can be pulled fully into frame, and the floor holds (no void drift)", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 

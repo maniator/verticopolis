@@ -2,7 +2,14 @@ import type { GameApp } from "../main";
 import { getCommonProps, setCommonProps, trackAppAction } from "../analytics";
 import { openAppearanceDialog } from "../ui/appearance/appearanceDialog";
 import { withScheme, wornScheme } from "../ui/fromGame";
-import { DEFAULT_SCHEME, applyScheme, loadScheme, saveScheme, shareScheme, type SchemeId } from "../ui/appearance/appearancePrefs";
+import {
+  DEFAULT_SCHEME,
+  applyScheme,
+  loadScheme,
+  saveScheme,
+  shareScheme,
+  type SchemeId,
+} from "../ui/appearance/appearancePrefs";
 
 /**
  * The appearance scheme in the game (owner, 2026-11-17): Options >
@@ -50,7 +57,11 @@ export function freshenHelpLink(e: Event): void {
 }
 
 /** Wire the dialog once. `current` is the scheme the page wears now. */
-export function wireAppearance(app: Pick<GameApp, "ui">, current: SchemeId, root: Element = document.documentElement): void {
+export function wireAppearance(
+  app: Pick<GameApp, "ui">,
+  current: SchemeId,
+  root: Element = document.documentElement,
+): void {
   let scheme = current;
   document.addEventListener("pointerdown", freshenHelpLink, true);
   document.addEventListener("focusin", freshenHelpLink, true);

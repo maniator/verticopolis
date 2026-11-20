@@ -26,7 +26,9 @@ describe("inflateCapped", () => {
   const MAX_DEFLATE_RATIO = 1032;
 
   it("round-trips ordinary data", () => {
-    const data = new TextEncoder().encode(JSON.stringify({ tower: "ok", rooms: Array.from({ length: 500 }, (_, i) => i) }));
+    const data = new TextEncoder().encode(
+      JSON.stringify({ tower: "ok", rooms: Array.from({ length: 500 }, (_, i) => i) }),
+    );
     expect(inflateCapped(deflateSync(data))).toEqual(data);
   });
 
@@ -133,13 +135,18 @@ describe("parseSaveJson", () => {
   });
 
   it("repairs a raw lone surrogate, as a legacy uncompressed slot can hold", () => {
-    expect(parseSaveJson('{"towerName":"Sky ' + String.fromCharCode(0xd83c) + '"}')).toEqual({ towerName: "Sky \uFFFD" });
+    expect(parseSaveJson('{"towerName":"Sky ' + String.fromCharCode(0xd83c) + '"}')).toEqual({
+      towerName: "Sky \uFFFD",
+    });
   });
 });
 
 /** Every web writer goes through encodeSaveJson, so none writes past the cap. */
 describe("the save writers refuse a save past the cap", () => {
-  const oversized = JSON.stringify({ ...(JSON.parse(SMALL_TOWER_SAVE) as object), towerName: "x".repeat(MAX_SAVE_INFLATED_BYTES) });
+  const oversized = JSON.stringify({
+    ...(JSON.parse(SMALL_TOWER_SAVE) as object),
+    towerName: "x".repeat(MAX_SAVE_INFLATED_BYTES),
+  });
 
   it("packSync and export throw SaveTooLargeError", async () => {
     expect(() => SaveGame.packSync(oversized)).toThrow(SaveTooLargeError);

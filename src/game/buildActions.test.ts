@@ -19,21 +19,14 @@ const CATALOG = catalogFor("classic");
 const WIDE = "office";
 
 /** A command record: status 1 (done) or 0 (refused), then the op's slots. */
-function rec(
-  op: string,
-  ok: boolean,
-  slots: Record<string, number> = {},
-): Float64Array {
+function rec(op: string, ok: boolean, slots: Record<string, number> = {}): Float64Array {
   const all: Record<string, number> = { ...slots, status: ok ? 1 : 0 };
   return Float64Array.from(LAYOUT.records[op].map((n) => all[n] ?? 0));
 }
 
 type Answers = Parameters<typeof mockPort>[0];
 
-function setup(
-  answers: Answers = {},
-  built: (floor: number, x: number) => string | undefined = () => undefined,
-) {
+function setup(answers: Answers = {}, built: (floor: number, x: number) => string | undefined = () => undefined) {
   const port = mockPort({
     lastReason: () => "The engine said no.",
     setLobbyHeight: () => undefined,
@@ -68,11 +61,7 @@ describe("BuildActions.tryBuild", () => {
       buildAt: () => rec("buildAt", true),
     });
     expect(build.tryBuild(WIDE, 3, 10)).toBe(true);
-    expect(port.buildAt).toHaveBeenCalledExactlyOnceWith(
-      codes.kind(WIDE),
-      3,
-      10,
-    );
+    expect(port.buildAt).toHaveBeenCalledExactlyOnceWith(codes.kind(WIDE), 3, 10);
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
   });
 
@@ -96,10 +85,7 @@ describe("BuildActions.tryBuild", () => {
     const { build, deps } = setup({ buildAt: () => rec("buildAt", false) });
     expect(build.tryBuild(WIDE, 3, 10)).toBe(false);
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
-    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "The engine said no.",
-      "bad",
-    );
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("The engine said no.", "bad");
     expect(build.tryBuild(WIDE, 3, 10, true)).toBe(false);
     expect(deps.audio.sfx).toHaveBeenCalledOnce();
   });
@@ -108,15 +94,8 @@ describe("BuildActions.tryBuild", () => {
 describe("BuildActions.tryBuildTransport", () => {
   it("places a span, and a refusal shows the build's own reason", () => {
     const placed = setup({ buildShaft: () => rec("buildAt", true) });
-    expect(placed.build.tryBuildTransport("elevatorStandard", 5, 1, 4)).toEqual(
-      { ok: true, reason: "" },
-    );
-    expect(placed.port.buildShaft).toHaveBeenCalledExactlyOnceWith(
-      placed.codes.kind("elevatorStandard"),
-      5,
-      1,
-      4,
-    );
+    expect(placed.build.tryBuildTransport("elevatorStandard", 5, 1, 4)).toEqual({ ok: true, reason: "" });
+    expect(placed.port.buildShaft).toHaveBeenCalledExactlyOnceWith(placed.codes.kind("elevatorStandard"), 5, 1, 4);
     expect(placed.deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
     const broke = setup({
       buildShaft: () => rec("buildAt", false),
@@ -126,17 +105,11 @@ describe("BuildActions.tryBuildTransport", () => {
       ok: false,
       reason: "Not enough money.",
     });
-    expect(broke.deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "Not enough money.",
-      "bad",
-    );
+    expect(broke.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("Not enough money.", "bad");
   });
 
   it("a refusal with no reason falls back to the placement diagnosis", () => {
-    const lastReason = vi
-      .fn()
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce("Floors 2-3 are not built.");
+    const lastReason = vi.fn().mockReturnValueOnce(undefined).mockReturnValueOnce("Floors 2-3 are not built.");
     const { build, port, codes } = setup({
       buildShaft: () => rec("buildAt", false),
       quoteShaft: () => rec("quoteShaft", false),
@@ -146,12 +119,7 @@ describe("BuildActions.tryBuildTransport", () => {
       ok: false,
       reason: "Floors 2-3 are not built.",
     });
-    expect(port.quoteShaft).toHaveBeenCalledExactlyOnceWith(
-      codes.kind("stairs"),
-      5,
-      1,
-      3,
-    );
+    expect(port.quoteShaft).toHaveBeenCalledExactlyOnceWith(codes.kind("stairs"), 5, 1, 3);
   });
 });
 
@@ -182,11 +150,7 @@ describe("BuildActions.paintBrush", () => {
       placed: 3,
       reason: undefined,
     });
-    expect(port.paintTiles).toHaveBeenCalledExactlyOnceWith(
-      codes.kind("floor"),
-      4,
-      Float64Array.from(brushTiles(20)),
-    );
+    expect(port.paintTiles).toHaveBeenCalledExactlyOnceWith(codes.kind("floor"), 4, Float64Array.from(brushTiles(20)));
   });
 
   it("says once that a floor on the ground floor went in as a lobby, at the lobby's price", () => {
@@ -226,7 +190,8 @@ describe("BuildActions.paintBrush", () => {
     expect(port.lobbyRise).toHaveBeenCalledExactlyOnceWith(1, 20);
     expect(port.paintTiles).toHaveBeenCalledExactlyOnceWith(codes.kind("floor"), 1, Float64Array.from(brushTiles(20)));
     const lobby = catalogFacility(CATALOG, "lobby");
-    const perTile = catalogTileCost(CATALOG, "lobby", "no floor yet") + 2 * catalogTileCost(CATALOG, "lobby", "a floor tile");
+    const perTile =
+      catalogTileCost(CATALOG, "lobby", "no floor yet") + 2 * catalogTileCost(CATALOG, "lobby", "a floor tile");
     expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
       `The ground floor is a ${lobby.name.toLowerCase()}, so a ${lobby.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,
       "info",
@@ -234,10 +199,7 @@ describe("BuildActions.paintBrush", () => {
   });
 
   it("nothing laid on a strip that already carries the kind reads again and says so", () => {
-    const { build, reader } = setup(
-      { paintTiles: () => rec("paintTiles", true, { placed: 0 }) },
-      () => "floor",
-    );
+    const { build, reader } = setup({ paintTiles: () => rec("paintTiles", true, { placed: 0 }) }, () => "floor");
     expect(build.paintBrush("floor", 20, 4)).toEqual({
       placed: 0,
       reason: "Floor already built here",
@@ -270,10 +232,7 @@ describe("BuildActions.paintBrush", () => {
       reason: "That's the edge of the lot.",
     });
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("error");
-    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "That's the edge of the lot.",
-      "bad",
-    );
+    expect(deps.ui.toast).toHaveBeenCalledExactlyOnceWith("That's the edge of the lot.", "bad");
   });
 });
 
@@ -288,18 +247,15 @@ describe("BuildActions paint gestures", () => {
     const edge = viewWorld().lotWidth - 1;
     room.build.seedPaint(WIDE, edge, 4);
     const snapped = viewWorld().lotWidth - catalogFacility(CATALOG, WIDE).width;
-    expect(room.port.buildAt).toHaveBeenCalledExactlyOnceWith(
-      room.codes.kind(WIDE),
-      4,
-      snapped,
-    );
+    expect(room.port.buildAt).toHaveBeenCalledExactlyOnceWith(room.codes.kind(WIDE), 4, snapped);
     expect(room.deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
   });
 
   // Regression (#308): on a phone a Classic sky lobby asked three stories
   // high was refused, or once laid one story, with no word on the tap.
   it("a refused lobby tap says the engine's reason aloud, once", () => {
-    const why = "In Classic, only the ground lobby can be taller than one story. Pick 1 story to build a lobby on floor 15.";
+    const why =
+      "In Classic, only the ground lobby can be taller than one story. Pick 1 story to build a lobby on floor 15.";
     const { build, deps, port } = setup({
       paintTiles: () => rec("paintTiles", false, { placed: 0 }),
       lastReason: () => why,
@@ -315,7 +271,10 @@ describe("BuildActions paint gestures", () => {
     const built = setup({ paintTiles: () => rec("paintTiles", true, { placed: 0 }) }, () => "floor");
     built.build.seedPaint("floor", 20, 4);
     expect(built.deps.ui.toast).not.toHaveBeenCalled();
-    const edge = setup({ paintTiles: () => rec("paintTiles", true, { placed: 0 }), lastReason: () => undefined }, () => "floor");
+    const edge = setup(
+      { paintTiles: () => rec("paintTiles", true, { placed: 0 }), lastReason: () => undefined },
+      () => "floor",
+    );
     edge.build.seedPaint("floor", viewWorld().lotWidth + 2, 4);
     expect(edge.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("That's the edge of the lot.", "bad");
   });
@@ -335,10 +294,7 @@ describe("BuildActions paint gestures", () => {
     expect(port.buildAt).toHaveBeenLastCalledWith(expect.any(Number), 5, 30);
     build.clearPaint();
     build.paintFloorRun("floor", 32, 5);
-    expect(
-      port.buildAt,
-      "a cleared anchor reseeds at the press",
-    ).toHaveBeenLastCalledWith(expect.any(Number), 5, 32);
+    expect(port.buildAt, "a cleared anchor reseeds at the press").toHaveBeenLastCalledWith(expect.any(Number), 5, 32);
     expect(port.buildAt).toHaveBeenCalledTimes(8);
     expect(deps.audio.sfx).not.toHaveBeenCalled();
   });
@@ -352,10 +308,7 @@ describe("BuildActions removals", () => {
     const refused = setup({ demolish: () => rec("demolish", false) });
     expect(refused.build.tryRemoveUnit({ id: 4 }, "sell")).toBe(false);
     expect(refused.port.demolish).toHaveBeenCalledExactlyOnceWith(4, false);
-    expect(refused.deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "The engine said no.",
-      "bad",
-    );
+    expect(refused.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("The engine said no.", "bad");
     const held = vi.fn();
     expect(refused.build.tryRemoveUnit({ id: 4 }, "sell", held)).toBe(false);
     expect(held).toHaveBeenCalledExactlyOnceWith("The engine said no.");
@@ -365,10 +318,7 @@ describe("BuildActions removals", () => {
 
   it("removes a shaft through demolish and answers whether the engine did", () => {
     const { build, port } = setup({
-      demolish: vi
-        .fn()
-        .mockReturnValueOnce(rec("demolish", true))
-        .mockReturnValueOnce(rec("demolish", false)),
+      demolish: vi.fn().mockReturnValueOnce(rec("demolish", true)).mockReturnValueOnce(rec("demolish", false)),
     });
     expect(build.removeTransportWithRefund({ id: 9 }, "sell")).toBe(true);
     expect(build.removeTransportWithRefund({ id: 9 }, "bulldoze")).toBe(false);
@@ -397,12 +347,9 @@ describe("BuildActions.bulldozePicked", () => {
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("sell");
     const refused = setup({ demolishTile: () => rec("demolish", false) });
     const held = vi.fn();
-    expect(
-      refused.build.bulldozePicked(
-        { type: "unit", id: 0, kind: "lobby", cell: { floor: 1, x: 2 } },
-        held,
-      ),
-    ).toBe(false);
+    expect(refused.build.bulldozePicked({ type: "unit", id: 0, kind: "lobby", cell: { floor: 1, x: 2 } }, held)).toBe(
+      false,
+    );
     expect(held).toHaveBeenCalledExactlyOnceWith("The engine said no.");
     expect(refused.deps.audio.sfx).not.toHaveBeenCalled();
     expect(refused.deps.ui.toast).not.toHaveBeenCalled();
@@ -414,9 +361,7 @@ describe("BuildActions.bulldozePicked", () => {
     });
     tower.getUnit.mockReturnValue({ id: 6 });
     deps.selectedId.mockReturnValue(6);
-    expect(build.bulldozePicked({ type: "unit", id: 6, kind: WIDE })).toBe(
-      true,
-    );
+    expect(build.bulldozePicked({ type: "unit", id: 6, kind: WIDE })).toBe(true);
     expect(port.demolish).toHaveBeenCalledExactlyOnceWith(6, true);
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("sell");
     expect(deps.clearSelection).toHaveBeenCalledOnce();
@@ -426,33 +371,22 @@ describe("BuildActions.bulldozePicked", () => {
     const { build, tower, reader, port } = setup({
       demolish: () => rec("demolish", true),
     });
-    tower.getTransport
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce({ id: 8 });
-    expect(
-      build.bulldozePicked({ type: "transport", id: 8, kind: "stairs" }),
-    ).toBe(true);
+    tower.getTransport.mockReturnValueOnce(undefined).mockReturnValueOnce({ id: 8 });
+    expect(build.bulldozePicked({ type: "transport", id: 8, kind: "stairs" })).toBe(true);
     expect(reader.update).toHaveBeenCalledOnce();
     expect(port.demolish).toHaveBeenCalledExactlyOnceWith(8, true);
     const stale = setup();
-    expect(
-      stale.build.bulldozePicked({ type: "unit", id: 8, kind: WIDE }),
-    ).toBe(false);
+    expect(stale.build.bulldozePicked({ type: "unit", id: 8, kind: WIDE })).toBe(false);
     expect(stale.reader.update).toHaveBeenCalledOnce();
   });
 
   it("a refused removal plays no sale", () => {
     const unit = setup({ demolish: () => rec("demolish", false) });
     unit.tower.getUnit.mockReturnValue({ id: 6 });
-    expect(
-      unit.build.bulldozePicked({ type: "unit", id: 6, kind: WIDE }, vi.fn()),
-    ).toBe(false);
+    expect(unit.build.bulldozePicked({ type: "unit", id: 6, kind: WIDE }, vi.fn())).toBe(false);
     const shaft = setup({ demolish: () => rec("demolish", false) });
     shaft.tower.getTransport.mockReturnValue({ id: 8 });
-    expect(
-      shaft.build.bulldozePicked({ type: "transport", id: 8, kind: "stairs" }),
-    ).toBe(false);
-    for (const s of [unit, shaft])
-      expect(s.deps.audio.sfx).not.toHaveBeenCalledWith("sell");
+    expect(shaft.build.bulldozePicked({ type: "transport", id: 8, kind: "stairs" })).toBe(false);
+    for (const s of [unit, shaft]) expect(s.deps.audio.sfx).not.toHaveBeenCalledWith("sell");
   });
 });

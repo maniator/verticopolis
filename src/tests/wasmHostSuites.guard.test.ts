@@ -24,15 +24,20 @@ function integrationSuites(dir: string): string[] {
 }
 
 describe("the engine host shards run every suite that needs the engine package", () => {
-  const script = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { scripts: Record<string, string> }).scripts["test:wasm:host"];
-  const filters = script.split(/\s+/).filter((w) => w && !w.startsWith("-") && !["vitest", "run", "integration"].includes(w));
+  const script = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { scripts: Record<string, string> })
+    .scripts["test:wasm:host"];
+  const filters = script
+    .split(/\s+/)
+    .filter((w) => w && !w.startsWith("-") && !["vitest", "run", "integration"].includes(w));
 
   it("reads a list of suite filters", () => {
     expect(filters.length).toBeGreaterThan(10);
   });
 
   it("lists every integration suite gated on hasWasmPackage()", () => {
-    const gated = integrationSuites(join(root, "src")).filter((f) => readFileSync(join(root, f), "utf8").includes("hasWasmPackage"));
+    const gated = integrationSuites(join(root, "src")).filter((f) =>
+      readFileSync(join(root, f), "utf8").includes("hasWasmPackage"),
+    );
     expect(gated).toContain("src/tests/integration/tallLobbyBuild.integration.test.ts");
     const unlisted = gated.filter((f) => !filters.some((filter) => f.includes(filter)));
     expect(unlisted).toEqual([]);

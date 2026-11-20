@@ -20,7 +20,11 @@ describeEngines("Cinema film booking (FAQ)", (leg: Leg) => {
     draft.money = 1e12;
     draft.star = 1; // star 1 gates random fires (which would gut the lone cinema); this
     // test only exercises the recurring booking economy, which is star-independent.
-    for (const [kind, floor] of [["lobby", 1], ["floor", 2], ["floor", 3]] as const) {
+    for (const [kind, floor] of [
+      ["lobby", 1],
+      ["floor", 2],
+      ["floor", 3],
+    ] as const) {
       for (let x = C; x < W; x++) draft.tower.place(kind, floor, x);
       for (let x = C - 1; x >= 0; x--) draft.tower.place(kind, floor, x);
     }
@@ -70,7 +74,11 @@ describeEngines("Cinema film policy (economy depth #5)", (leg: Leg) => {
     const draft = newSeededDraft(seed, "modern");
     draft.money = 1e9;
     draft.star = 1;
-    for (const [kind, floor] of [["lobby", 1], ["floor", 2], ["floor", 3]] as const) {
+    for (const [kind, floor] of [
+      ["lobby", 1],
+      ["floor", 2],
+      ["floor", 3],
+    ] as const) {
       for (let x = C; x < W; x++) draft.tower.place(kind, floor, x);
       for (let x = C - 1; x >= 0; x--) draft.tower.place(kind, floor, x);
     }

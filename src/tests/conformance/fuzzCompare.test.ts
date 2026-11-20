@@ -7,8 +7,20 @@ const run = (): RunRecord => ({
     { label: "h1", state: "s1", crowd: "c1", events: "e1" },
   ],
   details: [
-    { label: "start", money: 2000000, log: { seq: 0, count: 0, digest: "l0" }, save: { clock: "k0", units: "u0" }, fx: { santaFxSeq: 0, bombs: 0 } },
-    { label: "h1", money: 2000100, log: { seq: 2, count: 2, digest: "l1" }, save: { clock: "k1", units: "u1" }, fx: { santaFxSeq: 0, bombs: 1 } },
+    {
+      label: "start",
+      money: 2000000,
+      log: { seq: 0, count: 0, digest: "l0" },
+      save: { clock: "k0", units: "u0" },
+      fx: { santaFxSeq: 0, bombs: 0 },
+    },
+    {
+      label: "h1",
+      money: 2000100,
+      log: { seq: 2, count: 2, digest: "l1" },
+      save: { clock: "k1", units: "u1" },
+      fx: { santaFxSeq: 0, bombs: 1 },
+    },
   ],
 });
 
@@ -21,7 +33,13 @@ describe("seeded differential compare", () => {
     for (const hash of ["state", "crowd", "events"] as const) {
       const rust = run();
       rust.checkpoints[1][hash] = "x";
-      expect(compareRuns(run(), rust)).toMatchObject({ index: 1, label: "h1", kind: hash, other: run().checkpoints[1][hash], rust: "x" });
+      expect(compareRuns(run(), rust)).toMatchObject({
+        index: 1,
+        label: "h1",
+        kind: hash,
+        other: run().checkpoints[1][hash],
+        rust: "x",
+      });
     }
   });
 
@@ -63,7 +81,11 @@ describe("seeded differential compare", () => {
   });
 
   it("names which part of the log differs", () => {
-    for (const [part, value] of [["seq", 9], ["count", 9], ["digest", "z"]] as const) {
+    for (const [part, value] of [
+      ["seq", 9],
+      ["count", 9],
+      ["digest", "z"],
+    ] as const) {
       const rust = run();
       (rust.details[1].log as Record<string, unknown>)[part] = value;
       expect(compareRuns(run(), rust)).toMatchObject({ kind: "log", field: part });

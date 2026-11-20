@@ -52,7 +52,9 @@ describe("the boot point the engine-loaded mark stamps (#1254)", () => {
   it("is written only by publishBootState, which only bootstrap.ts calls", () => {
     // The host's engineBoot module (components package) defines and writes
     // the mark; in the game, only bootstrap.ts calls it and nothing writes it.
-    const files = (readdirSync(join(__dirname, "../.."), { recursive: true }) as string[]).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f) && !f.split(/[\\/]/).includes("tests"));
+    const files = (readdirSync(join(__dirname, "../.."), { recursive: true }) as string[]).filter(
+      (f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f) && !f.split(/[\\/]/).includes("tests"),
+    );
     const writers = files.filter((f) => /__vcEngineBoot\s*=[^=]/.test(read(f)));
     const callers = files.filter((f) => read(f).includes("publishBootState("));
     expect(writers).toEqual([]);

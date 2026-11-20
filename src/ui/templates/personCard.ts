@@ -49,14 +49,19 @@ const SHIFT_WORDS: Readonly<Record<ShiftStep, string>> = {
   out: "Going home after the shift",
 };
 
-const isHome = (kind: FacilityKind): boolean => kind === "condo" || kind === "rentalStudio" || kind === "rentalApartment";
+const isHome = (kind: FacilityKind): boolean =>
+  kind === "condo" || kind === "rentalStudio" || kind === "rentalApartment";
 
 /** The kind of the room a person belongs to, when the trip names it. */
 function ownRoom(p: PersonDetail): FacilityKind | null {
   // An outing heads back to their own room, and coming home or in to work
   // ends at it; every other trip starts there.
   // Someone who gave up heads back to where the trip began (#2188).
-  const endsAtOwn = p.gaveUp || (p.returning && (p.purpose === "meal" || p.purpose === "visit")) || p.purpose === "returnHome" || p.purpose === "toWork";
+  const endsAtOwn =
+    p.gaveUp ||
+    (p.returning && (p.purpose === "meal" || p.purpose === "visit")) ||
+    p.purpose === "returnHome" ||
+    p.purpose === "toWork";
   const own = endsAtOwn ? p.to : p.from;
   return own.place === "room" ? own.kind : null;
 }
@@ -177,12 +182,16 @@ export function goneWords(p: PersonDetail, catalog: Catalog): { now: string; not
   const onFloor = (t: TripPlace): boolean => t.place !== "none" && t.floor === p.floor;
   const leadsOut = (t: TripPlace): boolean => t.place === "metro" || (t.place === "lobby" && t.floor === 1);
   if (p.gaveUp) {
-    if (leadsOut(p.to) || p.to.place === "none") return { now: "Left the tower", note: "They gave up waiting and left the tower." };
+    if (leadsOut(p.to) || p.to.place === "none")
+      return { now: "Left the tower", note: "They gave up waiting and left the tower." };
     return { now: "Went back", note: `They gave up waiting and went back to ${placeWords(p.to, catalog)}.` };
   }
   if (onFloor(p.to)) {
     if (leadsOut(p.to)) return left;
-    return { now: p.to.place === "room" ? "Went inside" : "Arrived", note: `They reached ${placeWords(p.to, catalog)}.` };
+    return {
+      now: p.to.place === "room" ? "Went inside" : "Arrived",
+      note: `They reached ${placeWords(p.to, catalog)}.`,
+    };
   }
   if (onFloor(p.from) && !leadsOut(p.from)) {
     return { now: "Went back", note: `They went back to ${placeWords(p.from, catalog)}.` };

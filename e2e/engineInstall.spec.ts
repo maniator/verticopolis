@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { startDeployments, type Deployment, type Deployments } from "./deployments";
-import { engineEntries, engineEntriesOf as entriesOf, expectEngineIs as expectIs, newContext as makeContext, short } from "./engineDeployHelpers";
+import {
+  engineEntries,
+  engineEntriesOf as entriesOf,
+  expectEngineIs as expectIs,
+  newContext as makeContext,
+  short,
+} from "./engineDeployHelpers";
 import { expectControlledWithEngine, hostedGame, installWorker } from "./offlineHelpers";
 
 /**
@@ -42,7 +48,9 @@ const newContext = (browser: Browser): Promise<BrowserContext> => makeContext(br
 const engineEntriesOf = (which: Deployment): Record<string, string> => entriesOf(deployments, which);
 const expectEngineIs = (page: Page, which: Deployment): Promise<void> => expectIs(deployments, page, which);
 
-test("an update whose engine files come from another build fails to install and leaves the installed engine alone", async ({ browser }) => {
+test("an update whose engine files come from another build fails to install and leaves the installed engine alone", async ({
+  browser,
+}) => {
   const context = await newContext(browser);
   try {
     const page = await context.newPage();
@@ -67,19 +75,32 @@ test("an update whose engine files come from another build fails to install and 
       });
       // The install did try the engine files, and they came from the first build.
       await expect
-        .poll(() => deployments.requests.slice(before).some((r) => r.path.startsWith("/engine/") && r.from === "A"), { message: "the install asked for the engine files", timeout: 90_000 })
+        .poll(() => deployments.requests.slice(before).some((r) => r.path.startsWith("/engine/") && r.from === "A"), {
+          message: "the install asked for the engine files",
+          timeout: 90_000,
+        })
         .toBe(true);
       await expect
         .poll(
           () =>
             page.evaluate(async () => {
               const registration = await navigator.serviceWorker.getRegistration();
-              return { installing: !!registration?.installing, waiting: !!registration?.waiting, active: !!registration?.active };
+              return {
+                installing: !!registration?.installing,
+                waiting: !!registration?.waiting,
+                active: !!registration?.active,
+              };
             }),
-          { message: "the failed install leaves nothing installing or waiting and the first worker active", timeout: 90_000 },
+          {
+            message: "the failed install leaves nothing installing or waiting and the first worker active",
+            timeout: 90_000,
+          },
         )
         .toEqual({ installing: false, waiting: false, active: true });
-      await expect(page.locator('[data-act="update"]'), "no update is offered for a worker that never installed").toHaveCount(0);
+      await expect(
+        page.locator('[data-act="update"]'),
+        "no update is offered for a worker that never installed",
+      ).toHaveCount(0);
     });
 
     await test.step("the installed set still serves, and no key holds the other build's bytes", async () => {
@@ -87,7 +108,10 @@ test("an update whose engine files come from another build fails to install and 
       await page.reload();
       await expectControlledWithEngine(page);
       await hostedGame(page);
-      expect(await page.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null), "the first build still boots its engine").toBeNull();
+      expect(
+        await page.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null),
+        "the first build still boots its engine",
+      ).toBeNull();
     });
 
     await test.step("once the engine files match the worker script, the update installs and is offered", async () => {
@@ -109,7 +133,9 @@ test("an update whose engine files come from another build fails to install and 
   }
 });
 
-test("a first install whose engine files come from another build never activates, and the page refuses those bytes", async ({ browser }) => {
+test("a first install whose engine files come from another build never activates, and the page refuses those bytes", async ({
+  browser,
+}) => {
   const context = await newContext(browser);
   try {
     const page = await context.newPage();
@@ -149,11 +175,17 @@ test("a first install whose engine files come from another build never activates
     });
     await page.goto("/");
     const END_STATES = ["redundant", "activated", "register-failed", "no-worker", "no-service-worker"];
-    await page.waitForFunction((ends) => window.__vcWorkerStates?.some((s) => ends.includes(s)), END_STATES, { timeout: 90_000 }).catch(async (error: Error) => {
-      // A stall names the states it saw instead of a bare timeout.
-      const seen = await page.evaluate(() => window.__vcWorkerStates).catch(() => undefined);
-      throw new Error(`no worker reached an end state in 90 s; states seen: ${JSON.stringify(seen ?? null)}`, { cause: error });
-    });
+    await page
+      .waitForFunction((ends) => window.__vcWorkerStates?.some((s) => ends.includes(s)), END_STATES, {
+        timeout: 90_000,
+      })
+      .catch(async (error: Error) => {
+        // A stall names the states it saw instead of a bare timeout.
+        const seen = await page.evaluate(() => window.__vcWorkerStates).catch(() => undefined);
+        throw new Error(`no worker reached an end state in 90 s; states seen: ${JSON.stringify(seen ?? null)}`, {
+          cause: error,
+        });
+      });
     const states = await page.evaluate(() => window.__vcWorkerStates);
     expect(states, "the failed install never activates").not.toContain("activated");
     expect(states, "the page has service workers").not.toContain("no-service-worker");
@@ -177,11 +209,14 @@ test("a first install whose engine files come from another build never activates
     // failure stay), no engine key holds the other build's bytes.
     const held = await engineEntries(page);
     const mine = engineEntriesOf("A");
-    for (const [key, digest] of Object.entries(held)) expect(digest, `${key} holds only the first build's bytes`).toBe(mine[key]);
+    for (const [key, digest] of Object.entries(held))
+      expect(digest, `${key} holds only the first build's bytes`).toBe(mine[key]);
 
     // The page loaded the second build's glue and binary from the network; its own check refuses them.
     await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 90_000 });
-    const failure = await page.evaluate(() => (window as any).__vcEngineBoot.failure as { stage: string; reason: string; package?: { kind: string } });
+    const failure = await page.evaluate(
+      () => (window as any).__vcEngineBoot.failure as { stage: string; reason: string; package?: { kind: string } },
+    );
     expect(failure).toMatchObject({
       stage: "load",
       reason: "package-mismatch",
@@ -201,7 +236,10 @@ test("a first install whose engine files come from another build never activates
       await revisit.reload();
       await expectControlledWithEngine(revisit);
       await hostedGame(revisit);
-      expect(await revisit.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null), "no fallback on the offline start").toBeNull();
+      expect(
+        await revisit.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null),
+        "no fallback on the offline start",
+      ).toBeNull();
       await context.setOffline(false);
     });
   } finally {

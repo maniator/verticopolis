@@ -108,14 +108,17 @@ async function redPixels(page: Page): Promise<number> {
     const c = document.querySelector("#overview-map .overview-map-tower") as HTMLCanvasElement;
     const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
     let n = 0;
-    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0 && Math.abs(d[i] - 160) <= 16 && d[i + 1] < 40 && d[i + 2] < 40) n++;
+    for (let i = 0; i < d.length; i += 4)
+      if (d[i + 3] > 0 && Math.abs(d[i] - 160) <= 16 && d[i + 1] < 40 && d[i + 2] < 40) n++;
     return n;
   });
 }
 
 /** Wait two animation frames, so the frame loop runs the map. */
 async function nextFrames(page: Page): Promise<void> {
-  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  await page.evaluate(
+    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
+  );
 }
 
 /** The open map at 768 by 600 and 1280 by 720 overlaps none of the menu bar,
@@ -177,7 +180,9 @@ test.describe("the map's View dropdown on the desktop", () => {
     await expect(page.locator("#overlay-mode")).toHaveCount(0);
   });
 
-  test("changes view from the keyboard, keeps the game's keys, and hands a focused map its keys back", async ({ page }) => {
+  test("changes view from the keyboard, keeps the game's keys, and hands a focused map its keys back", async ({
+    page,
+  }) => {
     await boot(page);
     await page.evaluate(buildToStar, 2);
     const select = picker(page);
@@ -220,7 +225,9 @@ test.describe("the map's View dropdown on the desktop", () => {
     await expect.poll(() => page.evaluate(() => (window as any).game.engine.viewState().floor)).toBeGreaterThan(before);
   });
 
-  test("with the dropdown, the open map still clears the menu bar, the status bar, the palette and the hint", async ({ page }) => {
+  test("with the dropdown, the open map still clears the menu bar, the status bar, the palette and the hint", async ({
+    page,
+  }) => {
     await expectMapClear(page);
   });
 
@@ -240,7 +247,9 @@ test.describe("the map's View dropdown on the desktop", () => {
       g.enginePort.tick(31);
       g.reader.update();
     });
-    expect(await page.evaluate(() => (window as any).game.reader.rooms.filter((r: any) => r.state === "dirty").length)).toBe(HOTEL_ROOMS);
+    expect(
+      await page.evaluate(() => (window as any).game.reader.rooms.filter((r: any) => r.state === "dirty").length),
+    ).toBe(HOTEL_ROOMS);
     expect(await page.evaluate(() => (window as any).game.reader.header.revision)).toBe(revision);
     await expect(legend).toHaveText(`Dirty: ${HOTEL_ROOMS}Infested: 0`);
     await expect.poll(() => redPixels(page)).toBeGreaterThan(HOTEL_ROOMS);
@@ -249,7 +258,9 @@ test.describe("the map's View dropdown on the desktop", () => {
     await expect.poll(() => redPixels(page)).toBe(0);
   });
 
-  test("the Pricing view colors the rooms by the engine's rent tiers and follows a rent command at once", async ({ page }) => {
+  test("the Pricing view colors the rooms by the engine's rent tiers and follows a rent command at once", async ({
+    page,
+  }) => {
     await boot(page);
     await page.evaluate(foundHotelTower, HOTEL_ROOMS);
     await picker(page).selectOption("pricing");
@@ -295,7 +306,9 @@ test.describe("the map's View dropdown on the desktop", () => {
 test.describe("the map's View dropdown on a touch screen at desktop sizes", () => {
   test.use({ viewport: DESKTOP, hasTouch: true });
 
-  test("with a coarse pointer's taller dropdown, the open map still clears the menu bar, the status bar, the palette and the hint (#1769)", async ({ page }) => {
+  test("with a coarse pointer's taller dropdown, the open map still clears the menu bar, the status bar, the palette and the hint (#1769)", async ({
+    page,
+  }) => {
     await boot(page);
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
     await expectMapClear(page);
@@ -334,7 +347,9 @@ test.describe("the map's View dropdown on a phone", () => {
     await expect(page.locator('#overview-map .overview-map-legend[data-view="hotel"]')).toBeVisible();
   });
 
-  test("a view's legend hides no floor of a tower that fills the map, upright and on its side (#1769)", async ({ page }) => {
+  test("a view's legend hides no floor of a tower that fills the map, upright and on its side (#1769)", async ({
+    page,
+  }) => {
     for (const size of [PHONE, { width: PHONE.height, height: PHONE.width }]) {
       await page.setViewportSize(size);
       await boot(page);

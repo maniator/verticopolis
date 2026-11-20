@@ -19,7 +19,9 @@ afterEach(() => {
 /** A document that records the one listener the init script adds. */
 function fakePage(binding?: (arg: unknown) => void) {
   const added: { type: string; handler: Handler; capture: unknown }[] = [];
-  g.document = { addEventListener: (type: string, handler: Handler, capture: unknown) => added.push({ type, handler, capture }) };
+  g.document = {
+    addEventListener: (type: string, handler: Handler, capture: unknown) => added.push({ type, handler, capture }),
+  };
   g.window = binding ? { [CONTEXT_LOSS_BINDING]: binding } : {};
   return added;
 }
@@ -66,7 +68,10 @@ describe("watchContextLoss (the init script)", () => {
 describe("trackContextLoss and the record line", () => {
   it("exposes the binding on the context and passes each loss on as a record line", async () => {
     const exposed: { name: string; fn: (source: unknown, arg: unknown) => void }[] = [];
-    const ctx = { exposeBinding: async (name: string, fn: (source: unknown, arg: unknown) => void) => void exposed.push({ name, fn }) } as unknown as BrowserContext;
+    const ctx = {
+      exposeBinding: async (name: string, fn: (source: unknown, arg: unknown) => void) =>
+        void exposed.push({ name, fn }),
+    } as unknown as BrowserContext;
     const lines: string[] = [];
     await trackContextLoss(ctx, (l) => lines.push(l));
     expect(exposed.map((e) => e.name)).toEqual([CONTEXT_LOSS_BINDING]);
@@ -75,7 +80,9 @@ describe("trackContextLoss and the record line", () => {
   });
 
   it("names a canvas with no id as a canvas", () => {
-    expect(contextLossLine({ at: 5, id: "", width: 300, height: 150 })).toBe("WebGL context lost on a canvas (300x150) at 5 ms of a page");
+    expect(contextLossLine({ at: 5, id: "", width: 300, height: 150 })).toBe(
+      "WebGL context lost on a canvas (300x150) at 5 ms of a page",
+    );
   });
 });
 
@@ -87,25 +94,47 @@ describe("contextLossFinding", () => {
   });
 
   it("is one error that counts the process runs and quotes the first loss", () => {
-    const errors = contextLossFinding([[], ["WebGL context lost on canvas#game (1280x720) at 900 ms of a page", "second"], ["third"]]);
+    const errors = contextLossFinding([
+      [],
+      ["WebGL context lost on canvas#game (1280x720) at 900 ms of a page", "second"],
+      ["third"],
+    ]);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatch(/^2 of 3 process runs lost a WebGL context \(WebGL context lost on canvas#game \(1280x720\) at 900 ms of a page\)/);
+    expect(errors[0]).toMatch(
+      /^2 of 3 process runs lost a WebGL context \(WebGL context lost on canvas#game \(1280x720\) at 900 ms of a page\)/,
+    );
   });
 });
 
 describe("the compare validation", () => {
-  const nodeCheck = { scenario: "small", steps: 10, dt: 2, start: { state: "a", crowd: "c" }, end: { state: "b", crowd: "d" }, nodeWasmMs: 1 };
-  const runs = (lost: string[] | undefined) => [processRun(0, "ts"), processRun(0, "wasm"), processRun(1, "wasm"), processRun(1, "ts")].map((r, i) => (i === 2 ? { ...r, contextLost: lost } : r));
+  const nodeCheck = {
+    scenario: "small",
+    steps: 10,
+    dt: 2,
+    start: { state: "a", crowd: "c" },
+    end: { state: "b", crowd: "d" },
+    nodeWasmMs: 1,
+  };
+  const runs = (lost: string[] | undefined) =>
+    [processRun(0, "ts"), processRun(0, "wasm"), processRun(1, "wasm"), processRun(1, "ts")].map((r, i) =>
+      i === 2 ? { ...r, contextLost: lost } : r,
+    );
 
   it("fails a run that lost a context, in a full run, a quick run and under a renderer exception", () => {
     const lost = ["WebGL context lost on canvas#game (1280x720) at 900 ms of a page"];
-    expect(validateResults(config(), runs(lost), [nodeCheck]).errors.join(" ")).toMatch(/1 of 4 process runs lost a WebGL context/);
-    expect(validateResults({ ...config(), quick: true }, runs(lost), [nodeCheck]).errors.join(" ")).toMatch(/lost a WebGL context/);
+    expect(validateResults(config(), runs(lost), [nodeCheck]).errors.join(" ")).toMatch(
+      /1 of 4 process runs lost a WebGL context/,
+    );
+    expect(validateResults({ ...config(), quick: true }, runs(lost), [nodeCheck]).errors.join(" ")).toMatch(
+      /lost a WebGL context/,
+    );
     expect(validateResults(config(), runs(lost), [nodeCheck], "EX-4").errors.join(" ")).toMatch(/lost a WebGL context/);
   });
 
   it("passes runs with none lost, or recorded before the check", () => {
     expect(validateResults(config(), runs([]), [nodeCheck]).errors.join(" ")).not.toMatch(/lost a WebGL context/);
-    expect(validateResults(config(), runs(undefined), [nodeCheck]).errors.join(" ")).not.toMatch(/lost a WebGL context/);
+    expect(validateResults(config(), runs(undefined), [nodeCheck]).errors.join(" ")).not.toMatch(
+      /lost a WebGL context/,
+    );
   });
 });

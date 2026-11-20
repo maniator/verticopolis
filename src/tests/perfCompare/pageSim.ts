@@ -21,7 +21,19 @@ export interface SimRun {
    *  engine through the wrapper (must equal `steps`). `byExport` splits the
    *  exports by name, and `parseMs` is the JSON.parse time inside the host
    *  JavaScript remainder. */
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number; byExport: Record<string, { calls: number; ms: number }>; parseMs: number; parseCalls: number } | null;
+  attribution: {
+    engineTickMs: number;
+    engineExportMs: number;
+    hostJsMs: number;
+    wrappedTotalMs: number;
+    merges: number;
+    engineTicks: number;
+    exportCalls: number;
+    exportsWrapped: number;
+    byExport: Record<string, { calls: number; ms: number }>;
+    parseMs: number;
+    parseCalls: number;
+  } | null;
   /** Whether the page had gc() (Chromium's --expose-gc), so the loop began
    *  from a full collection. */
   gcAvailable: boolean;
@@ -51,7 +63,16 @@ export interface SimRun {
  * Nothing here touches a pending emergency: a write to the read model
  * would not reach the engine, and both engines must see the same state.
  */
-export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine: "ts" | "wasm"; steps: number; warmSteps: number; dt: number; engineUrl: string; attribute: boolean }): Promise<SimRun> {
+export async function simRun(arg: {
+  name: string;
+  mode: "hosted" | "raw";
+  engine: "ts" | "wasm";
+  steps: number;
+  warmSteps: number;
+  dt: number;
+  engineUrl: string;
+  attribute: boolean;
+}): Promise<SimRun> {
   const w = window as any;
   const g = w.game;
   const save = w.__perfSaves[arg.name] as string;
@@ -62,7 +83,12 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   const hostOf = () => w.__vcEngine;
   const errorsNow = (): string[] => [...((hostOf()?.status?.errors ?? []) as string[])];
 
-  interface Driver { tick(dt: number): void; save(): unknown; fields(): { minutes: number; money: number; star: number; population: number; people: number }; free(): void }
+  interface Driver {
+    tick(dt: number): void;
+    save(): unknown;
+    fields(): { minutes: number; money: number; star: number; population: number; people: number };
+    free(): void;
+  }
   let mod: any = null;
   if (arg.mode === "raw" && arg.engine === "wasm") {
     mod = await import(/* @vite-ignore */ arg.engineUrl);
@@ -95,10 +121,21 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
           // Every floor tile on its own where the build can say so (a
           // tooling build), so the digest is the conformance state digest
           // whichever save layout an arm writes.
-          save: () => JSON.parse(typeof (port as { serializeUnfolded?: () => string }).serializeUnfolded === "function" ? (port as unknown as { serializeUnfolded: () => string }).serializeUnfolded() : port.serialize()) as unknown,
+          save: () =>
+            JSON.parse(
+              typeof (port as { serializeUnfolded?: () => string }).serializeUnfolded === "function"
+                ? (port as unknown as { serializeUnfolded: () => string }).serializeUnfolded()
+                : port.serialize(),
+            ) as unknown,
           fields: () => {
             const h = reader.header;
-            return { minutes: h.minutes, money: h.money, star: h.star, population: h.population, people: reader.crowd.people.length };
+            return {
+              minutes: h.minutes,
+              money: h.money,
+              star: h.star,
+              population: h.population,
+              people: reader.crowd.people.length,
+            };
           },
           free: () => {},
         },
@@ -112,7 +149,13 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
         d: {
           tick: (dt) => sim.tick(dt),
           save: () => sim.serialize(),
-          fields: () => ({ minutes: sim.clock.minutes, money: sim.money, star: sim.star, population: sim.population, people: sim.crowd.people.length }),
+          fields: () => ({
+            minutes: sim.clock.minutes,
+            money: sim.money,
+            star: sim.star,
+            population: sim.population,
+            people: sim.crowd.people.length,
+          }),
           free: () => {},
         },
       };
@@ -124,12 +167,23 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
       hostedWasm: false,
       d: {
         tick: (dt) => e.tick(dt),
-        save: () => JSON.parse(typeof (e as { serializeUnfolded?: () => string }).serializeUnfolded === "function" ? (e as unknown as { serializeUnfolded: () => string }).serializeUnfolded() : e.serialize()),
+        save: () =>
+          JSON.parse(
+            typeof (e as { serializeUnfolded?: () => string }).serializeUnfolded === "function"
+              ? (e as unknown as { serializeUnfolded: () => string }).serializeUnfolded()
+              : e.serialize(),
+          ),
         fields: () => {
           // The engine's own view header, as the app's view reads it.
           const l = JSON.parse(e.viewLayout()).header;
           const f = e.viewFrame(true);
-          return { minutes: f[l.minutes], money: f[l.money], star: f[l.star], population: f[l.population], people: (JSON.parse(e.crowdView()).people as unknown[]).length };
+          return {
+            minutes: f[l.minutes],
+            money: f[l.money],
+            star: f[l.star],
+            population: f[l.population],
+            people: (JSON.parse(e.crowdView()).people as unknown[]).length,
+          };
         },
         free: () => e.free(),
       },
@@ -239,7 +293,12 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   d.free();
   const hostErrorsAdded = errorsNow().slice(errorsAtStart);
   // Still hosted at the end: the same host, no new error.
-  const stillHosted = hostedWasm && hostErrorsAdded.length === 0 && hostOf()?.port === h && g.enginePort === h && Boolean(hostOf()?.status?.hosted);
+  const stillHosted =
+    hostedWasm &&
+    hostErrorsAdded.length === 0 &&
+    hostOf()?.port === h &&
+    g.enginePort === h &&
+    Boolean(hostOf()?.status?.hosted);
   const sum = stepMs.reduce((s, x) => s + x, 0);
   return {
     mode: arg.mode,
@@ -250,7 +309,19 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
     totalMs,
     stepMs,
     attribution: attributing
-      ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), wrappedTotalMs: sum, merges: 0, engineTicks: acc.ticks, exportCalls: acc.calls, byExport, parseMs: acc.parse, parseCalls: acc.parses, exportsWrapped }
+      ? {
+          engineTickMs: acc.tick,
+          engineExportMs: acc.exp,
+          hostJsMs: Math.max(0, sum - acc.tick - acc.exp),
+          wrappedTotalMs: sum,
+          merges: 0,
+          engineTicks: acc.ticks,
+          exportCalls: acc.calls,
+          byExport,
+          parseMs: acc.parse,
+          parseCalls: acc.parses,
+          exportsWrapped,
+        }
       : null,
     hostErrorsAdded,
     gcAvailable,

@@ -69,7 +69,11 @@ export function pickFolderFiles(take: (files: File[]) => void): void {
   input.type = "file";
   input.multiple = true;
   input.setAttribute("webkitdirectory", "");
-  input.addEventListener("change", () => take(Array.from(input.files ?? []).filter((f) => linkedFileKind(f.name) !== null)), { once: true });
+  input.addEventListener(
+    "change",
+    () => take(Array.from(input.files ?? []).filter((f) => linkedFileKind(f.name) !== null)),
+    { once: true },
+  );
   input.click();
 }
 

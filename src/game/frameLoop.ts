@@ -137,7 +137,13 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // The view follows every frame, so the header, the HUD and the painters
   // read this frame's tower.
   readView(app);
-  gameplaySession.noteSimStep(stepMs, app.reader.header.minutes, minutesPerSecond, app.reader.header.population, app.reader.generation);
+  gameplaySession.noteSimStep(
+    stepMs,
+    app.reader.header.minutes,
+    minutesPerSecond,
+    app.reader.header.population,
+    app.reader.generation,
+  );
 
   // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
   // tower never makes panning feel sluggish.
@@ -240,7 +246,14 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // After an answered emergency they wait until its outcome toast has gone,
     // since their dialog would cover it (#1134).
     const winHeld = now < app.winHeldUntil;
-    if (!app.shownWin && !winHeld && !splashUp && !hasBlockingModal(app) && !dialogHoldsWork(app) && app.enginePort.evaluatedTower()) {
+    if (
+      !app.shownWin &&
+      !winHeld &&
+      !splashUp &&
+      !hasBlockingModal(app) &&
+      !dialogHoldsWork(app) &&
+      app.enginePort.evaluatedTower()
+    ) {
       app.shownWin = true;
       app.audio.sfx("promote");
       // An emergency that rolls while they are up replaces them (it latches

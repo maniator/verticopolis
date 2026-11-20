@@ -7,7 +7,14 @@ import { vi } from "vitest";
 import { FLOOR, TILE } from "@verticopolis/components/render/scale";
 import type { MapCameraCenter, MapExtent } from "@verticopolis/components/render/overviewMap/geometry";
 import { MAP_OPEN_STORAGE_KEY } from "./overviewMapPrefs";
-import { MAP_DOM_ID, OverviewMapWindow, WORLD_PRESS_CLASS, type MutableMapCamera, type OverviewMapDeps, type OverviewMapSource } from "./overviewMapWindow";
+import {
+  MAP_DOM_ID,
+  OverviewMapWindow,
+  WORLD_PRESS_CLASS,
+  type MutableMapCamera,
+  type OverviewMapDeps,
+  type OverviewMapSource,
+} from "./overviewMapWindow";
 import type { OverviewMapViews } from "./overviewMapViews";
 import type { MapViewId } from "@verticopolis/components/render/overviewMap/views";
 import { MAP_PICKER_DOM } from "./overviewMapPicker";
@@ -45,7 +52,14 @@ export interface Rig {
 
 /** A window in a 200 by 288 CSS px body at a pixel ratio of 1, so map pixels
  *  are CSS pixels and the layout is `CROP`. */
-export function rig(opts: { phone?: boolean; stored?: string; views?: OverviewMapViews; tallLobbies?: OverviewMapDeps["tallLobbies"] } = {}): Rig {
+export function rig(
+  opts: {
+    phone?: boolean;
+    stored?: string;
+    views?: OverviewMapViews;
+    tallLobbies?: OverviewMapDeps["tallLobbies"];
+  } = {},
+): Rig {
   document.body.innerHTML = '<section id="stage"><canvas id="view"></canvas></section>';
   const stage = document.getElementById("stage")!;
   const storage = new MemoryStore();
@@ -53,7 +67,13 @@ export function rig(opts: { phone?: boolean; stored?: string; views?: OverviewMa
   const phone = { value: opts.phone ?? false };
   const moves: MapCameraCenter[] = [];
   // The camera sees 80 tiles by 16 floors, centered on tile 100, floor 20.
-  const cam: MutableMapCamera = { posX: 100 * TILE, posY: -20 * FLOOR, zoom: 1, viewWidth: 80 * TILE, viewHeight: 16 * FLOOR };
+  const cam: MutableMapCamera = {
+    posX: 100 * TILE,
+    posY: -20 * FLOOR,
+    zoom: 1,
+    viewWidth: 80 * TILE,
+    viewHeight: 16 * FLOOR,
+  };
   const source = towerSource();
   const deps: OverviewMapDeps = {
     stage,
@@ -84,7 +104,20 @@ export function rig(opts: { phone?: boolean; stored?: string; views?: OverviewMa
   vi.spyOn(proto, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
     return this.classList.contains("overview-map-body") ? 288 : 0;
   });
-  vi.spyOn(proto, "getBoundingClientRect").mockImplementation(() => ({ left: 0, top: 0, width: 200, height: 288, right: 200, bottom: 288, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect);
+  vi.spyOn(proto, "getBoundingClientRect").mockImplementation(
+    () =>
+      ({
+        left: 0,
+        top: 0,
+        width: 200,
+        height: 288,
+        right: 200,
+        bottom: 288,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect,
+  );
   const win = new OverviewMapWindow(deps);
   built.push(win);
   return { win, moves, cam, storage, phone, source };
@@ -104,7 +137,20 @@ export function disposeRigs(): void {
  *  `vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(silent2d())`. */
 export function silent2d(): CanvasRenderingContext2D {
   const none = () => {};
-  const ctx = { fillStyle: "", strokeStyle: "", lineWidth: 1, fillRect: none, clearRect: none, strokeRect: none, beginPath: none, moveTo: none, lineTo: none, closePath: none, fill: none, createPattern: () => null };
+  const ctx = {
+    fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 1,
+    fillRect: none,
+    clearRect: none,
+    strokeRect: none,
+    beginPath: none,
+    moveTo: none,
+    lineTo: none,
+    closePath: none,
+    fill: none,
+    createPattern: () => null,
+  };
   return ctx as unknown as CanvasRenderingContext2D;
 }
 
@@ -112,10 +158,26 @@ export function viewCanvas(): HTMLCanvasElement {
   return document.querySelector(".overview-map-view") as HTMLCanvasElement;
 }
 
-export function pointer(type: string, x: number, y: number, pointerType = "mouse", pointerId = 1, button = 0): PointerEvent {
+export function pointer(
+  type: string,
+  x: number,
+  y: number,
+  pointerType = "mouse",
+  pointerId = 1,
+  button = 0,
+): PointerEvent {
   // A mouse move with the button held reports it in `buttons`.
   const buttons = type === "pointerup" ? 0 : 1;
-  return new PointerEvent(type, { clientX: x, clientY: y, pointerType, pointerId, button, buttons, bubbles: true, cancelable: true });
+  return new PointerEvent(type, {
+    clientX: x,
+    clientY: y,
+    pointerType,
+    pointerId,
+    button,
+    buttons,
+    bubbles: true,
+    cancelable: true,
+  });
 }
 
 export function rootEl(): HTMLElement {

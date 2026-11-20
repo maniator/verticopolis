@@ -26,11 +26,7 @@ export interface EventChoiceActions {
   onDecline: () => void;
 }
 
-export function eventChoiceTemplate(
-  message: string,
-  costLabel: string,
-  actions: EventChoiceActions,
-): TemplateResult {
+export function eventChoiceTemplate(message: string, costLabel: string, actions: EventChoiceActions): TemplateResult {
   return html`
       <h2>${iconTemplate("warning", { size: 16 })}Emergency</h2>
       <p>${messageWithIcons(message)}</p>

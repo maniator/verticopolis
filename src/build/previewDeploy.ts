@@ -109,7 +109,10 @@ export function applyHelpHostWorker(helpDir: string, swPath: string, files: Work
     return { code: 1, message: `preview-service-worker: ${helpDir} does not exist; build the help site first` };
   }
   files.write(swPath, HELP_HOST_SERVICE_WORKER);
-  return { code: 0, message: "preview-service-worker: dist/help/sw.js unregisters any worker left on the manual's host" };
+  return {
+    code: 0,
+    message: "preview-service-worker: dist/help/sw.js unregisters any worker left on the manual's host",
+  };
 }
 
 /** The file system calls {@link applyPreviewWorker} makes, so a test can stand in for them. */
@@ -130,15 +133,25 @@ export interface WorkerOutcome {
  * leave it. A missing worker on a preview fails, since writing ours where the
  * host does not serve it would hide that the build output moved.
  */
-export function applyPreviewWorker(env: Readonly<Record<string, string | undefined>>, swPath: string, files: WorkerFiles): WorkerOutcome {
+export function applyPreviewWorker(
+  env: Readonly<Record<string, string | undefined>>,
+  swPath: string,
+  files: WorkerFiles,
+): WorkerOutcome {
   if (!isPreviewDeploy(env)) {
-    return { code: 0, message: "preview-service-worker: not a preview deployment; dist/sw.js stays the production worker" };
+    return {
+      code: 0,
+      message: "preview-service-worker: not a preview deployment; dist/sw.js stays the production worker",
+    };
   }
   if (!files.exists(swPath)) {
     return { code: 1, message: `preview-service-worker: ${swPath} does not exist; did the build output move?` };
   }
   files.write(swPath, RETIRING_SERVICE_WORKER);
-  return { code: 0, message: "preview-service-worker: preview deployment; dist/sw.js now unregisters itself and clears the precache" };
+  return {
+    code: 0,
+    message: "preview-service-worker: preview deployment; dist/sw.js now unregisters itself and clears the precache",
+  };
 }
 
 /**
@@ -150,8 +163,10 @@ export function applyPreviewWorker(env: Readonly<Record<string, string | undefin
  */
 export function productionWorkerProblem(sw: string | null): string | null {
   if (sw === null) return "dist/sw.js is missing, so production would ship no service worker";
-  if (sw.includes(RETIRING_WORKER_MARKER)) return "dist/sw.js is the preview deployment's retiring worker, which would unregister every player's worker";
-  if (!sw.includes(PRECACHE_CALL)) return `dist/sw.js has no Workbox ${PRECACHE_CALL}...) call, so production would precache nothing`;
+  if (sw.includes(RETIRING_WORKER_MARKER))
+    return "dist/sw.js is the preview deployment's retiring worker, which would unregister every player's worker";
+  if (!sw.includes(PRECACHE_CALL))
+    return `dist/sw.js has no Workbox ${PRECACHE_CALL}...) call, so production would precache nothing`;
   return null;
 }
 
@@ -162,7 +177,8 @@ export function productionWorkerProblem(sw: string | null): string | null {
  * never goes live without the worker that clears a game worker left there.
  */
 export function helpHostWorkerProblem(sw: string | null): string | null {
-  if (sw === null) return "dist/help/sw.js is missing, so a game worker left on the manual's host would never be removed";
+  if (sw === null)
+    return "dist/help/sw.js is missing, so a game worker left on the manual's host would never be removed";
   if (sw !== HELP_HOST_SERVICE_WORKER) return "dist/help/sw.js is not the manual host's self-removing worker";
   return null;
 }

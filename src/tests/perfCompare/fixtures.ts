@@ -41,7 +41,24 @@ export function step(engine: EngineName, over: Partial<StepSummary> = {}): StepS
 }
 
 export function frames(engine: EngineName, over: Partial<FrameSummary> = {}): FrameSummary {
-  return { frames: 120, medianMs: 16, p95Ms: 20, p99Ms: 30, meanFps: 60, onePercentLowFps: 33, simMinutesPerSecond: 100, tickShare: 0.1, uiShare: 0.01, ticks: 200, restShare: 0.89, clampedFrames: 0, engineActive: engine, hostErrorsAdded: [], audioStarted: false, ...over };
+  return {
+    frames: 120,
+    medianMs: 16,
+    p95Ms: 20,
+    p99Ms: 30,
+    meanFps: 60,
+    onePercentLowFps: 33,
+    simMinutesPerSecond: 100,
+    tickShare: 0.1,
+    uiShare: 0.01,
+    ticks: 200,
+    restShare: 0.89,
+    clampedFrames: 0,
+    engineActive: engine,
+    hostErrorsAdded: [],
+    audioStarted: false,
+    ...over,
+  };
 }
 
 export function startupSample(engine: EngineName, over: Partial<StartupSample> = {}): StartupSample {
@@ -72,17 +89,41 @@ export function processRun(rep: number, engine: EngineName, over: Partial<Proces
     error: null,
     pageErrors: [],
     browserVersion: "141.0",
-    page: { crossOriginIsolated: true, timerResolutionMs: 0.005, userAgent: "ua", viewport: { width: 1280, height: 720, dpr: 1 }, webgl: { renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)", vendor: "Google Inc. (NVIDIA)" } },
+    page: {
+      crossOriginIsolated: true,
+      timerResolutionMs: 0.005,
+      userAgent: "ua",
+      viewport: { width: 1280, height: 720, dpr: 1 },
+      webgl: {
+        renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        vendor: "Google Inc. (NVIDIA)",
+      },
+    },
     rendererEnd: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)",
     cold: startupSample(engine),
     warm: startupSample(engine),
     cold4x: startupSample(engine, { gameReadyMs: 1200 }),
-    coldSaved: { small: { sample: startupSample(engine, { gameReadyMs: 600 }), error: null, seedSha256: "seed-small", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)", pageErrors: [], contextLost: [] } },
+    coldSaved: {
+      small: {
+        sample: startupSample(engine, { gameReadyMs: 600 }),
+        error: null,
+        seedSha256: "seed-small",
+        renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        pageErrors: [],
+        contextLost: [],
+      },
+    },
     cpuProbe: { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: {} },
     scenarios: {
       small: {
         adoptMs: 10 * scale,
-        memory: { jsHeapUsedBytes: 1e6, jsHeapTotalBytes: 2e6, wasmMemoryBytes: engine === "wasm" ? 8e6 : null, processPssBytes: 5e8, processes: 5 },
+        memory: {
+          jsHeapUsedBytes: 1e6,
+          jsHeapTotalBytes: 2e6,
+          wasmMemoryBytes: engine === "wasm" ? 8e6 : null,
+          processPssBytes: 5e8,
+          processes: 5,
+        },
         hosted: { "1": step(engine, { totalMs: 100 * scale }) },
         raw: { "1": step(engine, { totalMs: 50 * scale }) },
         frames: { "1": frames(engine) },
@@ -90,9 +131,25 @@ export function processRun(rep: number, engine: EngineName, over: Partial<Proces
       },
     },
     audio: { started: true, muted: false, contexts: ["running"] },
-    wasmCold: engine === "ts" ? { fetchMs: 10, bytes: 1000, compileMs: 300, instantiateMs: 1, firstEngineMs: 20 } : null,
-    wasmIdle: engine === "ts" ? { buffered: { responseMs: 5, bodyMs: 12, compileMs: 40, bytes: 1000 }, streamed: { responseMs: 5, totalMs: 45 }, error: null } : undefined,
-    firstVisitWithServiceWorker: { served: [{ path: "/", status: 200, bytes: 2000, encoding: "br" }], swActive: true, onlineEngineActive: engine, offlineEngineActive: "ts", onlinePageErrors: [], offlinePageErrors: [], error: null },
+    wasmCold:
+      engine === "ts" ? { fetchMs: 10, bytes: 1000, compileMs: 300, instantiateMs: 1, firstEngineMs: 20 } : null,
+    wasmIdle:
+      engine === "ts"
+        ? {
+            buffered: { responseMs: 5, bodyMs: 12, compileMs: 40, bytes: 1000 },
+            streamed: { responseMs: 5, totalMs: 45 },
+            error: null,
+          }
+        : undefined,
+    firstVisitWithServiceWorker: {
+      served: [{ path: "/", status: 200, bytes: 2000, encoding: "br" }],
+      swActive: true,
+      onlineEngineActive: engine,
+      offlineEngineActive: "ts",
+      onlinePageErrors: [],
+      offlinePageErrors: [],
+      error: null,
+    },
     ...over,
   };
 }

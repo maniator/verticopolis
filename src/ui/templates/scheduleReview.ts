@@ -33,14 +33,18 @@ function rowTemplate(row: ReviewRow): TemplateResult {
     ${row.preview ? html`<div class="sched-review-preview">${row.preview}</div>` : nothing}
     ${row.kept ? html`<div class="sched-review-facts">You chose to keep this schedule as it is.</div>` : nothing}
     <div class="sched-review-actions">
-      ${row.preview
-        ? html`<button type="button" class="btn primary" data-act=${recoverAct(row.id)} aria-label="Use all installed cars, ${row.title}">
+      ${
+        row.preview
+          ? html`<button type="button" class="btn primary" data-act=${recoverAct(row.id)} aria-label="Use all installed cars, ${row.title}">
             Use all installed cars
           </button>`
-        : nothing}
-      ${row.preview && !row.kept
-        ? html`<button type="button" class="btn" data-act=${keepAct(row.id)} aria-label="Keep as is, ${row.title}">Keep as is</button>`
-        : nothing}
+          : nothing
+      }
+      ${
+        row.preview && !row.kept
+          ? html`<button type="button" class="btn" data-act=${keepAct(row.id)} aria-label="Keep as is, ${row.title}">Keep as is</button>`
+          : nothing
+      }
       <button type="button" class="btn" data-act=${reviewAct(row.id)} aria-label="Review schedule, ${row.title}">Review schedule</button>
     </div>
   </li>`;
@@ -49,15 +53,17 @@ function rowTemplate(row: ReviewRow): TemplateResult {
 /** The dialog body: a short explanation, then one row per elevator, or a note that none are left. */
 export function scheduleReviewTemplate(rows: readonly ReviewRow[]): TemplateResult {
   return html`<h2>Elevator schedules</h2>
-    ${rows.length === 0
-      ? html`<p class="sched-review-intro">Every elevator in this tower puts all of its cars on shift whenever its schedule runs.</p>`
-      : html`<p class="sched-review-intro">
+    ${
+      rows.length === 0
+        ? html`<p class="sched-review-intro">Every elevator in this tower puts all of its cars on shift whenever its schedule runs.</p>`
+        : html`<p class="sched-review-intro">
             These elevators have more cars than their schedule puts on shift. Nothing changes unless you choose it, and floors served, stops
             and home floors are never touched.
           </p>
           <ul class="sched-review-list" role="list">
             ${rows.map(rowTemplate)}
-          </ul>`}
+          </ul>`
+    }
     <div class="modal-actions modal-footer">
       <button class="btn primary" data-act="close">Close</button>
     </div>`;

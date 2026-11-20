@@ -57,7 +57,9 @@ describe("showImportReport onShown", () => {
     const second = vi.fn();
     showImportReport(ui, report("FIRST"), { onOpen: vi.fn(), onShown: first });
     showImportReport(ui, report("SECOND"), { onOpen: vi.fn(), onShown: second });
-    expect(spies.sayVisibly).toHaveBeenLastCalledWith("The import was dropped: another file was picked before it could open. Try again.");
+    expect(spies.sayVisibly).toHaveBeenLastCalledWith(
+      "The import was dropped: another file was picked before it could open. Try again.",
+    );
     spies.closeModal();
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledOnce();
@@ -69,7 +71,9 @@ describe("showImportReport onShown", () => {
     const onShown = vi.fn();
     showImportReport(ui, report(), { onOpen: vi.fn(), onShown });
     spies.precedence.towerSwapped();
-    expect(spies.sayVisibly).toHaveBeenLastCalledWith("The import was dropped: you started a different tower before it could open. Try again.");
+    expect(spies.sayVisibly).toHaveBeenLastCalledWith(
+      "The import was dropped: you started a different tower before it could open. Try again.",
+    );
     spies.closeModal();
     expect(onShown).not.toHaveBeenCalled();
     expect(spies.openModalTemplate, "the dropped report never opens").toHaveBeenCalledOnce();

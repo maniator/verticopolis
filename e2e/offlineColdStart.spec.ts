@@ -65,14 +65,24 @@ test.afterAll(() => {
  * listens on, so the worker has no network either (offlineStart probes both).
  */
 function launch(dir: string, baseURL: string, launchOptions: LaunchOptions, offline: boolean): Promise<BrowserContext> {
-  const noNetwork = offline ? { proxy: { server: "http://127.0.0.1:9" }, args: [...(launchOptions.args ?? []), "--proxy-bypass-list=<-loopback>"] } : {};
+  const noNetwork = offline
+    ? {
+        proxy: { server: "http://127.0.0.1:9" },
+        args: [...(launchOptions.args ?? []), "--proxy-bypass-list=<-loopback>"],
+      }
+    : {};
   return chromium.launchPersistentContext(dir, { ...launchOptions, ...DESKTOP_CHROME, baseURL, offline, ...noNetwork });
 }
 
 /** The one online visit: install the worker, choose the WASM engine, reload
  *  under the worker's control and check the engine package is precached.
  *  `beforeClose` runs on the hosted game before the browser closes. */
-async function onlineVisit(dir: string, baseURL: string, launchOptions: LaunchOptions, beforeClose?: (page: Page) => Promise<void>): Promise<void> {
+async function onlineVisit(
+  dir: string,
+  baseURL: string,
+  launchOptions: LaunchOptions,
+  beforeClose?: (page: Page) => Promise<void>,
+): Promise<void> {
   const context = await launch(dir, baseURL, launchOptions, false);
   try {
     const page = context.pages()[0] ?? (await context.newPage());
@@ -91,7 +101,9 @@ async function onlineVisit(dir: string, baseURL: string, launchOptions: LaunchOp
 
 /** Open the profile offline and navigate to the game. The navigation and the
  *  engine package must come from the worker, since nothing else can answer. */
-async function offlineStart(context: BrowserContext): Promise<{ page: Page; seen: ReturnType<typeof watch>; audio: ReturnType<typeof recordAudio> }> {
+async function offlineStart(
+  context: BrowserContext,
+): Promise<{ page: Page; seen: ReturnType<typeof watch>; audio: ReturnType<typeof recordAudio> }> {
   const page = context.pages()[0] ?? (await context.newPage());
   const seen = watch(page);
   const audio = recordAudio(page);
@@ -106,10 +118,30 @@ async function offlineStart(context: BrowserContext): Promise<{ page: Page; seen
   // The network is really gone, for the page and for the worker alike: a
   // file that is not precached cannot be fetched by either.
   const probe = `/offline-probe-${Date.now()}.json`;
-  expect(await page.evaluate((u) => fetch(u).then(() => "fetched", () => "failed"), probe), "the page reaches no network").toBe("failed");
+  expect(
+    await page.evaluate(
+      (u) =>
+        fetch(u).then(
+          () => "fetched",
+          () => "failed",
+        ),
+      probe,
+    ),
+    "the page reaches no network",
+  ).toBe("failed");
   const [worker] = context.serviceWorkers();
   expect(worker, "the service worker is running").toBeDefined();
-  expect(await worker.evaluate((u) => fetch(u).then(() => "fetched", () => "failed"), probe), "the service worker reaches no network").toBe("failed");
+  expect(
+    await worker.evaluate(
+      (u) =>
+        fetch(u).then(
+          () => "fetched",
+          () => "failed",
+        ),
+      probe,
+    ),
+    "the service worker reaches no network",
+  ).toBe("failed");
   // The probes' own failures are expected; drop exactly those.
   seen.failed.splice(0, seen.failed.length, ...seen.failed.filter((f) => !f.includes(probe)));
   return { page, seen, audio };
@@ -125,7 +157,10 @@ async function engineMinutes(page: Page): Promise<number> {
   return ((await engineSave(page)) as { minutes: number }).minutes;
 }
 
-test("after one online visit, a fresh offline browser session opens the game on the WASM engine, runs the clock and plays today's sounds", async ({ baseURL, launchOptions }) => {
+test("after one online visit, a fresh offline browser session opens the game on the WASM engine, runs the clock and plays today's sounds", async ({
+  baseURL,
+  launchOptions,
+}) => {
   const dir = newProfile();
   await onlineVisit(dir, baseURL!, launchOptions);
 
@@ -133,7 +168,10 @@ test("after one online visit, a fresh offline browser session opens the game on 
   try {
     const { page, seen, audio } = await offlineStart(context);
     const engine = await page.evaluate(() => (window as any).__vcEngine.status);
-    expect({ hosted: engine.hosted, lastError: engine.lastError }, "the engine hosts the tower with no fallback").toEqual({ hosted: true, lastError: null });
+    expect(
+      { hosted: engine.hosted, lastError: engine.lastError },
+      "the engine hosts the tower with no fallback",
+    ).toEqual({ hosted: true, lastError: null });
     // Read the clock from the engine's own save, so the advance is the
     // engine's.
     const start = await engineMinutes(page);
@@ -148,7 +186,10 @@ test("after one online visit, a fresh offline browser session opens the game on 
   }
 });
 
-test("a tower saved online loads in a fresh offline browser session, runs, saves and reloads", async ({ baseURL, launchOptions }) => {
+test("a tower saved online loads in a fresh offline browser session, runs, saves and reloads", async ({
+  baseURL,
+  launchOptions,
+}) => {
   const dir = newProfile();
   // Online: build a lobby, run the clock, and save it in My Towers.
   let savedAt = 0;
@@ -181,7 +222,9 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       (window as any).game.syncSim();
     }, fileId);
     expect(await lobbyAt(page, 160), "the online save's lobby loaded").toBe(true);
-    expect(await page.evaluate(() => (window as any).game.sim.clock.minutes), "the online save's clock loaded").toBe(savedAt);
+    expect(await page.evaluate(() => (window as any).game.sim.clock.minutes), "the online save's clock loaded").toBe(
+      savedAt,
+    );
     expect(await engineSave(page), "the engine holds exactly the state saved online").toEqual(savedState);
     // Run it, issue a command, and save over the file.
     const ranTo = await advanceClock(page);
@@ -215,7 +258,11 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       lobby200: await lobbyAt(page, 200),
       minutes: await page.evaluate(() => (window as any).game.sim.clock.minutes as number),
     };
-    expect(reloaded, "the offline save persisted across the reload").toEqual({ lobby160: true, lobby200: true, minutes: resaved.minutes });
+    expect(reloaded, "the offline save persisted across the reload").toEqual({
+      lobby160: true,
+      lobby200: true,
+      minutes: resaved.minutes,
+    });
     expect(await engineSave(page), "the engine holds exactly the state saved offline").toEqual(resavedState);
     await expectEngineHosted(page);
     expect(seen).toEqual({ errors: [], failed: [] });

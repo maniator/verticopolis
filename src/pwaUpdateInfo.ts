@@ -66,7 +66,8 @@ function parseFingerprint(shell: unknown, engine: unknown): BuildFingerprint | u
   return { shell: s, engine: { crate: token(e.crate), rust: token(e.rust) } };
 }
 
-const differs = (a: string | undefined, b: string | undefined): boolean => a !== undefined && b !== undefined && a !== b;
+const differs = (a: string | undefined, b: string | undefined): boolean =>
+  a !== undefined && b !== undefined && a !== b;
 
 /**
  * Whether the incoming build changes the game shell, the engine, both or neither
@@ -93,7 +94,10 @@ export function classifyUpdate(
 }
 
 /** `info` with its {@link UpdateKind} and engine line filled in from the running build's fingerprint. */
-export function withUpdateKind(info: UpdateInfo | undefined, running: BuildFingerprint | undefined): UpdateInfo | undefined {
+export function withUpdateKind(
+  info: UpdateInfo | undefined,
+  running: BuildFingerprint | undefined,
+): UpdateInfo | undefined {
   if (!info) return info;
   const c = classifyUpdate(info.fingerprint, running);
   return c ? { ...info, ...c } : info;
@@ -174,11 +178,7 @@ export function parseUpdateInfo(j: unknown): UpdateInfo | null {
  * as missing, matching how the update prompt drops it. So absent or placeholder
  * data never triggers a false "update available".
  */
-export function isDifferentBuild(
-  info: UpdateInfo | null,
-  runningVersion: string,
-  runningSha: string,
-): boolean {
+export function isDifferentBuild(info: UpdateInfo | null, runningVersion: string, runningSha: string): boolean {
   if (!info) return false;
   const realSha = (s: string | undefined): string => (s && s !== "unknown" ? s : "");
   const deployedSha = realSha(info.sha);
@@ -262,7 +262,9 @@ export function notesSinceRunning(info: UpdateInfo, runningVersion: string, seen
   if (!isNewerVersion(info.version, floor)) return none;
   const carried = info.releases ?? [];
   const unseen = carried.filter((r) => isNewerVersion(r.version, floor) && !isNewerVersion(r.version, info.version));
-  const releases = unseen.some((r) => r.version === info.version) ? unseen : [{ version: info.version!, notes }, ...unseen];
+  const releases = unseen.some((r) => r.version === info.version)
+    ? unseen
+    : [{ version: info.version!, notes }, ...unseen];
   const shown = releases
     .filter((r) => r.notes.length > 0)
     .sort(newestFirst)

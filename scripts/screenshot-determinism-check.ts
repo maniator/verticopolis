@@ -56,8 +56,18 @@ const GENERATOR = resolve(ROOT, "scripts/screenshots.ts");
 // at once (give each its own SCREENSHOT_TMP and port pair). CI keeps the defaults.
 const TMP = process.env.SCREENSHOT_TMP || tmpdir();
 const LEGS = [
-  { tag: "a", dest: join(TMP, "run-a"), outDir: join(TMP, "dist-a"), port: Number(process.env.SCREENSHOT_PORT_A) || 4173 },
-  { tag: "b", dest: join(TMP, "run-b"), outDir: join(TMP, "dist-b"), port: Number(process.env.SCREENSHOT_PORT_B) || 4174 },
+  {
+    tag: "a",
+    dest: join(TMP, "run-a"),
+    outDir: join(TMP, "dist-a"),
+    port: Number(process.env.SCREENSHOT_PORT_A) || 4173,
+  },
+  {
+    tag: "b",
+    dest: join(TMP, "run-b"),
+    outDir: join(TMP, "dist-b"),
+    port: Number(process.env.SCREENSHOT_PORT_B) || 4174,
+  },
 ];
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -160,10 +170,7 @@ async function waitForServer(port: number): Promise<boolean> {
 /** One leg: clean build into its own outDir, start its own preview server, render
  *  the scenes into its own fresh output root, then tear the server down. Returns
  *  0 on success. */
-async function runLeg(
-  leg: { tag: string; dest: string; outDir: string; port: number },
-  only: string,
-): Promise<number> {
+async function runLeg(leg: { tag: string; dest: string; outDir: string; port: number }, only: string): Promise<number> {
   const { tag, dest, outDir, port } = leg;
   rmSync(dest, { recursive: true, force: true });
   rmSync(outDir, { recursive: true, force: true });
@@ -209,7 +216,9 @@ async function runLeg(
     // rather than bind a busy port). Rendering against a stale build would be
     // wrong, so fail loudly rather than trust the foreign 200.
     if (server.exitCode !== null || server.signalCode !== null) {
-      process.stdout.write(`[${tag}] port :${port} is held by another (stale) preview server; refusing to render against it. Kill it and retry.\n`);
+      process.stdout.write(
+        `[${tag}] port :${port} is held by another (stale) preview server; refusing to render against it. Kill it and retry.\n`,
+      );
       return 1;
     }
     // Never let the generator spawn its OWN preview: this leg already owns one at
@@ -281,7 +290,9 @@ function diffRoots(label: string, a: string, b: string): string | null {
       copyFileSync(join(src, f), dest);
     }
   }
-  process.stdout.write(`evidence: both legs' copies of ${differing.length} differing file(s) saved under ${evidenceRoot}\n`);
+  process.stdout.write(
+    `evidence: both legs' copies of ${differing.length} differing file(s) saved under ${evidenceRoot}\n`,
+  );
   return `pixel bytes differ for ${differing.join(", ")}`;
 }
 
@@ -301,7 +312,9 @@ function allShards(): string[] {
 /** Check one shard's scene set: render twice in parallel, diff. True if deterministic. */
 async function checkOnly(label: string, only: string): Promise<boolean> {
   if (!only) {
-    process.stdout.write(`::error::no scenes to render for '${label}'; refusing to run (an empty ONLY renders every scene)\n`);
+    process.stdout.write(
+      `::error::no scenes to render for '${label}'; refusing to run (an empty ONLY renders every scene)\n`,
+    );
     return false;
   }
   process.stdout.write(`\nchecking '${label}': ${only}\n`);
@@ -310,14 +323,20 @@ async function checkOnly(label: string, only: string): Promise<boolean> {
   // The two legs run concurrently, so this wall time is ~max(legA, legB) plus the
   // trailing byte-diff, NOT their sum. Printed on its own line so it shows even
   // when a leg fails or the diff trips below.
-  process.stdout.write(`'${label}' both legs (concurrent) finished in ${((Date.now() - shardStart) / 1000).toFixed(1)}s wall\n`);
+  process.stdout.write(
+    `'${label}' both legs (concurrent) finished in ${((Date.now() - shardStart) / 1000).toFixed(1)}s wall\n`,
+  );
   if (rcA !== 0 || rcB !== 0) {
-    process.stdout.write(`::error::screenshot check '${label}' failed to render (leg a exit=${rcA}, leg b exit=${rcB}); see the [a]/[b] output above.\n`);
+    process.stdout.write(
+      `::error::screenshot check '${label}' failed to render (leg a exit=${rcA}, leg b exit=${rcB}); see the [a]/[b] output above.\n`,
+    );
     return false;
   }
   const reason = diffRoots(label, LEGS[0].dest, LEGS[1].dest);
   if (reason) {
-    process.stdout.write(`::error::screenshot check '${label}' is nondeterministic: ${reason}. A wall-clock/RNG read leaked into the build or a capture (likely a new time-driven decoration in the engine render path, or a build-time timestamp); fix it before screenshots can update.\n`);
+    process.stdout.write(
+      `::error::screenshot check '${label}' is nondeterministic: ${reason}. A wall-clock/RNG read leaked into the build or a capture (likely a new time-driven decoration in the engine render path, or a build-time timestamp); fix it before screenshots can update.\n`,
+    );
     return false;
   }
   // Two identical EMPTY roots also byte-match, so a run that rendered nothing (a
@@ -326,7 +345,9 @@ async function checkOnly(label: string, only: string): Promise<boolean> {
   // failure rather than a green pass.
   const shots = countPngs(LEGS[0].dest);
   if (shots === 0) {
-    process.stdout.write(`::error::screenshot check '${label}' rendered 0 files, so nothing was compared; check the shard or scene ids.\n`);
+    process.stdout.write(
+      `::error::screenshot check '${label}' rendered 0 files, so nothing was compared; check the shard or scene ids.\n`,
+    );
     return false;
   }
   process.stdout.write(`'${label}' is deterministic (${shots} shot(s)).\n`);
@@ -334,9 +355,7 @@ async function checkOnly(label: string, only: string): Promise<boolean> {
 }
 
 function usage(): never {
-  process.stdout.write(
-    "usage: node scripts/screenshot-determinism-check.ts <shard> | --all | --only <scene-ids>\n",
-  );
+  process.stdout.write("usage: node scripts/screenshot-determinism-check.ts <shard> | --all | --only <scene-ids>\n");
   process.exit(2);
 }
 

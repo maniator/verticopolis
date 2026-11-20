@@ -39,7 +39,10 @@ export function expectOk(ok: boolean, expectFail: boolean | undefined, what: str
 export function expectOutcome(r: Outcome, c: { expectFail?: boolean; reason?: string }, what: string): void {
   if (c.reason !== undefined && !c.expectFail) throw new Error(`${what}: a reason needs expectFail`);
   expectOk(r.ok, c.expectFail, what, r.reason);
-  if (c.reason !== undefined && r.reason !== c.reason) throw new Error(`${what} was refused for ${JSON.stringify(r.reason ?? "no reason")}, expected ${JSON.stringify(c.reason)}`);
+  if (c.reason !== undefined && r.reason !== c.reason)
+    throw new Error(
+      `${what} was refused for ${JSON.stringify(r.reason ?? "no reason")}, expected ${JSON.stringify(c.reason)}`,
+    );
 }
 
 function unitAt(e: ScenarioEngine, at: At) {
@@ -61,11 +64,13 @@ export function applyTune(e: ScenarioEngine, c: TuneCommand): void {
       // sells a housekeeping crew cannot quietly sell whatever sits there.
       if (c.kind !== undefined) {
         const here = e.unitAt(c.floor, c.x)?.kind ?? e.transportAt(c.floor, c.x)?.kind;
-        if (here !== c.kind) throw new Error(`sell @ ${c.floor},${c.x}: expected ${c.kind}, found ${here ?? "nothing"}`);
+        if (here !== c.kind)
+          throw new Error(`sell @ ${c.floor},${c.x}: expected ${c.kind}, found ${here ?? "nothing"}`);
       }
       // A refusal needs something on the tile to refuse: a sell at a bare tile
       // is a bad address, as it is for the ops that look up a unit first.
-      if (c.expectFail && !e.unitAt(c.floor, c.x) && !e.transportAt(c.floor, c.x)) throw new Error(`no unit or transport at floor ${c.floor}, x ${c.x}`);
+      if (c.expectFail && !e.unitAt(c.floor, c.x) && !e.transportAt(c.floor, c.x))
+        throw new Error(`no unit or transport at floor ${c.floor}, x ${c.x}`);
       expectOk(e.sellAt(c.floor, c.x), c.expectFail, `sell @ ${c.floor},${c.x}`);
       return;
     }
@@ -80,11 +85,20 @@ export function applyTune(e: ScenarioEngine, c: TuneCommand): void {
       return;
     case "setCars": {
       const t = transportAt(e, c);
-      expectOk(e.setCars(t.id, c.cars) && transportAt(e, c).cars === c.cars, c.expectFail, `setCars ${c.cars} @ ${c.floor},${c.x}`);
+      expectOk(
+        e.setCars(t.id, c.cars) && transportAt(e, c).cars === c.cars,
+        c.expectFail,
+        `setCars ${c.cars} @ ${c.floor},${c.x}`,
+      );
       return;
     }
     case "setSchedule":
-      expectOk(e.setSchedule(transportAt(e, c).id, c.schedule), c.expectFail, `setSchedule @ ${c.floor},${c.x}`, "not an elevator");
+      expectOk(
+        e.setSchedule(transportAt(e, c).id, c.schedule),
+        c.expectFail,
+        `setSchedule @ ${c.floor},${c.x}`,
+        "not an elevator",
+      );
       return;
     case "startFire": {
       const before = e.fires();

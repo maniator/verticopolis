@@ -53,7 +53,8 @@ function makeApp() {
     ui: { toast: vi.fn(), sayVisibly: vi.fn() },
   };
 }
-const row = (id: string, type: "tower" | "tdt" = "tower"): FileRow => ({ id, name: id.replace(/\.[^.]+$/, ""), type }) as FileRow;
+const row = (id: string, type: "tower" | "tdt" = "tower"): FileRow =>
+  ({ id, name: id.replace(/\.[^.]+$/, ""), type }) as FileRow;
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 let app: ReturnType<typeof makeApp>;
@@ -90,7 +91,10 @@ describe("the linked folder in the Open and Save As windows", () => {
     expect(await place().link()).toBe("cancel");
     expect(m.track).toHaveBeenLastCalledWith("folder_link", "cancel");
     m.folder.link.mockRejectedValueOnce(new DOMException("no", "NotAllowedError"));
-    expect(await place().link()).toEqual({ text: "Your browser didn't allow the game to use that folder.", kind: "bad" });
+    expect(await place().link()).toEqual({
+      text: "Your browser didn't allow the game to use that folder.",
+      kind: "bad",
+    });
     expect(m.track).toHaveBeenCalledWith("folder_link", "refused");
     expect(m.track).toHaveBeenLastCalledWith("folder_failed");
   });
@@ -99,7 +103,10 @@ describe("the linked folder in the Open and Save As windows", () => {
     expect(await place().allow()).toBeNull();
     expect(m.track).toHaveBeenLastCalledWith("folder_allow", "granted");
     m.folder.allow.mockResolvedValueOnce("denied");
-    expect(await place().allow()).toEqual({ text: "The folder stays closed until your browser allows it.", kind: "bad" });
+    expect(await place().allow()).toEqual({
+      text: "The folder stays closed until your browser allows it.",
+      kind: "bad",
+    });
     expect(m.track).toHaveBeenLastCalledWith("folder_allow", "denied");
   });
 
@@ -119,7 +126,9 @@ describe("the linked folder in the Open and Save As windows", () => {
     expect(m.folder.read).toHaveBeenCalledExactlyOnceWith("A.vctower");
     expect(app.saveLoad.importGame).toHaveBeenCalledExactlyOnceWith(BINARY);
     expect(currentLinkedFile()).toBe("A.vctower");
-    expect(recentTowers()).toEqual([{ place: "folder", id: "A.vctower", name: "A.vctower", kind: "tower", link: "L1" }]);
+    expect(recentTowers()).toEqual([
+      { place: "folder", id: "A.vctower", name: "A.vctower", kind: "tower", link: "L1" },
+    ]);
     expect(m.track).toHaveBeenCalledWith("folder_open", "tower");
   });
 
@@ -153,7 +162,9 @@ describe("the linked folder in the Open and Save As windows", () => {
     m.folder.read.mockResolvedValueOnce(null);
     place().open(row("Gone.vctower"));
     await settle();
-    expect(app.ui.sayVisibly).toHaveBeenCalledExactlyOnceWith(`"Gone" isn't in the folder any more. It may have been moved or deleted.`);
+    expect(app.ui.sayVisibly).toHaveBeenCalledExactlyOnceWith(
+      `"Gone" isn't in the folder any more. It may have been moved or deleted.`,
+    );
     expect(app.saveLoad.importGame).not.toHaveBeenCalled();
   });
 
@@ -182,7 +193,9 @@ describe("the linked folder in the Open and Save As windows", () => {
     expect(await place().save("Sky", false)).toBeNull();
     expect(m.folder.save).toHaveBeenCalledExactlyOnceWith("Sky", Uint8Array.of(7, 7, 7), false);
     expect(currentLinkedFile()).toBe("Sky.vctower");
-    expect(recentTowers()).toEqual([{ place: "folder", id: "Sky.vctower", name: "Sky.vctower", kind: "tower", link: "L1" }]);
+    expect(recentTowers()).toEqual([
+      { place: "folder", id: "Sky.vctower", name: "Sky.vctower", kind: "tower", link: "L1" },
+    ]);
     expect(m.track).toHaveBeenCalledWith("folder_save", "new");
     expect(app.ui.toast).toHaveBeenCalledWith(`Saved "Sky" in Towers.`, "good");
     await place().save("Sky", true);
@@ -193,7 +206,10 @@ describe("the linked folder in the Open and Save As windows", () => {
     m.folder.save.mockRejectedValueOnce(new FileNameTakenError("Sky"));
     expect((await place().save("Sky", false))?.kind).toBe("bad");
     m.folder.save.mockRejectedValueOnce(new DOMException("full", "QuotaExceededError"));
-    expect(await place().save("Sky", false)).toEqual({ text: "There's no room left on your disk for that tower.", kind: "bad" });
+    expect(await place().save("Sky", false)).toEqual({
+      text: "There's no room left on your disk for that tower.",
+      kind: "bad",
+    });
     expect(currentLinkedFile()).toBeNull();
   });
 
@@ -208,7 +224,10 @@ describe("the copy of each tower in the linked folder", () => {
   beforeEach(() => setCurrentFile("T1"));
 
   it("turns on, writes the copy now, and says how often it is written", async () => {
-    expect(await place().setMirror(true)).toEqual({ text: `The tower you play is copied to "Towers" every minute, under its own name.`, kind: "info" });
+    expect(await place().setMirror(true)).toEqual({
+      text: `The tower you play is copied to "Towers" every minute, under its own name.`,
+      kind: "info",
+    });
     expect(m.mirror.set).toHaveBeenCalledExactlyOnceWith(true);
     expect(m.mirror.copy).toHaveBeenCalledExactlyOnceWith(app, expect.any(Number), true);
     expect(m.track).toHaveBeenCalledWith("folder_mirror", "on");
@@ -238,7 +257,10 @@ describe("the copy of each tower in the linked folder", () => {
   });
 
   it("turns off and says the copy stays", async () => {
-    expect(await place().setMirror(false)).toEqual({ text: `Your towers are no longer copied to "Towers". The copies there stay.`, kind: "info" });
+    expect(await place().setMirror(false)).toEqual({
+      text: `Your towers are no longer copied to "Towers". The copies there stay.`,
+      kind: "info",
+    });
     expect(m.mirror.set).toHaveBeenCalledExactlyOnceWith(false);
     expect(m.mirror.copy).not.toHaveBeenCalled();
     expect(m.track).toHaveBeenCalledWith("folder_mirror", "off");

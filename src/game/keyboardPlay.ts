@@ -157,7 +157,9 @@ export class KeyboardPlay {
     if (!c) return;
     const loc = c.floor >= 1 ? `floor ${c.floor}` : `basement ${1 - c.floor}`;
     const here = this.deps.pickedAt(c.floor, c.tile);
-    this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? catalogFacility(this.deps.catalog(), here.kind).name : "Empty"}.`);
+    this.deps.announce(
+      `Cursor: ${loc}, column ${c.tile}. ${here ? catalogFacility(this.deps.catalog(), here.kind).name : "Empty"}.`,
+    );
   }
 
   commitCursor(): void {
@@ -205,7 +207,9 @@ export class KeyboardPlay {
         // right edge places instead of failing.
         this.kbAnchor = { tile: snapX(catalog, kind, c.tile), floor: c.floor };
         this.refreshCursorPreview();
-        this.deps.announce(`${catalogFacility(catalog, kind).name} anchored at floor ${c.floor}. Move to the other end and press Enter.`);
+        this.deps.announce(
+          `${catalogFacility(catalog, kind).name} anchored at floor ${c.floor}. Move to the other end and press Enter.`,
+        );
       } else {
         const bottom = Math.min(this.kbAnchor.floor, c.floor);
         const top = Math.max(this.kbAnchor.floor, c.floor);

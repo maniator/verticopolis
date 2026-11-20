@@ -24,7 +24,10 @@ function funnel(): [string, number, string][] {
     .map(([n, p]) => [n, (p as Funnel).tower_n, (p as Funnel).page_life]);
 }
 /** The tower numbers a `new_game_started` opened: the funnel's entrants. */
-const entrants = () => funnel().filter(([n]) => n === "new_game_started").map(([, t]) => t);
+const entrants = () =>
+  funnel()
+    .filter(([n]) => n === "new_game_started")
+    .map(([, t]) => t);
 
 describe("the first-tower funnel's tower number", () => {
   beforeEach(() => {
@@ -53,7 +56,9 @@ describe("the first-tower funnel's tower number", () => {
     forwardGameplayEvents([founded(), placed("lobby")]);
     nextAnalyticsTower(); // File > Open: the app follows a saved tower, with no founding
     forwardGameplayEvents([star(2), star(3)]);
-    const stars = funnel().filter(([n]) => n === "star_reached").map(([, t]) => t);
+    const stars = funnel()
+      .filter(([n]) => n === "star_reached")
+      .map(([, t]) => t);
     expect(stars).toHaveLength(2);
     for (const t of stars) expect(entrants()).not.toContain(t);
   });

@@ -21,7 +21,11 @@ describe("settingsTemplate structure and a11y", () => {
     ]) {
       const input = frag.querySelector<HTMLInputElement>(`#${id}`)!;
       expect(input.getAttribute("type")).toBe("range");
-      expect([input.getAttribute("min"), input.getAttribute("max"), input.getAttribute("step")]).toEqual(["0", "100", "1"]);
+      expect([input.getAttribute("min"), input.getAttribute("max"), input.getAttribute("step")]).toEqual([
+        "0",
+        "100",
+        "1",
+      ]);
       // The label's `for` points at the slider (a real screen-reader association).
       const lbl = frag.querySelector(`label[for="${id}"]`)!;
       expect(lbl.textContent).toBe(label);

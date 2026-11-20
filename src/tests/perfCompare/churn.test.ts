@@ -13,7 +13,11 @@ describe("churnUnits", () => {
   it("keeps dotted and bracketed keys from colliding or landing in another section", () => {
     const u = churnUnits({ a: { "b.c": 1 }, "a.b": { c: 2 }, "units[0]": [5] });
     expect(u.size).toBe(3);
-    expect(churnBetween(new Map(), u).sections).toEqual({ a: { changed: 1, total: 1 }, "a.b": { changed: 1, total: 1 }, "units[0]": { changed: 1, total: 1 } });
+    expect(churnBetween(new Map(), u).sections).toEqual({
+      a: { changed: 1, total: 1 },
+      "a.b": { changed: 1, total: 1 },
+      "units[0]": { changed: 1, total: 1 },
+    });
   });
   it("keeps a save that is not an object as one unit", () => {
     expect([...churnUnits([1, 2]).keys()]).toEqual([""]);
@@ -78,10 +82,13 @@ describe("measureChurn", () => {
     expect(r.sections.minutes.medianChurn).toBe(1);
   });
   it("is the lower middle hour for an even count", () => {
-    expect(measureChurn(fake(), sc, 2, 30).medianShare).toBe(Math.min(...measureChurn(fake(), sc, 2, 30).hourly.map((h) => h.share)));
+    expect(measureChurn(fake(), sc, 2, 30).medianShare).toBe(
+      Math.min(...measureChurn(fake(), sc, 2, 30).hourly.map((h) => h.share)),
+    );
   });
   it("refuses a step that does not divide an hour, so an hour is always 60 minutes", () => {
-    for (const dt of [0, -2, 7, 25, 45, 90]) expect(() => measureChurn(fake(), sc, 1, dt)).toThrow(/does not divide an hour/);
+    for (const dt of [0, -2, 7, 25, 45, 90])
+      expect(() => measureChurn(fake(), sc, 1, dt)).toThrow(/does not divide an hour/);
     expect(measureChurn(fake(), sc, 1, 60).hourly).toHaveLength(1);
   });
   it("leaves warm-up steps out of hour 1", () => {
@@ -92,7 +99,9 @@ describe("measureChurn", () => {
   });
   it("frees the engine even when the save is unreadable", () => {
     let freed = false;
-    const bad = { Engine: { fromSave: () => ({ tick: () => {}, serialize: () => "{", free: () => (freed = true) }) } } as unknown as WasmModule;
+    const bad = {
+      Engine: { fromSave: () => ({ tick: () => {}, serialize: () => "{", free: () => (freed = true) }) },
+    } as unknown as WasmModule;
     expect(() => measureChurn(bad, sc, 1, 60)).toThrow();
     expect(freed).toBe(true);
   });

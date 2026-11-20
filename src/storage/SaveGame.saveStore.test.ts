@@ -57,7 +57,8 @@ function packedAt(ms: number, text: string): string {
 
 /** The same tower under another name, to tell two saves apart. */
 const renamed = (name: string): string => JSON.stringify({ ...(JSON.parse(tower) as object), towerName: name });
-const nameOf = (text: string | null): string | undefined => (text === null ? undefined : (JSON.parse(text) as { towerName: string }).towerName);
+const nameOf = (text: string | null): string | undefined =>
+  text === null ? undefined : (JSON.parse(text) as { towerName: string }).towerName;
 
 beforeEach(async () => {
   localStorage.clear();

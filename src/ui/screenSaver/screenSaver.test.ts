@@ -9,8 +9,12 @@ function scene() {
 describe("the screen saver overlay", () => {
   let ends: Array<() => void> = [];
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance", "requestAnimationFrame", "cancelAnimationFrame"] });
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctxDouble() as unknown as CanvasRenderingContext2D);
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "performance", "requestAnimationFrame", "cancelAnimationFrame"],
+    });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      ctxDouble() as unknown as CanvasRenderingContext2D,
+    );
   });
   afterEach(() => {
     // End every saver a test left up, and let its swallow window pass, so
@@ -76,7 +80,11 @@ describe("the screen saver overlay", () => {
     const { onEnd } = open();
     vi.advanceTimersByTime(GRACE_MS);
     const move = (x: number, pointerType = "mouse") => {
-      const e = new Event("pointermove", { cancelable: true }) as Event & { clientX: number; clientY: number; pointerType: string };
+      const e = new Event("pointermove", { cancelable: true }) as Event & {
+        clientX: number;
+        clientY: number;
+        pointerType: string;
+      };
       Object.assign(e, { clientX: x, clientY: 0, pointerType });
       window.dispatchEvent(e);
     };
@@ -121,7 +129,9 @@ describe("runScene", () => {
 
   it("stops drawing once its canvas leaves the page", () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctxDouble() as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      ctxDouble() as unknown as CanvasRenderingContext2D,
+    );
     const canvas = document.createElement("canvas");
     document.body.append(canvas);
     const s = scene();

@@ -61,9 +61,7 @@ export const SWEEP_DAYS = 3;
 /** Whether a pull request opened at `createdAt` is recent enough to sweep. */
 export function isRecent(createdAt: string, now: number): boolean {
   const opened = Number(new Date(createdAt));
-  return (
-    Number.isFinite(opened) && now - opened <= SWEEP_DAYS * 24 * 60 * 60 * 1000
-  );
+  return Number.isFinite(opened) && now - opened <= SWEEP_DAYS * 24 * 60 * 60 * 1000;
 }
 
 /** The first line of every message, which marks a thread as welcomed. */
@@ -75,44 +73,29 @@ export const WELCOME_MESSAGES: Readonly<Record<ContributionKind, string>> = {
 };
 
 /** Associations that already belong to the project. */
-const INSIDERS: ReadonlySet<string> = new Set([
-  "OWNER",
-  "MEMBER",
-  "COLLABORATOR",
-]);
+const INSIDERS: ReadonlySet<string> = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 
 /** GitHub logins: letters, digits and single hyphens, up to 39 characters. */
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
 
 /** Why this event gets no welcome before anything is looked up, or null. */
 export function skipBeforeLookup(event: ContributionEvent): string | null {
-  if (INSIDERS.has(event.association))
-    return `${event.author} is ${event.association}`;
-  if (event.authorType === "Bot" || event.author.endsWith("[bot]"))
-    return `${event.author} is a bot`;
+  if (INSIDERS.has(event.association)) return `${event.author} is ${event.association}`;
+  if (event.authorType === "Bot" || event.author.endsWith("[bot]")) return `${event.author} is a bot`;
   if (!LOGIN.test(event.author)) return `unexpected login '${event.author}'`;
   return null;
 }
 
 /** The message with the author's login and the repository filled in. */
-export function renderWelcome(
-  template: string,
-  author: string,
-  repo: string,
-): string {
+export function renderWelcome(template: string, author: string, repo: string): string {
   return template.split("{login}").join(author).split("{repo}").join(repo);
 }
 
-export function welcomeFirstContribution(
-  event: ContributionEvent,
-  port: WelcomePort,
-): WelcomeOutcome {
+export function welcomeFirstContribution(event: ContributionEvent, port: WelcomePort): WelcomeOutcome {
   const skip = skipBeforeLookup(event);
   if (skip) return { posted: false, reason: skip };
 
-  const earlier = port
-    .listAuthorNumbers(event.kind, event.author)
-    .filter((n) => n < event.number);
+  const earlier = port.listAuthorNumbers(event.kind, event.author).filter((n) => n < event.number);
   if (earlier.length > 0) {
     return {
       posted: false,
@@ -123,23 +106,16 @@ export function welcomeFirstContribution(
   const template = port.readMessage(WELCOME_MESSAGES[event.kind]);
   const marker = template.split("\n")[0];
   if (marker !== WELCOME_MARKER) {
-    throw new Error(
-      `${WELCOME_MESSAGES[event.kind]} must start with ${WELCOME_MARKER}`,
-    );
+    throw new Error(`${WELCOME_MESSAGES[event.kind]} must start with ${WELCOME_MARKER}`);
   }
-  const welcomed = port
-    .listCommentBodies(event.number)
-    .some((body) => body.split(/\r?\n/).includes(marker));
+  const welcomed = port.listCommentBodies(event.number).some((body) => body.split(/\r?\n/).includes(marker));
   if (welcomed)
     return {
       posted: false,
       reason: `#${event.number} already has the welcome`,
     };
 
-  port.postComment(
-    event.number,
-    renderWelcome(template, event.author, event.repo),
-  );
+  port.postComment(event.number, renderWelcome(template, event.author, event.repo));
   return {
     posted: true,
     reason: `welcomed ${event.author} on their first ${event.kind}, #${event.number}`,

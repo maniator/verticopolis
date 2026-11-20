@@ -13,7 +13,9 @@ describe("isBrowserExtensionError", () => {
   });
 
   it("flags Gecko and Safari frame formats", () => {
-    expect(isBrowserExtensionError("connect@moz-extension://abc/inpage.js:1:2\n@moz-extension://abc/inpage.js:3:4")).toBe(true);
+    expect(
+      isBrowserExtensionError("connect@moz-extension://abc/inpage.js:1:2\n@moz-extension://abc/inpage.js:3:4"),
+    ).toBe(true);
     expect(isBrowserExtensionError("connect@safari-web-extension://abc/inpage.js:1:2")).toBe(true);
     expect(isBrowserExtensionError("    at chrome-extension://abc/content.js:1:2")).toBe(true);
   });
@@ -21,7 +23,9 @@ describe("isBrowserExtensionError", () => {
   it("keeps an error with any frame from the game's own code", () => {
     const mixed = `${METAMASK_STACK}\n    at boot (https://verticopolis.app/assets/main-abc.js:1:2)`;
     expect(isBrowserExtensionError(mixed)).toBe(false);
-    expect(isBrowserExtensionError("render@https://verticopolis.app/assets/main.js:1:2\nx@chrome-extension://a/b.js:1:1")).toBe(false);
+    expect(
+      isBrowserExtensionError("render@https://verticopolis.app/assets/main.js:1:2\nx@chrome-extension://a/b.js:1:1"),
+    ).toBe(false);
   });
 
   it("keeps an error with a frame whose location it cannot place", () => {

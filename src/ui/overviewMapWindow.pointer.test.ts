@@ -108,7 +108,16 @@ describe("overview map window: camera binding (CAP-3)", () => {
   it("stops dragging a mouse that moves with no button held", () => {
     const r = rig();
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(110), mapY(22)));
-    viewCanvas().dispatchEvent(new PointerEvent("pointermove", { clientX: 150, clientY: 10, pointerType: "mouse", pointerId: 1, buttons: 0, bubbles: true }));
+    viewCanvas().dispatchEvent(
+      new PointerEvent("pointermove", {
+        clientX: 150,
+        clientY: 10,
+        pointerType: "mouse",
+        pointerId: 1,
+        buttons: 0,
+        bubbles: true,
+      }),
+    );
     viewCanvas().dispatchEvent(pointer("pointermove", 160, 10));
     expect(r.moves).toHaveLength(0);
   });
@@ -144,17 +153,29 @@ describe("overview map window: camera binding (CAP-3)", () => {
     document.getElementById(MAP_DOM_ID.toggle)!.dispatchEvent(pointer("pointerdown", 10, 10));
     expect(worldPressed()).toBe(false);
     // The middle button reports `buttons` 4 and the right button 2.
-    world.dispatchEvent(new PointerEvent("pointerdown", { pointerType: "mouse", pointerId: 1, button: 1, buttons: 4, bubbles: true }));
+    world.dispatchEvent(
+      new PointerEvent("pointerdown", { pointerType: "mouse", pointerId: 1, button: 1, buttons: 4, bubbles: true }),
+    );
     expect(worldPressed()).toBe(true);
     document.dispatchEvent(pointer("pointerup", 10, 10));
-    world.dispatchEvent(new PointerEvent("pointerdown", { pointerType: "mouse", pointerId: 1, button: 2, buttons: 2, bubbles: true }));
+    world.dispatchEvent(
+      new PointerEvent("pointerdown", { pointerType: "mouse", pointerId: 1, button: 2, buttons: 2, bubbles: true }),
+    );
     expect(worldPressed()).toBe(true);
   });
 
   it("keeps a mouse drag of the view mark going when a touch lands", () => {
     const r = rig();
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(110), mapY(22)));
-    const palm = new PointerEvent("pointerdown", { pointerType: "touch", pointerId: 9, isPrimary: true, button: 0, buttons: 1, bubbles: true, cancelable: true });
+    const palm = new PointerEvent("pointerdown", {
+      pointerType: "touch",
+      pointerId: 9,
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      bubbles: true,
+      cancelable: true,
+    });
     viewCanvas().dispatchEvent(palm);
     viewCanvas().dispatchEvent(pointer("pointermove", mapX(140), mapY(22)));
     expect(r.moves).toHaveLength(1);
@@ -163,7 +184,17 @@ describe("overview map window: camera binding (CAP-3)", () => {
   it("ignores a pen's barrel or eraser button, and drops a pen press whose release was lost", () => {
     const r = rig();
     const pen = (type: string, id: number, button: number, buttons: number) =>
-      new PointerEvent(type, { clientX: mapX(300), clientY: mapY(26), pointerType: "pen", pointerId: id, isPrimary: true, button, buttons, bubbles: true, cancelable: true });
+      new PointerEvent(type, {
+        clientX: mapX(300),
+        clientY: mapY(26),
+        pointerType: "pen",
+        pointerId: id,
+        isPrimary: true,
+        button,
+        buttons,
+        bubbles: true,
+        cancelable: true,
+      });
     viewCanvas().dispatchEvent(pen("pointerdown", 1, 2, 2));
     viewCanvas().dispatchEvent(pen("pointerup", 1, 2, 0));
     expect(r.moves).toHaveLength(0);
@@ -206,8 +237,22 @@ describe("overview map window: camera binding (CAP-3)", () => {
 
   it("ends a pen press whose release was lost when the pen hovers back with a new id", () => {
     const r = rig();
-    viewCanvas().dispatchEvent(new PointerEvent("pointerdown", { clientX: mapX(110), clientY: mapY(22), pointerType: "pen", pointerId: 4, isPrimary: true, button: 0, buttons: 1, bubbles: true, cancelable: true }));
-    viewCanvas().dispatchEvent(new PointerEvent("pointermove", { pointerType: "pen", pointerId: 5, buttons: 0, bubbles: true }));
+    viewCanvas().dispatchEvent(
+      new PointerEvent("pointerdown", {
+        clientX: mapX(110),
+        clientY: mapY(22),
+        pointerType: "pen",
+        pointerId: 4,
+        isPrimary: true,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    viewCanvas().dispatchEvent(
+      new PointerEvent("pointermove", { pointerType: "pen", pointerId: 5, buttons: 0, bubbles: true }),
+    );
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(26)));
     viewCanvas().dispatchEvent(pointer("pointerup", mapX(300), mapY(26)));
     expect(r.moves).toHaveLength(1);
@@ -238,7 +283,9 @@ describe("overview map window: camera binding (CAP-3)", () => {
     const r = rig({ phone: true, stored: MAP_OPEN_VALUE.open });
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(26), "touch"));
     // A key held from before (panning the world) repeats: still the tap's.
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", code: "ArrowUp", repeat: true, bubbles: true }));
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", code: "ArrowUp", repeat: true, bubbles: true }),
+    );
     viewCanvas().focus();
     expect(document.activeElement).not.toBe(viewCanvas());
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", code: "Tab", bubbles: true }));
@@ -291,7 +338,17 @@ describe("overview map window: camera binding (CAP-3)", () => {
     rig();
     const now = vi.spyOn(performance, "now").mockReturnValue(1000);
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(26), "touch", 1));
-    const down = new PointerEvent("pointerdown", { clientX: mapX(200), clientY: mapY(14), pointerType: "touch", pointerId: 2, isPrimary: true, button: 0, buttons: 1, bubbles: true, cancelable: true });
+    const down = new PointerEvent("pointerdown", {
+      clientX: mapX(200),
+      clientY: mapY(14),
+      pointerType: "touch",
+      pointerId: 2,
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      bubbles: true,
+      cancelable: true,
+    });
     viewCanvas().dispatchEvent(down);
     viewCanvas().dispatchEvent(pointer("pointerup", mapX(200), mapY(14), "touch", 2));
     now.mockReturnValue(1001 + MAP_POINTER_FOCUS_MS);
@@ -303,7 +360,17 @@ describe("overview map window: camera binding (CAP-3)", () => {
     rig();
     const now = vi.spyOn(performance, "now").mockReturnValue(1000);
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(26), "touch", 1));
-    viewCanvas().dispatchEvent(new PointerEvent("pointerdown", { pointerType: "mouse", pointerId: 9, isPrimary: true, button: 0, buttons: 1, bubbles: true, cancelable: true }));
+    viewCanvas().dispatchEvent(
+      new PointerEvent("pointerdown", {
+        pointerType: "mouse",
+        pointerId: 9,
+        isPrimary: true,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
     viewCanvas().dispatchEvent(pointer("pointerup", 0, 0, "mouse", 9));
     now.mockReturnValue(5000);
     viewCanvas().focus();
@@ -320,7 +387,17 @@ describe("overview map window: camera binding (CAP-3)", () => {
   it("drops a map touch whose release was lost when a new primary touch lands", () => {
     const r = rig();
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(26), "touch", 1));
-    const down = new PointerEvent("pointerdown", { clientX: mapX(200), clientY: mapY(14), pointerType: "touch", pointerId: 2, isPrimary: true, button: 0, buttons: 1, bubbles: true, cancelable: true });
+    const down = new PointerEvent("pointerdown", {
+      clientX: mapX(200),
+      clientY: mapY(14),
+      pointerType: "touch",
+      pointerId: 2,
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      bubbles: true,
+      cancelable: true,
+    });
     viewCanvas().dispatchEvent(down);
     viewCanvas().dispatchEvent(pointer("pointerup", mapX(200), mapY(14), "touch", 2));
     expect(r.moves).toHaveLength(1);
@@ -332,7 +409,19 @@ describe("overview map window: camera binding (CAP-3)", () => {
     // Finger 1 lands on the world and its release never reaches the page.
     document.getElementById("view")!.dispatchEvent(pointer("pointerdown", 10, 10, "touch", 1));
     const tap = (id: number) => {
-      viewCanvas().dispatchEvent(new PointerEvent("pointerdown", { clientX: mapX(300), clientY: mapY(26), pointerType: "touch", pointerId: id, isPrimary: true, button: 0, buttons: 1, bubbles: true, cancelable: true }));
+      viewCanvas().dispatchEvent(
+        new PointerEvent("pointerdown", {
+          clientX: mapX(300),
+          clientY: mapY(26),
+          pointerType: "touch",
+          pointerId: id,
+          isPrimary: true,
+          button: 0,
+          buttons: 1,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
       viewCanvas().dispatchEvent(pointer("pointerup", mapX(300), mapY(26), "touch", id));
     };
     tap(2);
@@ -343,9 +432,13 @@ describe("overview map window: camera binding (CAP-3)", () => {
     rig();
     const world = document.getElementById("view")!;
     world.dispatchEvent(pointer("pointerdown", 10, 10));
-    document.dispatchEvent(new PointerEvent("pointermove", { pointerType: "mouse", pointerId: 1, buttons: 1, bubbles: true }));
+    document.dispatchEvent(
+      new PointerEvent("pointermove", { pointerType: "mouse", pointerId: 1, buttons: 1, bubbles: true }),
+    );
     expect(worldPressed()).toBe(true);
-    document.dispatchEvent(new PointerEvent("pointermove", { pointerType: "mouse", pointerId: 1, buttons: 0, bubbles: true }));
+    document.dispatchEvent(
+      new PointerEvent("pointermove", { pointerType: "mouse", pointerId: 1, buttons: 0, bubbles: true }),
+    );
     expect(worldPressed()).toBe(false);
     world.dispatchEvent(pointer("pointerdown", 10, 10));
     window.dispatchEvent(new Event("blur"));
@@ -374,8 +467,9 @@ describe("overview map window: camera binding (CAP-3)", () => {
 
   it("ignores a right click", () => {
     const r = rig();
-    viewCanvas().dispatchEvent(new PointerEvent("pointerdown", { clientX: 10, clientY: 10, pointerType: "mouse", button: 2, bubbles: true }));
+    viewCanvas().dispatchEvent(
+      new PointerEvent("pointerdown", { clientX: 10, clientY: 10, pointerType: "mouse", button: 2, bubbles: true }),
+    );
     expect(r.moves).toHaveLength(0);
   });
-
 });

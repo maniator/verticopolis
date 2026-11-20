@@ -20,7 +20,8 @@ export const MAP_AB_VIEWPORT = { width: 1280, height: 800 } as const;
 /** `--map-ab` needs `--aa wasm`: the pass compares two Map states on the
  *  shipped host, and both slots run the same engine. */
 export function checkMapAb(mapAb: boolean, aa: AaMode | null): void {
-  if (mapAb && aa !== "wasm") throw new Error("--map-ab runs on the A/A pass of the shipped host; pass --aa wasm with it");
+  if (mapAb && aa !== "wasm")
+    throw new Error("--map-ab runs on the A/A pass of the shipped host; pass --aa wasm with it");
 }
 
 /** Whether a slot runs with the Map open. */
@@ -51,12 +52,17 @@ export async function checkMapSlot(page: Page, mapAb: boolean | undefined, slot:
   const want = mapOpenInSlot(slot);
   await page.waitForFunction(() => document.getElementById("overview-map") !== null, undefined, { timeout: 30_000 });
   // Give the stored choice a moment to apply before reading it once.
-  await page.waitForFunction((open) => document.getElementById("overview-map")?.hidden === !open, want, { timeout: 5_000 }).catch(() => undefined);
+  await page
+    .waitForFunction((open) => document.getElementById("overview-map")?.hidden === !open, want, { timeout: 5_000 })
+    .catch(() => undefined);
   const open = await page.evaluate(() => {
     const map = document.getElementById("overview-map");
     return map !== null && !map.hidden;
   });
-  if (open !== want) throw new Error(`slot ${slot} should run with the Map ${want ? "open" : "closed"}, but the page shows it ${open ? "open" : "closed"}`);
+  if (open !== want)
+    throw new Error(
+      `slot ${slot} should run with the Map ${want ? "open" : "closed"}, but the page shows it ${open ? "open" : "closed"}`,
+    );
 }
 
 /** The report banner that leads a `--map-ab` folder, in place of the A/A one. */
@@ -72,6 +78,12 @@ export const MAP_AB_LIMITATION =
  *  A/A input or a comparison. */
 export function checkMapAbFolder(name: string, mapAb: boolean): void {
   const named = /(^|[-_.])map-ab([-_.]|$)/i.test(name);
-  if (mapAb && !named) throw new Error(`--map-ab needs an --out folder name containing map-ab, so the folder cannot be mistaken for an A/A pass`);
-  if (!mapAb && named) throw new Error(`--out ${name} names a Map A/B folder, but this run is not one; pass --map-ab or pick another name`);
+  if (mapAb && !named)
+    throw new Error(
+      `--map-ab needs an --out folder name containing map-ab, so the folder cannot be mistaken for an A/A pass`,
+    );
+  if (!mapAb && named)
+    throw new Error(
+      `--out ${name} names a Map A/B folder, but this run is not one; pass --map-ab or pick another name`,
+    );
 }
