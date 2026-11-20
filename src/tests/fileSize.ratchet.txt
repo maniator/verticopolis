@@ -9,10 +9,39 @@
 # ui / app spine
 # storage
 # scripts
-# tests (split last; grouped by type, so colocated test paths may live outside src/tests/)
-src/tests/integration/uiDialogs.integration.test.ts
-src/tests/integration/gameControllersCoverage.integration.test.ts
-src/tests/integration/tdtImport.integration.test.ts
-src/tests/integration/tdtExport.integration.test.ts
-src/tests/integration/storage.integration.test.ts
-src/tests/integration/gameControllers.integration.test.ts
+# Over the ceiling once Prettier formatted them (owner, 2026-11-20); test
+# files (*.test.ts) are exempt, so none is listed.
+scripts/perf-load-memory.ts
+scripts/scenes/features.ts
+scripts/scenes/showcase.ts
+scripts/screenshot-tower-builders.ts
+scripts/screenshots.ts
+src/analyticsSession.ts
+src/bootstrap.ts
+src/build/rollbackRehearsal.ts
+src/build/thirdPartyNotices.ts
+src/game/engineWiring.ts
+src/game/inputKeys.ts
+src/game/saveLoad.ts
+src/game/toolingTower.ts
+src/main.ts
+src/storage/fileSpace.ts
+src/storage/linkedFolder.ts
+src/tests/engineFixtures/engineLifecycle.fixture.ts
+src/tests/goldens/portEditCases.ts
+src/tests/goldens/portEdits.ts
+src/tests/perfCompare/calibrate.ts
+src/tests/perfCompare/main.ts
+src/tests/perfCompare/metrics.ts
+src/tests/perfCompare/report.ts
+src/tests/perfCompare/runner.ts
+src/tests/perfWorker/analysis.ts
+src/tests/perfWorker/main.ts
+src/tests/perfWorker/runner.ts
+src/tests/portKit/portSim.ts
+src/ui/Onboarding.ts
+src/ui/UI.ts
+src/ui/desk/deskController.ts
+src/ui/fileDialog.ts
+src/ui/overviewMapWindow.ts
+src/ui/uiElevatorSchedule.ts

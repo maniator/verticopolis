@@ -42,10 +42,11 @@ instead of ticking a box.
 
 ## Quality gates
 
-<!-- All four must be green before merge. -->
+<!-- All five must be green before merge. -->
 
 - [ ] `npm run typecheck`
 - [ ] `npm run lint`
+- [ ] `npm run format:check`
 - [ ] `npm test`
 - [ ] `npm run build`
 

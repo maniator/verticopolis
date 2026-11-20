@@ -68,7 +68,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   existing guard's allowlist or shrinking its ratchet is fine. See
   CONTRIBUTING.md → **Quality gates**.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
-  `npm test`, `npm run build`. All four must be green. The build needs the
+  `npm run format:check`, `npm test`, `npm run build`. All five must be
+  green. Prettier owns code layout (`.prettierrc.json`) and ESLint the rest;
+  run `npm run format` before committing. The build needs the
   engine package (`npm install` copies it from `@verticopolis/engine`), or `VC_ALLOW_NO_ENGINE=1` for a
   deliberate build without the engine (it cannot run the game); see CONTRIBUTING.md.
 - **American English everywhere.**

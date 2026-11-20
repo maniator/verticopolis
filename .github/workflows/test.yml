@@ -204,6 +204,12 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
         run: npm run lint
 
+      # Prettier skips Markdown and JSON, so the prose lane cannot change its
+      # answer either.
+      - name: Format check
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
+        run: npm run format:check
+
       - name: Typecheck
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
         run: npm run typecheck
