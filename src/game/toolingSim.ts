@@ -1,5 +1,5 @@
 import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import type { PortRenderSim } from "@verticopolis/components/port/portRenderSim";
+import type { FrameReader } from "@verticopolis/engine/port/frameReader";
 import { newRenderSim } from "./portAccess";
 import type { ViewReader } from "@verticopolis/components/port/viewReader";
 import type { HudSource } from "../ui/uiStatus";
@@ -104,8 +104,8 @@ export function adoptToolingSim(app: ToolingApp, built: ToolingTower, keepCamera
 export function followToolingEdit(app: {
   readonly enginePort: EnginePort;
   readonly reader: ViewReader;
-  renderSim: PortRenderSim;
-  readonly engine: { setSim(sim: PortRenderSim, opts?: { keepCamera?: boolean }): void };
+  renderSim: FrameReader;
+  readonly engine: { setSim(sim: FrameReader, opts?: { keepCamera?: boolean }): void };
   readonly ui: { lastLogSeq: number };
 }): void {
   app.reader.update();

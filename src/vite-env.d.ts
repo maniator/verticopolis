@@ -29,8 +29,7 @@ declare const __PREVIEW_DEPLOY__: boolean;
 /** This build's parts, for the update prompt's "game or engine" label (see
  *  src/pwaUpdateInfo.ts and src/build/buildFingerprint.ts). */
 declare const __BUILD_FINGERPRINT__: import("./pwaUpdateInfo").BuildFingerprint;
-declare const __ENGINE_PACKAGE__:
-  import("@verticopolis/components/host/enginePackageRecord").ExpectedEnginePackage | null;
+declare const __ENGINE_PACKAGE__: import("@verticopolis/engine/host/enginePackageRecord").ExpectedEnginePackage | null;
 
 /** A help page from help-site/src/content/docs/, compiled at build time by
  *  src/build/helpMarkdown.ts: its front matter and its body as lit templates. */

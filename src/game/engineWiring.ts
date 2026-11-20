@@ -22,6 +22,7 @@ import { appPlacementPaused, refuseAppPlacementWhilePaused } from "./pausedBuild
 import { holdRefusal, sayHeldRefusal, sayPressRefusal } from "./dragRefusal";
 import { pickPersonAt } from "@verticopolis/components/render/excalibur/personFocus";
 import { placeSkyBridge, skyBridgeStep, tapSkyBridge } from "./skyBridgeGestures";
+import { toRenderSim } from "../engineRender";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -499,7 +500,7 @@ export function rebuildEngine(app: GameApp): Promise<void> {
   app.inspector.hide(); // drop a peek card the severed touch can no longer dismiss
   app.commitUndo(); // close the severed gesture's pending capture (no-op when clean)
   app.canvas = fresh;
-  app.engine = new TowerEngine(fresh, app.renderSim, app.reader);
+  app.engine = new TowerEngine(fresh, toRenderSim(app.renderSim));
   if (!app.engine.rendersWithWebGL()) {
     // Excalibur silently fell back to Canvas2D: the GPU is still wedged.
     // That mode is degraded AND blind to further context losses, so treat

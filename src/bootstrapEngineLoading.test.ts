@@ -13,8 +13,8 @@ vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 // A package load the test settles itself, to hold the boot while it looks at the cover.
 const held = vi.hoisted(() => ({ fail: (_e: Error) => {} }));
 const noop = held.fail;
-vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>()),
+vi.mock("@verticopolis/engine/host/rustEngine", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@verticopolis/engine/host/rustEngine")>()),
   loadWasmEngine: vi.fn(() => new Promise((_, reject) => (held.fail = reject))),
 }));
 

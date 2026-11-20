@@ -195,10 +195,10 @@ describe.skipIf(noEngine)("PortRenderSim on the engine", () => {
     const { engine, reader, r } = renderTower();
     engine.tick(600);
     reader.update();
-    const q = r.crowd.queueView(r.tower);
-    expect(r.crowd.queueView(r.tower)).toBe(q);
+    const q = r.crowd.queueView();
+    expect(r.crowd.queueView()).toBe(q);
     engine.tick(1);
     reader.update();
-    expect(r.crowd.queueView(r.tower)).not.toBe(q);
+    expect(r.crowd.queueView()).not.toBe(q);
   });
 });

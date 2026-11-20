@@ -1,9 +1,11 @@
 import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
-import { catalogOn, useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
+import { catalogOn } from "@verticopolis/components/catalog/towerCatalog";
+import { useTowerSource } from "@verticopolis/components/render/towerSource";
 import type { FacilityKind } from "@verticopolis/components/shared/types";
 import type { EnginePort } from "@verticopolis/components/port/enginePort";
 import type { PortCodes } from "@verticopolis/components/port/portCodes";
-import { PortRenderSim } from "@verticopolis/components/port/portRenderSim";
+import { FrameReader } from "@verticopolis/engine/port/frameReader";
+import { renderRules, toRenderCatalog } from "../engineRender";
 import type { SimView } from "@verticopolis/components/port/view";
 import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
 import { ViewReader } from "@verticopolis/components/port/viewReader";
@@ -78,9 +80,9 @@ export function newViewReader(port: EnginePort): ViewReader {
 /** What the renderer draws for `port`: the render sim reads its catalog from the
  *  engine's source, so a room is sized as the engine sizes it (the Rust engine's
  *  wedding hall is five stories; the TypeScript tables hold one). */
-export function newRenderSim(port: EnginePort, reader: ViewReader): PortRenderSim {
-  const sim = new PortRenderSim(port, reader);
-  useTowerCatalogSource(sim, (mode) => catalogOn(port, mode));
+export function newRenderSim(port: EnginePort, reader: ViewReader): FrameReader {
+  const sim = new FrameReader(port, reader);
+  useTowerSource(sim, { catalog: (mode) => toRenderCatalog(catalogOn(port, mode)), rules: renderRules });
   return sim;
 }
 

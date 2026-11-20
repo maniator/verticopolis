@@ -12,14 +12,17 @@ import { repoRel, sourceFiles } from "./guardFiles";
  * Rust, say) would reopen the gap with every other test green, so this fails
  * on it.
  */
-const BOOT_CALLS = ["rustBootTower(", "loadWasmEngine(", "publishRustEngine("] as const;
+const BOOT_CALLS = ["rustBootTower(", "loadGameEngine(", "publishRustEngine("] as const;
+
+/** The engine's own loader, which only the game's wrapper (`src/engineLoad.ts`) calls. */
+const LOADER = "loadWasmEngine(";
 
 /** Where each call may appear in shipped code: its definition, the boot, the
  *  `.TDT` codec, which loads the package only to read and write a file with a
  *  short-lived engine and never offers a tower to Rust, and the sprite gallery
  *  and the room preview, which load it only to read the catalog tables they
  *  draw from. */
-const ALLOWED = new Set(["src/wasmhost/rustEngine.ts", "src/bootstrap.ts", "src/gallery.ts", "src/preview.ts"]);
+const ALLOWED = new Set(["src/engineLoad.ts", "src/bootstrap.ts", "src/gallery.ts", "src/preview.ts"]);
 
 const isTestFile = (rel: string): boolean => /\.(test|spec|fixture)\.tsx?$/.test(rel) || rel.startsWith("src/tests/");
 
@@ -31,7 +34,9 @@ describe("the Rust engine enters a page life at the boot only", () => {
 
   it("names each Rust boot call outside the boot and its definition nowhere", () => {
     const strays = files
-      .filter((f) => !isTestFile(f.rel) && !ALLOWED.has(f.rel) && BOOT_CALLS.some((c) => f.text.includes(c)))
+      .filter(
+        (f) => !isTestFile(f.rel) && !ALLOWED.has(f.rel) && [...BOOT_CALLS, LOADER].some((c) => f.text.includes(c)),
+      )
       .map((f) => f.rel);
     expect(strays).toEqual([]);
   });

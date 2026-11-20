@@ -10,7 +10,7 @@ import { trackAppAction } from "./analytics";
 import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
 import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
 import { readCatalog } from "@verticopolis/components/binding/catalog";
-import { loadWasmEngine } from "@verticopolis/components/host/rustEngine";
+import { loadGameEngine } from "./engineLoad";
 import { helpUrl } from "./helpAddress";
 
 /** The Rust engine's Modern catalog, read before the page draws. The engine is
@@ -365,7 +365,7 @@ function frame() {
  *  for the sizes. */
 async function start(): Promise<void> {
   try {
-    catalog = readCatalog(await loadWasmEngine(), "modern");
+    catalog = readCatalog(await loadGameEngine(), "modern");
     // A tooling page draws sprites without a tower, so it binds the catalog's
     // world for the view (the lot geometry the sprites hash on).
     bindViewWorld(catalog.world);

@@ -66,7 +66,8 @@ import { arrivalLine } from "./game/arrivalLine";
 import { ViewReader } from "@verticopolis/components/port/viewReader";
 import { PortCodes } from "@verticopolis/components/port/portCodes";
 import { PortEvents } from "@verticopolis/components/port/portEvents";
-import type { PortRenderSim } from "@verticopolis/components/port/portRenderSim";
+import type { FrameReader } from "@verticopolis/engine/port/frameReader";
+import { toRenderSim } from "./engineRender";
 import { hudSource } from "./game/hudSource";
 import { catalogOf, newRenderSim, newViewReader } from "./game/portAccess";
 import type { BootTower } from "./game/bootTower";
@@ -101,7 +102,7 @@ class GameApp implements GameAppPorts {
   reader!: ViewReader;
   portCodes!: PortCodes;
   /** The engine's gameplay events, for the analytics bridge. */ events!: PortEvents;
-  /** What the renderer draws: the reader's view and the port's render queries. */ renderSim!: PortRenderSim;
+  /** What the renderer draws: the reader's view and the port's render queries. */ renderSim!: FrameReader;
   /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
   /** The elevator schedule review for older towers (#1548). @internal */ scheduleReview!: ScheduleReview;
   /** The tower the tooling harnesses edit by hand (`toolingSim.ts`); undefined on the Rust engine in production. */
@@ -267,7 +268,7 @@ class GameApp implements GameAppPorts {
     // A reloaded TOWER was congratulated when it was won (#1134).
     this.shownWin = this.enginePort.evaluatedTower();
     this.renderSim = newRenderSim(this.enginePort, this.reader);
-    this.engine = new TowerEngine(this.canvas, this.renderSim, this.reader);
+    this.engine = new TowerEngine(this.canvas, toRenderSim(this.renderSim));
 
     // Restore persisted audio prefs onto the facade BEFORE any UI wiring or
     // gesture listener exists, so the very first interaction (which starts the

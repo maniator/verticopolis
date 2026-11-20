@@ -18,7 +18,7 @@ import type { GameApp } from "../main";
 import type { FacilityKind } from "@verticopolis/components/shared/types";
 import { findViewKind } from "@verticopolis/components/presentation/viewKinds";
 import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "@verticopolis/components/port/roomTiers";
-import type { HallRun } from "@verticopolis/components/render/lobbyHalls";
+import { lobbyHalls, type HallRun } from "@verticopolis/components/render/lobbyHalls";
 import { FLOOR, TILE } from "@verticopolis/components/render/scale";
 import { browserStorage, type MapLayoutClass } from "../ui/overviewMapPrefs";
 import { rememberMapSpot, storedMapSpot } from "../ui/overviewMapSpot";
@@ -80,7 +80,7 @@ function guardedHeat(app: GameApp): MapHeatSource {
 function guardedHalls(app: GameApp): readonly HallRun[] {
   if (engineTrapped() || isEngineStopped()) return [];
   try {
-    return app.engine.sim.tower.tallLobbies().runs;
+    return lobbyHalls(app.engine.sim.tower.lobbyHeights()).runs;
   } catch (error) {
     if (noteEngineThrow(error)) return [];
     throw error;

@@ -16,11 +16,11 @@ const wasmStub = vi.hoisted(() => ({
   rustCorrupt: false,
   binary: null as { state: "ok"; sourceHash: string } | null,
 }));
-vi.mock("@verticopolis/components/host/rustEngine", async (importOriginal) => {
-  const real = await importOriginal<typeof import("@verticopolis/components/host/rustEngine")>();
+vi.mock("@verticopolis/engine/host/rustEngine", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@verticopolis/engine/host/rustEngine")>();
   return {
     ...real,
-    loadWasmEngine: vi.fn(async (_url?: string, _signal?: AbortSignal, opts?: { onBuild?: (b: unknown) => void }) => {
+    loadWasmEngine: vi.fn(async (_url?: string, opts?: { onBuild?: (b: unknown) => void }) => {
       if (wasmStub.binary) opts?.onBuild?.(wasmStub.binary);
       if (wasmStub.module) return wasmStub.module;
       throw wasmStub.loadError ?? new Error("no package in this test");
@@ -46,7 +46,7 @@ vi.mock("./engineCrash/crashReload", async (importOriginal) => {
 });
 // The relay, so the reliability rows (`engine_status`) can be read back.
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
-import { rustBootTower } from "@verticopolis/components/host/rustEngine";
+import { rustBootTower } from "@verticopolis/engine/host/rustEngine";
 import { sendToRelay } from "./analyticsRelay";
 import { resetEngineStatus } from "./analyticsEngineStatus";
 import * as pwa from "./pwa";

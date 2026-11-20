@@ -5,6 +5,7 @@ import { catalogLockView } from "../conformance/catalogLockView";
 import { RoomTierReader } from "@verticopolis/components/port/roomTiers";
 import { BOOT_SEED, bootTower } from "../../game/bootTower";
 import { rustBootTower } from "@verticopolis/components/host/rustEngine";
+import { useEngineCatalogs } from "../../engineRender";
 import { digest } from "../conformance/canonical";
 import { CONFORMANCE_DIR, REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
@@ -40,7 +41,7 @@ describe.skipIf(!hasWasmPackage())("engine package surface", () => {
   // type, since the TypeScript reference lacks it, so nothing at compile time
   // notices a hosted port that dropped it: this does.
   it("the port the app boots answers roomTiers, and a reader on it is available", () => {
-    const { port } = rustBootTower(wasm(), { seed: BOOT_SEED, boot: bootTower });
+    const { port } = rustBootTower(wasm(), { seed: BOOT_SEED, boot: bootTower, useCatalogs: useEngineCatalogs });
     try {
       expect(typeof port.roomTiers).toBe("function");
       const reader = new RoomTierReader(port);
