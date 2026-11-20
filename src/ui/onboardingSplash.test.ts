@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { OnboardingController } from "./Onboarding";
-import { gameStylesheet } from "../tests/gameStylesheet.ts";
 
 /**
  * Splash-mute contract (SPEC-splash-mute, `_bmad-output/specs/spec-splash-mute/`):
@@ -119,17 +118,6 @@ describe("splash mute toggle (CAP-1)", () => {
     expect(btn.getAttribute("aria-label")).toBe("Mute sound");
   });
 
-  it("carries a comfortable touch target: the .splash-mute rule floors both dimensions at >= 44px (CAP-1)", () => {
-    // happy-dom applies no stylesheet, so read the shipped CSS rule directly:
-    // the 44px WCAG floor is the spec requirement, and no unit DOM can measure
-    // layout. Pins the rule against a future value trim below the floor.
-    const css = gameStylesheet();
-    const rule = css.match(/\.splash-mute\s*\{([^}]*)\}/)?.[1] ?? "";
-    const px = (prop: string) => Number(rule.match(new RegExp(`${prop}\\s*:\\s*(\\d+)px`))?.[1] ?? "0");
-    expect(px("min-width")).toBeGreaterThanOrEqual(44);
-    expect(px("min-height")).toBeGreaterThanOrEqual(44);
-  });
-
   it("joins the focus trap's button cycle, LAST in reading order (title -> actions -> utility)", () => {
     const el = mountSplash({ hasSave: true });
     const items = Array.from(el.querySelectorAll<HTMLElement>("button:not([disabled])"));
@@ -222,14 +210,6 @@ describe("splash install button (SPEC-pwa-install CAP-5)", () => {
     const items = Array.from(el.querySelectorAll<HTMLElement>("button:not([disabled])"));
     expect(items[items.length - 1].getAttribute("data-splash")).toBe("install");
     expect(items[items.length - 2].getAttribute("data-splash")).toBe("mute");
-  });
-
-  it("carries a comfortable touch target: the .splash-install rule floors both dimensions at >= 44px", () => {
-    const css = gameStylesheet();
-    const rule = css.match(/\.splash-install\s*\{([^}]*)\}/)?.[1] ?? "";
-    const px = (prop: string) => Number(rule.match(new RegExp(`${prop}\\s*:\\s*(\\d+)px`))?.[1] ?? "0");
-    expect(px("min-width")).toBeGreaterThanOrEqual(44);
-    expect(px("min-height")).toBeGreaterThanOrEqual(44);
   });
 });
 

@@ -410,8 +410,8 @@ test.describe("overview map on a phone", () => {
     });
     // In the page's own font, then in DejaVu Sans, the widest common UI font.
     // The pinned CI image has no DejaVu Sans (and adding it would change the
-    // default sans font under the visual baselines), so CI skips that pass;
-    // src/tests/landscapeChipWidths.test.ts pins its measured widths instead.
+    // default sans font under the visual baselines), so CI skips that pass and
+    // checks the chips against the widths it measured instead (below).
     for (const font of ["", '"DejaVu Sans"']) {
       if (font && !hasDejaVu) {
         test.info().annotations.push({ type: "skipped pass", description: "DejaVu Sans is not installed" });
@@ -447,6 +447,43 @@ test.describe("overview map on a phone", () => {
       // Two rows: the buttons, then the chips.
       expect(sizes.shortest.bar, font).toBeLessThan(60);
     }
+    // The longest values as DejaVu Sans 2.37 draws them in Chrome, in each
+    // chip's own weight and size (the floor suffix in its smaller medium
+    // face). Each chip, as laid out here, must hold them whole, with any
+    // letter-spacing the page adds; money and population also keep room to
+    // grow (9em and 4.5em).
+    const room = await page.evaluate(() => {
+      const MEASURED_PX = {
+        trafficLabel: 70.06, // "Backed up", bold
+        trafficFloor: 33.8, // " · 100F"
+        time: 73.92, // "WD2 00:00"
+        date: 156.28, // "2nd WD/4Q/122nd Year"
+        money: 110.4, // "$-1,000,000,000"
+        pop: 54.2, // "100,000"
+      };
+      const el = (id: string) => document.getElementById(id)!;
+      const width = (id: string) => el(id).getBoundingClientRect().width;
+      const px = (v: string) => (v === "normal" ? 0 : parseFloat(v));
+      // What `chars` characters of text need in `id`, letter-spacing included.
+      const need = (id: string, measured: number, chars: number) => measured + px(getComputedStyle(el(id)).letterSpacing) * chars;
+      const fontPx = (id: string) => parseFloat(getComputedStyle(el(id)).fontSize);
+      const glyph = el("traffic-glyph");
+      return {
+        traffic: {
+          width: width("traffic"),
+          need:
+            glyph.getBoundingClientRect().width +
+            px(getComputedStyle(glyph).marginInlineEnd) +
+            need("traffic-label", MEASURED_PX.trafficLabel, "Backed up".length) +
+            need("traffic-floor", MEASURED_PX.trafficFloor, " · 100F".length),
+        },
+        time: { width: width("stat-time"), need: need("stat-time", MEASURED_PX.time, "WD2 00:00".length) },
+        date: { width: width("stat-date"), need: need("stat-date", MEASURED_PX.date, "2nd WD/4Q/122nd Year".length) },
+        money: { width: width("stat-money"), need: Math.max(need("stat-money", MEASURED_PX.money, "$-1,000,000,000".length), 9 * fontPx("stat-money")) },
+        pop: { width: width("stat-pop"), need: Math.max(need("stat-pop", MEASURED_PX.pop, "100,000".length), 4.5 * fontPx("stat-pop")) },
+      };
+    });
+    for (const [chip, { width, need }] of Object.entries(room)) expect(width, chip).toBeGreaterThanOrEqual(need - 0.01);
     // A tier word too wide for its chip is trimmed on its one line, and the
     // floor still shows whole.
     const trimmed = await page.evaluate(() => {

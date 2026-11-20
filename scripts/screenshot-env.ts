@@ -126,7 +126,7 @@ export const PHONE_LANDSCAPE: Viewport = { width: 852, height: 352 };
 
 /** Whether a scene's viewport takes the phone layout, in either orientation,
  *  so the page presents as a touch device and the coarse-pointer rules apply.
- *  The bounds live in src/tests/phoneTier.ts, tested against the page's query. */
+ *  The bounds live in src/tests/phoneTier.ts; e2e/phoneTier.spec.ts checks them against the page. */
 export { isPhoneViewport } from "../src/tests/phoneTier.ts";
 
 /** Assert the page finished staging: the splash is gone and (optionally) the

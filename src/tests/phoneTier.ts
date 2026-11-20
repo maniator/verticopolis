@@ -1,6 +1,6 @@
 /**
  * The phone tier's bounds, the same numbers as `mobileMq` in src/main.ts and
- * the phone block in styles.css (phoneTierBounds.test.ts keeps the three in
+ * the phone block in the stylesheet (e2e/phoneTier.spec.ts keeps the three in
  * step): up to 767px wide, or up to 1023 by 599. The screenshot generator
  * (scripts/screenshot-env.ts) reads it to decide which scenes present as a
  * touch device. Lives under src/tests (not scripts/) so the unit tier can
