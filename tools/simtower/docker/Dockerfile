@@ -5,12 +5,12 @@
 # libmspack (see kwajd.c). (STOWER.EXE on the disc is a 32-bit Macromedia
 # Director autorun shell, not the game -- don't run it.)
 #
-# WINE VERSION MATTERS: Debian's Wine 8.0 crashes SimTower's 16-bit code in the
-# file Open/Save common dialog (null far pointer) AND overruns a 16-bit string
+# WINE VERSION MATTERS: Debian 12's Wine 8.0 crashed SimTower's 16-bit code in the
+# file Open/Save common dialog (null far pointer) AND overran a 16-bit string
 # buffer while loading a tower (strict LDT selector-limit enforcement traps what
 # real Win3.1/95 tolerated). We install a current WineHQ build, whose 16-bit
 # selector/memory + commdlg handling is years ahead, so save/load work.
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     WINEARCH=win32 \
@@ -20,13 +20,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WINEDLLOVERRIDES="mscoree,mshtml=" \
     DISPLAY=:0
 
-# WineHQ (current staging) instead of Debian's ancient wine 8.0 (see header).
+# WineHQ (current staging) instead of Debian's packaged Wine (8.0 when this was
+# tested; see header).
 RUN dpkg --add-architecture i386 \
  && apt-get update \
  && apt-get install -y --no-install-recommends wget ca-certificates gnupg \
  && mkdir -pm755 /etc/apt/keyrings \
  && wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
- && wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources \
+ && wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/trixie/winehq-trixie.sources \
  && apt-get update \
  && apt-get install -y --install-recommends winehq-staging \
  && apt-get install -y --no-install-recommends \
