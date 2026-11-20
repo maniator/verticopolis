@@ -162,8 +162,8 @@ Verticopolis has **two test tiers**:
     with the Rust leg required. Without the engine package the Rust leg skips.
 
     **The suites on the WASM engine.** `npm run test:wasm` runs the suites
-    that start the Rust engine themselves (conformance, the goldens' Rust
-    legs, the telemetry and log-text comparisons, perf comparison) with the
+    that start the Rust engine themselves (the save suites, the card-text
+    golden, perf comparison) with the
     engine package required. CI runs it
     once per PR in three shards, reported as the required
     `test-engine (host)` check; the

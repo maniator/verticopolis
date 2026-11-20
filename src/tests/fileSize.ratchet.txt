@@ -28,8 +28,6 @@ src/main.ts
 src/storage/fileSpace.ts
 src/storage/linkedFolder.ts
 src/tests/engineFixtures/engineLifecycle.fixture.ts
-src/tests/goldens/portEditCases.ts
-src/tests/goldens/portEdits.ts
 src/tests/perfCompare/calibrate.ts
 src/tests/perfCompare/main.ts
 src/tests/perfCompare/metrics.ts

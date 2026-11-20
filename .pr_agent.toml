@@ -73,8 +73,4 @@ resolve_threads = false
 glob = [
   "src/tests/goldens/card-text/*.vctower",
   "src/tests/goldens/card-text/*.json",
-  # Generated golden data is validated by the Rust and TypeScript tests.
-  # Review the generator and test logic instead of spending context on JSON.
-  "src/tests/goldens/frame-days.json",
-  "src/tests/goldens/port-edits.json",
 ]

@@ -94,8 +94,7 @@ The settings in `.pr_agent.toml` address this without disabling code review:
   but not every source of ticket context. Branch-name ticket extraction is
   disabled too; title and explicit issue URLs may still supply ticket context
   during an opt-in analysis. Such analysis remains advisory.
-- Generated golden snapshots (`frame-days.json`, `port-edits.json`, the
-  card-text outputs, the fuzz corpus goldens in
+- Generated golden snapshots (the card-text outputs, the fuzz corpus goldens in
   `conformance/fuzz-corpus/goldens/`, the conformance lock
   `conformance/expected.json` and the TDT case hashes
   `conformance/tdt-cases.json`) are excluded from the AI's diff context so the **source
