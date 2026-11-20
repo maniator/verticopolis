@@ -76,7 +76,7 @@
     "@vercel/functions": "^3.10.6",
     "@vercel/speed-insights": "^2.0.0",
     "@verticopolis/components": "1.0.0",
-    "@verticopolis/engine": "1.60.0",
+    "@verticopolis/engine": "1.60.1",
     "excalibur": "^1.0.0",
     "fflate": "^0.8.3",
     "lit-html": "^3.3.3",
