@@ -4,7 +4,8 @@
 Clean-room note: this copies bytes off an original-game CD you own onto your
 local disk so the Wine harness can run the real game and emit real .TDT saves
 for round-trip testing. The extracted binaries are gitignored and must never be
-committed (see docs/canon/tdt-format.md sources policy).
+committed (see the sources policy in docs/tdt/tdt-format.md in
+Verticopolis/engine).
 
 The game files ship LZ-compressed (Microsoft KWAJ) inside a Microsoft ACME
 Setup disc. We copy them verbatim; decompression happens inside the container

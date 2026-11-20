@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Independent .TDT validator, written straight from docs/canon/tdt-format.md.
+"""Independent .TDT validator, written straight from docs/tdt/tdt-format.md
+in Verticopolis/engine.
 
 Deliberately does NOT import the engine's own tdtImport code: if our exporter
 and importer share a wrong assumption, a self-round-trip would still pass. This

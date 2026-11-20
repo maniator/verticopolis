@@ -55,7 +55,7 @@ Revision 4 adds only a follow-up note (no new wiki pages). It confirms what the 
 
 Rows 19 to 26 come from the Windows Help file and Read Me checks of 2026-10-30. "Matches" means the Rust engine already does what the source says. Rows that change how every passenger routes are asks, because they move the whole simulation and need an in-game check first.
 
-Open source conflicts the note flags and we do not settle: escalator use with offices (kiwizoid says commercial only, furdude2 says offices work) and the cinema's capacity (60 versus 120). Whether films age is settled by runs of the original on a PC (#1932, `tdt-format.md` section 11).
+Open source conflicts the note flags and we do not settle: escalator use with offices (kiwizoid says commercial only, furdude2 says offices work) and the cinema's capacity (60 versus 120). Whether films age is settled by runs of the original on a PC (#1932, [tdt-format.md](https://github.com/Verticopolis/engine/blob/main/docs/tdt/tdt-format.md) section 11 in Verticopolis/engine).
 
 The stair reach conflicts between sources (wiki five levels, Aristotle47 four); ours is 4. Left alone until tested.
 

@@ -254,7 +254,7 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     // for TDT_ELEVATOR_BUILT_FIXED (3140), TDT_ELEVATOR_PER_FLOOR_SIZE (324) or
     // TDT_ELEVATOR_CAR_BLOCK_SIZE (348) round-trips through our own code
     // perfectly while the real 1994 game desyncs. Those three numbers are
-    // measured against the retail game (docs/canon/tdt-format.md §8), not
+    // measured against the retail game (tdt-format.md §8 in Verticopolis/engine), not
     // derivable, so pin them with a LITERAL: this tower must export to exactly
     // this many bytes.
     //

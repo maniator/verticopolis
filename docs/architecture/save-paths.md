@@ -78,6 +78,29 @@ flowchart TD
 `src/tests/vctowerCodecPin.guard.test.ts` fails when production code calls a
 TypeScript `.vctower` reader or writer outside the named allowances.
 
+## `.TDT` files
+
+The engine owns the 1994 `.TDT` format: its codec is `engine-rs/src/tdt/`, and
+the format is written up beside it in Verticopolis/engine,
+[tdt-format.md](https://github.com/Verticopolis/engine/blob/main/docs/tdt/tdt-format.md) for what the values mean and
+[tdt-byte-map.md](https://github.com/Verticopolis/engine/blob/main/docs/tdt/tdt-byte-map.md) for every byte. The game decodes
+none of a `.TDT` itself. Its part is the UI around the engine's calls:
+
+- **Picking.** The file picker and the drop target accept `.TDT`
+  (`src/ui/uiImport.ts`). `looksLikeLegacyTower`
+  (`src/storage/tdtImportHelpers.ts`) routes a pick to the `.TDT` import by
+  its extension, or by the two-byte header magic when a save was renamed.
+- **The reports.** `src/storage/tdtImportReport.ts` and
+  `tdtExportReport.ts` turn the engine's counts into the sentences the import
+  and export dialogs show. They read numbers and decide nothing about the
+  file.
+- **The download.** Export names the file and downloads the bytes
+  `port.tdtExport` and `port.tdtFile` give it.
+
+The integration tests (`tdtImport`, `tdtExport`, `tdtRealSaves`) run these
+paths against the real engine package, and `canon.integration.test.ts` checks
+the engine's catalog against the format notes.
+
 ## Where the saves are kept
 
 `src/storage/saveStore.ts` keeps every save in an IndexedDB database

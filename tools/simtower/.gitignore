@@ -1,4 +1,4 @@
-# Original-game bits must NEVER be committed (clean-room policy, docs/canon/tdt-format.md).
+# Original-game bits must NEVER be committed (clean-room policy, docs/tdt/tdt-format.md in Verticopolis/engine).
 # Everything pulled off the retail CD / owned OS disks lives here and stays local.
 gamedata/
 manuals/

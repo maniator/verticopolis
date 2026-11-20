@@ -89,7 +89,7 @@ shared PR template and issue form checks live in
 | [Controls](https://help.verticopolis.com/controls/) (mouse, touch, keyboard) | [ARCHITECTURE.md](ARCHITECTURE.md): source layout, the frame loop, input, saves, the PWA; deeper pages in [docs/architecture/](docs/architecture/README.md) |
 | [Rooms](https://help.verticopolis.com/rooms/) | [Verticopolis/engine](https://github.com/Verticopolis/engine): working on the simulation |
 | [Map and windows](https://help.verticopolis.com/tower/map-and-windows/) | [docs.verticopolis.com](https://docs.verticopolis.com/): the engine package, crate, API and conformance |
-| [Importing and exporting](https://help.verticopolis.com/your-towers/importing-exporting/) | [docs/canon/tdt-format.md](docs/canon/tdt-format.md): the `.TDT` save format |
+| [Importing and exporting](https://help.verticopolis.com/your-towers/importing-exporting/) | [docs/tdt/ in Verticopolis/engine](https://github.com/Verticopolis/engine/tree/main/docs/tdt): the `.TDT` save format |
 | [The whole manual](https://help.verticopolis.com/) | [docs/screenshots.md](docs/screenshots.md): the screenshot gallery and how it is rendered, including the [1★ to TOWER ladder](docs/screenshots/milestones/) |
 
 ## License
