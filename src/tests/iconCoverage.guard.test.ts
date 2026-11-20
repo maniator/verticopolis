@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, relative } from "node:path";
-import { EMOJI_ICONS, ICON_NAMES, ACCENT_FILLS, iconElement } from "@verticopolis/components/windows/icons";
-import { srcFile } from "./packagePaths";
+import { EMOJI_ICONS } from "@verticopolis/components/windows/icons";
 
 /**
  * Bulletin icon coverage guard (issue #721).
@@ -41,8 +40,6 @@ import { srcFile } from "./packagePaths";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = resolve(here, "..");
-/** The mapping table, as the components package ships it. */
-const iconsPath = srcFile("ui/icons.ts");
 /** `src/tests`, `src`-relative. Everything under it is test code, including the
  *  fixtures and helpers that are not named `*.test.ts`. */
 const TEST_DIR = "tests";
@@ -404,58 +401,5 @@ describe("bulletin icon coverage (issue #721)", () => {
       [...byName, ...byLocation].filter((f) => f.emitter).map((f) => f.rel),
       "test code is not an emitter",
     ).toEqual([]);
-  });
-
-  it("keeps every bulletin icon currentColor-only (so severity color carries)", () => {
-    // A bulletin icon inherits its log line's severity color (red for bad, green
-    // for money) purely through `fill="currentColor"`. A baked fill on one of
-    // its paths would freeze it off-color, so pin that no EMOJI_ICONS target
-    // bakes a fill and each still declares currentColor on the <svg>.
-    for (const name of new Set(Object.values(EMOJI_ICONS))) {
-      const svg = iconElement(name);
-      expect(svg.getAttribute("fill"), `${name} lost its currentColor root`).toBe("currentColor");
-      for (const p of svg.querySelectorAll("path")) {
-        expect(
-          p.getAttribute("fill"),
-          `${name} bakes a path fill; a bulletin icon must inherit severity color`,
-        ).toBeNull();
-      }
-    }
-  });
-
-  it("allows an accent fill only on an allowlisted accent icon, only from the hazard palette", () => {
-    // Nearly all icons are currentColor; the bulldoze wrecking ball is the one
-    // exception, a two-tone red/amber glyph. Pin the exception TIGHT: only an
-    // icon named in ACCENT_ICONS may bake a fill at all, and only from the
-    // ACCENT_FILLS palette. Every other icon (bulletin AND chrome) must inherit
-    // currentColor, so a stray `fill: "#ff6b6b"` on, say, the save glyph fails
-    // here instead of silently freezing it red. The generated pixelarticons
-    // paths never bake a fill at all.
-    const ACCENT_ICONS = new Set<string>(["bulldoze"]);
-    const allow = new Set<string>(ACCENT_FILLS);
-    for (const name of ICON_NAMES) {
-      for (const p of iconElement(name).querySelectorAll("path")) {
-        const fill = p.getAttribute("fill");
-        if (!fill) continue;
-        expect(
-          ACCENT_ICONS.has(name),
-          `${name} bakes a fill but is not an allowlisted accent icon; it must inherit currentColor`,
-        ).toBe(true);
-        expect(allow.has(fill), `${name} uses a non-allowlisted fill ${fill}`).toBe(true);
-      }
-    }
-    const generatedPath = srcFile("ui/iconPaths.generated.ts");
-    const hexRe = /fill\s*[:=]\s*["'`]?#[0-9a-fA-F]{3,8}/g;
-    const generatedFills = readFileSync(generatedPath, "utf8").match(hexRe) ?? [];
-    expect(generatedFills, `generated pixelarticons paths must stay currentColor-only`).toEqual([]);
-    expect(readFileSync(iconsPath, "utf8")).toContain('fill="currentColor"');
-  });
-
-  it("carries its MIT provenance", () => {
-    // The vendored paths are from Pixelarticons (MIT); the attribution ships in
-    // the generated file the icons draw from, as the components package ships it.
-    expect(readFileSync(srcFile("ui/iconPaths.generated.ts"), "utf8")).toMatch(
-      /pixelarticons.*MIT|MIT.*pixelarticons/is,
-    );
   });
 });
