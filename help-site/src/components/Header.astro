@@ -33,7 +33,7 @@ import { siteHref } from "../../site.mjs";
   import { getCommonProps, setCommonProps, trackAppAction } from "../../../src/analytics";
   import { gameLinkDetail, helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
   import { saveManualOffline } from "../../../src/manual/manualOffline";
-  import { EMBEDDED_CLASS, gameOriginFor, pageMessage, replacedBy } from "../../../src/manual/manualEmbed";
+  import { EMBEDDED_CLASS, gameOriginFor, pageMessage, embeddedClick } from "../../../src/manual/manualEmbed";
 
   // The site's base as Astro built it: "" at the root of the manual's own
   // host, "/help" on the game's.
@@ -68,9 +68,10 @@ import { siteHref } from "../../site.mjs";
   const fromGame = takeFromGameFlag(location, history);
   // Inside the game's Help window (src/manual/manualEmbed.ts), once the
   // game's marks are off the address: tell the game each page shown, for its
-  // title bar and its Back and Forward, and follow the manual's own links
-  // with location.replace so the game's history never fills with manual
-  // pages.
+  // title bar and its Back and Forward; follow the manual's own links with
+  // location.replace so the game's history never fills with manual pages,
+  // and open links out of the manual in a browser tab. F1 does nothing here:
+  // the manual is already open, and the browser's own help would cover it.
   if (document.documentElement.classList.contains(EMBEDDED_CLASS)) {
     const game = gameOriginFor(location.host, location.origin);
     const tell = () => window.parent.postMessage(pageMessage(location, base, document.title), game);
@@ -78,10 +79,14 @@ import { siteHref } from "../../site.mjs";
     window.addEventListener("hashchange", tell);
     document.addEventListener("click", (e) => {
       const link = e.target instanceof Element ? e.target.closest("a") : null;
-      const to = replacedBy(e, link, location.href, base);
+      const to = embeddedClick(e, link, location.href, base);
       if (!to) return;
       e.preventDefault();
-      location.replace(to);
+      if ("replace" in to) location.replace(to.replace);
+      else window.open(to.open, "_blank", "noopener");
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "F1") e.preventDefault();
     });
   }
   for (const play of document.querySelectorAll<HTMLAnchorElement>("a[data-game-link]")) {

@@ -446,8 +446,9 @@ export class DeskController {
 
   private changed(id: DeskWindowId, what: DeskChange): void {
     if (what === "move" || what === "resize") this.save();
-    if (what === "max" || what === "unmax")
-      write(this.store, DESK_KEY.max, what === "max" && id === "tower" ? "tower" : "");
+    // Only the tower's maximize is remembered for the next visit.
+    if ((what === "max" || what === "unmax") && id === "tower")
+      write(this.store, DESK_KEY.max, what === "max" ? "tower" : "");
     if (what === "max" && id === "tower")
       if (this.desk) clearTowerChrome(this.doc, this.desk, this.wins, this.steppedDown);
     if (what === "unmax" && id === "tower" && this.steppedDown.size) {

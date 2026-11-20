@@ -17,6 +17,7 @@ import {
   deskActive,
   wireDesk,
 } from "./deskController";
+import { deskManual } from "./deskHelpWindow";
 
 /** The page the desk works on: the game's own elements, in their usual places. */
 const PAGE = html`
@@ -367,6 +368,28 @@ describe("DeskController", () => {
     expect(Object.keys(JSON.parse(localStorage.getItem(DESK_KEY.layout)!))).toEqual(
       expect.arrayContaining(["map", "bulletin", "info"]),
     );
+  });
+
+  it("remembers only the tower's maximize, and leaves a maximized Help window where it is", () => {
+    new DeskController(doc).start();
+    doc.getElementById("menubar")!.getBoundingClientRect = () => ({ bottom: 40 }) as DOMRect;
+    doc.querySelector<HTMLElement>("#desk-win-tower .desk-btn-max")!.click();
+    expect(localStorage.getItem(DESK_KEY.max)).toBe("tower");
+    deskManual()!.show("/help/", "game_menu");
+    const help = doc.getElementById("desk-win-help")!;
+    const helpMax = help.querySelector<HTMLElement>(".desk-btn-max")!;
+    helpMax.click();
+    helpMax.click();
+    // Help's maximize and restore leave the tower's remembered.
+    expect(localStorage.getItem(DESK_KEY.max)).toBe("tower");
+
+    // The tower maximizing again leaves a maximized Help alone.
+    doc.querySelector<HTMLElement>("#desk-win-tower .desk-btn-max")!.click();
+    helpMax.click();
+    const top = help.style.top;
+    doc.querySelector<HTMLElement>("#desk-win-tower .desk-btn-max")!.click();
+    expect(help.classList.contains("desk-maximized")).toBe(true);
+    expect(help.style.top).toBe(top);
   });
 
   it("shows a sound toggled from the Control Panel on the tray and the Sounds icon, with no menu opened", async () => {

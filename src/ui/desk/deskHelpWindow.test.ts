@@ -114,6 +114,15 @@ describe("ManualWindow", () => {
     expect(win.frame.root.querySelector(".desk-title-text")!.textContent).toBe(MANUAL_TITLE);
   });
 
+  it("ignores what the page it just emptied says after a close", () => {
+    const { win, frameWin } = placed();
+    win.show("/help/", "game_menu");
+    win.close();
+    message(frameWin, page("/rooms/", "Rooms"));
+    expect(win.current()).toBeNull();
+    expect(win.frame.root.querySelector(".desk-title-text")!.textContent).toBe(MANUAL_TITLE);
+  });
+
   it("opens again in place after a close, so the game's history stays clean", () => {
     const { win, frameWin } = placed();
     win.show("/help/", "game_menu");

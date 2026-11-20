@@ -27,12 +27,15 @@ import { siteHref } from "../../site.mjs";
   import { backToOpenGame, takeFromGameFlag } from "../../../src/ui/fromGame";
   import { linkToGame, startHelpBar } from "../../../src/ui/helpBar";
   import { GAME_HOME } from "../../../src/helpAddress";
+  import { EMBEDDED_CLASS } from "../../../src/manual/manualEmbed";
   import { trackAppAction } from "../../../src/analytics";
 
   const root = document.getElementById("vc-help-bar");
   // Header.astro has already taken ?from=game off the address; the flag
-  // lives on in this tab's storage, which takeFromGameFlag reads.
-  if (root && takeFromGameFlag(location, history)) {
+  // lives on in this tab's storage, which takeFromGameFlag reads. Inside the
+  // game's Help window the game is right there, so the bar never starts.
+  const embedded = document.documentElement.classList.contains(EMBEDDED_CLASS);
+  if (root && !embedded && takeFromGameFlag(location, history)) {
     const link = linkToGame(new URL(GAME_HOME, location.href).origin);
     if (link) {
       startHelpBar(root, {

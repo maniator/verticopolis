@@ -113,7 +113,8 @@ export class ManualWindow {
   }
 
   private readonly onMessage = (e: MessageEvent): void => {
-    if (e.origin !== this.manualOrigin || e.source !== this.frame.page.contentWindow) return;
+    // A closed window ignores the last words of the page it just emptied.
+    if (!this.isOpen() || e.origin !== this.manualOrigin || e.source !== this.frame.page.contentWindow) return;
     const page = readPageMessage(e.data);
     if (!page) return;
     this.frame.setTitle(page.title === MANUAL_TITLE ? MANUAL_TITLE : `${page.title} - ${MANUAL_TITLE}`);

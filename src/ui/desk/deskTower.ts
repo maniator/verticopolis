@@ -38,7 +38,8 @@ export function clearTowerChrome(
   if (!bar) return;
   const top = bar.getBoundingClientRect().bottom - desk.getBoundingClientRect().top + 2;
   for (const [id, win] of wins) {
-    if (win.spec.layer !== "tool" || !win.spec.isOpen() || win.minimized) continue;
+    // A maximized window (Help) already fills the desk on its own.
+    if (win.spec.layer !== "tool" || !win.spec.isOpen() || win.minimized || win.maximized) continue;
     const r = win.rect();
     if (r.y >= top) continue;
     const next = fitRect({ ...r, y: top }, desk.clientWidth, desk.clientHeight, win.spec.limits);

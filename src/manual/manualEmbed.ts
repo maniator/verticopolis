@@ -7,7 +7,8 @@
  * wears {@link EMBEDDED_CLASS}, which hides the parts the window already has
  * (the menu bar, the game button, the Help bar), follows its own links with
  * `location.replace` so the game's browser history never fills with manual
- * pages, and tells the game each page it shows ({@link ManualPageMessage}).
+ * pages, opens links out of the manual in a browser tab, and tells the game
+ * each page it shows ({@link ManualPageMessage}).
  * The game keeps the window's Back and Forward from those messages.
  *
  * Messages go to one origin and are read from one origin: the game's
@@ -64,17 +65,25 @@ export function readPageMessage(data: unknown): ManualPageMessage | null {
   return { type, path, title: title.slice(0, 200) };
 }
 
-/** The click a manual page inside the window follows itself: the address it
- *  replaces the page with, or null for a click the browser keeps (a modified
- *  or middle click, a link to another site or out of the manual, a new tab or
- *  a download). A link to a spot on the same page is replaced too, which
- *  scrolls there without a history entry. */
-export function replacedBy(
+/** What a manual page inside the window does with a click on a link. */
+export type EmbeddedClick =
+  /** Another manual page: replace this one, so the game's history stays clean. */
+  | { readonly replace: string }
+  /** A page outside the manual: open it in a browser tab, so the window keeps
+   *  showing the manual and its Back and Forward stay the manual's. */
+  | { readonly open: string };
+
+/** The click a manual page inside the window handles itself, or null for a
+ *  click the browser keeps (a modified or middle click, a link that already
+ *  names a new tab, a download, a link to something that is no web page). A
+ *  link to a spot on the same page is replaced too, which scrolls there
+ *  without a history entry. */
+export function embeddedClick(
   event: Pick<MouseEvent, "button" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey" | "defaultPrevented">,
   link: Pick<HTMLAnchorElement, "href" | "target" | "hasAttribute"> | null,
   here: string,
   base: string,
-): string | null {
+): EmbeddedClick | null {
   if (!link || event.defaultPrevented || event.button !== 0) return null;
   if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return null;
   if ((link.target && link.target !== "_self") || link.hasAttribute("download")) return null;
@@ -84,6 +93,7 @@ export function replacedBy(
   } catch {
     return null;
   }
-  if (to.origin !== new URL(here).origin || !to.pathname.startsWith(`${base}/`)) return null;
-  return to.href;
+  if (to.protocol !== "https:" && to.protocol !== "http:") return null;
+  if (to.origin === new URL(here).origin && to.pathname.startsWith(`${base}/`)) return { replace: to.href };
+  return { open: to.href };
 }

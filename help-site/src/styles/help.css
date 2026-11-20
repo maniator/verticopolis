@@ -247,6 +247,7 @@ html.vc-help-bar-showing:not(.vc-embedded) body {
 html.vc-embedded #help-menubar-host,
 html.vc-embedded .vc-bar-links,
 html.vc-embedded #back-note,
-html.vc-embedded #vc-help-bar {
+html.vc-embedded #vc-help-bar,
+html.vc-embedded a[data-game-link] {
   display: none !important;
 }

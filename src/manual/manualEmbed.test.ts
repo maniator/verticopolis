@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MANUAL_PAGE_TYPE, gameOriginFor, pageMessage, readPageMessage, replacedBy } from "./manualEmbed";
+import { MANUAL_PAGE_TYPE, gameOriginFor, pageMessage, readPageMessage, embeddedClick } from "./manualEmbed";
 
 describe("gameOriginFor", () => {
   it("posts to the production game from the manual's own host, else to the page's own origin", () => {
@@ -46,7 +46,7 @@ describe("readPageMessage", () => {
   });
 });
 
-describe("replacedBy", () => {
+describe("embeddedClick", () => {
   const HERE = "https://help.example/help/rooms/";
   const click = { button: 0, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, defaultPrevented: false };
   const link = (href: string, target = "", download = false) => ({
@@ -55,27 +55,33 @@ describe("replacedBy", () => {
     hasAttribute: (name: string) => name === "download" && download,
   });
 
-  it("follows a plain click on a link to another manual page itself", () => {
-    expect(replacedBy(click, link("https://help.example/help/rooms/hotels/"), HERE, "/help")).toBe(
-      "https://help.example/help/rooms/hotels/",
-    );
-    expect(replacedBy(click, link("https://help.example/help/rooms/?q=hotel"), HERE, "/help")).toBe(
-      "https://help.example/help/rooms/?q=hotel",
-    );
-    expect(replacedBy(click, link("https://help.example/help/rooms/#offices"), HERE, "/help")).toBe(
-      "https://help.example/help/rooms/#offices",
-    );
+  it("replaces the page on a plain click on a link to another manual page", () => {
+    expect(embeddedClick(click, link("https://help.example/help/rooms/hotels/"), HERE, "/help")).toEqual({
+      replace: "https://help.example/help/rooms/hotels/",
+    });
+    expect(embeddedClick(click, link("https://help.example/help/rooms/?q=hotel"), HERE, "/help")).toEqual({
+      replace: "https://help.example/help/rooms/?q=hotel",
+    });
+    expect(embeddedClick(click, link("https://help.example/help/rooms/#offices"), HERE, "/help")).toEqual({
+      replace: "https://help.example/help/rooms/#offices",
+    });
+  });
+
+  it("opens a plain click on a link out of the manual in a browser tab", () => {
+    expect(embeddedClick(click, link("https://github.com/x"), HERE, "/help")).toEqual({ open: "https://github.com/x" });
+    expect(embeddedClick(click, link("https://help.example/"), HERE, "/help")).toEqual({
+      open: "https://help.example/",
+    });
   });
 
   it("leaves other clicks and links to the browser", () => {
     const manualPage = link("https://help.example/help/rooms/hotels/");
-    expect(replacedBy({ ...click, button: 1 }, manualPage, HERE, "/help")).toBeNull();
-    expect(replacedBy({ ...click, ctrlKey: true }, manualPage, HERE, "/help")).toBeNull();
-    expect(replacedBy({ ...click, defaultPrevented: true }, manualPage, HERE, "/help")).toBeNull();
-    expect(replacedBy(click, null, HERE, "/help")).toBeNull();
-    expect(replacedBy(click, link("https://github.com/x"), HERE, "/help")).toBeNull();
-    expect(replacedBy(click, link("https://help.example/"), HERE, "/help")).toBeNull();
-    expect(replacedBy(click, link("https://help.example/help/rooms/hotels/", "_blank"), HERE, "/help")).toBeNull();
-    expect(replacedBy(click, link("https://help.example/help/catalog.json", "", true), HERE, "/help")).toBeNull();
+    expect(embeddedClick({ ...click, button: 1 }, manualPage, HERE, "/help")).toBeNull();
+    expect(embeddedClick({ ...click, ctrlKey: true }, manualPage, HERE, "/help")).toBeNull();
+    expect(embeddedClick({ ...click, defaultPrevented: true }, manualPage, HERE, "/help")).toBeNull();
+    expect(embeddedClick(click, null, HERE, "/help")).toBeNull();
+    expect(embeddedClick(click, link("https://help.example/help/rooms/hotels/", "_blank"), HERE, "/help")).toBeNull();
+    expect(embeddedClick(click, link("https://help.example/help/catalog.json", "", true), HERE, "/help")).toBeNull();
+    expect(embeddedClick(click, link("mailto:someone@example.com"), HERE, "/help")).toBeNull();
   });
 });
