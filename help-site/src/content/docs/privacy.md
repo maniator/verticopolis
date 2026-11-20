@@ -11,4 +11,6 @@ Crash reports carry the technical details of the error and the same kind of anon
 
 The game sets one cookie, and only after you pick a look in Options > Appearance: `vc_scheme`, which holds the name of that look (`standard`, `skyline` or `high_contrast`) and nothing else. Your browser sends it to every verticopolis.com address, and two of them read it: this manual, at help.verticopolis.com, and the engine's developer docs, at docs.verticopolis.com, so both can wear the same look when you visit them on their own. It never goes to anyone else, it lasts up to 400 days, and it is not used to count or recognize you.
 
+This manual sets one more once your browser has saved it for offline reading: `vc_manual`, which holds the manual's address (`help.verticopolis.com`) and nothing else, so the game knows it can open the manual with no connection. It is shared with the game's address the same way, lasts up to 400 days, and is not used to count or recognize you either.
+
 There are no accounts and no ads: the game never asks for your name or email, keeps no profile, and nothing recognizes you from one day to the next. There is no consent banner, because nothing that identifies you is kept. Saves live in your own storage and leave your device only when you export them. The counts help decide what to improve; they are never sold or shared.

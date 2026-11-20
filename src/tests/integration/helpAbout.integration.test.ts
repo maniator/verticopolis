@@ -247,8 +247,38 @@ describe("About… (About this game)", () => {
     const say = vi.spyOn(ui, "sayVisibly");
     ui.showHelp("game_menu");
     expect(open).not.toHaveBeenCalled();
-    expect(say).toHaveBeenCalledWith("The manual needs an internet connection. It is at help.verticopolis.com.");
+    expect(say).toHaveBeenCalledWith(
+      "The manual needs the internet the first time. Open it once while online and it works offline after that. It is at help.verticopolis.com.",
+    );
     expect(speed.now()).toBe(3);
+  });
+
+  it("opens the manual offline when its worker has saved it on this device", () => {
+    const speed = speedAt(3);
+    const { ui } = makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    document.cookie = `vc_manual=${location.host}`;
+    try {
+      const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
+      ui.showHelp("game_menu");
+      expect(open).toHaveBeenCalledWith("/help/?from=game&via=game_menu", "_blank");
+      expect(speed.now()).toBe(0);
+    } finally {
+      document.cookie = "vc_manual=; Max-Age=0";
+    }
+  });
+
+  it("still says the manual needs the internet when the saved mark names another host", () => {
+    const { ui } = makeUI();
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    document.cookie = "vc_manual=help.verticopolis.com";
+    try {
+      const open = vi.spyOn(window, "open");
+      ui.showHelp("game_menu");
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      document.cookie = "vc_manual=; Max-Age=0";
+    }
   });
 
   it("says where the guide is when the browser blocks the new tab, and keeps the tower running", () => {

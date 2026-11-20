@@ -103,6 +103,9 @@ export type AppActionName =
   // `detail` = where the visit started (src/ui/fromGame.ts HelpSource: a place
   // in the game, `game` or `direct`; #2037).
   | "help_page_view"
+  // The manual's worker saved the whole manual on this device for offline
+  // reading, sent the first time on a device (src/manual/manualOffline.ts).
+  | "help_offline_saved"
   // A press on the Help bar of a page the game opened (#2035, HelpBar.astro);
   // `detail` = run (Keep my tower running), pause (Pause it) or back.
   | "help_bar_pick"

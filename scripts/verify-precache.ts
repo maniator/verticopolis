@@ -241,9 +241,10 @@ if (!existsSync(resolve(DIST, "sw-navigation-fallback.js")))
   fail("dist/sw-navigation-fallback.js is missing, so the worker would not install");
 if (seen.has("sw-navigation-fallback.js"))
   fail("sw-navigation-fallback.js is in the precache manifest; the worker imports it, so it must stay out of it");
-// The Help site at /help (release notes included) always comes from the
-// network, never the worker's cache (owner, 2026-11-12): nothing under help/ is
-// precached, and the navigation fallback leaves /help alone.
+// The Help site at /help (release notes included) never comes from the game
+// worker's cache (owner, 2026-11-12): nothing under help/ is precached, and the
+// navigation fallback leaves /help alone. The manual saves itself for offline
+// reading with its own worker (src/manual/manualWorker.ts).
 const helpCached = urls.filter((u) => u === "help" || u.startsWith("help/"));
 if (helpCached.length > 0)
   fail(`the Help site must not be precached, but the manifest lists: ${helpCached.join(", ")}`);

@@ -63,7 +63,7 @@ export const PRECACHE_CALL = "precacheAndRoute(";
 export const RETIRING_SERVICE_WORKER = `// ${RETIRING_WORKER_MARKER}: no service worker (src/build/previewDeploy.ts).
 ${retiringWorkerBody()}`;
 
-/** The lifecycle code {@link RETIRING_SERVICE_WORKER} and {@link HELP_HOST_SERVICE_WORKER} share. */
+/** The lifecycle code of {@link RETIRING_SERVICE_WORKER}. */
 function retiringWorkerBody(): string {
   return `self.addEventListener("install", () => {
   self.skipWaiting();
@@ -80,39 +80,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 `;
-}
-
-/**
- * The `sw.js` the manual's own host serves (help.verticopolis.com/sw.js, from
- * dist/help/sw.js). The manual never registers a worker, but the game's did:
- * a browser that opened that host while it still served the game keeps the
- * game's worker there, and it answers every manual page with the game. The
- * browser's update check after a navigation fetches this file, installs it,
- * and it unregisters itself and reloads the page from the network, as
- * {@link RETIRING_SERVICE_WORKER} does on a preview. It is served on every
- * deployment, production included, so it has its own first line rather than
- * the preview marker the production deploy refuses.
- */
-export const HELP_HOST_WORKER_MARKER = "Verticopolis manual host";
-
-export const HELP_HOST_SERVICE_WORKER = `// ${HELP_HOST_WORKER_MARKER}: no service worker (src/build/previewDeploy.ts).
-${retiringWorkerBody()}`;
-
-/**
- * scripts/preview-service-worker.ts: on every build, write
- * {@link HELP_HOST_SERVICE_WORKER} as the manual's `sw.js` at `swPath`. A
- * missing manual build fails, since the host would then answer that address
- * with nothing to replace a stale worker.
- */
-export function applyHelpHostWorker(helpDir: string, swPath: string, files: WorkerFiles): WorkerOutcome {
-  if (!files.exists(helpDir)) {
-    return { code: 1, message: `preview-service-worker: ${helpDir} does not exist; build the help site first` };
-  }
-  files.write(swPath, HELP_HOST_SERVICE_WORKER);
-  return {
-    code: 0,
-    message: "preview-service-worker: dist/help/sw.js unregisters any worker left on the manual's host",
-  };
 }
 
 /** The file system calls {@link applyPreviewWorker} makes, so a test can stand in for them. */
@@ -167,18 +134,5 @@ export function productionWorkerProblem(sw: string | null): string | null {
     return "dist/sw.js is the preview deployment's retiring worker, which would unregister every player's worker";
   if (!sw.includes(PRECACHE_CALL))
     return `dist/sw.js has no Workbox ${PRECACHE_CALL}...) call, so production would precache nothing`;
-  return null;
-}
-
-/**
- * Why a build's manual worker (dist/help/sw.js) is not
- * {@link HELP_HOST_SERVICE_WORKER}, or null when it is. The production deploy
- * runs it beside {@link productionWorkerProblem}, so help.verticopolis.com
- * never goes live without the worker that clears a game worker left there.
- */
-export function helpHostWorkerProblem(sw: string | null): string | null {
-  if (sw === null)
-    return "dist/help/sw.js is missing, so a game worker left on the manual's host would never be removed";
-  if (sw !== HELP_HOST_SERVICE_WORKER) return "dist/help/sw.js is not the manual host's self-removing worker";
   return null;
 }

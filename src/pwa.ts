@@ -170,16 +170,23 @@ async function reloadFromNetwork(registration: ServiceWorkerRegistration): Promi
 }
 
 /**
- * Remove whatever an earlier build of this preview registered: every worker
- * registration on the origin and Workbox's caches. The page reached here from
- * the network, so nothing needs a reload. Best-effort: a browser that refuses
- * leaves the old worker to the retiring `sw.js`, which removes it on the next
- * navigation.
+ * Remove whatever an earlier build of this preview registered: the game's
+ * worker registration and Workbox's caches. The manual's own worker under
+ * /help/ (src/manual/manualWorker.ts) stays: it answers from the network
+ * first, so it never serves a preview a stale page. The page reached here
+ * from the network, so nothing needs a reload. Best-effort: a browser that
+ * refuses leaves the old worker to the retiring `sw.js`, which removes it on
+ * the next navigation.
  */
 async function removeServiceWorkers(): Promise<void> {
   try {
+    const gameScope = new URL("/", window.location.href).href;
     const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister().catch(() => false)));
+    await Promise.all(
+      registrations
+        .filter((registration) => registration.scope === gameScope)
+        .map((registration) => registration.unregister().catch(() => false)),
+    );
     const names = await caches.keys();
     await Promise.all(names.filter((name) => name.startsWith(WORKBOX_CACHE_PREFIX)).map((name) => caches.delete(name)));
   } catch {
