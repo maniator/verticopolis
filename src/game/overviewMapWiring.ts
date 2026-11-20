@@ -10,7 +10,8 @@
  * app's port, which stays the same engine object for the page life, and the
  * Traffic and Occupancy views read its heat cells through the renderer's sim.
  * The Edit view reads the tall lobby halls there too, so a hall shows at its
- * full height (#308).
+ * full height (#308). A tap on any other view opens the card of what it shows
+ * there (`overviewMapCard.ts`).
  * The player drags the window by its title bar, and the spot they choose is
  * kept per layout class (`ui/overviewMapSpot.ts`).
  */
@@ -30,6 +31,7 @@ import { OverviewMapViews, type MapHeatSource } from "../ui/overviewMapViews";
 import { viewWorld, viewWorldBound } from "@verticopolis/components/presentation/viewWorld";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 import { isEngineStopped } from "./interactionState";
+import { openMapCard } from "./overviewMapCard";
 
 const windows = new WeakMap<GameApp, OverviewMapWindow>();
 const mapViews = new WeakMap<GameApp, OverviewMapViews>();
@@ -134,6 +136,7 @@ export function wireOverviewMap(app: GameApp): void {
     isPhone: () => app.mobileMq.matches,
     storage,
     views,
+    tapped: (tap) => openMapCard(app, views.selected, tap, floorsOf),
   });
   // The window moves by its title bar and remembers the spot per layout class.
   const layoutClass = (): MapLayoutClass => (app.mobileMq.matches ? "phone" : "desktop");

@@ -55,6 +55,7 @@ import {
 } from "@verticopolis/components/windows/overviewMapInput";
 import { mapStartsOpen, rememberMapOpen, type MapLayoutClass } from "./overviewMapPrefs";
 import { mapSummary } from "./overviewMapText";
+import { tapReach } from "./overviewMapPick";
 import type { MutableMapCamera, OverviewMapDeps } from "./overviewMapDeps";
 
 export type { MutableMapCamera, OverviewMapDeps, OverviewMapSource } from "./overviewMapDeps";
@@ -485,8 +486,8 @@ export class OverviewMapWindow {
   }
 
   /** The press ends. A tap that did not travel, the release included,
-   *  centers the view where it lifted, on the view mark too; a cancel never
-   *  moves the camera. */
+   *  centers the view where it lifted, on the view mark too, then tells
+   *  `tapped` where (to open a card); a cancel never moves the camera. */
   private endPress(e: PointerEvent, released: boolean): void {
     const press = this.press;
     if (!press || press.pointerId !== e.pointerId) return;
@@ -496,6 +497,7 @@ export class OverviewMapWindow {
     const p = this.mapPoint(e);
     if (pastTapSlop(press.start, p, this.px)) return;
     this.deps.moveCamera(mapPointToCenter(layout, p.x, p.y));
+    this.deps.tapped?.({ layout, x: p.x, y: p.y, reach: tapReach(e.pointerType, this.px) });
   }
 
   private onKey(e: KeyboardEvent): void {

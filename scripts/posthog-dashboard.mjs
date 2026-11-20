@@ -917,6 +917,16 @@ function buildInsights(ids) {
       }),
     },
     {
+      name: "Map card taps",
+      description:
+        "Clicks or taps on the Map that opened a card (app_action map_card), production: a room's card on the Eval, Pricing, Hotel and Occupancy views, a shaft's on Traffic. detail is the Map's view at the tap. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, The Map's cards.",
+      query: trends([series("app_action", "Taps")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["map_card"])],
+      }),
+    },
+    {
       name: "Drags stopped by a rule",
       description:
         "Releases of a drag that said why it stopped (app_action drag_stopped, #1847 and #2046), split by detail: extend (an elevator's arrow drag that stopped for any reason: a floor it can't serve, such as an unbuilt lobby or another shaft, too little money, the kind's longest span or the edge of the lot) or bulldoze (a bulldoze drag that left tiles), production. A refusal the press already said is not counted. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Drags that stop.",

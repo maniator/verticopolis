@@ -58,6 +58,7 @@ export function rig(
     stored?: string;
     views?: OverviewMapViews;
     tallLobbies?: OverviewMapDeps["tallLobbies"];
+    tapped?: OverviewMapDeps["tapped"];
   } = {},
 ): Rig {
   document.body.innerHTML = '<section id="stage"><canvas id="view"></canvas></section>';
@@ -95,6 +96,7 @@ export function rig(
     isPhone: () => phone.value,
     storage: storage as unknown as Storage,
     views: opts.views ?? null,
+    tapped: opts.tapped,
   };
   // happy-dom lays nothing out: give the body and the view canvas a box.
   const proto = HTMLElement.prototype;
