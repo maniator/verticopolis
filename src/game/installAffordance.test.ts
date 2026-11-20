@@ -15,9 +15,9 @@ import type { TemplateResult } from "lit-html";
 /** The text of the how-to modal the controller opened, for asserting WHICH
  *  variant (iOS Safari steps vs the generic browser-menu steps) it selected. */
 function openedModalText(app: GameApp): string {
-  const mock = app.ui.openModalTemplate as unknown as { mock: { calls: [TemplateResult][] } };
+  const mock = app.ui.openModal as unknown as { mock: { calls: [TemplateResult][] } };
   const calls = mock.mock.calls;
-  if (calls.length === 0) throw new Error("openModalTemplate was never called");
+  if (calls.length === 0) throw new Error("openModal was never called");
   return renderToFragment(calls[calls.length - 1][0]).textContent ?? "";
 }
 
@@ -57,7 +57,7 @@ function makeApp(opts: { units?: number; splash?: boolean } = {}): GameApp {
   if (opts.splash) document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
   return {
     reader: { rooms: Array.from({ length: opts.units ?? 0 }, () => ({})), structure: [] },
-    ui: { openModalTemplate: vi.fn(), closeModal: vi.fn() },
+    ui: { openModal: vi.fn(), closeModal: vi.fn() },
   } as unknown as GameApp;
 }
 
@@ -179,7 +179,7 @@ describe("iOS activation (CAP-3)", () => {
     // activation can only reach the how-to.
     expect(canPromptInstall()).toBe(false);
     menu().click();
-    expect(app.ui.openModalTemplate).toHaveBeenCalledTimes(1);
+    expect(app.ui.openModal).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -205,7 +205,7 @@ describe("splash front door (CAP-5)", () => {
 
     await activateInstall(app, "splash");
     expect(promptSpy).toHaveBeenCalledTimes(1);
-    expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
+    expect(app.ui.openModal).not.toHaveBeenCalled();
   });
 
   it("activateInstall falls back to the BROWSER how-to on a non-iOS session with no captured event (a splash tap before the browser fires)", async () => {
@@ -215,7 +215,7 @@ describe("splash front door (CAP-5)", () => {
     await activateInstall(app, "splash");
     // No native prompt possible, so the honest browser-menu how-to opens: it must
     // be the browser variant (mentions the browser menu), NOT the iOS Safari steps.
-    expect(app.ui.openModalTemplate).toHaveBeenCalledTimes(1);
+    expect(app.ui.openModal).toHaveBeenCalledTimes(1);
     const text = openedModalText(app);
     expect(text).toMatch(/menu/i);
     expect(text).not.toMatch(/Safari/);
@@ -230,7 +230,7 @@ describe("splash front door (CAP-5)", () => {
     initInstallAffordance(app);
     expect(canPromptInstall()).toBe(false); // iOS never fires beforeinstallprompt
     await activateInstall(app, "splash");
-    expect(app.ui.openModalTemplate).toHaveBeenCalledTimes(1);
+    expect(app.ui.openModal).toHaveBeenCalledTimes(1);
     // The iOS variant names the Safari Share sheet; the browser-menu copy must not leak in.
     expect(openedModalText(app)).toMatch(/Safari/);
   });
@@ -252,10 +252,10 @@ describe("splash front door (CAP-5)", () => {
 
     const first = activateInstall(app, "splash"); // enters the prompt branch, awaits userChoice
     await activateInstall(app, "splash"); // concurrent tap: must be a no-op, NOT a how-to
-    expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
+    expect(app.ui.openModal).not.toHaveBeenCalled();
     release();
     await first;
-    expect(app.ui.openModalTemplate).not.toHaveBeenCalled(); // still the prompt path, never a modal
+    expect(app.ui.openModal).not.toHaveBeenCalled(); // still the prompt path, never a modal
   });
 
   it("activateInstall offers nothing to a standalone session (defensive: no surface should call it)", async () => {
@@ -263,7 +263,7 @@ describe("splash front door (CAP-5)", () => {
     const app = makeApp();
     initInstallAffordance(app);
     await activateInstall(app, "splash");
-    expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
+    expect(app.ui.openModal).not.toHaveBeenCalled();
   });
 });
 

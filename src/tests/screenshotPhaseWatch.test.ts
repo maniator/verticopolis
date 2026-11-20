@@ -23,7 +23,7 @@ function openDialog(): HTMLDialogElement {
   box.className = "modal-box";
   const title = document.createElement("h2");
   title.className = "win-title";
-  // The structure finishModal (src/ui/uiModal.ts) leaves: the title text in
+  // The structure the components' ModalShell draws: the title text in
   // its own labelled span, the ✕ button beside it inside the heading.
   const label = document.createElement("span");
   label.id = "verticopolis-modal-title";

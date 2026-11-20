@@ -30,8 +30,8 @@ describe("eventChoiceTemplate structure", () => {
     expect([...accept.classList].sort()).toEqual(["btn", "primary"]);
     expect(decline.textContent).toBe("Decline");
     expect([...decline.classList]).toEqual(["btn"]);
-    // NOTE: this reads the bare template. In a live mount, finishModal appends the
-    // title-bar close INTO the top-level h2, so the mounted h2.textContent differs.
+    // NOTE: this reads the bare template. In a live mount, ModalShell draws the
+    // title-bar close INTO the h2, so the mounted h2.textContent differs.
   });
 
   it("renders no [data-act=close] button (the x closes via the cancel path)", () => {

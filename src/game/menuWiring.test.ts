@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { drawElement, mountPage } from "../ui/testing/litTestUtils";
+import { html } from "lit-html";
 import type { GameApp } from "../main";
 
 const map = vi.hoisted(() => ({ open: false, set: vi.fn() }));
@@ -52,45 +54,15 @@ import {
   TOWER_ONLY_ITEMS,
   TOWER_ONLY_MENUS,
   toggleFullScreen,
+  drawMenuBar,
   wireMenus,
 } from "./menuWiring";
 
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */
 function mount(): void {
-  const item = (id: string, role = "menuitem") => `<button class="mb-item" id="${id}" role="${role}">${id}</button>`;
-  document.body.innerHTML = `
-    <nav id="menubar">
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-file" aria-expanded="false" aria-controls="mb-file-menu"><u>F</u>ile</button>
-        <div class="mb-pop" id="mb-file-menu" role="menu" hidden>
-          ${item("mb-quick-save")}${item("mb-close")}${item("mb-import")}${item("mb-export")}${item("mb-undo")}${item("mb-redo")}
-          ${item("mb-rename")}${item("mb-rules")}${item("mb-compare")}${item("mb-replay")}
-          ${item("mb-win-tools", "menuitemcheckbox")}${item("mb-win-map", "menuitemcheckbox")}
-          ${item("mb-win-tower", "menuitemcheckbox")}${item("mb-win-bulletin", "menuitemcheckbox")}
-          ${item("mb-win-statusbar", "menuitemcheckbox")}${item("mb-fullscreen", "menuitemcheckbox")}
-          ${item("mb-sound", "menuitemcheckbox")}
-          <a class="mb-item" id="mb-sponsor" hidden>Sponsor</a>
-          ${item("btn-new")}${item("btn-stats")}
-          <hr class="mb-sep mb-install-sep" hidden /><button class="mb-item" id="btn-install-menu" hidden>Install</button>
-          <hr class="mb-sep" id="mb-save-sep" /><hr class="mb-sep" id="mb-close-sep" />
-        </div>
-      </div>
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-edit" aria-expanded="false" aria-controls="mb-edit-menu"><u>E</u>dit</button>
-        <div class="mb-pop" id="mb-edit-menu" role="menu" hidden>${item("mb-edit-probe")}</div>
-      </div>
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-tower" aria-expanded="false" aria-controls="mb-tower-menu"><u>T</u>ower</button>
-        <div class="mb-pop" id="mb-tower-menu" role="menu" hidden>
-          ${item("mb-fire-rescue")}<button class="mb-item" id="mb-exterminator" role="menuitem" hidden>Call Exterminator</button>
-        </div>
-      </div>
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-window" aria-expanded="false" aria-controls="mb-window-menu"><u>W</u>indow</button>
-        <div class="mb-pop" id="mb-window-menu" role="menu" hidden></div>
-      </div>
-    </nav>
+  mountPage(html`
+    <div id="menubar-host"></div>
     <div id="palette"></div>
     <button id="btn-palette-collapse"></button>
     <main id="stage">
@@ -99,7 +71,8 @@ function mount(): void {
     </main>
     <input id="tower-name" />
     <button id="btn-undo" aria-disabled="true"></button>
-    <button id="btn-redo"></button>`;
+    <button id="btn-redo"></button>`);
+  drawMenuBar();
 }
 
 function fakeApp(onPhone = false) {
@@ -132,7 +105,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
+  document.body.replaceChildren();
 });
 
 describe("wireMenus", () => {
@@ -140,7 +113,7 @@ describe("wireMenus", () => {
     const { app } = fakeApp();
     expect(wireMenus(app)).not.toBeNull();
     expect(wireMenus(app)).toBeNull();
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     expect(wireMenus(app)).toBeNull();
   });
 
@@ -176,7 +149,7 @@ describe("wireMenus", () => {
   it("routes File, Edit, Tower, Options and Help items to the game", () => {
     const { app, ui } = fakeApp();
     const undo = vi.fn();
-    $("btn-undo").addEventListener("click", undo);
+    vi.spyOn($("btn-undo"), "click").mockImplementation(undo);
     wireMenus(app);
     $("mb-quick-save").click();
     $("mb-close").click();
@@ -261,7 +234,7 @@ describe("wireMenus", () => {
 
   it("Tools clicks the palette's fold, and Map flips the Map window", () => {
     const fold = vi.fn();
-    $("btn-palette-collapse").addEventListener("click", fold);
+    vi.spyOn($("btn-palette-collapse"), "click").mockImplementation(fold);
     wireMenus(fakeApp().app);
     $("mb-win-tools").click();
     expect(fold).toHaveBeenCalledOnce();
@@ -335,9 +308,7 @@ describe("wireMenus", () => {
     const towerOnly = () => [...TOWER_ONLY_MENUS.map((id) => $(id).parentElement!), ...TOWER_ONLY_ITEMS.map($)];
     expect(towerOnly().map((el) => el.hidden)).toEqual(towerOnly().map(() => false));
     const splashNew = vi.fn();
-    const splash = document.createElement("div");
-    splash.id = "splash";
-    splash.innerHTML = `<button data-splash="new"></button>`;
+    const splash = drawElement(html`<div id="splash"><button data-splash="new" @click=${splashNew}></button></div>`);
     // The title screen mounts the way ui/Onboarding.ts mounts it: the element,
     // then its body class, which the bar follows before any menu opens.
     document.body.append(splash);
@@ -348,12 +319,11 @@ describe("wireMenus", () => {
     for (const id of ["btn-new", "mb-import"]) expect($(id).hidden, id).toBe(false);
     // The arrow keys and the Alt letters skip a menu that left the bar.
     $("mb-file").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    expect(document.activeElement).toBe($("mb-file"));
+    expect(document.activeElement).toBe($("mb-options"));
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true }));
     expect(bar.current()).toBeNull();
-    splash.querySelector("button")!.addEventListener("click", splashNew);
     const gameNew = vi.fn();
-    $("btn-new").addEventListener("click", gameNew);
+    $("btn-new").addEventListener("click", gameNew); // the game's own New, wired as UI.ts wires it
     bar.open($("mb-file") as HTMLButtonElement, false);
     // Opening a menu keeps them out, Tools' layout check included.
     expect(towerOnly().map((el) => el.hidden)).toEqual(towerOnly().map(() => true));
@@ -372,8 +342,7 @@ describe("wireMenus", () => {
 
   it("follows the title screen element alone, whatever body class a removal left behind", async () => {
     wireMenus(fakeApp().app);
-    const splash = document.createElement("div");
-    splash.id = "splash";
+    const splash = drawElement(html`<div id="splash"></div>`);
     document.body.append(splash);
     await Promise.resolve();
     expect($("mb-tower").parentElement!.hidden).toBe(true);
@@ -433,19 +402,19 @@ describe("wireMenus analytics", () => {
 
   it("a grayed item reports a grayed pick with no state, and the menu stays open", () => {
     const bar = wireMenus(fakeApp().app)!; // the toolbar's Undo is grayed
-    pointerClick($("mb-file"));
+    pointerClick($("mb-edit"));
     pointerClick($("mb-undo"));
     expect(menus.pick).toHaveBeenCalledExactlyOnceWith({
-      menu: "file",
+      menu: "edit",
       item: "undo",
       via: "pointer",
       screen: "tower",
       browsed: 1,
       grayed: true,
     });
-    expect(bar.current()).toBe($("mb-file"));
+    expect(bar.current()).toBe($("mb-edit"));
     bar.close(true, "escape");
-    expect(menus.dismiss).toHaveBeenCalledExactlyOnceWith({ menu: "file", how: "escape", screen: "tower", browsed: 1 });
+    expect(menus.dismiss).toHaveBeenCalledExactlyOnceWith({ menu: "edit", how: "escape", screen: "tower", browsed: 1 });
   });
 
   it("a click with no menu open (a script's) is not a pick", () => {
@@ -456,9 +425,7 @@ describe("wireMenus analytics", () => {
 
   it("on the title screen the events say so, and a routed item still counts as its pick", () => {
     const bar = wireMenus(fakeApp().app)!;
-    const splash = document.createElement("div");
-    splash.id = "splash";
-    splash.innerHTML = `<button data-splash="new"></button>`;
+    const splash = drawElement(html`<div id="splash"><button data-splash="new"></button></div>`);
     document.body.append(splash);
     pointerClick($("mb-file"));
     expect(menus.open).toHaveBeenLastCalledWith({ menu: "file", via: "click", screen: "title" });

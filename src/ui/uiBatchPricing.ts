@@ -1,5 +1,4 @@
 import type { UI } from "./UI";
-import { render } from "lit-html";
 import {
   batchPricingTemplate,
   batchPriceText,
@@ -86,11 +85,10 @@ export function showBatchPricingDialog(ui: UI, ctx: BatchPricingDialogCtx, cb: B
     state.previewMsg = batchPreviewMessage(tctx, t, r);
     state.applyDisabled = r.changed === 0;
   };
-  // Re-render the whole dialog from `state` into the modal box. lit patches in
-  // place, and the title-bar close that finishModal appends after the h2 (outside
-  // lit's managed region) survives the re-render.
+  // Redraw the whole dialog from `state`; lit patches in place. Never once
+  // another dialog has taken the modal, which this view would overwrite.
   function rerender(): void {
-    render(batchPricingTemplate(tctx, state, handlers), box);
+    if (box.isConnected) ui.renderModal(batchPricingTemplate(tctx, state, handlers));
   }
   // Any input disarms a pending bulk reset (as the old refresh() did), then
   // re-previews and re-renders.
@@ -147,7 +145,7 @@ export function showBatchPricingDialog(ui: UI, ctx: BatchPricingDialogCtx, cb: B
     onCancel: () => ui.closeModal(),
   };
   recompute();
-  const box = ui.openModalTemplate(batchPricingTemplate(tctx, state, handlers));
+  const box = ui.openModal(batchPricingTemplate(tctx, state, handlers));
 }
 
 /** The Classic (ladder) batch-pricing body: one rung picker in place of the
@@ -180,7 +178,7 @@ function showBatchRungDialog(
     state.applyDisabled = r.changed === 0;
   };
   function rerender(): void {
-    render(batchRungTemplate(tctx, state, handlers), box);
+    if (box.isConnected) ui.renderModal(batchRungTemplate(tctx, state, handlers));
     // Post-render selection write (see rungPicker.ts): options must be
     // attached before a select's value can be set reliably.
     syncRungSelects(box);
@@ -240,6 +238,6 @@ function showBatchRungDialog(
     onCancel: () => ui.closeModal(),
   };
   recompute();
-  const box = ui.openModalTemplate(batchRungTemplate(tctx, state, handlers));
+  const box = ui.openModal(batchRungTemplate(tctx, state, handlers));
   syncRungSelects(box); // initial selection, post-attach (see rungPicker.ts)
 }

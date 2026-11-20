@@ -142,8 +142,8 @@ export function pgStopModalPhaseWatch(): {
   const dlg = document.getElementById("modal") as HTMLDialogElement | null;
   const open = dlg?.open ? dlg.querySelector(".modal-box") : null;
   const box = rec.target ?? open;
-  // The title text without its ✕: finishModal (src/ui/uiModal.ts) moves the
-  // heading's content into #verticopolis-modal-title beside the button; a
+  // The title text without its ✕: the components' modal draws the title in
+  // #verticopolis-modal-title beside the button; a
   // bar built any other way falls back to its text minus the button's.
   const bar = box?.querySelector(".win-title");
   const label = bar?.querySelector("#verticopolis-modal-title");

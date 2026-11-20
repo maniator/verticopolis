@@ -1,4 +1,5 @@
-import { render, type TemplateResult } from "lit-html";
+import { html, render, type TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 
 /**
  * Unit-tier test harness for lit templates (see the plan of record in
@@ -20,19 +21,42 @@ import { render, type TemplateResult } from "lit-html";
  * never by app code, so it is tree-shaken out of the production bundle.
  */
 
-/** Render a lit template into a detached container and hand back its nodes as a
- *  fragment. lit brackets its bindings with boundary comment markers; those are
- *  stripped here so the fragment's child list matches the template's authored
- *  structure. The template is rendered once (this harness never re-renders). */
-export function renderToFragment(result: TemplateResult): DocumentFragment {
+/** A dialog's view as the modal draws it, its title in an `<h2>` above its
+ *  body (the title bar's ✕ and notice line are the shell's, not the view's). */
+export const viewTemplate = (view: ModalView): TemplateResult => html`<h2>${view.title}</h2>${view.body}`;
+
+/** Render a lit template, or a dialog's view (see {@link viewTemplate}), into
+ *  a detached container and hand back its nodes as a fragment. lit brackets
+ *  its bindings with boundary comment markers; those are stripped here so the
+ *  fragment's child list matches the template's authored structure. The
+ *  template is rendered once (this harness never re-renders). */
+export function renderToFragment(result: TemplateResult | ModalView): DocumentFragment {
   const container = document.createElement("div");
-  render(result, container);
+  render("body" in result ? viewTemplate(result) : result, container);
   const frag = document.createDocumentFragment();
   for (const node of Array.from(container.childNodes)) {
     if (node.nodeType === 8 /* Comment: lit part markers */) continue;
     frag.appendChild(node);
   }
   return frag;
+}
+
+/** Draw a lit template into a fresh fragment, ready to place on a test page.
+ *  A fresh fragment each time keeps lit from reusing an earlier render. */
+export function drawFragment(template: TemplateResult, doc: Document = document): DocumentFragment {
+  const frag = doc.createDocumentFragment();
+  render(template, frag);
+  return frag;
+}
+
+/** Draw a template with one top-level element and hand that element back. */
+export function drawElement<T extends Element = HTMLElement>(template: TemplateResult, doc: Document = document): T {
+  return drawFragment(template, doc).firstElementChild as T;
+}
+
+/** Replace a test page's body with the page a lit template draws. */
+export function mountPage(template: TemplateResult, doc: Document = document): void {
+  doc.body.replaceChildren(drawFragment(template, doc));
 }
 
 /** Fire a bubbling, cancelable event on a rendered node so a test can prove an

@@ -30,7 +30,7 @@
 import { APP_VERSION } from "../appVersion";
 import { PREVIEW_DEPLOY } from "../deployTarget";
 import { DEBUG_FLAG, debugFlagOn } from "../debugFlags";
-import type { TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { WELCOME_LINKS, welcomeModalTemplate } from "./templates/welcome";
 import { trackAppAction } from "../analytics";
 
@@ -249,7 +249,7 @@ export function drawSky(ctx: CanvasRenderingContext2D, sky: Sky): void {
  *  the same window grammar as every other dialog (title bar, ✕, Escape, a
  *  click on the backdrop, the OK button). */
 export interface WelcomeModalPort {
-  openModalTemplate(result: TemplateResult, opts?: { displaceable?: boolean; onDisplaced?: () => void }): HTMLElement;
+  openModal(view: ModalView, opts?: { displaceable?: boolean; onDisplaced?: () => void }): HTMLElement;
   wireActions(box: HTMLElement): void;
 }
 
@@ -327,7 +327,7 @@ export function showLaunchFireworks(deps: ShowDeps): void {
   const raf = deps.raf ?? ((cb: FrameRequestCallback) => requestAnimationFrame(cb));
   let displaced = false;
   let stopTracking = (): void => {};
-  const box = deps.ui.openModalTemplate(welcomeModalTemplate(), {
+  const box = deps.ui.openModal(welcomeModalTemplate(), {
     displaceable: true,
     onDisplaced: () => {
       displaced = true;

@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { TOWER_FILE_EXT } from "../../storage/SaveGame";
 import type { ImportReport } from "../../storage/tdtImportReport";
 import type { ExportReport } from "../../storage/tdtExportReport";
@@ -25,30 +26,33 @@ const listItems = (lines: string[]): TemplateResult[] => lines.map((s) => html`<
 const starLabel = (star: number): string => (star >= 6 ? "TOWER" : `${star}★`);
 
 /** The export-choice modal body (.vctower primary, 1994 .TDT secondary). */
-export function exportConfirmTemplate(exportsTo1994: boolean): TemplateResult {
+export function exportConfirmTemplate(exportsTo1994: boolean): ModalView {
   const legacyLine = exportsTo1994
     ? html`You can also save it for the original 1994 game (<b>.TDT</b>); a summary of what carries over shows first. <b>Still experimental</b>: verified to load in the real game for smaller Classic towers.`
     : html`Saving for the original 1994 game (<b>.TDT</b>) is <b>Classic towers only</b>: the 1994 rule set cannot hold Modern mechanics.`;
-  return html`
-      <h2>Save As</h2>
+  return {
+    title: "Save As",
+    body: html`
       <p>Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.</p>
       <p style="color:var(--muted);font-size:12px">${legacyLine}</p>
       <div class="modal-actions modal-footer">
         <button class="btn" data-act="close">Cancel</button>
         <button class="btn" data-act="legacy" ?disabled=${!exportsTo1994} title=${exportsTo1994 ? nothing : "Classic towers only"}>For SimTower (1994)…</button>
         <button class="btn primary" data-act="export" autofocus>Save ${TOWER_FILE_EXT}</button>
-      </div>`;
+      </div>`,
+  };
 }
 
 /** The legacy (.TDT) import fidelity report modal body. */
-export function importReportTemplate(report: ImportReport): TemplateResult {
+export function importReportTemplate(report: ImportReport): ModalView {
   const stars = starLabel(report.star);
   // Minus before the dollar sign, same as the stats panel (legacy imports
   // can legitimately arrive in the red).
   const money = Math.round(report.money);
   const funds = `${money < 0 ? "-" : ""}$${groupDigits(Math.abs(money))}`;
-  return html`
-      <h2>Import from SimTower (1994)</h2>
+  return {
+    title: "Import from SimTower (1994)",
+    body: html`
       <div class="import-facts well">
         <b>${report.towerName}</b> · ${stars} · ${funds}
         · ${report.floors} floor${report.floors === 1 ? "" : "s"}${report.basements ? ` / B${report.basements}` : ""}
@@ -62,15 +66,17 @@ export function importReportTemplate(report: ImportReport): TemplateResult {
       <div class="modal-actions modal-footer">
         <button class="btn" data-act="close">Cancel</button>
         <button class="btn primary" data-act="open" autofocus>Open tower</button>
-      </div>`;
+      </div>`,
+  };
 }
 
 /** The reverse-fidelity legacy (.TDT) export report modal body. */
-export function exportReportTemplate(report: ExportReport): TemplateResult {
+export function exportReportTemplate(report: ExportReport): ModalView {
   const stars = starLabel(report.star);
   const funds = `${report.money < 0 ? "-" : ""}$${groupDigits(Math.abs(report.money))}`;
-  return html`
-      <h2>Export for SimTower (1994)</h2>
+  return {
+    title: "Export for SimTower (1994)",
+    body: html`
       <p style="color:var(--muted);font-size:12px"><b>Work in progress.</b> Exporting to the original 1994 format is still experimental. It has been verified to load and play in the real game for smaller Classic towers; a large or complex tower may not load correctly yet. Your tower here is never changed.</p>
       <div class="import-facts well">
         <b>${report.towerName}</b> · ${stars} · ${funds}
@@ -85,5 +91,6 @@ export function exportReportTemplate(report: ExportReport): TemplateResult {
       <div class="modal-actions modal-footer">
         <button class="btn" data-act="close">Cancel</button>
         <button class="btn primary" data-act="download" autofocus>Download .TDT</button>
-      </div>`;
+      </div>`,
+  };
 }

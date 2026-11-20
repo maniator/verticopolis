@@ -31,8 +31,8 @@ describe("showImportReport onShown", () => {
     const onShown = vi.fn();
     showImportReport(ui, report(), { onOpen: vi.fn(), onShown });
     expect(onShown).toHaveBeenCalledOnce();
-    expect(spies.openModalTemplate).toHaveBeenCalledOnce();
-    expect(onShown.mock.invocationCallOrder[0]).toBeGreaterThan(spies.openModalTemplate.mock.invocationCallOrder[0]!);
+    expect(spies.openModal).toHaveBeenCalledOnce();
+    expect(onShown.mock.invocationCallOrder[0]).toBeGreaterThan(spies.openModal.mock.invocationCallOrder[0]!);
   });
 
   it("does not fire while the report waits, and fires once when the dialog in the way closes", () => {
@@ -41,10 +41,10 @@ describe("showImportReport onShown", () => {
     const onShown = vi.fn();
     showImportReport(ui, report(), { onOpen: vi.fn(), onShown });
     expect(onShown, "a waiting report is not on screen").not.toHaveBeenCalled();
-    expect(spies.openModalTemplate).toHaveBeenCalledOnce(); // only the blocking dialog
+    expect(spies.openModal).toHaveBeenCalledOnce(); // only the blocking dialog
     spies.closeModal();
     expect(onShown).toHaveBeenCalledOnce();
-    expect(spies.openModalTemplate).toHaveBeenCalledTimes(2);
+    expect(spies.openModal).toHaveBeenCalledTimes(2);
     // A second close (the report's own) does not show it again.
     spies.closeModal();
     expect(onShown).toHaveBeenCalledOnce();
@@ -76,7 +76,7 @@ describe("showImportReport onShown", () => {
     );
     spies.closeModal();
     expect(onShown).not.toHaveBeenCalled();
-    expect(spies.openModalTemplate, "the dropped report never opens").toHaveBeenCalledOnce();
+    expect(spies.openModal, "the dropped report never opens").toHaveBeenCalledOnce();
   });
 
   it("never fires for a waiting report dropped when another dialog takes over", () => {
@@ -92,7 +92,7 @@ describe("showImportReport onShown", () => {
   it("opens without an onShown", () => {
     const { ui, spies } = precedenceUi();
     expect(() => showImportReport(ui, report(), { onOpen: vi.fn() })).not.toThrow();
-    expect(spies.openModalTemplate).toHaveBeenCalledOnce();
+    expect(spies.openModal).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { html } from "lit-html";
+import { drawFragment, mountPage } from "../testing/litTestUtils";
 
 vi.mock("../../analyticsActions", () => ({ trackAppAction: vi.fn(), trackAppActionOnce: vi.fn() }));
 
@@ -16,10 +18,10 @@ import {
 } from "./deskController";
 
 /** The page the desk works on: the game's own elements, in their usual places. */
-const PAGE = `
+const PAGE = html`
   <div id="app">
     <div id="topbar">Info</div>
-    <nav id="menubar"><button id="mb-options">Options</button><div id="mb-window-menu"><button id="mb-dw-info" data-desk-win="info">Info</button><button id="mb-dw-map" data-desk-win="map">Map</button></div><button id="mb-win-map">Map</button><button id="mb-win-statusbar">Status Bar</button><button id="mb-fullscreen">Full Screen</button><button id="mb-close">Close</button><button id="mb-sound" aria-checked="true">Sound</button></nav>
+    <div id="menubar-host"><nav id="menubar"><button id="mb-options">Options</button><div id="mb-window-menu"><button id="mb-dw-info" data-desk-win="info">Info</button><button id="mb-dw-map" data-desk-win="map">Map</button></div><button id="mb-win-map">Map</button><button id="mb-win-statusbar">Status Bar</button><button id="mb-fullscreen">Full Screen</button><button id="mb-close">Close</button><button id="mb-sound" aria-checked="true">Sound</button></nav></div>
     <div id="stage">tower</div>
     <div id="statusbar">status</div>
     <aside id="palette" class="win"><div class="win-title">Tools</div></aside>
@@ -47,14 +49,14 @@ let doc: Document;
 /** A fresh page at `url`, with the game's elements in their usual places. */
 function page(url = "http://localhost/"): Document {
   const d = document.implementation.createHTMLDocument("Verticopolis");
-  d.body.innerHTML = PAGE;
+  mountPage(PAGE, d);
   Object.defineProperty(d, "location", { value: new URL(url) });
   return d;
 }
 
 /** Where each of the game's elements sits: its parent's id. */
 function places(): Record<string, string | undefined> {
-  const ids = ["topbar", "menubar", "stage", "statusbar", "palette", "overview-map", "bulletin-win", "tower-win"];
+  const ids = ["topbar", "menubar-host", "stage", "statusbar", "palette", "overview-map", "bulletin-win", "tower-win"];
   return Object.fromEntries(ids.map((id) => [id, doc.getElementById(id)?.parentElement?.id]));
 }
 
@@ -90,7 +92,7 @@ describe("DeskController", () => {
     new DeskController(doc).start();
     expect(doc.body.classList.contains(DESK_CLASS)).toBe(true);
     const tower = doc.querySelector("#desk-win-tower .desk-body")!;
-    expect([...tower.children].map((e) => e.id)).toEqual(["menubar", "stage", "statusbar"]);
+    expect([...tower.children].map((e) => e.id)).toEqual(["menubar-host", "stage", "statusbar"]);
     expect(doc.getElementById("topbar")!.parentElement!.closest("#desk-win-info")).not.toBeNull();
     for (const id of ["palette", "overview-map", "bulletin-win", "tower-win"])
       expect(doc.getElementById(id)!.parentElement!.id).toBe("desk");
@@ -329,10 +331,8 @@ describe("DeskController", () => {
   it("opens a Tools window folded off the desk", () => {
     const palette = doc.getElementById("palette")!;
     palette.classList.add("pal-collapsed");
-    const toggle = doc.createElement("button");
-    toggle.id = "btn-palette-collapse";
-    toggle.addEventListener("click", () => palette.classList.remove("pal-collapsed"));
-    doc.body.appendChild(toggle);
+    const unfold = () => palette.classList.remove("pal-collapsed");
+    doc.body.append(drawFragment(html`<button id="btn-palette-collapse" @click=${unfold}></button>`, doc));
     new DeskController(doc).start();
     expect(palette.classList.contains("pal-collapsed")).toBe(false);
   });
@@ -344,10 +344,7 @@ describe("DeskController", () => {
     doc.getElementById("overview-map")!.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(mapButton().getAttribute("aria-pressed")).toBe("true");
     const about = vi.fn();
-    const item = doc.createElement("button");
-    item.id = "btn-about";
-    item.addEventListener("click", about);
-    doc.body.appendChild(item);
+    doc.body.append(drawFragment(html`<button id="btn-about" @click=${about}></button>`, doc));
     doc.querySelector<HTMLElement>('.desk-start-menu [data-item="btn-about"]')!.click();
     expect(about).toHaveBeenCalledTimes(1);
     expect(trackAppAction).toHaveBeenCalledWith("desk_start", "btn-about");

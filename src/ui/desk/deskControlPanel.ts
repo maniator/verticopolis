@@ -1,4 +1,4 @@
-import { buildFrame, titleButton } from "@verticopolis/components/windows/desk/deskWindow";
+import { buildFrame } from "@verticopolis/components/windows/desk/deskWindow";
 
 /**
  * The Control Panel on the 1994 desk: the settings a 1995 player looked for
@@ -55,16 +55,16 @@ export function buildControlPanel(
   picked: (icon: ControlIcon) => void,
   closed?: () => void,
 ): ControlPanel {
-  const frame = buildFrame(doc, "desk-win-control", "Control Panel");
+  const frame = buildFrame(doc, "desk-win-control", "Control Panel", {
+    label: "Close Control Panel",
+    onClick: () => {
+      root.hidden = true;
+      closed?.();
+    },
+  });
   const root = frame.root;
   root.classList.add("desk-control");
   root.hidden = true;
-  const close = titleButton(doc, "close", "Close Control Panel");
-  close.addEventListener("click", () => {
-    root.hidden = true;
-    closed?.();
-  });
-  frame.root.querySelector(".win-title")?.appendChild(close);
   let soundLabel: HTMLElement | null = null;
   const grid = doc.createElement("div");
   grid.className = "desk-control-icons";

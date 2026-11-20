@@ -1,38 +1,22 @@
 import { describe, it, expect, vi } from "vitest";
+import { html } from "lit-html";
+import { mountPage } from "./testing/litTestUtils";
 import { BACK_TO_GAME_LABEL, PLAY_LABEL, wireHelpMenu, type HelpMenuDeps } from "./helpSiteMenu";
 
-/** The help site's bar, as MenuBar.astro renders it (trimmed to the items the tests pick). */
+/** The host MenuBar.astro gives the bar. */
 function mountBar(): HTMLElement {
-  document.body.innerHTML = `
-    <nav id="help-menubar" class="menubar">
-      <div class="mb-menu">
-        <button type="button" class="mb-title" id="hm-file" aria-expanded="false" aria-controls="hm-file-menu"><u>F</u>ile</button>
-        <div class="mb-pop" id="hm-file-menu" role="menu" hidden>
-          <a role="menuitem" class="mb-item" href="/" data-help-item="game">Play Verticopolis</a>
-          <button type="button" role="menuitem" class="mb-item" data-help-item="print">Print…</button>
-        </div>
-      </div>
-      <div class="mb-menu">
-        <button type="button" class="mb-title" id="hm-edit" aria-expanded="false" aria-controls="hm-edit-menu"><u>E</u>dit</button>
-        <div class="mb-pop" id="hm-edit-menu" role="menu" hidden>
-          <button type="button" role="menuitem" class="mb-item" data-help-item="find">Find…</button>
-          <button type="button" role="menuitem" class="mb-item" data-help-item="copy_link">Copy Link to This Page</button>
-        </div>
-      </div>
-      <div class="mb-menu">
-        <button type="button" class="mb-title" id="hm-options" aria-expanded="false" aria-controls="hm-options-menu"><u>O</u>ptions</button>
-        <div class="mb-pop" id="hm-options-menu" role="menu" hidden>
-          <button type="button" role="menuitemradio" class="mb-item" data-help-item="theme_light" aria-checked="false">Light</button>
-          <button type="button" role="menuitemradio" class="mb-item" data-help-item="theme_dark" aria-checked="false">Dark</button>
-          <button type="button" role="menuitemradio" class="mb-item" data-help-item="theme_auto" aria-checked="false">Match My Device</button>
-        </div>
-      </div>
-    </nav>`;
-  return document.getElementById("help-menubar")!;
+  mountPage(html`<div id="host"></div>`);
+  return document.getElementById("host")!;
 }
 
 function stubDeps(over: Partial<HelpMenuDeps> = {}): HelpMenuDeps {
   return {
+    links: {
+      game: "/",
+      whatsNew: "/help/changelog/",
+      report: "https://example.test/issues",
+      sponsor: "https://example.test/sponsor",
+    },
     fromGame: false,
     backToGame: vi.fn(),
     print: vi.fn(),
@@ -49,6 +33,35 @@ function stubDeps(over: Partial<HelpMenuDeps> = {}): HelpMenuDeps {
 const pick = (code: string) => document.querySelector<HTMLElement>(`[data-help-item="${code}"]`)!.click();
 
 describe("the help site's menu bar", () => {
+  it("draws the manual's bar, each item carrying the code its pick reports", () => {
+    wireHelpMenu(mountBar(), stubDeps());
+    const bar = document.getElementById("help-menubar")!;
+    expect(bar.getAttribute("aria-label")).toBe("Help menu");
+    expect([...bar.querySelectorAll(".mb-title")].map((t) => t.textContent)).toEqual([
+      "File",
+      "Edit",
+      "Options",
+      "Help",
+    ]);
+    const codes = [...bar.querySelectorAll<HTMLElement>(".mb-item")].map((i) => i.dataset.helpItem);
+    expect(codes).toEqual([
+      "game",
+      "print",
+      "find",
+      "copy_link",
+      "theme_light",
+      "theme_dark",
+      "theme_auto",
+      "whats_new",
+      "report",
+      "sponsor",
+    ]);
+    const report = bar.querySelector<HTMLAnchorElement>('[data-help-item="report"]')!;
+    expect(report.getAttribute("href")).toBe("https://example.test/issues");
+    expect(report.target).toBe("_blank");
+    expect(bar.querySelector('[data-help-item="whats_new"]')!.getAttribute("href")).toBe("/help/changelog/");
+  });
+
   it("offers to start the game in a plain visit, and lets its link load it", () => {
     const root = mountBar();
     const deps = stubDeps();

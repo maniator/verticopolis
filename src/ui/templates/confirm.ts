@@ -1,4 +1,5 @@
-import { html, type TemplateResult } from "lit-html";
+import { html } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 
 /**
  * lit-html templates for the UI dialogs, the declarative replacement for the
@@ -30,14 +31,12 @@ export interface ConfirmActions {
  * lit. There is deliberately no `data-act="close"` button; the title-bar x closes
  * through the dialog's cancel path.
  */
-export function confirmTemplate(
-  title: string,
-  body: string,
-  yesLabel: string,
-  actions: ConfirmActions,
-): TemplateResult {
-  return html`<h2>${title}</h2><p>${body}</p>
-       <div class="modal-actions modal-footer"><button class="btn" data-act="no" @click=${actions.onCancel}>Cancel</button><button class="btn primary" data-act="yes" @click=${actions.onYes}>${yesLabel}</button></div>`;
+export function confirmTemplate(title: string, body: string, yesLabel: string, actions: ConfirmActions): ModalView {
+  return {
+    title: title,
+    body: html`<p>${body}</p>
+       <div class="modal-actions modal-footer"><button class="btn" data-act="no" @click=${actions.onCancel}>Cancel</button><button class="btn primary" data-act="yes" @click=${actions.onYes}>${yesLabel}</button></div>`,
+  };
 }
 
 /** Which honest "add to your device" how-to a session gets when no native
@@ -59,13 +58,16 @@ export type InstallHelpVariant = "ios" | "browser";
  * install button without a captured install event. Copy leads with the outcome, not the
  * mechanism; the word "PWA" never appears.
  */
-export function installHelpTemplate(onClose: () => void, variant: InstallHelpVariant = "ios"): TemplateResult {
+export function installHelpTemplate(onClose: () => void, variant: InstallHelpVariant = "ios"): ModalView {
   const steps =
     variant === "ios"
       ? html`<p>In Safari, tap the <b>Share</b> button (the square with an arrow pointing up), then choose <b>Add to Home Screen</b>.</p>`
       : html`<p>Look for an <b>Install</b> or <b>Add to Home screen</b> option in your browser, usually in its main menu or the address bar. Not every browser offers it; if you don't see it yet, keep playing for a moment and try again.</p>`;
-  return html`<h2>Add Verticopolis to your Home Screen</h2>
+  return {
+    title: "Add Verticopolis to your Home Screen",
+    body: html`
        <p>Play offline and fullscreen, and open it straight from your home screen with no browser bar.</p>
        ${steps}
-       <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" @click=${onClose}>Got it</button></div>`;
+       <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" @click=${onClose}>Got it</button></div>`,
+  };
 }

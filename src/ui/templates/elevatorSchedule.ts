@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { live } from "lit-html/directives/live.js";
 import type { ElevatorSchedule } from "@verticopolis/engine/model/engineTypes";
 import type { ElevatorScheduleUX } from "../scheduleDialogRules";
@@ -443,12 +444,11 @@ function presetsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Te
     ${hint ? html`<p class="es-hint">${hint}</p>` : nothing}`;
 }
 
-export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
+export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): ModalView {
   const strip = stripTemplate(ctx, state, h);
-  // No .modal-box wrapper here: openModalTemplate supplies it, and finishModal
-  // skins only a DIRECT-child h2 as the title bar (same grammar as batchPricing).
-  return html`
-      <h2>${ctx.title}</h2>
+  return {
+    title: ctx.title,
+    body: html`
       <div class="es-body">
         <div class="es-row es-day">
           <span class="es-daypair" role="group" aria-label="Day type">
@@ -495,5 +495,6 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
         }
         <button class="btn primary" data-act="apply" @click=${h.onOk}>OK</button>
         <button class="btn" data-act="close" @click=${h.onCancel}>${state.cancelArmed ? "Discard changes?" : "Cancel"}</button>
-      </div>`;
+      </div>`,
+  };
 }

@@ -20,7 +20,7 @@ export function showStarUp(ui: UI, screen: StarUpScreen, onClosed: () => void): 
     ui.closeModal();
     finish();
   };
-  ui.openModalTemplate(starUpTemplate(screen, ok), { onDisplaced: finish });
+  ui.openModal(starUpTemplate(screen, ok), { onDisplaced: finish });
   const dialog = ui.el.modal as HTMLDialogElement;
   dialog.oncancel = (e) => {
     e.preventDefault();

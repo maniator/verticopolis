@@ -1,48 +1,22 @@
 ---
 // The game's Win95 menu bar across the top of every help page, above its title bar, so the manual
-// looks like the game (owner, 2026-11-15). The markup matches the game's
-// (src/index.html #menubar) and shares its stylesheet
-// (src/styles/menu-bar.css); src/ui/helpSiteMenu.ts says what each item does,
-// and each item's data-help-item is the code its pick reports. The game item
-// reads "Play Verticopolis" until the script finds a tab the game opened,
-// where it becomes "Back to Game".
+// looks like the game (owner, 2026-11-15). The components' MenuBar draws it
+// into the host below from the model src/ui/helpSiteMenu.ts builds, which
+// also says what each item does; each item's data-help-item is the code its
+// pick reports. The host carries the addresses the links go to. The game item
+// reads "Back to Game" in a tab the game opened, and "Play Verticopolis"
+// elsewhere.
 import { GITHUB_ISSUES, SPONSOR_URL, siteHref } from "../../site.mjs";
 ---
 
-<nav id="help-menubar" class="menubar help-menubar print:hidden" aria-label="Help menu">
-  <div class="mb-menu">
-    <button type="button" class="mb-title" id="hm-file" aria-haspopup="menu" aria-expanded="false" aria-controls="hm-file-menu"><u>F</u>ile</button>
-    <div class="mb-pop" id="hm-file-menu" role="menu" aria-labelledby="hm-file" hidden>
-      <a role="menuitem" class="mb-item" href={siteHref("/")} data-help-item="game">Play Verticopolis</a>
-      <hr class="mb-sep" />
-      <button type="button" role="menuitem" class="mb-item" data-help-item="print">Print…<kbd>Ctrl+P</kbd></button>
-    </div>
-  </div>
-  <div class="mb-menu">
-    <button type="button" class="mb-title" id="hm-edit" aria-haspopup="menu" aria-expanded="false" aria-controls="hm-edit-menu"><u>E</u>dit</button>
-    <div class="mb-pop" id="hm-edit-menu" role="menu" aria-labelledby="hm-edit" hidden>
-      <button type="button" role="menuitem" class="mb-item" data-help-item="find">Find…<kbd>Ctrl+K</kbd></button>
-      <button type="button" role="menuitem" class="mb-item" data-help-item="copy_link">Copy Link to This Page</button>
-    </div>
-  </div>
-  <div class="mb-menu">
-    <button type="button" class="mb-title" id="hm-options" aria-haspopup="menu" aria-expanded="false" aria-controls="hm-options-menu"><u>O</u>ptions</button>
-    <div class="mb-pop" id="hm-options-menu" role="menu" aria-labelledby="hm-options" hidden>
-      <button type="button" role="menuitemradio" class="mb-item" data-help-item="theme_light" aria-checked="false">Light</button>
-      <button type="button" role="menuitemradio" class="mb-item" data-help-item="theme_dark" aria-checked="false">Dark</button>
-      <button type="button" role="menuitemradio" class="mb-item" data-help-item="theme_auto" aria-checked="false">Match My Device</button>
-    </div>
-  </div>
-  <div class="mb-menu">
-    <button type="button" class="mb-title" id="hm-help" aria-haspopup="menu" aria-expanded="false" aria-controls="hm-help-menu"><u>H</u>elp</button>
-    <div class="mb-pop" id="hm-help-menu" role="menu" aria-labelledby="hm-help" hidden>
-      <a role="menuitem" class="mb-item" href={siteHref("/help/changelog/")} data-help-item="whats_new">What's New</a>
-      <a role="menuitem" class="mb-item" href={GITHUB_ISSUES} target="_blank" rel="noopener noreferrer" data-help-item="report">Report a Problem…</a>
-      <hr class="mb-sep" />
-      <a role="menuitem" class="mb-item" href={SPONSOR_URL} target="_blank" rel="noopener noreferrer" data-help-item="sponsor">Sponsor Verticopolis</a>
-    </div>
-  </div>
-</nav>
+<div
+  id="help-menubar-host"
+  data-game={siteHref("/")}
+  data-whats-new={siteHref("/help/changelog/")}
+  data-report={GITHUB_ISSUES}
+  data-sponsor={SPONSOR_URL}
+>
+</div>
 
 <script>
   import { wireHelpMenu, type HelpTheme } from "../../../src/ui/helpSiteMenu";
@@ -50,10 +24,17 @@ import { GITHUB_ISSUES, SPONSOR_URL, siteHref } from "../../site.mjs";
   import { openStarlightSearch } from "../../../src/ui/starlightSearch";
   import { trackAppAction } from "../../../src/analytics";
 
-  const root = document.getElementById("help-menubar");
-  if (root) {
+  const host = document.getElementById("help-menubar-host");
+  if (host) {
     const themeSelect = () => document.querySelector<HTMLSelectElement>("starlight-theme-select select");
-    wireHelpMenu(root, {
+    const links = host.dataset;
+    wireHelpMenu(host, {
+      links: {
+        game: links.game ?? "/",
+        whatsNew: links.whatsNew ?? "",
+        report: links.report ?? "",
+        sponsor: links.sponsor ?? "",
+      },
       // Header.astro has already taken ?from=game off the address; the flag
       // lives on in this tab's session storage, which this reads.
       fromGame: takeFromGameFlag(location, history),

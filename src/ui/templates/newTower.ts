@@ -1,4 +1,5 @@
-import { html, nothing, type TemplateResult } from "lit-html";
+import { html, nothing } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { compareTemplate } from "./compare";
 import { iconTemplate } from "@verticopolis/components/windows/icons";
 
@@ -36,11 +37,13 @@ import { iconTemplate } from "@verticopolis/components/windows/icons";
  * mounted box (`input[name="nt-mode"]:checked` / `input[name="nt-cal"]:checked`),
  * and the Cancel/Found actions are wired via `wireActions`. Nothing binds inline.
  */
-export function newTowerTemplate(hasSave: boolean): TemplateResult {
+export function newTowerTemplate(hasSave: boolean): ModalView {
   const abandon = hasSave
     ? html`<p class="nt-abandon">${iconTemplate("warning", { size: 14 })}Your current tower is kept in My Towers first, so you can open it again.</p>`
     : nothing;
-  return html`<h2>Found a New Tower</h2>
+  return {
+    title: "Found a New Tower",
+    body: html`
        <p class="nt-lede">Choose your rule-set. This is set once and <b>cannot be changed</b> for this tower. Start another to play the other way.</p>
        <div class="nt-choice">
          <div class="nt-modes">
@@ -85,5 +88,6 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
        <div class="modal-actions modal-footer">
          <button class="btn" data-act="cancel">Cancel</button>
          <button class="btn primary" data-act="found">Found Tower</button>
-       </div>`;
+       </div>`,
+  };
 }

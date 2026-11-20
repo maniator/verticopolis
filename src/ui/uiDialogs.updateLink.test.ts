@@ -10,18 +10,18 @@ vi.mock("./standalone", () => standalone);
 
 import { showUpdatePrompt } from "./uiDialogs";
 
-function fakeUI(): { ui: UI; openModalTemplate: ReturnType<typeof vi.fn> } {
-  const openModalTemplate = vi.fn((_t: TemplateResult) => document.createElement("div"));
+function fakeUI(): { ui: UI; openModal: ReturnType<typeof vi.fn> } {
+  const openModal = vi.fn((_t: TemplateResult) => document.createElement("div"));
   const ui = {
     el: { modal: document.createElement("dialog") },
-    openModalTemplate,
+    openModal,
     closeModal: vi.fn(),
   } as unknown as UI;
-  return { ui, openModalTemplate };
+  return { ui, openModal };
 }
 
-function shownLink(openModalTemplate: ReturnType<typeof vi.fn>): HTMLAnchorElement | null {
-  const template = openModalTemplate.mock.calls[0][0] as TemplateResult;
+function shownLink(openModal: ReturnType<typeof vi.fn>): HTMLAnchorElement | null {
+  const template = openModal.mock.calls[0][0] as TemplateResult;
   return renderToFragment(template).querySelector('a[data-act="release-notes"]');
 }
 
@@ -32,7 +32,7 @@ describe("showUpdatePrompt release notes link", () => {
 
   it("shows the link in a browser tab", () => {
     standalone.isInstalledStandalone.mockReturnValue(false);
-    const { ui, openModalTemplate } = fakeUI();
+    const { ui, openModal } = fakeUI();
     showUpdatePrompt(
       ui,
       () => {},
@@ -40,20 +40,18 @@ describe("showUpdatePrompt release notes link", () => {
       info,
     );
     expect(standalone.isInstalledStandalone).toHaveBeenCalled();
-    expect(shownLink(openModalTemplate)?.getAttribute("href")).toBe(
-      "/help/changelog?from=game&via=update_prompt#3.2.0",
-    );
+    expect(shownLink(openModal)?.getAttribute("href")).toBe("/help/changelog?from=game&via=update_prompt#3.2.0");
   });
 
   it("leaves it out in the installed app", () => {
     standalone.isInstalledStandalone.mockReturnValue(true);
-    const { ui, openModalTemplate } = fakeUI();
+    const { ui, openModal } = fakeUI();
     showUpdatePrompt(
       ui,
       () => {},
       () => {},
       info,
     );
-    expect(shownLink(openModalTemplate)).toBeNull();
+    expect(shownLink(openModal)).toBeNull();
   });
 });

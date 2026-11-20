@@ -41,7 +41,7 @@ export { showSettings } from "./uiSettings";
 export { openImport } from "./uiImport";
 
 export function showStats(ui: UI, body: TemplateResult, handlers: Record<string, () => void> = {}): void {
-  const box = ui.openModalTemplate(statsModalTemplate(body), { displaceable: true });
+  const box = ui.openModal(statsModalTemplate(body), { displaceable: true });
   ui.wireActions(box, handlers);
 }
 
@@ -52,7 +52,7 @@ export function showScheduleReview(
   handlers: Record<string, () => void> = {},
   focus?: string,
 ): HTMLElement {
-  const box = ui.openModalTemplate(scheduleReviewTemplate(rows), { displaceable: true });
+  const box = ui.openModal(scheduleReviewTemplate(rows), { displaceable: true });
   ui.wireActions(box, handlers);
   // A redraw after a choice replaces the button that was pressed; keep the player's place.
   if (focus) box.querySelector<HTMLElement>(`[data-act="${focus}"]`)?.focus();
@@ -64,7 +64,7 @@ export function showScheduleReview(
  *  it is only ever reached from a deliberate tap on an install affordance. The
  *  `variant` picks the iOS Safari steps or the Chrome/Edge browser-menu steps. */
 export function showInstallHelp(ui: UI, variant: InstallHelpVariant = "ios"): void {
-  ui.openModalTemplate(
+  ui.openModal(
     installHelpTemplate(() => ui.closeModal(), variant),
     { displaceable: true },
   );
@@ -74,7 +74,7 @@ export function confirmModal(ui: UI, title: string, body: string, onYes: () => v
   // The lit template binds both actions inline with @click, so there is no
   // wireActions pass. There is no [data-act="close"] button; the title-bar ✕
   // still exists and closes through the dialog's cancel path.
-  ui.openModalTemplate(
+  ui.openModal(
     confirmTemplate(title, body, yesLabel, {
       onCancel: () => ui.closeModal(),
       onYes: () => {
@@ -94,7 +94,7 @@ export function newTowerModal(
   ui: UI,
   opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind, startUnbridged: boolean) => void },
 ): void {
-  const box = ui.openModalTemplate(newTowerTemplate(opts.hasSave));
+  const box = ui.openModal(newTowerTemplate(opts.hasSave));
   ui.wireActions(
     box,
     {
@@ -131,7 +131,7 @@ export function confirmExport(ui: UI): void {
   // The catalog says whether this tower can go to the 1994 .TDT format; where
   // it cannot, the engine's export refuses it, so disable the button up front
   // (with the reason) rather than let it fail.
-  const box = ui.openModalTemplate(exportConfirmTemplate(ui.cb.getCatalog().rules.exportsTo1994));
+  const box = ui.openModal(exportConfirmTemplate(ui.cb.getCatalog().rules.exportsTo1994));
   ui.wireActions(box, {
     export: () => {
       ui.closeModal();
@@ -210,7 +210,7 @@ export function showImportReport(ui: UI, report: ImportReport, cb: ImportReportC
     waitForDialog(ui, () => showImportReport(ui, report, cb), "import");
     return;
   }
-  const box = ui.openModalTemplate(importReportTemplate(report), {
+  const box = ui.openModal(importReportTemplate(report), {
     // An open report holds a parsed tower; losing it silently is the same
     // defect one step later (GH #685).
     onDisplaced: () => ui.sayVisibly(DROPPED("import")),
@@ -238,7 +238,7 @@ export function showExportReport(ui: UI, report: ExportReport, cb: { onDownload:
     waitForDialog(ui, () => showExportReport(ui, report, cb), "export");
     return;
   }
-  const box = ui.openModalTemplate(exportReportTemplate(report), {
+  const box = ui.openModal(exportReportTemplate(report), {
     onDisplaced: () => ui.sayVisibly(DROPPED("export")),
   });
   const live = document.getElementById("a11y-live");
@@ -271,7 +271,7 @@ export function showEventChoice(
   };
   // Actions bind inline in the template; the controller keeps the fire-once
   // logic and the dismissal paths. No wireActions pass, no [data-act="close"].
-  ui.openModalTemplate(
+  ui.openModal(
     eventChoiceTemplate(message, costLabel, {
       onAccept: () => finish("accept"),
       onDecline: () => finish("decline"),
@@ -321,7 +321,7 @@ export function showUpdatePrompt(
   // and the dismissal paths. No wireActions pass, no [data-act="close"].
   // The release notes link opens a new tab, which in the installed app means
   // leaving it for the system browser, so it shows in a browser tab only.
-  ui.openModalTemplate(
+  ui.openModal(
     updatePromptTemplate(info, { onLater: later, onUpdate: update }, { releaseNotesLink: !isInstalledStandalone() }),
   );
   dialog.onclick = (e) => {
@@ -353,7 +353,7 @@ export function showUpdateChip(_ui: UI, onClick: () => void): void {
  *  `onDisplaced` runs when something does (an emergency rolled while they were
  *  up), so the frame loop can bring them back once the way is clear (#1134). */
 export function congratsTower(ui: UI, onDisplaced: () => void): void {
-  ui.openModalTemplate(
+  ui.openModal(
     congratsTemplate(ui.cb.getCatalog().world.maxFloor, () => ui.closeModal()),
     { displaceable: true, onDisplaced },
   );

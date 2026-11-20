@@ -142,8 +142,7 @@ export function showInspector(ui: UI, tpl: TemplateResult | null): void {
   // the peek card and the desktop hover card stay click-through.
   // Routed through the app so it can latch the dismissal, otherwise the very
   // next hover pick over the same facility re-opens the card. Appended from
-  // the one shared recipe AFTER the h4's lit-managed content (the finishModal
-  // pattern): a foreign node at the tail survives same-shape re-renders, and
+  // the one shared recipe AFTER the h4's lit-managed content: a foreign node at the tail survives same-shape re-renders, and
   // a card-shape swap replaces the h4, so re-append whenever it's missing.
   const h4 = ui.el.inspector.querySelector("h4");
   if (h4 && !h4.querySelector(".insp-close")) {

@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { drawElement, mountPage } from "../ui/testing/litTestUtils";
+import { html } from "lit-html";
 import type { GameApp } from "../main";
 
 const map = vi.hoisted(() => ({ open: false, set: vi.fn() }));
@@ -41,40 +43,13 @@ vi.mock("../ui/overviewMapPrefs", () => ({
   }),
 }));
 
-import { wireMenus } from "./menuWiring";
+import { wireMenus, drawMenuBar } from "./menuWiring";
 
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */
 function mount(): void {
-  const item = (id: string, role = "menuitem") => `<button class="mb-item" id="${id}" role="${role}">${id}</button>`;
-  document.body.innerHTML = `
-    <nav id="menubar">
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-file" aria-expanded="false" aria-controls="mb-file-menu"><u>F</u>ile</button>
-        <div class="mb-pop" id="mb-file-menu" role="menu" hidden>
-          ${item("mb-quick-save")}${item("mb-close")}${item("mb-import")}${item("mb-export")}${item("mb-undo")}${item("mb-redo")}
-          ${item("mb-rename")}${item("mb-rules")}${item("mb-compare")}${item("mb-replay")}
-          ${item("mb-win-tools", "menuitemcheckbox")}${item("mb-win-map", "menuitemcheckbox")}
-          ${item("mb-win-tower", "menuitemcheckbox")}${item("mb-win-bulletin", "menuitemcheckbox")}
-          ${item("mb-win-statusbar", "menuitemcheckbox")}${item("mb-fullscreen", "menuitemcheckbox")}
-          ${item("mb-sound", "menuitemcheckbox")}
-          <a class="mb-item" id="mb-sponsor" hidden>Sponsor</a>
-          ${item("btn-new")}${item("btn-stats")}
-          <hr class="mb-sep mb-install-sep" hidden /><button class="mb-item" id="btn-install-menu" hidden>Install</button>
-          <hr class="mb-sep" id="mb-save-sep" /><hr class="mb-sep" id="mb-close-sep" />
-        </div>
-      </div>
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-edit" aria-expanded="false" aria-controls="mb-edit-menu"><u>E</u>dit</button>
-        <div class="mb-pop" id="mb-edit-menu" role="menu" hidden>${item("mb-edit-probe")}</div>
-      </div>
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-tower" aria-expanded="false" aria-controls="mb-tower-menu"><u>T</u>ower</button>
-        <div class="mb-pop" id="mb-tower-menu" role="menu" hidden>
-          ${item("mb-fire-rescue")}<button class="mb-item" id="mb-exterminator" role="menuitem" hidden>Call Exterminator</button>
-        </div>
-      </div>
-    </nav>
+  mountPage(html`
+    <div id="menubar-host"></div>
     <div id="palette"></div>
     <button id="btn-palette-collapse"></button>
     <main id="stage">
@@ -83,7 +58,8 @@ function mount(): void {
     </main>
     <input id="tower-name" />
     <button id="btn-undo" aria-disabled="true"></button>
-    <button id="btn-redo"></button>`;
+    <button id="btn-redo"></button>`);
+  drawMenuBar();
 }
 
 function fakeApp(onPhone = false) {
@@ -115,7 +91,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
+  document.body.replaceChildren();
 });
 
 /** Split from menuWiring.test.ts (the 500-line ceiling): the Tower menu's
@@ -163,11 +139,10 @@ describe("wireMenus: the Tower menu's calls for help", () => {
   it("on the title screen, an item whose title-screen button is missing runs its own command", () => {
     const { app } = fakeApp();
     const bar = wireMenus(app)!;
-    const splash = document.createElement("div");
-    splash.id = "splash";
+    const splash = drawElement(html`<div id="splash"></div>`);
     document.body.append(splash);
     const gameNew = vi.fn();
-    $("btn-new").addEventListener("click", gameNew);
+    $("btn-new").addEventListener("click", gameNew); // the game's own New, wired as UI.ts wires it
     bar.open($("mb-file") as HTMLButtonElement, false);
     $("btn-new").click();
     expect(gameNew).toHaveBeenCalledOnce();
@@ -179,11 +154,8 @@ describe("wireMenus: the Tower menu's calls for help", () => {
     const bar = wireMenus(app)!;
     files.showOpenDialog.mockClear();
     const splashLoad = vi.fn();
-    const splash = document.createElement("div");
-    splash.id = "splash";
-    splash.innerHTML = `<button data-splash="load"></button>`;
+    const splash = drawElement(html`<div id="splash"><button data-splash="load" @click=${splashLoad}></button></div>`);
     document.body.append(splash);
-    splash.querySelector("button")!.addEventListener("click", splashLoad);
     bar.open($("mb-file") as HTMLButtonElement, false);
     $("mb-import").click();
     expect(files.showOpenDialog).toHaveBeenCalledExactlyOnceWith(app, "menu");

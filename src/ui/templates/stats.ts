@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
 import { iconTemplate } from "@verticopolis/components/windows/icons";
 import { LEDGER_CATS, LEDGER_LABELS, MILESTONE_COPY } from "@verticopolis/components/presentation/statsCopy";
@@ -67,9 +68,12 @@ export function statsScreen(
 }
 
 /** The stats modal shell: the heading, the body drawn from the report, and Close. */
-export function statsModalTemplate(body: TemplateResult): TemplateResult {
-  return html`<h2>Tower Statistics</h2>${body}
-      <div class="modal-actions modal-footer"><button class="btn primary" data-act="close">Close</button></div>`;
+export function statsModalTemplate(body: TemplateResult): ModalView {
+  return {
+    title: "Tower Statistics",
+    body: html`${body}
+      <div class="modal-actions modal-footer"><button class="btn primary" data-act="close">Close</button></div>`,
+  };
 }
 
 /** True when the stats modal should offer the "Call exterminator" action:

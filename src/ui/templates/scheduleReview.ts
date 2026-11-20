@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 
 /**
  * The elevator schedule review (#1548): a list of the elevators whose schedule
@@ -51,8 +52,10 @@ function rowTemplate(row: ReviewRow): TemplateResult {
 }
 
 /** The dialog body: a short explanation, then one row per elevator, or a note that none are left. */
-export function scheduleReviewTemplate(rows: readonly ReviewRow[]): TemplateResult {
-  return html`<h2>Elevator schedules</h2>
+export function scheduleReviewTemplate(rows: readonly ReviewRow[]): ModalView {
+  return {
+    title: "Elevator schedules",
+    body: html`
     ${
       rows.length === 0
         ? html`<p class="sched-review-intro">Every elevator in this tower puts all of its cars on shift whenever its schedule runs.</p>`
@@ -66,7 +69,8 @@ export function scheduleReviewTemplate(rows: readonly ReviewRow[]): TemplateResu
     }
     <div class="modal-actions modal-footer">
       <button class="btn primary" data-act="close">Close</button>
-    </div>`;
+    </div>`,
+  };
 }
 
 /** The Tower Statistics entry: a button that opens the review, shown only while a flat short schedule waits on the

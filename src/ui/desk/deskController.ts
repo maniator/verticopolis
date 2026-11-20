@@ -29,7 +29,6 @@ import {
   buildFrame,
   DESK_ACTIVE_CLASS,
   DeskWindow,
-  titleButton,
   type DeskChange,
   type DeskWindowSpec,
 } from "@verticopolis/components/windows/desk/deskWindow";
@@ -96,7 +95,8 @@ export class DeskController {
   private desk: HTMLElement | null = null;
   private taskbar: DeskTaskbar | null = null;
   private readonly title: DeskTitle;
-  private towerTitle: HTMLElement | null = null;
+  /** Renames the tower window (lit touches its title only when it changed). */
+  private setTowerTitle: ((title: string) => void) | null = null;
   private infoFrame: HTMLElement | null = null;
   /** True while the saved maximize comes back at start, which is not a click. */
   private restoring = false;
@@ -192,16 +192,18 @@ export class DeskController {
     this.desk = desk;
 
     // The tower window: the menu bar, the tower and the status bar.
-    const tower = buildFrame(doc, "desk-win-tower", this.towerTitleText());
-    this.towerTitle = tower.titleText;
-    const towerClose = titleButton(doc, "close", "Close the tower");
-    towerClose.addEventListener("click", () => {
-      trackDeskClose("tower");
-      doc.getElementById("mb-close")?.click();
+    const tower = buildFrame(doc, "desk-win-tower", this.towerTitleText(), {
+      label: "Close the tower",
+      onClick: () => {
+        trackDeskClose("tower");
+        doc.getElementById("mb-close")?.click();
+      },
     });
-    tower.root.querySelector(".win-title")?.appendChild(towerClose);
+    this.setTowerTitle = tower.setTitle;
     desk.appendChild(tower.root);
-    this.move(doc.getElementById("menubar"), tower.body);
+    // The bar's host lays out as if it were not there, so the bar sits in the
+    // tower window as its first row.
+    this.move(doc.getElementById("menubar-host"), tower.body);
     this.move(doc.getElementById("stage"), tower.body);
     this.move(doc.getElementById("statusbar"), tower.body);
 
@@ -360,7 +362,7 @@ export class DeskController {
     this.desk?.remove();
     this.desk = null;
     this.infoFrame = null;
-    this.towerTitle = null;
+    this.setTowerTitle = null;
     this.active = null;
     this.doc.body.classList.remove(DESK_CLASS);
     this.doc.dispatchEvent(new CustomEvent(DESK_CHANGE_EVENT));
@@ -509,10 +511,7 @@ export class DeskController {
 
   /** Rebuild the taskbar and the tower's title from the windows' state. */
   private refresh(): void {
-    if (this.towerTitle) {
-      const t = this.towerTitleText();
-      if (this.towerTitle.textContent !== t) this.towerTitle.textContent = t;
-    }
+    this.setTowerTitle?.(this.towerTitleText());
     const entries: TaskEntry[] = [];
     for (const id of ORDER) {
       const w = this.wins.get(id);
