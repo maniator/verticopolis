@@ -65,14 +65,18 @@ on the module's middle story, where the crowd engine stands routed commuters.
 
 ## Traffic readout (the worst waiting line)
 
-Captured from the built app via the unified generator (`scripts/screenshots.ts`). The chip shots (`traffic` scene) step a
-jammed tower (three office floors slammed onto one weak elevator) until the readout leaves Smooth; the jump shots
-(`traffic-jump` scenes) step the Monday-morning crowd tower until it reads red and tap it.
+Captured from the built app via the unified generator (`scripts/screenshots.ts`). The chip shots show the meter at each of its
+four levels. The `traffic` scene steps a jammed tower (three office floors slammed onto one weak elevator) from Smooth
+through Busy to Backed up; the `traffic-gridlock` scene loads the same weak elevator with ten office floors until it reads
+Gridlock. The jump shots (`traffic-jump` scenes) step the Monday-morning crowd tower until it reads Backed up and tap it.
 
 | Screenshot | Shows |
 |---|---|
-| `traffic-chip.png` | The chip above Smooth: it follows the tower's worst line of people waiting for an elevator right now and names that line's floor, tier word bold and the floor a lighter footnote. |
+| `traffic-chip-smooth.png` | **Smooth** before any line forms: every bar of the meter empty and no floor named. |
+| `traffic-chip.png` | **Busy**, the first level above Smooth: it follows the tower's worst line of people waiting for an elevator right now and names that line's floor, tier word bold and the floor a lighter footnote. |
 | `traffic-chip-mobile.png` | The same state at phone width: the HUD wraps its stats onto rows and the chip (bars + tier + floor) reads cleanly there too. |
+| `traffic-chip-backed-up.png` | **Backed up**, three bars, in red. |
+| `traffic-chip-gridlock.png` | **Gridlock**, all four bars, in red. |
 | `traffic-jump.png` | **Backed up · 1F** after a tap: the view zoomed in on the lobby line, its stretch of the floor banded red from the shaft to the last person in it, and its elevator outlined in yellow on that floor only. |
 | `traffic-jump-mobile.png` | The same tap at phone width. |
 

@@ -1,8 +1,9 @@
-import { html, nothing, type TemplateResult } from "lit-html";
+import { html, nothing, svg, type TemplateResult } from "lit-html";
 import { iconTemplate } from "@verticopolis/components/windows/icons";
 import { versionLine } from "@verticopolis/components/host/engineLabel";
 import { platformLabel } from "../analyticsEnrichment";
 import { trackAppAction } from "../analytics";
+import { SKYLINE_BUILDINGS, SKYLINE_VIEWBOX, SKYLINE_WINDOWS, SKYLINE_WINDOW_COLOR, SKYLINE_WINDOW_SIZE } from "./splashSkyline";
 
 /**
  * The "Metropolis Dusk" splash/title-screen body, split out of the onboarding
@@ -103,20 +104,11 @@ export interface SplashHandlers {
 export function splashTemplate(hasSave: boolean, premise: string, muted: boolean, installOffered: boolean, founder: boolean, h: SplashHandlers): TemplateResult {
   return html`<div class="splash-stars" aria-hidden="true"></div>
     <div class="splash-sun" aria-hidden="true"></div>
-    <svg class="splash-skyline" aria-hidden="true" viewBox="0 0 460 200" preserveAspectRatio="xMidYMax slice">
-      <g class="buildings" stroke-width="1">
-        <path d="M-5 200 V120 h34 V98 h16 V120 h40 V200 z" />
-        <path d="M95 200 V80 h26 V56 h12 V80 h26 V200 z" />
-        <path d="M200 200 V54 h20 V30 h9 V10 h9 V30 h9 V54 h20 V200 z" />
-        <path d="M310 200 V92 h30 V68 h15 V92 h30 V200 z" />
-        <path d="M410 200 V60 h20 V36 h11 V60 h34 V200 z" />
-      </g>
-      <g fill="#ffdca0">
-        <rect x="8" y="130" width="3" height="4" /><rect x="8" y="146" width="3" height="4" />
-        <rect x="104" y="92" width="3" height="4" /><rect x="104" y="112" width="3" height="4" />
-        <rect x="214" y="66" width="3" height="4" /><rect x="214" y="90" width="3" height="4" />
-        <rect x="320" y="100" width="3" height="4" /><rect x="424" y="72" width="3" height="4" />
-      </g>
+    <svg class="splash-skyline" aria-hidden="true" viewBox=${SKYLINE_VIEWBOX} preserveAspectRatio="xMidYMax slice">
+      <g class="buildings" stroke-width="1">${SKYLINE_BUILDINGS.map((d) => svg`<path d=${d} />`)}</g>
+      <g fill=${SKYLINE_WINDOW_COLOR}>${SKYLINE_WINDOWS.map(
+        ([x, y]) => svg`<rect x=${x} y=${y} width=${SKYLINE_WINDOW_SIZE.width} height=${SKYLINE_WINDOW_SIZE.height} />`,
+      )}</g>
     </svg>
     <div class="splash-brand">
       <svg class="splash-word" viewBox="0 0 400 66" role="img" aria-label="Verticopolis">

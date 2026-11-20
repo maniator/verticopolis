@@ -12,27 +12,21 @@
  */
 import type { Page } from "playwright";
 import { PHONE, type Scene } from "../screenshot-env.ts";
-import { buildCrowdTower, pgStep, pgStepNoDraw } from "../screenshot-builders.ts";
+import { buildCrowdTower, pgStep } from "../screenshot-builders.ts";
+import { buildHotspotTower } from "../screenshot-scene-builders.ts";
+import { stepTrafficUntil } from "./trafficChip.ts";
 
-/** The readouts the shot waits for: a red line the help can point at. */
-const RED = ["Backed up", "Gridlock"];
+/** The readout the shot waits for: a red line the help can point at. Gridlock
+ *  has its own chip shot (`traffic-gridlock` below), so this
+ *  one pins Backed up alone. */
+const LEVEL = "Backed up";
 
-/** Step the morning rush until the readout turns red, then tap it and draw
+/** Step the morning rush until the readout reads Backed up, then tap it and draw
  *  one frame so the moved camera and the spotlight are on the canvas. The
  *  rush steps without drawing (pgStepNoDraw): drawing its frames in software
  *  raster made this the slowest scene in the gallery (about 134s a shot in CI). */
 async function jumpToTheJam(page: Page): Promise<void> {
-  let label = "";
-  for (let i = 0; i < 60 && !RED.includes(label); i++) {
-    const stepped = await page.evaluate(pgStepNoDraw, 10);
-    if (!stepped) throw new Error("traffic-jump needs the stepped clock");
-    label = await page.evaluate(async () => {
-      const g = (window as any).game;
-      await g?.refreshTraffic();
-      return document.getElementById("traffic-label")?.textContent ?? "";
-    });
-  }
-  if (!RED.includes(label)) throw new Error(`traffic-jump: the rush never backed up (last read "${label}")`);
+  await stepTrafficUntil(page, LEVEL, 60);
   // The tap's own answer: true only once the camera went to a line and its
   // spotlight went up, so a tap that did nothing fails the scene.
   const jumped = await page.evaluate(() => (window as any).game.jumpToTraffic() as boolean);
@@ -57,5 +51,27 @@ export const TRAFFIC_JUMP_SCENES: Scene[] = [
     build: buildCrowdTower,
     assertUnits: 40,
     shots: [shot("traffic-jump-mobile")],
+  },
+  {
+    // The meter's top level: the chip shots' tower (`buildHotspotTower`) with its weak shaft serving ten
+    // full office floors, so the morning line reaches Gridlock.
+    id: "traffic-gridlock",
+    outDir: "features",
+    viewport: { width: 1440, height: 400 },
+    initScript: () => {
+      (window as unknown as { __vcGridlock?: boolean }).__vcGridlock = true;
+    },
+    build: buildHotspotTower,
+    assertUnits: 100,
+    shots: [
+      {
+        name: "traffic-chip-gridlock",
+        crop: "#topbar",
+        wait: 0,
+        setup: async (page) => {
+          await stepTrafficUntil(page, "Gridlock", 300);
+        },
+      },
+    ],
   },
 ];

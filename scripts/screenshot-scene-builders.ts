@@ -216,9 +216,13 @@ export function buildStatsTower(): void {
   g.engine.paused = false;
 }
 
-/** A hotspot tower: 8 healthy floors + a 3-floor jam on one weak shaft. */
+/** A hotspot tower: 8 healthy floors + a 3-floor jam on one weak shaft. On a
+ *  page that set `__vcGridlock` (the traffic-gridlock scene's initScript) the
+ *  jam fills every floor the weak shaft serves above its lobby, enough riders
+ *  for the traffic meter's top level. */
 export function buildHotspotTower(): void {
   const g = (window as unknown as { game: any }).game;
+  const jamFloors = (window as unknown as { __vcGridlock?: boolean }).__vcGridlock ? [11, 12, 13, 14, 15, 16, 17, 18, 19, 20] : [11, 12, 13];
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(1);
   const s = g.sim;
@@ -253,7 +257,7 @@ export function buildHotspotTower(): void {
     }
   };
   for (let f = 2; f <= 9; f++) fill(f, 12);
-  for (const f of [11, 12, 13]) fill(f, 30);
+  for (const f of jamFloors) fill(f, 30);
   s.evaluateStar();
   s.money = 9_126_661;
   g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));

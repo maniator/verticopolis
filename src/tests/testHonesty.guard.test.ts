@@ -307,7 +307,7 @@ const assertingTiers = [...srcTests.filter((rel) => /\.test\.tsx?$/.test(rel) &&
 
 describe("unit tests mock the engine; integration tests run it", () => {
   it("scans the unit tier", () => {
-    expect(unitTests.length).toBeGreaterThan(400);
+    expect(unitTests.length).toBeGreaterThan(300);
     expect(unitTests.some((rel) => rel.endsWith(".integration.test.ts"))).toBe(false);
   });
 

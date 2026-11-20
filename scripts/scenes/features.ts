@@ -6,6 +6,7 @@
  */
 import { type Scene, PHONE } from "../screenshot-env.ts";
 import { RAIN_SHELTERED_SHOT } from "./rainShots.ts";
+import { expectTrafficLevel, stepTrafficUntil } from "./trafficChip.ts";
 import {
   buildBasement,
   buildCanonTower,
@@ -326,33 +327,24 @@ export const FEATURE_SCENES: Scene[] = [
     assertUnits: 100,
     shots: [
       {
-        name: "traffic-chip",
+        // The meter before any line forms: Smooth, every bar empty.
+        name: "traffic-chip-smooth",
         crop: "#topbar",
-        // Capture exactly at the verified state: `wait: 0` is a 0ms settle that
-        // steps 0 frames (settle ceils 0/FRAME_MS to 0), so the pre-capture
-        // refresh repaints the chip off the precise jammed state the loop below
-        // confirmed, not a frame later. The default 500ms would instead advance
-        // the sim ~30 more frames past it.
         wait: 0,
         setup: async (page) => {
-          // Step the clock in fixed chunks and refresh the chip until it leaves
-          // "Smooth". The sim and the step count are both deterministic, so the
-          // chip flips on the same chunk (and reads the same) every run; the
-          // wall-clock UI throttle is bypassed by refreshing explicitly. The
-          // chunks skip their intermediate draws (pgStepNoDraw): the shot crops
-          // the DOM top bar, which the update phase alone drives, and the line
-          // takes about 34 chunks to form, so drawing every frame cost minutes.
-          for (let i = 0; i < 40; i++) {
-            const stepped = await page.evaluate(pgStepNoDraw, 10);
-            if (!stepped) throw new Error("traffic chip needs the stepped clock");
-            const label = await page.evaluate(async () => {
-              const g = (window as any).game;
-              // The chip draws once the port answers.
-              await g?.refreshTraffic();
-              return document.getElementById("traffic-label")?.textContent ?? "";
-            });
-            if (label && label !== "Smooth") break;
-          }
+          await page.evaluate(async () => (window as any).game.refreshTraffic());
+          await expectTrafficLevel(page, "Smooth");
+        },
+      },
+      {
+        // The first level above Smooth the line reaches: Busy.
+        name: "traffic-chip",
+        crop: "#topbar",
+        // `wait: 0` steps no frames, so the capture shows the exact state the
+        // loop confirmed; the default 500ms would step ~30 frames past it.
+        wait: 0,
+        setup: async (page) => {
+          await stepTrafficUntil(page, "Busy", 40);
         },
       },
       {
@@ -368,6 +360,16 @@ export const FEATURE_SCENES: Scene[] = [
         // Reflow-only shot: the viewport change is pure DOM, so step no frames
         // (wait 0) from the jammed state the desktop shot just verified.
         wait: 0,
+      },
+      {
+        // The line keeps growing to Backed up, the most this tower's jam
+        // reaches. Gridlock has its own scene (scenes/trafficJump.ts).
+        name: "traffic-chip-backed-up",
+        crop: "#topbar",
+        wait: 0,
+        setup: async (page) => {
+          await stepTrafficUntil(page, "Backed up", 200);
+        },
       },
     ],
   },

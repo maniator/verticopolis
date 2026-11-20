@@ -248,10 +248,9 @@ describe("the exterminator row is never a dialog footer", () => {
     // `.modal-box > .modal-footer` pins the DIALOG FOOTER (#671). Tower
     // Statistics also renders a `.modal-actions` mid-body for the exterminator,
     // and pinning that would park a button on an opaque band over the sections
-    // the player is scrolling through. The CSS guard
-    // (src/tests/stickyDialogActions.guard.test.ts) proves the selector keeps
-    // its child combinator; this proves the other half, that the exterminator
-    // row really is nested. `openModalTemplate` makes the modal template's
+    // the player is scrolling through. The components stylesheet pins only a
+    // direct child of `.modal-box`; this proves the other half, that the
+    // exterminator row really is nested. `openModalTemplate` makes the modal template's
     // TOP-LEVEL nodes the children of `.modal-box`, so "not a top-level node"
     // is exactly "not reachable by that selector".
     const housekeeping = { rooms: 1, crews: 0, maids: 0, dailyCapacity: 0, outOfReach: 0, dirty: 0, infested: 1 };
