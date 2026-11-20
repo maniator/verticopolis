@@ -17,118 +17,31 @@ import { describe, it, expect } from "vitest";
  *
  * Adding a NEW export is fine and needs no change here; only removals and
  * renames trip it. Retire a symbol here in the same change that retires it.
+ * Only the game's own barrels are pinned here; the engine and components
+ * packages hold their own exports to account.
  */
 
 // --- 1. Compile-time surface: every exported TYPE. ---
-import type { Person, PersonState } from "@verticopolis/engine/model/engineTypes";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { ImportReport } from "../storage/tdtImportReport";
 import type { SlotInfo } from "../storage/SaveGame";
-import type { FastFoodLook, RestaurantLook, RoomCtx, ShopLook } from "@verticopolis/components/render/pixelSprites";
-import type { EntranceKind } from "@verticopolis/components/render/sprites/structure";
-import type { SfxName } from "@verticopolis/components/audio/ToneAudioEngine";
 
 // Reference every type once so the block is provably load-bearing (a removed
 // type becomes an unresolved reference here, failing typecheck).
-export type _TypeSurfacePins = [
-  Person,
-  PersonState,
-  ImportReport,
-  ExportReport,
-  SlotInfo,
-  FastFoodLook,
-  RestaurantLook,
-  RoomCtx,
-  ShopLook,
-  EntranceKind,
-  SfxName,
-];
+export type _TypeSurfacePins = [ImportReport, ExportReport, SlotInfo];
 
 // --- 2. Runtime surface: value bindings must resolve, not just typecheck. ---
 import * as tdtImportHelpers from "../storage/tdtImportHelpers";
 import * as saveGame from "../storage/SaveGame";
-import * as pixelSprites from "@verticopolis/components/render/pixelSprites";
-import * as structure from "@verticopolis/components/render/sprites/structure";
-import * as spriteFacilities from "@verticopolis/components/render/sprites/facilities";
-import * as audio from "@verticopolis/components/audio/ToneAudioEngine";
-import * as toneScenes from "@verticopolis/components/audio/toneScenes";
-import * as toneVoices from "@verticopolis/components/audio/toneVoices";
 
 const RUNTIME_EXPORTS: Record<string, string[]> = {
   tdtImportHelpers: ["looksLikeLegacyTower"],
   saveGame: ["SLOT_COUNT", "SaveGame", "TOWER_FILE_EXT"],
-  pixelSprites: [
-    "FASTFOOD_LOOKS",
-    "PAL",
-    "RESTAURANT_LOOKS",
-    "SHIRTS",
-    "SHOP_LOOKS",
-    "SKIN",
-    "drawRoom",
-    "person",
-    "sampleState",
-  ],
-  structure: [
-    "AWNING_W",
-    "CRANE_H",
-    "CRANE_W",
-    "ENTRANCE_GRAND_LEFT",
-    "ENTRANCE_GRAND_RIGHT",
-    "ENTRANCE_GRAND_SOLO",
-    "ENTRANCE_SERVICE",
-    "ESCAPE_W",
-    "LOBBY_VARIANTS",
-    "craneAnchorTile",
-    "drawAwning",
-    "drawBurntShell",
-    "drawConstruction",
-    "drawCrane",
-    "drawEscapeStairs",
-    "drawFlames",
-    "drawFloor",
-    "drawLobby",
-    "drawLobbyEntrance",
-    "lobbyVariant",
-  ],
-  spriteFacilities: [
-    "drawGarbageTruck",
-    "drawHousekeeping",
-    "drawMedical",
-    "drawMetro",
-    "drawMetroTrain",
-    "drawParking",
-    "drawParkingRamp",
-    "drawPartyHall",
-    "drawRecycling",
-    "drawSecurity",
-    "drawStreetCar",
-    "drawWeddingHall",
-  ],
-  audio: ["ToneAudioEngine"],
-  toneScenes: [
-    "DETAIL_ZOOM",
-    "OVERVIEW_EXIT",
-    "OVERVIEW_ZOOM",
-    "SCENES",
-    "clamp",
-    "detailFor",
-    "lerp",
-    "midiToFreq",
-    "sameNotes",
-    "sceneFor",
-  ],
-  toneVoices: ["createSfxVoices", "playSfx"],
 };
 
 const MODULES: Record<string, Record<string, unknown>> = {
   tdtImportHelpers,
   saveGame,
-  pixelSprites,
-  structure,
-  spriteFacilities,
-  audio,
-  toneScenes,
-  toneVoices,
 };
 
 describe("barrel surface: every re-exported value binding resolves", () => {
