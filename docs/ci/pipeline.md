@@ -28,8 +28,8 @@ flowchart TD
 ```
 
 **Required checks** (branch rules on `main`): `test`, `test-engine (unit)`,
-`test-engine (port-kit)`, `test-engine (host)`, `e2e-serial`, `e2e-general`
-and `drift-gate`. The engine's own checks (`cargo test`, the conformance
+`test-engine (port-kit)`, `test-engine (host)`, `e2e-serial`, `e2e-general`,
+`drift-gate`, `Analyze (actions)` and `Analyze (javascript-typescript)`. The engine's own checks (`cargo test`, the conformance
 referee, the fuzzers, the coverage floor) run in Verticopolis/engine. Each sharded job reports through one result
 job with the required name, so a shard count can change without touching the
 branch rules.
