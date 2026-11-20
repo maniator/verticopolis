@@ -3,7 +3,15 @@ import { sendException } from "./analyticsRelay";
 import { getCommonProps } from "./analytics";
 import { createEventThrottle } from "./analyticsThrottle";
 import { isBrowserExtensionError } from "./analyticsErrorOrigin";
-import { MAX_PLAYER_TEXT, knownPlayerText, mentionsJson, playerTextMatcher, scrubJsonEcho, scrubPlayerText, type PlayerTextMatcher } from "./analyticsPlayerText";
+import {
+  MAX_PLAYER_TEXT,
+  knownPlayerText,
+  mentionsJson,
+  playerTextMatcher,
+  scrubJsonEcho,
+  scrubPlayerText,
+  type PlayerTextMatcher,
+} from "./analyticsPlayerText";
 
 /**
  * Cookieless JavaScript error tracking (spec CAP-2 posture, the S5 follow-up
@@ -229,11 +237,14 @@ function report(
       aboutJson && messageAt >= 0
         ? (head: string) => {
             const end = Math.min(messageAt + message.length, head.length);
-            return messageAt >= end ? head : head.slice(0, messageAt) + scrubJsonEcho(head.slice(messageAt, end)) + head.slice(end);
+            return messageAt >= end
+              ? head
+              : head.slice(0, messageAt) + scrubJsonEcho(head.slice(messageAt, end)) + head.slice(end);
           }
         : undefined;
     const sentStack = sentField(stack, MAX_STACK_LEN, known, echo);
-    const fingerprint = opts.fingerprint ?? key(sentType, sentMessage, scrubPlayerText(synthetic ? "" : firstFrame, known));
+    const fingerprint =
+      opts.fingerprint ?? key(sentType, sentMessage, scrubPlayerText(synthetic ? "" : firstFrame, known));
 
     const properties: Record<string, unknown> = {
       ...getCommonProps(), // version / platform / distribution_channel / returning / tenure / recency / display

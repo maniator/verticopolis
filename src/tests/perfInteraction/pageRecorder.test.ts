@@ -3,7 +3,14 @@ import { collectRecord, setPhase, type PhaseWindow } from "./pageRecorder";
 
 // `collectRecord` runs in the page; here it runs against a stubbed recorder,
 // so the attribution of entries to phase windows is checked like the statistics.
-const win = (name: string, start: number, end: number): PhaseWindow => ({ name, start, end, simMinutesStart: 100, simMinutesEnd: 160, minuteOfDayStart: 450 });
+const win = (name: string, start: number, end: number): PhaseWindow => ({
+  name,
+  start,
+  end,
+  simMinutesStart: 100,
+  simMinutesEnd: 160,
+  minuteOfDayStart: 450,
+});
 
 function stub(over: Record<string, unknown>): void {
   (window as any).__interaction = {
@@ -31,7 +38,12 @@ describe("phase windows", () => {
   function recorder(): { saves: number[] } {
     const saves: number[] = [];
     (window as any).game = { reader: { header: { minutes: 0, minuteOfDay: 0 } } };
-    (window as any).__interaction = { windows: [], open: null, autosave: () => saves.push(Date.now()), autosaveTimer: null };
+    (window as any).__interaction = {
+      windows: [],
+      open: null,
+      autosave: () => saves.push(Date.now()),
+      autosaveTimer: null,
+    };
     return { saves };
   }
 
@@ -62,10 +74,27 @@ describe("phase windows", () => {
 describe("collecting the page's record", () => {
   it("gives each entry to the window holding its start, and drops entries between windows", () => {
     stub({
-      frames: [[999, 16], [1000, 17], [1999, 18], [2000, 19], [2500, 20], [3500, 21]],
-      longTasks: [[1500, 60], [2500, 90]],
-      inputs: [[3999, 5], [4000, 7]],
-      calls: [[1200, "view decode", 3], [1300, "view decode", 5], [2600, "view decode", 50]],
+      frames: [
+        [999, 16],
+        [1000, 17],
+        [1999, 18],
+        [2000, 19],
+        [2500, 20],
+        [3500, 21],
+      ],
+      longTasks: [
+        [1500, 60],
+        [2500, 90],
+      ],
+      inputs: [
+        [3999, 5],
+        [4000, 7],
+      ],
+      calls: [
+        [1200, "view decode", 3],
+        [1300, "view decode", 5],
+        [2600, "view decode", 50],
+      ],
     });
     const r = collectRecord();
     expect(r.phases.idle.frames).toEqual([17, 18]);
@@ -94,7 +123,12 @@ describe("collecting the page's record", () => {
   });
 
   it("gives an interaction to the window of its first entry", () => {
-    stub({ events: [[1999, "pointerdown", 20, 1, 5, 3], [3000, "click", 60, 30, 9, 3]] });
+    stub({
+      events: [
+        [1999, "pointerdown", 20, 1, 5, 3],
+        [3000, "click", 60, 30, 9, 3],
+      ],
+    });
     const r = collectRecord();
     expect(r.phases.idle.events).toEqual([{ name: "click", dur: 60, delay: 30, proc: 9 }]);
     expect(r.phases.pan.events).toEqual([]);

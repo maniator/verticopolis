@@ -45,7 +45,9 @@ function pick(box: HTMLElement, selector: string, value: string) {
 
 describe("the Screen Saver dialog", () => {
   beforeEach(() => {
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctxDouble() as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      ctxDouble() as unknown as CanvasRenderingContext2D,
+    );
   });
   afterEach(() => {
     document.querySelectorAll(".test-modal").forEach((e) => e.remove());

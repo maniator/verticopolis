@@ -34,7 +34,15 @@ const PINNED: Record<string, Nonzero> = {
   // thirteen rooms, and wait averages starting from no wait (#2435) onto one
   // that lights none.
   "scenarios/holidays-classic.json": { santaFxSeq: 2, thiefSeq: 1, thiefCaught: 1, thiefFloor: 77 },
-  "scenarios/events-classic.json": { explosionSeq: 1, explosionFloor: 5, explosionX: 174.5, thiefFloor: 1, fires: 1, firesGutRooms: 1, bombs: 1 },
+  "scenarios/events-classic.json": {
+    explosionSeq: 1,
+    explosionFloor: 5,
+    explosionX: 174.5,
+    thiefFloor: 1,
+    fires: 1,
+    firesGutRooms: 1,
+    bombs: 1,
+  },
   // After the direct threat detonates, a second threat is called in during
   // the last two days, with Security sold and nobody to search (#1973). Venue
   // staff coming in as people (#2238) moved the run onto a path where only
@@ -48,11 +56,19 @@ const PINNED: Record<string, Nonzero> = {
   "scenarios/vip-review-modern.json": { thiefFloor: 1, vipFxSeq: 1 },
   "fuzz-corpus/fx-thief-uncaught.json": { thiefSeq: 3, thiefFloor: 1 },
   // Sixty days at three stars also cross the holidays and light a fire.
-  "fuzz-corpus/fx-thief-caught.json": { santaFxSeq: 3, thiefSeq: 1, thiefCaught: 1, thiefFloor: 1, fires: 1, firesGutRooms: 1 },
+  "fuzz-corpus/fx-thief-caught.json": {
+    santaFxSeq: 3,
+    thiefSeq: 1,
+    thiefCaught: 1,
+    thiefFloor: 1,
+    fires: 1,
+    firesGutRooms: 1,
+  },
   "fuzz-corpus/fx-treasure-cap.json": { treasureSeq: 3, treasureX: 172, thiefFloor: 1 },
 };
 
-const asRecord = (d: CheckpointDetail): Nonzero => Object.fromEntries(Object.entries(d.fx).filter(([, v]) => v !== 0)) as Nonzero;
+const asRecord = (d: CheckpointDetail): Nonzero =>
+  Object.fromEntries(Object.entries(d.fx).filter(([, v]) => v !== 0)) as Nonzero;
 
 /** A month or two of game time; the longest takes several seconds on a busy runner. */
 const SLOW = 180_000;
@@ -61,11 +77,15 @@ const run = hasWasmPackage();
 
 describe.runIf(run)("the fx sequences and emergency counters, pinned on the shipped build", () => {
   for (const [file, expected] of Object.entries(PINNED)) {
-    it(`${file}: the shipped build ends on the pinned values`, () => {
-      const wasm: CheckpointDetail[] = [];
-      runScenario(loadScenario(resolve(CONFORMANCE_DIR, file)), startWasmEngine, wasm);
-      expect(asRecord(wasm[wasm.length - 1])).toEqual(expected);
-    }, SLOW);
+    it(
+      `${file}: the shipped build ends on the pinned values`,
+      () => {
+        const wasm: CheckpointDetail[] = [];
+        runScenario(loadScenario(resolve(CONFORMANCE_DIR, file)), startWasmEngine, wasm);
+        expect(asRecord(wasm[wasm.length - 1])).toEqual(expected);
+      },
+      SLOW,
+    );
   }
 
   it("reaches every slot at least once across the pinned scenarios, so no site goes unpinned", () => {

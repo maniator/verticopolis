@@ -48,7 +48,7 @@ export function buildSkyBridgeTower(): void {
     }
     for (let f = 2; f <= sky + 2; f++) {
       if (f === sky) continue;
-      for (let x = lo; x <= hi; ) x += lay("office", f, x) ? office : 1;
+      for (let x = lo; x <= hi;) x += lay("office", f, x) ? office : 1;
     }
   }
   g.reader.update();

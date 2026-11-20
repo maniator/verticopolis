@@ -41,7 +41,9 @@ test("winning the TOWER shows the congratulations modal", async ({ page }) => {
  * a load does not open them again (#1134): the choice shows, and time runs
  * once it is answered.
  */
-test("a TOWER save with an open emergency shows the choice, not the congratulations again, and keeps running", async ({ page }) => {
+test("a TOWER save with an open emergency shows the choice, not the congratulations again, and keeps running", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
   await page.evaluate(() => {
@@ -50,7 +52,11 @@ test("a TOWER save with an open emergency shows the choice, not the congratulati
     const Sim = g.sim.constructor;
     const s = Sim.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
     s.evaluatedTower = true;
-    s.events.pending = { kind: "bombThreat", cost: 300_000, message: "TEST bomb threat: pay the ransom or have Security search the tower." };
+    s.events.pending = {
+      kind: "bombThreat",
+      cost: 300_000,
+      message: "TEST bomb threat: pay the ransom or have Security search the tower.",
+    };
     // Lend the staged tower to the one synchronous autosave, then put the live one back.
     const live = g.sim;
     g.sim = s;
@@ -63,7 +69,9 @@ test("a TOWER save with an open emergency shows the choice, not the congratulati
   await page.reload();
   await page.waitForFunction(() => {
     const g = (window as unknown as { game?: { sim?: { pendingChoice?: unknown; evaluatedTower?: boolean } } }).game;
-    return Boolean(g?.sim?.pendingChoice) && g?.sim?.evaluatedTower === true && Boolean(document.getElementById("splash"));
+    return (
+      Boolean(g?.sim?.pendingChoice) && g?.sim?.evaluatedTower === true && Boolean(document.getElementById("splash"))
+    );
   });
   await expectEngineHosted(page);
   expect(await engineSave(page)).toMatchObject({ evaluatedTower: true, events: { pending: { kind: "bombThreat" } } });
@@ -81,7 +89,9 @@ test("a TOWER save with an open emergency shows the choice, not the congratulati
  * path, which sets the win latch from the tower but not the freeze latches, so
  * it has its own case.
  */
-test("a TOWER save with an open emergency adopted mid-session shows the choice, not the congratulations again, and keeps running", async ({ page }) => {
+test("a TOWER save with an open emergency adopted mid-session shows the choice, not the congratulations again, and keeps running", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
   await page.evaluate(() => document.getElementById("splash")?.remove());
@@ -90,7 +100,11 @@ test("a TOWER save with an open emergency adopted mid-session shows the choice, 
     const g = (window as any).game;
     const s = g.sim.constructor.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
     s.evaluatedTower = true;
-    s.events.pending = { kind: "bombThreat", cost: 300_000, message: "TEST bomb threat: pay the ransom or have Security search the tower." };
+    s.events.pending = {
+      kind: "bombThreat",
+      cost: 300_000,
+      message: "TEST bomb threat: pay the ransom or have Security search the tower.",
+    };
     g.adoptSim(s);
     g.speed = 3;
   });
@@ -106,7 +120,10 @@ async function expectChoiceThenRunning(page: Page): Promise<void> {
   await expect(modal).not.toContainText("TOWER achieved");
 
   // Time is frozen under the choice.
-  const minutes = () => page.evaluate(() => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes);
+  const minutes = () =>
+    page.evaluate(
+      () => (window as unknown as { game: { sim: { clock: { minutes: number } } } }).game.sim.clock.minutes,
+    );
   const frozenAt = await minutes();
   await page.waitForTimeout(600);
   expect(await minutes()).toBe(frozenAt);

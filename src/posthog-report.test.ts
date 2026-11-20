@@ -122,7 +122,8 @@ describe("HogQL query builders", () => {
     // change is the tokens and operators. Without this the guard cries wolf on a
     // formatting pass, and a guard that cries wolf gets deleted.
     const collapse = (text: string): string => text.replace(/\s+/g, " ");
-    const walk = /arraySum\(arrayMap\(\(x, i\) -> if\(i = length\((\w+)\) OR \1\[i \+ 1\] < x, x, 0\), \1, arrayEnumerate\(\1\)\)\)/;
+    const walk =
+      /arraySum\(arrayMap\(\(x, i\) -> if\(i = length\((\w+)\) OR \1\[i \+ 1\] < x, x, 0\), \1, arrayEnumerate\(\1\)\)\)/;
 
     const viewWalk = walk.exec(collapse(dashboard));
     expect(viewWalk, "the view's page-life walk should be findable in the dashboard script").not.toBeNull();
@@ -173,7 +174,13 @@ describe("HogQL query builders", () => {
 
 describe("rowsToObjects (HogQL response normalizer)", () => {
   it("keys each result row by its column name", () => {
-    const json = { columns: ["event", "events", "sessions"], results: [["boot", 5400, 2600], ["crash", 37, 30]] };
+    const json = {
+      columns: ["event", "events", "sessions"],
+      results: [
+        ["boot", 5400, 2600],
+        ["crash", 37, 30],
+      ],
+    };
     expect(rowsToObjects(json)).toEqual([
       { event: "boot", events: 5400, sessions: 2600 },
       { event: "crash", events: 37, sessions: 30 },
@@ -206,13 +213,19 @@ describe("totalsByEvent (totals fold)", () => {
 
 describe("depthRow (exact percentile row)", () => {
   it("reads the single stats row when there is a sample", () => {
-    const res = { ok: true, json: { columns: ["n", "p50", "p90", "p95", "mx"], results: [[3120, 92.4, 640, 1180, 4200]] } };
+    const res = {
+      ok: true,
+      json: { columns: ["n", "p50", "p90", "p95", "mx"], results: [[3120, 92.4, 640, 1180, 4200]] },
+    };
     const r = depthRow(res);
     expect(r).toMatchObject({ skipped: false, empty: false, n: 3120, p50: 92.4, p90: 640, p95: 1180, max: 4200 });
   });
 
   it("flags an empty window (a zero-count row) distinctly from a skip", () => {
-    const res = { ok: true, json: { columns: ["n", "p50", "p90", "p95", "mx"], results: [[0, null, null, null, null]] } };
+    const res = {
+      ok: true,
+      json: { columns: ["n", "p50", "p90", "p95", "mx"], results: [[0, null, null, null, null]] },
+    };
     expect(depthRow(res)).toEqual({ skipped: false, empty: true });
   });
 
@@ -253,10 +266,18 @@ describe("countRow (filtered-count row)", () => {
   });
 
   it("zeroes an empty window (no rows)", () => {
-    expect(countRow({ ok: true, json: { columns: ["events", "sessions"], results: [] } })).toEqual({ events: 0, sessions: 0 });
+    expect(countRow({ ok: true, json: { columns: ["events", "sessions"], results: [] } })).toEqual({
+      events: 0,
+      sessions: 0,
+    });
   });
 
   it("zeroes and flags a skipped query with its hint", () => {
-    expect(countRow({ ok: false, hint: "rate limited" })).toEqual({ events: 0, sessions: 0, skipped: true, hint: "rate limited" });
+    expect(countRow({ ok: false, hint: "rate limited" })).toEqual({
+      events: 0,
+      sessions: 0,
+      skipped: true,
+      hint: "rate limited",
+    });
   });
 });

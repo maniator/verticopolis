@@ -23,7 +23,9 @@ export async function idleLoad(
     const ctx = await newContext();
     try {
       const page = await ctx.newPage();
-      await page.route(blank, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>idle</title>" }));
+      await page.route(blank, (route) =>
+        route.fulfill({ contentType: "text/html", body: "<!doctype html><title>idle</title>" }),
+      );
       await page.goto(blank, { waitUntil: "load" });
       return await measure(page);
     } finally {

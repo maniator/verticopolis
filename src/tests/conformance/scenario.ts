@@ -23,18 +23,27 @@ import { CONFORMANCE_ROOT } from "../packagePaths";
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 export const CONFORMANCE_DIR = CONFORMANCE_ROOT;
 
-export type Start =
-  | { newGame: { seed: number; mode: GameMode; star?: number } }
-  | { fixture: string; mode?: GameMode };
+export type Start = { newGame: { seed: number; mode: GameMode; star?: number } } | { fixture: string; mode?: GameMode };
 
 /** A unit or shaft is named by a tile it covers, never by id. */
-export interface At { floor: number; x: number }
+export interface At {
+  floor: number;
+  x: number;
+}
 
 export type Command =
   | { op: "setMoney"; amount: number }
   | { op: "build"; kind: FacilityKind; floor: number; x: number; expectFail?: boolean; reason?: string }
   | { op: "buildRow"; kind: FacilityKind; floor: number; from: number; to: number }
-  | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number; expectFail?: boolean; reason?: string }
+  | {
+      op: "buildTransport";
+      kind: FacilityKind;
+      x: number;
+      bottom: number;
+      top: number;
+      expectFail?: boolean;
+      reason?: string;
+    }
   | { op: "paintBrush"; kind: "floor" | "lobby"; floor: number; tiles: number[]; placed: number }
   | ChargeCommand
   | TuneCommand
@@ -122,7 +131,10 @@ export function loadScenario(file: string): Scenario {
 
 /** The outcome of a command an engine may refuse: `ok`, and the refusal
  *  reason when it did. */
-export interface Outcome { ok: boolean; reason?: string }
+export interface Outcome {
+  ok: boolean;
+  reason?: string;
+}
 
 /** What a scenario drives: one engine behind the small command surface the
  *  ops use. The Rust engine implements it through its WASM binding
@@ -200,9 +212,17 @@ function transportAt(e: ScenarioEngine, at: At) {
 
 /** `carry` keeps the events of an engine a `reload` replaces, since a save
  *  carries none and the next checkpoint must still count them. */
-function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clock: { minutes: number }, carry: (events: unknown[]) => void): ScenarioEngine {
+function apply(
+  e: ScenarioEngine,
+  c: Command,
+  emit: (label: string) => void,
+  clock: { minutes: number },
+  carry: (events: unknown[]) => void,
+): ScenarioEngine {
   switch (c.op) {
-    case "setMoney": e.setMoney(c.amount); break;
+    case "setMoney":
+      e.setMoney(c.amount);
+      break;
     case "build": {
       const r = e.build(c.kind, c.floor, c.x);
       expectOutcome(r, c, `build ${c.kind} @ ${c.floor},${c.x}`);
@@ -223,13 +243,34 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       // The brush lays what it can and skips the rest, so the scenario names
       // the count it expects.
       const r = e.paintBrush(c.kind, c.floor, c.tiles);
-      if (r.placed !== c.placed) throw new Error(`paintBrush ${c.kind} @ ${c.floor}: placed ${r.placed}, expected ${c.placed}${r.reason ? ` (${r.reason})` : ""}`);
+      if (r.placed !== c.placed)
+        throw new Error(
+          `paintBrush ${c.kind} @ ${c.floor}: placed ${r.placed}, expected ${c.placed}${r.reason ? ` (${r.reason})` : ""}`,
+        );
       break;
     }
-    case "addCar": case "removeCar": case "beginExtend": case "extendTransport": case "endExtend": case "removeFacility": applyCharge(e, c); break;
-    case "sell": case "adjustRent": case "setNoRate": case "setCars": case "setSchedule": case "startFire": applyTune(e, c); break;
-    case "bombThreat": e.bombThreat(); break;
-    case "evaluateStar": e.evaluateStar(); break;
+    case "addCar":
+    case "removeCar":
+    case "beginExtend":
+    case "extendTransport":
+    case "endExtend":
+    case "removeFacility":
+      applyCharge(e, c);
+      break;
+    case "sell":
+    case "adjustRent":
+    case "setNoRate":
+    case "setCars":
+    case "setSchedule":
+    case "startFire":
+      applyTune(e, c);
+      break;
+    case "bombThreat":
+      e.bombThreat();
+      break;
+    case "evaluateStar":
+      e.evaluateStar();
+      break;
     case "toggleAutoBridge": {
       // The toggle is a Modern control; a Classic scenario that asks for it
       // is wrong, and the flip must be visible.
@@ -242,24 +283,51 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       expectOutcome(r, c, `resizeTransport @ ${c.floor},${c.x} to ${c.bottom}-${c.top}`);
       break;
     }
-    case "clearStops": expectOk(e.clearStops(transportAt(e, c).id), false, `clearStops @ ${c.floor},${c.x}`); break;
+    case "clearStops":
+      expectOk(e.clearStops(transportAt(e, c).id), false, `clearStops @ ${c.floor},${c.x}`);
+      break;
     case "setStop":
-      expectOk(e.setStop(transportAt(e, c).id, c.stopFloor, c.stop), false, `setStop ${c.stopFloor} ${c.stop} @ ${c.floor},${c.x}`, "outside the span, or an express stop off a lobby");
+      expectOk(
+        e.setStop(transportAt(e, c).id, c.stopFloor, c.stop),
+        false,
+        `setStop ${c.stopFloor} ${c.stop} @ ${c.floor},${c.x}`,
+        "outside the span, or an express stop off a lobby",
+      );
       break;
     case "priceUnit":
-      expectOk(e.priceUnit(unitAt(e, c).id, c.target) !== null, false, `priceUnit ${c.target} @ ${c.floor},${c.x}`, "not repriceable");
+      expectOk(
+        e.priceUnit(unitAt(e, c).id, c.target) !== null,
+        false,
+        `priceUnit ${c.target} @ ${c.floor},${c.x}`,
+        "not repriceable",
+      );
       break;
     case "setFilmPolicy":
-      expectOk(e.setFilmPolicy(unitAt(e, c).id, c.policy) !== null, false, `setFilmPolicy ${c.policy} @ ${c.floor},${c.x}`, "not a cinema");
+      expectOk(
+        e.setFilmPolicy(unitAt(e, c).id, c.policy) !== null,
+        false,
+        `setFilmPolicy ${c.policy} @ ${c.floor},${c.x}`,
+        "not a cinema",
+      );
       break;
     case "rerollSubtype":
-      expectOk(e.rerollSubtype(unitAt(e, c).id) !== null, false, `rerollSubtype @ ${c.floor},${c.x}`, "no subtype to draw");
+      expectOk(
+        e.rerollSubtype(unitAt(e, c).id) !== null,
+        false,
+        `rerollSubtype @ ${c.floor},${c.x}`,
+        "no subtype to draw",
+      );
       break;
     case "applyRentBatch": {
       // A batch that matched nothing changes nothing, so the scenario must
       // point at units that exist.
       const matched = e.applyRentBatch(c.kind, c.target, c.onlyDefaultPriced ?? false);
-      expectOk(matched !== null && matched > 0, false, `applyRentBatch ${c.kind}`, matched === null ? "not a priced kind or target" : "no unit of that kind");
+      expectOk(
+        matched !== null && matched > 0,
+        false,
+        `applyRentBatch ${c.kind}`,
+        matched === null ? "not a priced kind or target" : "no unit of that kind",
+      );
       break;
     }
     case "callExterminator": {
@@ -273,7 +341,8 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       // never asked for.
       const p = e.pendingChoice();
       if (!p) throw new Error("resolveChoice: no pending choice");
-      if (c.kind !== undefined && p.kind !== c.kind) throw new Error(`resolveChoice: expected ${c.kind}, found ${p.kind}`);
+      if (c.kind !== undefined && p.kind !== c.kind)
+        throw new Error(`resolveChoice: expected ${c.kind}, found ${p.kind}`);
       // An accept the tower cannot afford is a decline in the engine; the
       // scenario must mean what it says, so it is an error here.
       if (c.accept && e.money() < p.cost) throw new Error(`resolveChoice: cannot pay ${p.cost}`);
@@ -305,15 +374,21 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
         if (c.checkpointEvery && i % c.checkpointEvery === 0) emit(`t+${clock.minutes}`);
       }
       break;
-    case "checkpoint": emit(c.label); break;
-    default: throw new Error(`unknown op ${(c as { op: string }).op}`);
+    case "checkpoint":
+      emit(c.label);
+      break;
+    default:
+      throw new Error(`unknown op ${(c as { op: string }).op}`);
   }
   return e;
 }
 
 /** The first checkpoint where a run departs from its lock entry (index, both
  *  sides), or null when they agree to the end. The useful fact for a port. */
-export function firstDivergence(got: Checkpoint[], want: Checkpoint[]): { checkpoint: number; got: Checkpoint | null; want: Checkpoint | null } | null {
+export function firstDivergence(
+  got: Checkpoint[],
+  want: Checkpoint[],
+): { checkpoint: number; got: Checkpoint | null; want: Checkpoint | null } | null {
   const same = (a: Checkpoint | undefined, b: Checkpoint | undefined) =>
     !!a && !!b && a.label === b.label && a.state === b.state && a.crowd === b.crowd && a.events === b.events;
   for (let i = 0; i < Math.max(got.length, want.length); i++) {
@@ -340,7 +415,9 @@ export function runScenario(s: Scenario, start: EngineStart, details?: Checkpoin
     out.push({ label, state: e.stateDigest(), crowd: e.crowdDigest(), events: digest(events) });
     if (details) details.push({ label, ...requireDetail(e) });
   };
-  const carry = (events: unknown[]) => { carried.push(...events); };
+  const carry = (events: unknown[]) => {
+    carried.push(...events);
+  };
   try {
     emit("start");
     for (const c of s.commands) e = apply(e, c, emit, clock, carry);

@@ -44,7 +44,12 @@ export interface ScreenSaverOpts {
 /** Drive a scene on a canvas until the returned stop is called, or until the
  *  canvas leaves the page (a dialog that another one replaced): at most
  *  {@link MAX_FPS} frames a second, or one still frame. */
-export function runScene(canvas: HTMLCanvasElement, scene: SaverScene, still: boolean, win: Window = window): () => void {
+export function runScene(
+  canvas: HTMLCanvasElement,
+  scene: SaverScene,
+  still: boolean,
+  win: Window = window,
+): () => void {
   const c = canvas.getContext("2d");
   if (!c) return () => {};
   c.imageSmoothingEnabled = false;

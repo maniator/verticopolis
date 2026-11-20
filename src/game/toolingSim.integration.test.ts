@@ -91,7 +91,8 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     for (let x = 150; x < 200; x++) expect(sim.tower.place("floor", 2, x), `floor at ${x}`).toMatchObject({ ok: true });
     await Promise.resolve();
     type Tile = Unit & { x: number; run?: number; label?: string };
-    const floorEntries = () => (saved().units as Tile[]).filter((u) => u.kind === "floor").map((u) => [u.x, u.run ?? 1, u.label ?? null]);
+    const floorEntries = () =>
+      (saved().units as Tile[]).filter((u) => u.kind === "floor").map((u) => [u.x, u.run ?? 1, u.label ?? null]);
     expect(floorEntries()).toEqual([[150, 50, null]]);
     const tiles = sim.tower.units.filter((u) => u.kind === "floor") as unknown as Tile[];
     expect(tiles.map((u) => u.x)).toEqual(Array.from({ length: 50 }, (_, i) => 150 + i));
@@ -99,7 +100,11 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     expect(sim.serialize()).toEqual(JSON.parse(engine.serialize()));
     tiles[25].label = "Mezzanine";
     await Promise.resolve();
-    expect(floorEntries()).toEqual([[150, 25, null], [175, 1, "Mezzanine"], [176, 24, null]]);
+    expect(floorEntries()).toEqual([
+      [150, 25, null],
+      [175, 1, "Mezzanine"],
+      [176, 24, null],
+    ]);
   });
 
   it("runs a command, a tick and a money write on the engine, with no load", () => {
@@ -186,7 +191,11 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     (sim.tower.getTransport(shaft.transportId!) as unknown as { cars: number }).cars = 2;
     expect(sim.tower.setCars(shaft.transportId!, 3)).toBe(true);
     syncToolingSim(a);
-    expect((saved() as unknown as { transports: { id: number; cars: number }[] }).transports.find((t) => t.id === shaft.transportId)?.cars).toBe(3);
+    expect(
+      (saved() as unknown as { transports: { id: number; cars: number }[] }).transports.find(
+        (t) => t.id === shaft.transportId,
+      )?.cars,
+    ).toBe(3);
   });
 
   it("keeps the edits two views of the same shaft make, whichever was read first", () => {
@@ -205,7 +214,9 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     first.schedule.waitingCarResponse = 3;
     second.schedule.standardFloorDeparture = 20;
     syncToolingSim(a);
-    const t = (saved() as unknown as { transports: ({ id: number } & View)[] }).transports.find((x) => x.id === shaft.transportId);
+    const t = (saved() as unknown as { transports: ({ id: number } & View)[] }).transports.find(
+      (x) => x.id === shaft.transportId,
+    );
     expect(t).toMatchObject({ cars: 2, schedule: { waitingCarResponse: 3, standardFloorDeparture: 20 } });
   });
 
@@ -214,7 +225,10 @@ describe.skipIf(!hasWasmPackage())("the tooling harnesses' tower", () => {
     const sim = toolingSim(a)!;
     floorOn(sim);
     const shaft = sim.tower.placeTransport("elevatorStandard", 152, 1, 2);
-    sim.elevatorHourly.set(shaft.transportId!, { weekday: Array<number>(24).fill(0.5), weekend: Array<number>(24).fill(0.25) });
+    sim.elevatorHourly.set(shaft.transportId!, {
+      weekday: Array<number>(24).fill(0.5),
+      weekend: Array<number>(24).fill(0.25),
+    });
     engine.seedLoopMemos(7, 1, 0, 0);
     const telemetry = engine.elevatorTelemetry();
     syncToolingSim(a);

@@ -30,7 +30,9 @@ async function boot(page: Page): Promise<void> {
 
 /** What a stray build would change: the tower's rooms, the keyboard cursor
  *  and the tool; and the camera, which the pan must move. */
-async function snapshot(page: Page): Promise<{ units: number; cursor: unknown; tool: unknown; tile: number; floor: number }> {
+async function snapshot(
+  page: Page,
+): Promise<{ units: number; cursor: unknown; tool: unknown; tile: number; floor: number }> {
   return page.evaluate(() => {
     const g = (window as any).game;
     const v = g.engine.viewState();
@@ -99,7 +101,9 @@ for (const focus of ["the palette item", "the page"] as const) {
   });
 }
 
-test("Space pressed during a mouse drag keeps the drag's tool and does nothing at the keyboard cursor", async ({ page }) => {
+test("Space pressed during a mouse drag keeps the drag's tool and does nothing at the keyboard cursor", async ({
+  page,
+}) => {
   await boot(page);
   await page.click('.pal-item[data-kind="lobby"]');
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -173,14 +177,19 @@ for (const type of ["checkbox", "radio"] as const) {
 }
 
 for (const control of ["button", "checkbox"] as const) {
-  test(`a ${control} that a script focuses while Space is held is not pressed by its repeats or release`, async ({ page }) => {
+  test(`a ${control} that a script focuses while Space is held is not pressed by its repeats or release`, async ({
+    page,
+  }) => {
     await boot(page);
     await page.click('.pal-item[data-kind="lobby"]');
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press("ArrowUp"); // reveal the cursor
     await page.keyboard.press("ArrowDown"); // back to the ground floor
     await page.evaluate((kind) => {
-      const el = kind === "button" ? document.createElement("button") : Object.assign(document.createElement("input"), { type: "checkbox" });
+      const el =
+        kind === "button"
+          ? document.createElement("button")
+          : Object.assign(document.createElement("input"), { type: "checkbox" });
       el.id = "space-focus-control";
       (window as any).__controlClicks = 0;
       el.addEventListener("click", () => (window as any).__controlClicks++);
@@ -195,7 +204,8 @@ for (const control of ["button", "checkbox"] as const) {
     await settle(page);
     await page.waitForTimeout(300); // a late build would land well within this
     expect(await page.evaluate(() => (window as any).__controlClicks), `the ${control} was not pressed`).toBe(0);
-    if (control === "checkbox") expect(await page.locator("#space-focus-control").isChecked(), "the checkbox kept its state").toBe(false);
+    if (control === "checkbox")
+      expect(await page.locator("#space-focus-control").isChecked(), "the checkbox kept its state").toBe(false);
     // The focus rule returns before the build, and without it blocksGameKey
     // (its focused-control or typing-target rule) would keep the build out.
     // This check fails only if both break.
@@ -203,7 +213,9 @@ for (const control of ["button", "checkbox"] as const) {
   });
 }
 
-test("a wheel over the world during a Space hold makes it a pan; one over the palette leaves the tap", async ({ page }) => {
+test("a wheel over the world during a Space hold makes it a pan; one over the palette leaves the tap", async ({
+  page,
+}) => {
   await boot(page);
   await page.click('.pal-item[data-kind="lobby"]');
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

@@ -1,6 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEBUG_HUD_ID, DEBUG_HUD_REFRESH_MS, DEBUG_HUD_VIEW_ID, debugHudText, mountDebugHud, type FrameStatsLike } from "./debugHud";
+import {
+  DEBUG_HUD_ID,
+  DEBUG_HUD_REFRESH_MS,
+  DEBUG_HUD_VIEW_ID,
+  debugHudText,
+  mountDebugHud,
+  type FrameStatsLike,
+} from "./debugHud";
 
 const frame = (fps: number, drawCalls: number): FrameStatsLike => ({
   fps,

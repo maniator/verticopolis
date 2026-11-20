@@ -15,8 +15,17 @@ import { hasWasmPackage } from "../conformance/wasmEngine";
 
 const DRAFTS: ReadonlyArray<readonly [string, ((cars: number) => ElevatorSchedule) | undefined]> = [
   ["no draft", undefined],
-  ["rows only, homes untouched", (cars) => ({ activeCars: { weekday: Array(SCHEDULE_HOURS).fill(cars), weekend: Array(SCHEDULE_HOURS).fill(2) } })],
-  ["hand-set homes", (cars) => ({ activeCars: { weekday: Array(SCHEDULE_HOURS).fill(1), weekend: Array(SCHEDULE_HOURS).fill(1) }, homeFloors: [3, 6, 11, 20].slice(0, cars) })],
+  [
+    "rows only, homes untouched",
+    (cars) => ({ activeCars: { weekday: Array(SCHEDULE_HOURS).fill(cars), weekend: Array(SCHEDULE_HOURS).fill(2) } }),
+  ],
+  [
+    "hand-set homes",
+    (cars) => ({
+      activeCars: { weekday: Array(SCHEDULE_HOURS).fill(1), weekend: Array(SCHEDULE_HOURS).fill(1) },
+      homeFloors: [3, 6, 11, 20].slice(0, cars),
+    }),
+  ],
   ["a weekday row only", () => ({ activeCars: { weekday: Array(SCHEDULE_HOURS).fill(3) } })],
 ];
 
@@ -62,7 +71,10 @@ describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal through the bind
                   const got = rust.autoTuneProposal(id, slots, weekend);
                   asked++;
                   if (got.status === "available") available++;
-                  else expect(got.status, `${mode} shaft ${id}`).toBe(mode === "classic" ? "unavailable-in-mode" : "insufficient-data");
+                  else
+                    expect(got.status, `${mode} shaft ${id}`).toBe(
+                      mode === "classic" ? "unavailable-in-mode" : "insufficient-data",
+                    );
                 }
               }
             }

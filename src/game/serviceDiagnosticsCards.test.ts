@@ -23,29 +23,102 @@ const ID = 40;
 const NONE: ServiceDiagnosticFacts = {
   hotel: { rating: "notApplicable", condition: "other", infestDays: null, recovery: null },
   parking: { status: "notApplicable", shortage: null, have: null, total: null, offices: null, suites: null },
-  retail: { active: false, today: null, barWidth: null, tier: "notApplicable", localDemandPct: null, advice: "none", profitYest: null, rainy: null },
+  retail: {
+    active: false,
+    today: null,
+    barWidth: null,
+    tier: "notApplicable",
+    localDemandPct: null,
+    advice: "none",
+    profitYest: null,
+    rainy: null,
+  },
   commercial: { lobbyFar: null },
   housekeeping: {
-    status: "notApplicable", crews: null, maids: null, rooms: null, maidsPerUnit: null, roomsPerMaid: null,
-    cleaned: null, leftover: null, infested: null, outOfReach: null, hasInfested: null, hasOutOfReach: null, recovery: null,
+    status: "notApplicable",
+    crews: null,
+    maids: null,
+    rooms: null,
+    maidsPerUnit: null,
+    roomsPerMaid: null,
+    cleaned: null,
+    leftover: null,
+    infested: null,
+    outOfReach: null,
+    hasInfested: null,
+    hasOutOfReach: null,
+    recovery: null,
   },
 };
 
-const DIRTY_HOTEL: ServiceDiagnosticFacts = { ...NONE, hotel: { rating: "excluded", condition: "dirty", infestDays: 3, recovery: false } };
-const INFESTED_HOTEL: ServiceDiagnosticFacts = { ...NONE, hotel: { rating: "excluded", condition: "infested", infestDays: null, recovery: true } };
+const DIRTY_HOTEL: ServiceDiagnosticFacts = {
+  ...NONE,
+  hotel: { rating: "excluded", condition: "dirty", infestDays: 3, recovery: false },
+};
+const INFESTED_HOTEL: ServiceDiagnosticFacts = {
+  ...NONE,
+  hotel: { rating: "excluded", condition: "infested", infestDays: null, recovery: true },
+};
 const HOUSEKEEPING: ServiceDiagnosticFacts = {
   ...NONE,
-  housekeeping: { ...NONE.housekeeping, status: "adequate", crews: 1, maids: 6, rooms: 10, maidsPerUnit: 6, roomsPerMaid: 2, cleaned: 10, leftover: 0, infested: 0, outOfReach: 0, hasInfested: false, hasOutOfReach: false, recovery: false },
+  housekeeping: {
+    ...NONE.housekeeping,
+    status: "adequate",
+    crews: 1,
+    maids: 6,
+    rooms: 10,
+    maidsPerUnit: 6,
+    roomsPerMaid: 2,
+    cleaned: 10,
+    leftover: 0,
+    infested: 0,
+    outOfReach: 0,
+    hasInfested: false,
+    hasOutOfReach: false,
+    recovery: false,
+  },
 };
-const SHOP: ServiceDiagnosticFacts = { ...NONE, retail: { active: true, today: 3, barWidth: 1, tier: "low", localDemandPct: null, advice: "none", profitYest: 100, rainy: false } };
+const SHOP: ServiceDiagnosticFacts = {
+  ...NONE,
+  retail: {
+    active: true,
+    today: 3,
+    barWidth: 1,
+    tier: "low",
+    localDemandPct: null,
+    advice: "none",
+    profitYest: 100,
+    rainy: false,
+  },
+};
 
 /** A kit whose port answers one occupied unit of `kind` with `facts`. */
 function kitFor(kind: string, facts: ServiceDiagnosticFacts | undefined, mode: "classic" | "modern" = "classic") {
   const port = mockPort({
-    unitCard: () => record("unitCard", { id: ID, kindCode: code("kinds", kind), floor: 2, x: 170, width: 9, stateCode: code("unitStates", "occupied"), rent: NaN, price: 0, vacateReason: NaN, filmPolicy: NaN, blockbuster: NaN, served: 1, reachable: 1, floorHasLobby: 1 }),
+    unitCard: () =>
+      record("unitCard", {
+        id: ID,
+        kindCode: code("kinds", kind),
+        floor: 2,
+        x: 170,
+        width: 9,
+        stateCode: code("unitStates", "occupied"),
+        rent: NaN,
+        price: 0,
+        vacateReason: NaN,
+        filmPolicy: NaN,
+        blockbuster: NaN,
+        served: 1,
+        reachable: 1,
+        floorHasLobby: 1,
+      }),
     unitLabel: () => undefined,
     unitSubtype: () => undefined,
-    unitFacts: () => record("unitFacts", { id: ID, access: (LAYOUT as unknown as { accessLines: string[] }).accessLines.indexOf("reachable") }),
+    unitFacts: () =>
+      record("unitFacts", {
+        id: ID,
+        access: (LAYOUT as unknown as { accessLines: string[] }).accessLines.indexOf("reachable"),
+      }),
     serviceDiagnostics: () => facts,
     generation: () => 1,
   });

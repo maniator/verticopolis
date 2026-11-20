@@ -1,6 +1,13 @@
 import type { GameApp } from "../main";
 import { trackAppAction } from "../analytics";
-import { cleanFileName, FileConflictError, FileGoneError, fileSpace, type TowerFileEntry, type TowerFileKind } from "../storage/fileSpace";
+import {
+  cleanFileName,
+  FileConflictError,
+  FileGoneError,
+  fileSpace,
+  type TowerFileEntry,
+  type TowerFileKind,
+} from "../storage/fileSpace";
 import { copySlotsOnce } from "../storage/fileSpaceMigrate";
 import { SaveGame } from "../storage/SaveGame";
 import { TOWER_FILE_MAGIC } from "../storage/saveCompression";
@@ -174,7 +181,10 @@ async function addDropped(files: readonly File[], how: "drop" | "folder" = "drop
   }
   if (refused.length > 0) {
     const which = refused.length === 1 ? `"${refused[0]}" isn't` : `${refused.length} files aren't`;
-    return { text: `${which} a tower file (.vctower or .TDT).${added > 0 ? ` Added the other ${added}.` : ""}`, kind: "bad" };
+    return {
+      text: `${which} a tower file (.vctower or .TDT).${added > 0 ? ` Added the other ${added}.` : ""}`,
+      kind: "bad",
+    };
   }
   return { text: added === 1 ? "Added 1 tower." : `Added ${added} towers.`, kind: "info" };
 }
@@ -219,8 +229,14 @@ function folderCommands() {
       if (liveFileId() === id) {
         const name = fileSpace.get(id)?.name ?? "That tower";
         return isSplashUp()
-          ? { text: `"${name}" is the tower Continue opens, so it can't be deleted. Open or start another tower first.`, kind: "bad" as const }
-          : { text: `You're playing "${name}", so it can't be deleted. Open or start another tower first.`, kind: "bad" as const };
+          ? {
+              text: `"${name}" is the tower Continue opens, so it can't be deleted. Open or start another tower first.`,
+              kind: "bad" as const,
+            }
+          : {
+              text: `You're playing "${name}", so it can't be deleted. Open or start another tower first.`,
+              kind: "bad" as const,
+            };
       }
       try {
         await fileSpace.remove(id);
@@ -327,7 +343,11 @@ export async function saveFile(app: GameApp, name: string): Promise<string> {
  *  From a folder… where it can't but can pick a folder's files. */
 function places(app: GameApp) {
   const linked = linkedPlace(app);
-  return { linked, canPickFolder: !linked && typeof HTMLInputElement !== "undefined" && "webkitdirectory" in HTMLInputElement.prototype };
+  return {
+    linked,
+    canPickFolder:
+      !linked && typeof HTMLInputElement !== "undefined" && "webkitdirectory" in HTMLInputElement.prototype,
+  };
 }
 
 /** The live tower's file name in the linked folder, when it came from there. */
@@ -400,7 +420,12 @@ export async function saveCurrentFile(): Promise<void> {
     if (app.enginePort.generation() === generation) setCurrentFile(entry.id);
     noteTowersFile(entry);
     trackAppAction("file_save", why);
-    app.ui.toast(why === "forked" ? `Another window saved "${file!.name}" too, so this tower is saved as "${entry.name}".` : `Saved "${entry.name}" in My Towers.`, "good");
+    app.ui.toast(
+      why === "forked"
+        ? `Another window saved "${file!.name}" too, so this tower is saved as "${entry.name}".`
+        : `Saved "${entry.name}" in My Towers.`,
+      "good",
+    );
   } catch (err) {
     app.ui.sayVisibly(failed(err).text);
   }

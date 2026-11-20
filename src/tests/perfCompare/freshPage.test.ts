@@ -40,17 +40,23 @@ describe("freshPage", () => {
   it("reloads on every call, so a later scenario never starts in the earlier one's page", async () => {
     const f = fakePage("wasm");
     const seen: string[][] = [];
-    await eachScenarioFresh([{ name: "medium" }, { name: "large" }], (sc) => freshPage(f.page, "wasm", `${sc.name} boot`), async (sc) => {
-      seen.push([...f.state.left]);
-      f.state.left.push(sc.name);
-    });
+    await eachScenarioFresh(
+      [{ name: "medium" }, { name: "large" }],
+      (sc) => freshPage(f.page, "wasm", `${sc.name} boot`),
+      async (sc) => {
+        seen.push([...f.state.left]);
+        f.state.left.push(sc.name);
+      },
+    );
     expect(f.log.filter((l) => l === "reload")).toHaveLength(2);
     expect(seen).toEqual([[], []]);
   });
 
   it("refuses a page that runs another engine, before it prepares the app", async () => {
     const f = fakePage("ts");
-    await expect(freshPage(f.page, "wasm", "large boot")).rejects.toThrow("large boot: requested the wasm engine but ts is active");
+    await expect(freshPage(f.page, "wasm", "large boot")).rejects.toThrow(
+      "large boot: requested the wasm engine but ts is active",
+    );
     expect(f.log).not.toContain("prepare");
   });
 

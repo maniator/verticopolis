@@ -23,7 +23,9 @@ const forms = readdirSync(TEMPLATE_DIR)
 
 /** Every `- name:` in labels.yml. */
 const knownLabels = new Set(
-  [...readFileSync(resolve(repoRoot, ".github/labels.yml"), "utf8").matchAll(/^\s*- name:\s*"?([^"\n]+?)"?\s*$/gm)].map((m) => m[1]),
+  [...readFileSync(resolve(repoRoot, ".github/labels.yml"), "utf8").matchAll(/^\s*- name:\s*"?([^"\n]+?)"?\s*$/gm)].map(
+    (m) => m[1],
+  ),
 );
 
 /** The `labels: [...]` line of a form. */

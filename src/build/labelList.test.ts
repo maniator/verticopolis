@@ -31,51 +31,34 @@ describe("parseLabelList", () => {
   });
 
   it("reads the same list with Windows line endings", () => {
-    expect(parseLabelList(LIST.replace(/\n/g, "\r\n"))).toEqual(
-      parseLabelList(LIST),
-    );
+    expect(parseLabelList(LIST.replace(/\n/g, "\r\n"))).toEqual(parseLabelList(LIST));
   });
 
   it("refuses an entry without a six-digit color or a description", () => {
-    expect(() =>
-      parseLabelList(
-        'labels:\n  - name: a\n    color: "red"\n    description: x\n',
-      ),
-    ).toThrow(/"a" \(line 2\)/);
-    expect(() =>
-      parseLabelList('labels:\n  - name: a\n    color: "aaaaaa"\n'),
-    ).toThrow(/needs a quoted six-digit color and a description/);
+    expect(() => parseLabelList('labels:\n  - name: a\n    color: "red"\n    description: x\n')).toThrow(
+      /"a" \(line 2\)/,
+    );
+    expect(() => parseLabelList('labels:\n  - name: a\n    color: "aaaaaa"\n')).toThrow(
+      /needs a quoted six-digit color and a description/,
+    );
   });
 
   it("refuses an entry it cannot read instead of skipping it", () => {
     const ok = '  - name: a\n    color: "aaaaaa"\n    description: x\n';
-    for (const bad of [
-      "  - name:",
-      "  - name:   ",
-      "  - title: b",
-      "    - name: b",
-    ])
-      expect(() => parseLabelList(`labels:\n${ok}${bad}\n`)).toThrow(
-        /line 5 starts an entry/,
-      );
+    for (const bad of ["  - name:", "  - name:   ", "  - title: b", "    - name: b"])
+      expect(() => parseLabelList(`labels:\n${ok}${bad}\n`)).toThrow(/line 5 starts an entry/);
   });
 
   it("refuses a duplicate name and an empty list", () => {
     const one = '  - name: a\n    color: "aaaaaa"\n    description: x\n';
-    expect(() => parseLabelList(`labels:\n${one}${one}`)).toThrow(
-      /"a" is listed twice/,
-    );
+    expect(() => parseLabelList(`labels:\n${one}${one}`)).toThrow(/"a" is listed twice/);
     expect(() => parseLabelList("labels:\n")).toThrow(/no labels found/);
   });
 
   it("reads the repository's list, every issue-form label included", () => {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-    const names = parseLabelList(
-      readFileSync(resolve(root, ".github/labels.yml"), "utf8"),
-    ).map((l) => l.name);
-    expect(names).toEqual(
-      expect.arrayContaining(["bug", "task", "needs-triage", "needs-form"]),
-    );
+    const names = parseLabelList(readFileSync(resolve(root, ".github/labels.yml"), "utf8")).map((l) => l.name);
+    expect(names).toEqual(expect.arrayContaining(["bug", "task", "needs-triage", "needs-form"]));
   });
 });
 
@@ -87,15 +70,6 @@ describe("labelSyncArgs", () => {
         color: "7057ff",
         description: "Hi",
       }),
-    ).toEqual([
-      "label",
-      "create",
-      "good first issue",
-      "--color",
-      "7057ff",
-      "--description",
-      "Hi",
-      "--force",
-    ]);
+    ).toEqual(["label", "create", "good first issue", "--color", "7057ff", "--description", "Hi", "--force"]);
   });
 });

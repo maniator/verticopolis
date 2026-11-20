@@ -479,9 +479,14 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
  *  player is told not to start another tower first). With a readable older save
  *  loaded and the newer one not kept, there is nothing to update for, so the
  *  notice only says the next autosave replaces it. */
-export function unreadableSaveNotice(flags: { hadReadableSave: boolean; saveWasNewer: boolean; unreadableKept: boolean }): string {
+export function unreadableSaveNotice(flags: {
+  hadReadableSave: boolean;
+  saveWasNewer: boolean;
+  unreadableKept: boolean;
+}): string {
   if (flags.hadReadableSave) {
-    if (!flags.saveWasNewer) return "⚠️ Your latest autosave couldn't be read, so an older saved tower was loaded instead.";
+    if (!flags.saveWasNewer)
+      return "⚠️ Your latest autosave couldn't be read, so an older saved tower was loaded instead.";
     return flags.unreadableKept
       ? "⚠️ Your latest autosave was made by a newer version of Verticopolis, so an older saved tower was loaded instead. Update the game to open the newer one. It is kept aside, and Saves can download it."
       : "⚠️ Your latest autosave was made by a newer version of Verticopolis, so an older saved tower was loaded instead. The newer one could not be kept aside, so the next autosave replaces it.";
@@ -493,4 +498,3 @@ export function unreadableSaveNotice(flags: { hadReadableSave: boolean; saveWasN
   }
   return "⚠️ Your saved tower couldn't be read. It may be corrupted. Starting a new tower.";
 }
-

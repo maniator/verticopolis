@@ -41,8 +41,7 @@ sim.star = 3; // so hotel double/suite behave as established units
 
 // Floor 1 lobby full width; floors 2..TOP plain floors full width.
 for (let x = 0; x < TOWER_W; x++) must(t.place("lobby", 1, x).ok, `lobby 1,${x}`);
-for (let f = 2; f <= TOP; f++)
-  for (let x = 0; x < TOWER_W; x++) must(t.place("floor", f, x).ok, `floor ${f},${x}`);
+for (let f = 2; f <= TOP; f++) for (let x = 0; x < TOWER_W; x++) must(t.place("floor", f, x).ok, `floor ${f},${x}`);
 
 // One standard elevator serving the whole stub (x0).
 const shaft = t.placeTransport("elevatorStandard", 0, 1, TOP);
@@ -98,6 +97,7 @@ const out = resolve(SAVES, "ECONVER.TDT");
 writeFileSync(out, built.bytes);
 console.log(`Wrote ${out} (${built.bytes.length} bytes; game filename ${built.report.filename}).`);
 console.log("Rooms and intended rent classes:");
-for (const r of rooms) console.log(`  ${r.tag.padEnd(16)} rent=$${r.rent.toLocaleString()} at floor ${r.floor}, x ${r.x}`);
+for (const r of rooms)
+  console.log(`  ${r.tag.padEnd(16)} rent=$${r.rent.toLocaleString()} at floor ${r.floor}, x ${r.x}`);
 const behind = built.report?.staysBehind ?? [];
 if (behind.length) console.log(`stays behind: ${behind.length} (${behind.slice(0, 4).join("; ")})`);

@@ -48,9 +48,10 @@ export function viewSentence(placement: Where, built: BuiltFloors): string {
 /** The whole summary: the tower's size, then where the view is. */
 export function mapSummary(built: BuiltFloors, placement: Where): string {
   const { above, basements } = builtFloorCounts(built);
-  const size = basements > 0
-    ? `${count(above, "floor", "floors")} above ground and ${count(basements, "basement", "basements")}.`
-    : `${count(above, "floor", "floors")} above ground.`;
+  const size =
+    basements > 0
+      ? `${count(above, "floor", "floors")} above ground and ${count(basements, "basement", "basements")}.`
+      : `${count(above, "floor", "floors")} above ground.`;
   const where = viewSentence(placement, built);
   return where ? `Tower map: ${size} ${where}` : `Tower map: ${size}`;
 }

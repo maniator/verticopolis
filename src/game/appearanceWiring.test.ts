@@ -69,7 +69,9 @@ describe("the appearance wiring", () => {
     expect(trackAppAction).toHaveBeenCalledWith("appearance_set", "skyline");
     // The next open starts from the new scheme.
     openDialog();
-    expect(vi.mocked(openAppearanceDialog).mock.calls[vi.mocked(openAppearanceDialog).mock.calls.length - 1][1]).toBe("skyline");
+    expect(vi.mocked(openAppearanceDialog).mock.calls[vi.mocked(openAppearanceDialog).mock.calls.length - 1][1]).toBe(
+      "skyline",
+    );
   });
 
   it("sends nothing when OK keeps the same scheme", () => {

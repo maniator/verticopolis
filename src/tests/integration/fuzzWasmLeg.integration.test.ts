@@ -59,11 +59,26 @@ describe.runIf(run)("the WASM leg of the seeded differential", () => {
 
   it("names a money, a log and a save-field difference with the WASM label", () => {
     const first = corpusFiles()[0];
-    const money = replayCompare(withEditedGolden(first, (d) => { d[d.length - 1].money += 1; }), dir);
+    const money = replayCompare(
+      withEditedGolden(first, (d) => {
+        d[d.length - 1].money += 1;
+      }),
+      dir,
+    );
     expect(money).toMatchObject({ status: "diverged", signature: "money" });
-    const log = replayCompare(withEditedGolden(first, (d) => { d[d.length - 1].log.digest = "x"; }), dir);
+    const log = replayCompare(
+      withEditedGolden(first, (d) => {
+        d[d.length - 1].log.digest = "x";
+      }),
+      dir,
+    );
     expect(log).toMatchObject({ status: "diverged", signature: "log:digest" });
-    const save = replayCompare(withEditedGolden(first, (d) => { d[d.length - 1].save.clock = "x"; }), dir);
+    const save = replayCompare(
+      withEditedGolden(first, (d) => {
+        d[d.length - 1].save.clock = "x";
+      }),
+      dir,
+    );
     expect(save).toMatchObject({ status: "diverged", signature: "save:clock" });
     expect(save.status === "diverged" && save.message).toContain("WASM");
   });

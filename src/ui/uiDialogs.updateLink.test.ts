@@ -12,7 +12,11 @@ import { showUpdatePrompt } from "./uiDialogs";
 
 function fakeUI(): { ui: UI; openModalTemplate: ReturnType<typeof vi.fn> } {
   const openModalTemplate = vi.fn((_t: TemplateResult) => document.createElement("div"));
-  const ui = { el: { modal: document.createElement("dialog") }, openModalTemplate, closeModal: vi.fn() } as unknown as UI;
+  const ui = {
+    el: { modal: document.createElement("dialog") },
+    openModalTemplate,
+    closeModal: vi.fn(),
+  } as unknown as UI;
   return { ui, openModalTemplate };
 }
 
@@ -29,15 +33,27 @@ describe("showUpdatePrompt release notes link", () => {
   it("shows the link in a browser tab", () => {
     standalone.isInstalledStandalone.mockReturnValue(false);
     const { ui, openModalTemplate } = fakeUI();
-    showUpdatePrompt(ui, () => {}, () => {}, info);
+    showUpdatePrompt(
+      ui,
+      () => {},
+      () => {},
+      info,
+    );
     expect(standalone.isInstalledStandalone).toHaveBeenCalled();
-    expect(shownLink(openModalTemplate)?.getAttribute("href")).toBe("/help/changelog?from=game&via=update_prompt#3.2.0");
+    expect(shownLink(openModalTemplate)?.getAttribute("href")).toBe(
+      "/help/changelog?from=game&via=update_prompt#3.2.0",
+    );
   });
 
   it("leaves it out in the installed app", () => {
     standalone.isInstalledStandalone.mockReturnValue(true);
     const { ui, openModalTemplate } = fakeUI();
-    showUpdatePrompt(ui, () => {}, () => {}, info);
+    showUpdatePrompt(
+      ui,
+      () => {},
+      () => {},
+      info,
+    );
     expect(shownLink(openModalTemplate)).toBeNull();
   });
 });

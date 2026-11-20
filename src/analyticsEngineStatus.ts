@@ -1,7 +1,12 @@
 import { trackEvent, type GameplayEvents } from "./analyticsCore";
 import { APP_VERSION } from "./appVersion";
 import type { EngagedBy } from "./analyticsEngagement";
-import { FALLBACK_REASONS, type BootStage, type FallbackReason, type FallbackStage } from "@verticopolis/components/host/engineBoot";
+import {
+  FALLBACK_REASONS,
+  type BootStage,
+  type FallbackReason,
+  type FallbackStage,
+} from "@verticopolis/components/host/engineBoot";
 import type { EngineChoice } from "@verticopolis/components/host/engineChoice";
 import type { TrapKind } from "@verticopolis/components/host/hostFault";
 
@@ -52,7 +57,15 @@ export const ENGINE_KINDS = ["ts", "wasm", "wasm-frame", "wasm-worker", "ts-fall
 export type EngineKind = (typeof ENGINE_KINDS)[number];
 
 /** Why a row was sent; see the module comment. */
-export const ENGINE_STATUS_TRIGGERS = ["attempt", "settle", "fallback", "crash-reload", "writer-latch", "summary", "engaged"] as const;
+export const ENGINE_STATUS_TRIGGERS = [
+  "attempt",
+  "settle",
+  "fallback",
+  "crash-reload",
+  "writer-latch",
+  "summary",
+  "engaged",
+] as const;
 export type EngineStatusTrigger = (typeof ENGINE_STATUS_TRIGGERS)[number];
 
 /** The bundle kind (see `src/build/engineBundle.ts`). */
@@ -141,7 +154,8 @@ let engagedSent = false;
 export function pageLifeId(): string {
   if (pageLife !== undefined) return pageLife;
   try {
-    pageLife = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : fallbackId();
+    pageLife =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : fallbackId();
   } catch {
     pageLife = fallbackId();
   }
@@ -191,7 +205,10 @@ export function noteEngineAttempt(attempt: { build: EngineBuild; requested: Engi
   if (attemptSent) return;
   attemptSent = true;
   const { build, requested } = attempt;
-  send({ build, requested, engine: engineKind(build, requested, false), reason: "none", stage: "none", fallbacks: 0 }, "attempt");
+  send(
+    { build, requested, engine: engineKind(build, requested, false), reason: "none", stage: "none", fallbacks: 0 },
+    "attempt",
+  );
 }
 
 /** The page life engaged (`analyticsEngagement.ts`): send its `engaged` row,
@@ -223,7 +240,11 @@ export function noteEngineSettled(settle: EngineSettle): void {
 /** A fallback after boot settled: a tower the host would not take, or a
  *  running engine's fault (#874). Before `settle` it is ignored, because the
  *  boot state the settle row reads already holds it. */
-export function noteEngineFallback(fallback: { reason: FallbackReason; stage: FallbackStage; trapKind?: TrapKind }): void {
+export function noteEngineFallback(fallback: {
+  reason: FallbackReason;
+  stage: FallbackStage;
+  trapKind?: TrapKind;
+}): void {
   if (!status) return;
   status.fallbacks++;
   status.reason = fallback.reason;
@@ -237,7 +258,11 @@ export function noteEngineFallback(fallback: { reason: FallbackReason; stage: Fa
  *  (#1422). The row keeps the engine that crashed, and goes out past the cap,
  *  since a page life reloads once. Before `settle` it is ignored, as a
  *  fallback is. */
-export function noteEngineCrashReload(fault: { reason: FallbackReason; stage: FallbackStage; trapKind?: TrapKind }): void {
+export function noteEngineCrashReload(fault: {
+  reason: FallbackReason;
+  stage: FallbackStage;
+  trapKind?: TrapKind;
+}): void {
   if (!status) return;
   status.fallbacks++;
   status.reason = fault.reason;

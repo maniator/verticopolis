@@ -41,7 +41,9 @@ export const TITLE_PICK_CONTINUE = "continue";
 export function titlePickOf(target: EventTarget | null): string | null {
   const button = target instanceof Element ? target.closest<HTMLElement>("#splash [data-splash]") : null;
   const code = button?.dataset.splash;
-  return code && Object.prototype.hasOwnProperty.call(TITLE_PICK, code) ? TITLE_PICK[code as keyof typeof TITLE_PICK] : null;
+  return code && Object.prototype.hasOwnProperty.call(TITLE_PICK, code)
+    ? TITLE_PICK[code as keyof typeof TITLE_PICK]
+    : null;
 }
 
 /** Report a press on a title-screen button; a script's click is not one. */

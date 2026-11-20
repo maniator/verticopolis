@@ -140,7 +140,7 @@ const SESSION_LENGTHS_SQL = [
   "    SELECT",
   "        -- distinct_id IS the per-tab session id: the ingest relay sets it from",
   "        -- the session id and sets $process_person_profile false, so no person",
-  "        -- sits behind it. \"Unique users\" here means \"unique sessions\".",
+  '        -- sits behind it. "Unique users" here means "unique sessions".',
   "        distinct_id AS session_id,",
   "        -- Every reported length, oldest first. Cumulative WITHIN a page life and",
   "        -- back to 0 after a reload, which is what the peak walk above keys on.",
@@ -264,7 +264,11 @@ function buildInsights(ids) {
       // id survives a reload into the next day, appears on each day it touched.
       // That is right for a daily series and wrong as a total, which is why the
       // 30-day figure is its own tile over the view rather than a sum of this one.
-      query: trends([series("boot", "Boots"), series("session_end", "Sessions ended", "dau"), actionSeries(ids.newGame, "New games")]),
+      query: trends([
+        series("boot", "Boots"),
+        series("session_end", "Sessions ended", "dau"),
+        actionSeries(ids.newGame, "New games"),
+      ]),
     },
     {
       name: "First-tower funnel (new game → first build → 2★)",
@@ -395,7 +399,10 @@ function buildInsights(ids) {
       description:
         "Median of session_fps.p50 and of session_fps.low across the rows each day (production). `low` is the 5th-percentile fps of one page life's sampled frames, a hitch signal, not its single worst frame. Observed in the field on whatever device each player has: it is not a hardware benchmark or the performance gate. From the release after 4.13.1 only frames where the simulation runs are sampled (#603); before it, paused and modal-frozen frames counted too, so compare versions on the same side of that change. The tile beside it gives the number of rows behind each day (#538, #2391).",
       query: trends(
-        [series("session_fps", "Typical fps (median of p50)", "median", "p50"), series("session_fps", "5th-percentile fps (median of low)", "median", "low")],
+        [
+          series("session_fps", "Typical fps (median of p50)", "median", "p50"),
+          series("session_fps", "5th-percentile fps (median of low)", "median", "low"),
+        ],
         { display: "ActionsLineGraph" },
       ),
     },
@@ -403,7 +410,9 @@ function buildInsights(ids) {
       name: "FPS reports per day",
       description:
         "How many session_fps rows arrived each day and how many sessions sent them (distinct per-tab session ids), production: the n behind the fps percentiles tile. A row is one reporting window: a page life, or the stretch after a back/forward-cache restore (#621), and it is sent only after 120 sampled frames, so short visits, killed tabs and blocked relays send none. A session that reloads sends one row per page life, so rows can outnumber sessions; it is a volume, never a coverage rate (see docs/analytics-fps-telemetry.md, #2391).",
-      query: trends([series("session_fps", "FPS rows"), series("session_fps", "Sessions sending one", "dau")], { display: "ActionsLineGraph" }),
+      query: trends([series("session_fps", "FPS rows"), series("session_fps", "Sessions sending one", "dau")], {
+        display: "ActionsLineGraph",
+      }),
     },
     {
       name: "Session FPS by tower size and speed",
@@ -509,7 +518,11 @@ function buildInsights(ids) {
     {
       name: "Tool adoption (first use per session)",
       description: "tool_used events by tool, production.",
-      query: trends([series("tool_used", "Tool used")], { breakdown: "tool", display: "ActionsBar", breakdownLimit: 25 }),
+      query: trends([series("tool_used", "Tool used")], {
+        breakdown: "tool",
+        display: "ActionsBar",
+        breakdownLimit: 25,
+      }),
     },
     {
       name: "Star ratings reached",
@@ -520,11 +533,23 @@ function buildInsights(ids) {
       name: "Star-up message box",
       description:
         "The star-up message box opening (app_action star_notice), by mode and rating (detail classic-2 to modern-5), production, beside the star_reached tile above. See docs/analytics-data-map.md, The star-up message box.",
-      query: trends([series("app_action", "Star-up box")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["star_notice"])] }),
+      query: trends([series("app_action", "Star-up box")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["star_notice"])],
+      }),
     },
     // Table + KPI tiles for precise at-a-glance numbers.
-    { name: "Boots (30d)", description: "Total boot events, production, 30d.", query: trends([series("boot", "Boots")], { display: "BoldNumber" }) },
-    { name: "Distinct play sessions (30d)", description: "Unique per-tab session ids, production, 30d.", query: trends([series("boot", "Play sessions", "dau")], { display: "BoldNumber" }) },
+    {
+      name: "Boots (30d)",
+      description: "Total boot events, production, 30d.",
+      query: trends([series("boot", "Boots")], { display: "BoldNumber" }),
+    },
+    {
+      name: "Distinct play sessions (30d)",
+      description: "Unique per-tab session ids, production, 30d.",
+      query: trends([series("boot", "Play sessions", "dau")], { display: "BoldNumber" }),
+    },
     {
       name: "New games started (30d)",
       description:
@@ -537,11 +562,30 @@ function buildInsights(ids) {
       // date filter, so this one stays at 30 days if that filter is moved.
       description:
         "Distinct sessions that reported an end, production, 30d. Counts sessions from the session_lengths view, not session_end rows, which re-fire once per tab-hide. Its 30-day window is fixed in the SQL and does not follow the dashboard date filter.",
-      query: hogql(["SELECT count() AS sessions", "FROM session_lengths", "WHERE ended_at >= now() - INTERVAL 30 DAY"].join("\n"), { display: "BoldNumber" }),
+      query: hogql(
+        ["SELECT count() AS sessions", "FROM session_lengths", "WHERE ended_at >= now() - INTERVAL 30 DAY"].join("\n"),
+        { display: "BoldNumber" },
+      ),
     },
-    { name: "Platform table", description: "Boots by platform as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "platform", display: "ActionsTable" }) },
-    { name: "Tool usage table", description: "tool_used by tool as a table, production, 30d.", query: trends([series("tool_used", "Tool used")], { breakdown: "tool", display: "ActionsTable", breakdownLimit: 25 }) },
-    { name: "Boot reason table", description: "Boots by reason as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "reason", display: "ActionsTable" }) },
+    {
+      name: "Platform table",
+      description: "Boots by platform as a table, production, 30d.",
+      query: trends([series("boot", "Boots")], { breakdown: "platform", display: "ActionsTable" }),
+    },
+    {
+      name: "Tool usage table",
+      description: "tool_used by tool as a table, production, 30d.",
+      query: trends([series("tool_used", "Tool used")], {
+        breakdown: "tool",
+        display: "ActionsTable",
+        breakdownLimit: 25,
+      }),
+    },
+    {
+      name: "Boot reason table",
+      description: "Boots by reason as a table, production, 30d.",
+      query: trends([series("boot", "Boots")], { breakdown: "reason", display: "ActionsTable" }),
+    },
     // Version adoption and crash reliability: the last two sections the retired
     // Vercel report carried that had no dashboard tile, added at the D-1 cutover
     // so nothing the report answered went dark.
@@ -556,8 +600,13 @@ function buildInsights(ids) {
       // applied-count signal is the post-reload boot with reason=update, next
       // tile (approximate in both directions; see its comment).
       name: "Update attempts by target version",
-      description: "Update attempts (emitted before the activating reload; a failed activation still counts) by target version, production, 30d.",
-      query: trends([series("update", "Update attempts")], { breakdown: "to", display: "ActionsTable", breakdownLimit: 10 }),
+      description:
+        "Update attempts (emitted before the activating reload; a failed activation still counts) by target version, production, 30d.",
+      query: trends([series("update", "Update attempts")], {
+        breakdown: "to",
+        display: "ActionsTable",
+        breakdownLimit: 10,
+      }),
     },
     {
       // An approximate applied-updates signal, bounded in neither direction: a
@@ -566,7 +615,8 @@ function buildInsights(ids) {
       // reload inside the 30s resume window can boot the OLD build with
       // reason=update, overcounting (see updateFlow.ts and appBoot.ts).
       name: "Update-reason boots by version",
-      description: "Boots with reason=update by the build version booted into, production, 30d. Approximate applied-updates signal: reclassification undercounts, and a manual reload in the resume window can count the old build.",
+      description:
+        "Boots with reason=update by the build version booted into, production, 30d. Approximate applied-updates signal: reclassification undercounts, and a manual reload in the resume window can count the old build.",
       query: trends([series("boot", "Update boots")], {
         breakdown: "version",
         display: "ActionsTable",
@@ -589,7 +639,11 @@ function buildInsights(ids) {
       name: "Crashes by build version",
       description:
         "Typed crash events by build version, production, 30d. Deduped per page life on the crash's flag set since 2026-09-14 (finer than the $exception mirror's single fingerprint, but still not an occurrence count), so counts before and after that date are not comparable.",
-      query: trends([series("crash", "Crashes")], { breakdown: "version", display: "ActionsTable", breakdownLimit: 10 }),
+      query: trends([series("crash", "Crashes")], {
+        breakdown: "version",
+        display: "ActionsTable",
+        breakdownLimit: 10,
+      }),
     },
     // Reliability / error tracking. $exception is the cookieless error signal
     // (uncaught JS errors + unhandled rejections + synthetic WebGL-crash events);
@@ -602,12 +656,20 @@ function buildInsights(ids) {
     {
       name: "Errors by type",
       description: "$exception by top-level $exception_type (TypeError / WebGLContextLost / ...), production.",
-      query: trends([series("$exception", "Errors")], { breakdown: "$exception_type", display: "ActionsBar", breakdownLimit: 25 }),
+      query: trends([series("$exception", "Errors")], {
+        breakdown: "$exception_type",
+        display: "ActionsBar",
+        breakdownLimit: 25,
+      }),
     },
     {
       name: "Top error issues",
       description: "$exception grouped by $exception_fingerprint (the distinct issues), production.",
-      query: trends([series("$exception", "Errors")], { breakdown: "$exception_fingerprint", display: "ActionsTable", breakdownLimit: 50 }),
+      query: trends([series("$exception", "Errors")], {
+        breakdown: "$exception_fingerprint",
+        display: "ActionsTable",
+        breakdownLimit: 50,
+      }),
     },
     {
       name: "Errors by platform",
@@ -619,7 +681,11 @@ function buildInsights(ids) {
       description: "$exception by build version, so a regression in a new build is visible, production.",
       query: trends([series("$exception", "Errors")], { breakdown: "version", display: "ActionsTable" }),
     },
-    { name: "Errors (30d)", description: "Total $exception events, production, 30d.", query: trends([series("$exception", "Errors")], { display: "BoldNumber" }) },
+    {
+      name: "Errors (30d)",
+      description: "Total $exception events, production, 30d.",
+      query: trends([series("$exception", "Errors")], { display: "BoldNumber" }),
+    },
     {
       name: "WebGL crashes by recovery outcome",
       // Not a recovery success rate, in either era. `recoveryFailed` can only be
@@ -631,14 +697,18 @@ function buildInsights(ids) {
       // most one row to each bucket, so the split is pulled toward 1:1 by the
       // dedup rather than by how devices behave.
       description:
-        "The typed crash event split by whether in-place recovery was tried and failed, production. NOT a recovery success rate: false also covers every loss where recovery was never attempted (a repeat or a failed flush; before the build that ships graphics_recovered, also a loss behind the title screen). Recoveries that worked are in \"WebGL losses recovered in place\". Deduped per page life on the crash's flag set since 2026-09-14, which pulls the split toward 1:1, so counts before and after that date are not comparable.",
+        'The typed crash event split by whether in-place recovery was tried and failed, production. NOT a recovery success rate: false also covers every loss where recovery was never attempted (a repeat or a failed flush; before the build that ships graphics_recovered, also a loss behind the title screen). Recoveries that worked are in "WebGL losses recovered in place". Deduped per page life on the crash\'s flag set since 2026-09-14, which pulls the split toward 1:1, so counts before and after that date are not comparable.',
       query: trends([series("crash", "Crashes")], { breakdown: "recoveryFailed", display: "ActionsBar" }),
     },
     {
       name: "WebGL losses recovered in place",
       description:
         "app_action graphics_recovered by where the loss happened (game: mid-game, title: behind the title screen), production, from the build that ships it (2026-11-16). One event per recovery that worked, a lower bound like every client event. Read it beside the crash event with repeat false; crash is deduped per page life on its flag set, so do not add the two as a count of first losses.",
-      query: trends([series("app_action", "Recoveries")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["graphics_recovered"])] }),
+      query: trends([series("app_action", "Recoveries")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["graphics_recovered"])],
+      }),
     },
     {
       name: "Engine files from another build, reloaded",
@@ -647,7 +717,11 @@ function buildInsights(ids) {
       // when the owner wants the tile placed.
       description:
         "app_action engine_reload (detail mismatch), production, from the build that ships it (2026-11-18): a boot on a page no service worker controls, whose engine files were from another build than the page, reloaded once by itself instead of showing the stop screen. One event per reload, a lower bound like every client event. A controlled page, or a page that came back as a build the tab already reloaded from, still stops, and shows as engine_status package-mismatch with no reload event.",
-      query: trends([series("app_action", "Reloads")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["engine_reload"])] }),
+      query: trends([series("app_action", "Reloads")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["engine_reload"])],
+      }),
     },
     // App-chrome actions (the app_action event). COOKIELESS: every tile here is
     // per-session and cohort, never per-person. "8% of sessions exported, more
@@ -656,8 +730,13 @@ function buildInsights(ids) {
     // individuals.
     {
       name: "App actions by type",
-      description: "Every app_action broken down by action (save / export / import / TDT / dialog opens / toggles / page landings), production, 30d. COOKIELESS: session counts, never individuals.",
-      query: trends([series("app_action", "Actions")], { breakdown: "action", display: "ActionsTable", breakdownLimit: 40 }),
+      description:
+        "Every app_action broken down by action (save / export / import / TDT / dialog opens / toggles / page landings), production, 30d. COOKIELESS: session counts, never individuals.",
+      query: trends([series("app_action", "Actions")], {
+        breakdown: "action",
+        display: "ActionsTable",
+        breakdownLimit: 40,
+      }),
     },
     {
       name: "App actions over time",
@@ -671,7 +750,21 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Actions")], {
         breakdown: "action",
         display: "ActionsBar",
-        where: [inAction(["quick_save", "save_slot", "load_slot", "delete_save", "rename_slot", "file_save", "file_open", "export_save", "import_save", "export_tdt", "import_tdt"])],
+        where: [
+          inAction([
+            "quick_save",
+            "save_slot",
+            "load_slot",
+            "delete_save",
+            "rename_slot",
+            "file_save",
+            "file_open",
+            "export_save",
+            "import_save",
+            "export_tdt",
+            "import_tdt",
+          ]),
+        ],
       }),
     },
     {
@@ -681,20 +774,44 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Actions")], {
         breakdown: "action",
         display: "ActionsBar",
-        where: [inAction(["files_open", "files_waited", "file_open", "file_save", "file_ask", "file_add", "file_dropped", "file_rename", "file_copy", "file_delete", "file_failed", "files_copied", "recent_missing"])],
+        where: [
+          inAction([
+            "files_open",
+            "files_waited",
+            "file_open",
+            "file_save",
+            "file_ask",
+            "file_add",
+            "file_dropped",
+            "file_rename",
+            "file_copy",
+            "file_delete",
+            "file_failed",
+            "files_copied",
+            "recent_missing",
+          ]),
+        ],
       }),
     },
     {
       name: "Towers kept when another opened",
       description:
         "app_action tower_kept split by detail, production, from 4.9.0: the tower a player left by opening another (File > Open…, New…, a picked or dropped file, or a 1994 import) was kept in its own My Towers file (file), as a new file under its name (new), offered as a download because My Towers couldn't take it (offered, then download on the click), or lost (failed). Before 4.9.0 the swap's autosave wrote over it. See docs/analytics-data-map.md, My Towers.",
-      query: trends([series("app_action", "Towers kept")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["tower_kept"])] }),
+      query: trends([series("app_action", "Towers kept")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["tower_kept"])],
+      }),
     },
     {
       name: "Open window: where players asked for it",
       description:
         "app_action files_open split by detail, production, from 4.3: open for File > Open… in the menu, open_key for its Ctrl+O key, open_title for the title screen's Open Tower… button, recent for a tower picked from File > Open Recent (no window shows), and save_as for File > Save As…. See docs/analytics-data-map.md, My Towers.",
-      query: trends([series("app_action", "Windows opened")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["files_open"])] }),
+      query: trends([series("app_action", "Windows opened")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["files_open"])],
+      }),
     },
     {
       name: "Linked folder (Open, Save As)",
@@ -703,39 +820,70 @@ function buildInsights(ids) {
       query: trends([series("app_action", "Actions")], {
         breakdown: "action",
         display: "ActionsBar",
-        where: [inAction(["folder_link", "folder_allow", "folder_unlink", "folder_open", "folder_save", "folder_copy", "folder_failed", "folder_mirror"])],
+        where: [
+          inAction([
+            "folder_link",
+            "folder_allow",
+            "folder_unlink",
+            "folder_open",
+            "folder_save",
+            "folder_copy",
+            "folder_failed",
+            "folder_mirror",
+          ]),
+        ],
       }),
     },
     {
       name: "Bridge floors between rooms (Modern)",
       description:
         "Whether players turn Modern's bridging back on, production: found_bridged is the New Tower box at a Modern founding (unticked by default from 2026-11-15), auto_bridge the Settings switch, each split by its new state (on, off). See docs/analytics-data-map.md, Bridge floors between rooms.",
-      query: trends([series("app_action", "Choices")], { breakdown: ["action", "detail"], display: "ActionsTable", where: [inAction(["found_bridged", "auto_bridge"])] }),
+      query: trends([series("app_action", "Choices")], {
+        breakdown: ["action", "detail"],
+        display: "ActionsTable",
+        where: [inAction(["found_bridged", "auto_bridge"])],
+      }),
     },
     {
       name: "Sky bridges built (Modern)",
       description:
         "Sky bridges the Sky Bridge tool laid, production, one event per bridge: new for a fresh bridge, finish for the rest of a half bridge from a save made before the tool, restyle (from 4.14.0) for a finished bridge given a new look. Only builds from the release after 4.8 send it (the tool shipped then), so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Sky bridges (Modern).",
-      query: trends([series("app_action", "Bridges")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sky_bridge"])] }),
+      query: trends([series("app_action", "Bridges")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["sky_bridge"])],
+      }),
     },
     {
       name: "Sky bridge looks (Modern)",
       description:
         "The look each sky bridge went up in or was changed to, production, one event per bridge laid or restyled (app_action sky_bridge_look, detail = the look's name from the catalog's rules.skyBridge.looks). Restyles alone are sky_bridge detail restyle on the tile above. Only builds from 4.14.0 send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Sky bridges (Modern).",
       overview: true,
-      query: trends([series("app_action", "Bridge looks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sky_bridge_look"])] }),
+      query: trends([series("app_action", "Bridge looks")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["sky_bridge_look"])],
+      }),
     },
     {
       name: "Traffic readout taps",
       description:
         "Taps, clicks, Enter or Space on the HUD's Traffic readout while it names a floor (app_action traffic_jump), production: the view zoomed in on the worst waiting line it names. detail is the readout's level at the tap (busy, backed-up or gridlock); builds through 4.13.1 sent shafts or none instead. Only builds from the release after 4.12.0 send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, traffic_jump.",
-      query: trends([series("app_action", "Taps")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["traffic_jump"])] }),
+      query: trends([series("app_action", "Taps")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["traffic_jump"])],
+      }),
     },
     {
       name: "Drags stopped by a rule",
       description:
         "Releases of a drag that said why it stopped (app_action drag_stopped, #1847 and #2046), split by detail: extend (an elevator's arrow drag that stopped for any reason: a floor it can't serve, such as an unbuilt lobby or another shaft, too little money, the kind's longest span or the edge of the lot) or bulldoze (a bulldoze drag that left tiles), production. A refusal the press already said is not counted. Only builds from the release that ships it send it, so an earlier range reads Not measurable, not zero. See docs/analytics-data-map.md, Drags that stop.",
-      query: trends([series("app_action", "Stopped drags")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["drag_stopped"])] }),
+      query: trends([series("app_action", "Stopped drags")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["drag_stopped"])],
+      }),
     },
     {
       name: "Persistence failures (counts, not rates)",
@@ -751,70 +899,123 @@ function buildInsights(ids) {
       name: "Import and export failures by reason",
       description:
         "import_failed and export_failed events split by reason, the closed code the engine gives a refused tower file (#2075): too_large, not_tower, damaged, newer_version, not_save, unreadable (a .TDT the reader could not walk), modern (a Modern tower cannot become a .TDT) or refused (any other refusal), or error when the engine threw or another step failed. detail still names the format (save or tdt). Production. Only builds from the release that ships it send reason, so earlier failures read as none. See docs/analytics-data-map.md.",
-      query: trends([series("app_action", "Failures")], { breakdown: "reason", display: "ActionsBar", where: [inAction(["import_failed", "export_failed"])] }),
+      query: trends([series("app_action", "Failures")], {
+        breakdown: "reason",
+        display: "ActionsBar",
+        where: [inAction(["import_failed", "export_failed"])],
+      }),
     },
     {
       name: "Persistence actions by platform (cohort)",
-      description: "The persistence surface split by platform, so 'who exports' reads as a cohort (web / twa / ios), production. Never a person.",
+      description:
+        "The persistence surface split by platform, so 'who exports' reads as a cohort (web / twa / ios), production. Never a person.",
       query: trends([series("app_action", "Actions")], {
         breakdown: "platform",
         display: "ActionsTable",
-        where: [inAction(["quick_save", "save_slot", "file_save", "export_save", "import_save", "export_tdt", "import_tdt"])],
+        where: [
+          inAction(["quick_save", "save_slot", "file_save", "export_save", "import_save", "export_tdt", "import_tdt"]),
+        ],
       }),
     },
     {
       name: "Standalone page landings (help, gallery & release notes)",
-      description: "Landings on the manual (help.verticopolis.com), its release notes (help.verticopolis.com/changelog/) and /gallery (app_action page_help / page_changelog / page_gallery), production. These pages report nowhere else in PostHog.",
-      query: trends([series("app_action", "Landings")], { breakdown: "action", display: "ActionsBar", where: [inAction(["page_help", "page_gallery", "page_changelog"])] }),
+      description:
+        "Landings on the manual (help.verticopolis.com), its release notes (help.verticopolis.com/changelog/) and /gallery (app_action page_help / page_changelog / page_gallery), production. These pages report nowhere else in PostHog.",
+      query: trends([series("app_action", "Landings")], {
+        breakdown: "action",
+        display: "ActionsBar",
+        where: [inAction(["page_help", "page_gallery", "page_changelog"])],
+      }),
     },
     {
       name: "Help pages viewed",
-      description: "Every help site page view (app_action help_page_view), split by page (detail: the page's path on help.verticopolis.com, home for the front page), production. Landings alone (one per visit) are in the \"Standalone page landings\" tile.",
-      query: trends([series("app_action", "Page views")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_page_view"])] }),
+      description:
+        'Every help site page view (app_action help_page_view), split by page (detail: the page\'s path on help.verticopolis.com, home for the front page), production. Landings alone (one per visit) are in the "Standalone page landings" tile.',
+      query: trends([series("app_action", "Page views")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["help_page_view"])],
+      }),
     },
     {
       name: "Help landings by source",
       description:
         "Manual and release notes landings (app_action page_help / page_changelog) by page and by where the visit started (detail, #2037): a place in the game (game_menu, title, mode_badge, compare, welcome, update_prompt, about, inspector or stats for a problem line's Help link, help_key for F1 with no card up), game (an older build) or direct (not opened by the game), production. One per visit; older builds send no detail.",
-      query: trends([series("app_action", "Landings")], { breakdown: ["action", "detail"], display: "ActionsTable", where: [inAction(["page_help", "page_changelog"])] }),
+      query: trends([series("app_action", "Landings")], {
+        breakdown: ["action", "detail"],
+        display: "ActionsTable",
+        where: [inAction(["page_help", "page_changelog"])],
+      }),
     },
     {
       name: "In-game Help opens",
-      description: "The game opening the manual in a new tab (app_action help_open), split by where (detail: game_menu for Help > Player's Manual, title for the title screen's How to Play, help_key for F1 with no card up), production. Builds before #2037 send no detail. The visit the tab then makes is the \"Help landings by source\" tile.",
-      query: trends([series("app_action", "Help opens")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_open"])] }),
+      description:
+        "The game opening the manual in a new tab (app_action help_open), split by where (detail: game_menu for Help > Player's Manual, title for the title screen's How to Play, help_key for F1 with no card up), production. Builds before #2037 send no detail. The visit the tab then makes is the \"Help landings by source\" tile.",
+      query: trends([series("app_action", "Help opens")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["help_open"])],
+      }),
     },
     {
       name: "Help links from problem lines",
       description:
         "Presses on a problem line's Help link in the game (app_action help_topic_open, #2036), split by detail: the surface (inspector for the room card, stats for Tower Statistics) then the topic (parking, recycling, noise, elevatorWaits and the rest in src/ui/helpTopics.ts), production. F1 on the room card counts as the inspector link it opens; F1 with no card up is help_open help_key.",
-      query: trends([series("app_action", "Help link presses")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_topic_open"])] }),
+      query: trends([series("app_action", "Help link presses")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["help_topic_open"])],
+      }),
     },
     {
       name: "Help menu picks",
-      description: "Picks on the help site's menu bar (app_action help_menu_pick), split by item (detail: game, print, find, copy_link, theme_light, theme_dark, theme_auto, whats_new, report or sponsor), production.",
-      query: trends([series("app_action", "Help menu picks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_menu_pick"])] }),
+      description:
+        "Picks on the help site's menu bar (app_action help_menu_pick), split by item (detail: game, print, find, copy_link, theme_light, theme_dark, theme_auto, whats_new, report or sponsor), production.",
+      query: trends([series("app_action", "Help menu picks")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["help_menu_pick"])],
+      }),
     },
     {
       name: "Help bar presses",
       description:
         "Presses on the Help bar of a page the game opened (app_action help_bar_pick, #2035), split by detail: run (Keep my tower running), pause (Pause it) or back (Back to game), production.",
-      query: trends([series("app_action", "Help bar presses")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_bar_pick"])] }),
+      query: trends([series("app_action", "Help bar presses")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["help_bar_pick"])],
+      }),
     },
     {
       name: "Help site: Play and Back to game",
       description:
         "Presses on the help site's links to the game (app_action help_game_link), split by detail: bar_ or front_ (the title bar's button or the front page's Play) then play (loads the game) or back (Back to game in a tab the game opened, which closes it), production. The File menu's Play/Back to Game item is help_menu_pick game instead.",
-      query: trends([series("app_action", "Game link presses")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["help_game_link"])] }),
+      query: trends([series("app_action", "Game link presses")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["help_game_link"])],
+      }),
     },
     {
       name: "Page not found",
-      description: "The 404 page (app_action not_found_view, detail game or help for whose missing page it was) and where people went from it (not_found_pick, detail game, manual, changelog, rooms, close or taskbar), production. The missing address is never sent.",
-      query: trends([series("app_action", "Actions")], { breakdown: ["action", "detail"], display: "ActionsTable", where: [inAction(["not_found_view", "not_found_pick"])] }),
+      description:
+        "The 404 page (app_action not_found_view, detail game or help for whose missing page it was) and where people went from it (not_found_pick, detail game, manual, changelog, rooms, close or taskbar), production. The missing address is never sent.",
+      query: trends([series("app_action", "Actions")], {
+        breakdown: ["action", "detail"],
+        display: "ActionsTable",
+        where: [inAction(["not_found_view", "not_found_pick"])],
+      }),
     },
     {
       name: "Sponsor link taps",
-      description: "Taps on a link to the GitHub Sponsors page (app_action sponsor_click), split by where (detail: splash for the title screen, menu for the menu bar's Help menu, help for the help site), production. The tap only: whether anyone sponsored is not known. The Android app shows no Sponsor link.",
-      query: trends([series("app_action", "Sponsor taps")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["sponsor_click"])] }),
+      description:
+        "Taps on a link to the GitHub Sponsors page (app_action sponsor_click), split by where (detail: splash for the title screen, menu for the menu bar's Help menu, help for the help site), production. The tap only: whether anyone sponsored is not known. The Android app shows no Sponsor link.",
+      query: trends([series("app_action", "Sponsor taps")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["sponsor_click"])],
+      }),
     },
     // The version 4 menu bar (owner, 2026-11-14): menu_open, menu_pick and
     // menu_dismiss (src/analyticsMenus.ts, docs/analytics-data-map.md "The
@@ -833,14 +1034,24 @@ function buildInsights(ids) {
           ],
           dateRange: LAST_30D,
           properties: PROD_ONLY,
-          funnelsFilter: { funnelOrderType: "ordered", funnelVizType: "steps", funnelWindowInterval: 1, funnelWindowIntervalUnit: "minute" },
+          funnelsFilter: {
+            funnelOrderType: "ordered",
+            funnelVizType: "steps",
+            funnelWindowInterval: 1,
+            funnelWindowIntervalUnit: "minute",
+          },
         },
       },
     },
     {
       name: "Menu bar: picks by item",
-      description: "menu_pick split by item and grayed (true: the item was grayed out, so nothing happened), production. The command's own event (settings_open and the like) still counts its total from every surface.",
-      query: trends([series("menu_pick", "Picks")], { breakdown: ["item", "grayed"], display: "ActionsTable", breakdownLimit: 60 }),
+      description:
+        "menu_pick split by item and grayed (true: the item was grayed out, so nothing happened), production. The command's own event (settings_open and the like) still counts its total from every surface.",
+      query: trends([series("menu_pick", "Picks")], {
+        breakdown: ["item", "grayed"],
+        display: "ActionsTable",
+        breakdownLimit: 60,
+      }),
     },
     {
       name: "Menu bar: Full Screen by display mode",
@@ -855,32 +1066,58 @@ function buildInsights(ids) {
     },
     {
       name: "Menu bar: what follows what",
-      description: "menu_pick split by the page life's previous real pick (after) and this pick (item), production: the click path through the menus as a table. 'none' is the first pick of a page life.",
-      query: trends([series("menu_pick", "Picks")], { breakdown: ["after", "item"], display: "ActionsTable", breakdownLimit: 100 }),
+      description:
+        "menu_pick split by the page life's previous real pick (after) and this pick (item), production: the click path through the menus as a table. 'none' is the first pick of a page life.",
+      query: trends([series("menu_pick", "Picks")], {
+        breakdown: ["after", "item"],
+        display: "ActionsTable",
+        breakdownLimit: 100,
+      }),
     },
     {
       name: "Menu bar: how menus open and close",
-      description: "menu_open by menu and how it opened (click, keys, alt), and menu_dismiss by menu and how a trip ended with no pick (outside, escape, tab, title, blur), production.",
-      query: trends([series("menu_open", "Opens"), series("menu_dismiss", "Dismissals")], { breakdown: ["menu", "via"], display: "ActionsTable", breakdownLimit: 40 }),
+      description:
+        "menu_open by menu and how it opened (click, keys, alt), and menu_dismiss by menu and how a trip ended with no pick (outside, escape, tab, title, blur), production.",
+      query: trends([series("menu_open", "Opens"), series("menu_dismiss", "Dismissals")], {
+        breakdown: ["menu", "via"],
+        display: "ActionsTable",
+        breakdownLimit: 40,
+      }),
     },
     {
       name: "Menu bar: dismissals by how",
-      description: "menu_dismiss split by menu and how (outside, escape, tab, title, blur), with browsed as the menus each trip looked through, production.",
-      query: trends([series("menu_dismiss", "Dismissals")], { breakdown: ["menu", "how"], display: "ActionsTable", breakdownLimit: 40 }),
+      description:
+        "menu_dismiss split by menu and how (outside, escape, tab, title, blur), with browsed as the menus each trip looked through, production.",
+      query: trends([series("menu_dismiss", "Dismissals")], {
+        breakdown: ["menu", "how"],
+        display: "ActionsTable",
+        breakdownLimit: 40,
+      }),
     },
     {
       name: "Version 4 windows and welcome",
-      description: "app_action for the windows and cards that came with the menu bar: window_close (detail tower, bulletin or map) and window_move (tower, bulletin, map, dialog or card), bulletin_read_back (the player scrolled back through the Bulletin, once per page life, from the release after 4.8.0; from the release after 4.11.1 the Bulletin carries no meal rush lines, #2090), welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
+      description:
+        "app_action for the windows and cards that came with the menu bar: window_close (detail tower, bulletin or map) and window_move (tower, bulletin, map, dialog or card), bulletin_read_back (the player scrolled back through the Bulletin, once per page life, from the release after 4.8.0; from the release after 4.11.1 the Bulletin carries no meal rush lines, #2090), welcome_shown, welcome_close (detail ok, x, escape, backdrop, displaced) and welcome_link (first_tower, modes, whats_new), production.",
       query: trends([series("app_action", "Actions")], {
         breakdown: ["action", "detail"],
         display: "ActionsTable",
         breakdownLimit: 40,
-        where: [inAction(["window_close", "window_move", "bulletin_read_back", "welcome_shown", "welcome_close", "welcome_link"])],
+        where: [
+          inAction([
+            "window_close",
+            "window_move",
+            "bulletin_read_back",
+            "welcome_shown",
+            "welcome_close",
+            "welcome_link",
+          ]),
+        ],
       }),
     },
     {
       name: "Windows: moved, resized, minimized, maximized and closed",
-      description: "Every window change in one table, production: desk_window (<window>_<verb>: min, restore, max, unmax, resize, first move, close) on the 1994 desk, plus window_close (a window's own ✕: tower, bulletin, map) and window_move (first drag: tower, bulletin and map off the desk; dialog and card anywhere). See docs/analytics-data-map.md.",
+      description:
+        "Every window change in one table, production: desk_window (<window>_<verb>: min, restore, max, unmax, resize, first move, close) on the 1994 desk, plus window_close (a window's own ✕: tower, bulletin, map) and window_move (first drag: tower, bulletin and map off the desk; dialog and card anywhere). See docs/analytics-data-map.md.",
       query: trends([series("app_action", "Window changes")], {
         breakdown: ["action", "detail"],
         display: "ActionsTable",
@@ -897,7 +1134,20 @@ function buildInsights(ids) {
         breakdown: ["action", "detail"],
         display: "ActionsTable",
         breakdownLimit: 100,
-        where: [inAction(["desk_shown", "desk_title_shown", "desk_window", "desk_task", "desk_start_open", "desk_start", "desk_tray", "desk_win_menu_open", "desk_win_menu", "desk_control"])],
+        where: [
+          inAction([
+            "desk_shown",
+            "desk_title_shown",
+            "desk_window",
+            "desk_task",
+            "desk_start_open",
+            "desk_start",
+            "desk_tray",
+            "desk_win_menu_open",
+            "desk_win_menu",
+            "desk_control",
+          ]),
+        ],
       }),
     },
     {
@@ -909,12 +1159,22 @@ function buildInsights(ids) {
         source: {
           kind: "FunnelsQuery",
           series: [
-            { kind: "EventsNode", event: "app_action", name: "Opened the Verticopolis menu", properties: [inAction(["desk_start_open"])] },
+            {
+              kind: "EventsNode",
+              event: "app_action",
+              name: "Opened the Verticopolis menu",
+              properties: [inAction(["desk_start_open"])],
+            },
             { kind: "EventsNode", event: "app_action", name: "Picked an item", properties: [inAction(["desk_start"])] },
           ],
           dateRange: LAST_30D,
           properties: PROD_ONLY,
-          funnelsFilter: { funnelOrderType: "ordered", funnelVizType: "steps", funnelWindowInterval: 1, funnelWindowIntervalUnit: "minute" },
+          funnelsFilter: {
+            funnelOrderType: "ordered",
+            funnelVizType: "steps",
+            funnelWindowInterval: 1,
+            funnelWindowIntervalUnit: "minute",
+          },
         },
       },
     },
@@ -922,12 +1182,21 @@ function buildInsights(ids) {
       name: "Title screen: buttons pressed",
       description:
         "Presses on the title screen's buttons (app_action title_pick), split by detail: continue (its button, Esc or a click on the title screen's empty background), open, new, help, mute, install or sponsor, production. Each button's own event still follows (files_open open_title, help_open and the rest). A menu item that presses a title button from a script counts as the menu's pick only.",
-      query: trends([series("app_action", "Title picks")], { breakdown: "detail", display: "ActionsBar", where: [inAction(["title_pick"])] }),
+      query: trends([series("app_action", "Title picks")], {
+        breakdown: "detail",
+        display: "ActionsBar",
+        where: [inAction(["title_pick"])],
+      }),
     },
     {
       name: "Mute toggles by state",
-      description: "app_action mute split by the new state (on / off), so the share of sessions that play muted is visible, production.",
-      query: trends([series("app_action", "Mute toggles")], { breakdown: "detail", display: "ActionsPie", where: [inAction(["mute"])] }),
+      description:
+        "app_action mute split by the new state (on / off), so the share of sessions that play muted is visible, production.",
+      query: trends([series("app_action", "Mute toggles")], {
+        breakdown: "detail",
+        display: "ActionsPie",
+        where: [inAction(["mute"])],
+      }),
     },
     // Gameplay economy + emergencies (#611: economy_action, emergency_choice,
     // session_emergencies). COOKIELESS: every tile is per-session and cohort,
@@ -935,18 +1204,33 @@ function buildInsights(ids) {
     // "which player bulldozed" is NOT. No currency amounts are ever collected.
     {
       name: "Economy actions by type",
-      description: "economy_action broken down by action: demolish (per action; from 2.31.2 at most 40 per page in each one-minute window, so a heavy bulldozer clear is undercounted) vs the latched price_tune / capacity_tune bits, production, 30d. COOKIELESS session counts.",
-      query: trends([series("economy_action", "Economy actions")], { breakdown: "action", display: "ActionsTable", breakdownLimit: 10 }),
+      description:
+        "economy_action broken down by action: demolish (per action; from 2.31.2 at most 40 per page in each one-minute window, so a heavy bulldozer clear is undercounted) vs the latched price_tune / capacity_tune bits, production, 30d. COOKIELESS session counts.",
+      query: trends([series("economy_action", "Economy actions")], {
+        breakdown: "action",
+        display: "ActionsTable",
+        breakdownLimit: 10,
+      }),
     },
     {
       name: "Demolitions: sell vs bulldoze",
-      description: "economy_action demolish split by method (sell / bulldoze), production. Does removal happen via the editor Sell or the bulldozer. From 2.31.2 capped at 40 per page in each one-minute window, which trims bulldoze more than sell.",
-      query: trends([series("economy_action", "Demolitions")], { breakdown: "detail", display: "ActionsPie", where: [inAction(["demolish"])] }),
+      description:
+        "economy_action demolish split by method (sell / bulldoze), production. Does removal happen via the editor Sell or the bulldozer. From 2.31.2 capped at 40 per page in each one-minute window, which trims bulldoze more than sell.",
+      query: trends([series("economy_action", "Demolitions")], {
+        breakdown: "detail",
+        display: "ActionsPie",
+        where: [inAction(["demolish"])],
+      }),
     },
     {
       name: "Emergency choices (kind x decision)",
-      description: "emergency_choice as a 2x2 of kind (fireRescue / bombThreat) by decision (accept / decline), production. Do players pay for fire rescue but decline bomb threats. Only real clicks count; a timed-out auto-decline reports nothing.",
-      query: trends([series("emergency_choice", "Choices")], { breakdown: ["kind", "decision"], display: "ActionsTable", breakdownLimit: 10 }),
+      description:
+        "emergency_choice as a 2x2 of kind (fireRescue / bombThreat) by decision (accept / decline), production. Do players pay for fire rescue but decline bomb threats. Only real clicks count; a timed-out auto-decline reports nothing.",
+      query: trends([series("emergency_choice", "Choices")], {
+        breakdown: ["kind", "decision"],
+        display: "ActionsTable",
+        breakdownLimit: 10,
+      }),
     },
     {
       name: "Per-session emergency severity (avg)",
@@ -991,7 +1275,8 @@ function buildInsights(ids) {
     },
     {
       name: "How fires end",
-      description: "fire_outcome split by outcome (security / rescue / burnedOut), production, from the release that ships #1889. One event per fire the engine reports out: security when a guard reached it, rescue when the paid helicopter landed, burnedOut when neither came. Rate-limited per page like the other gameplay events, so a lower bound.",
+      description:
+        "fire_outcome split by outcome (security / rescue / burnedOut), production, from the release that ships #1889. One event per fire the engine reports out: security when a guard reached it, rescue when the paid helicopter landed, burnedOut when neither came. Rate-limited per page like the other gameplay events, so a lower bound.",
       query: trends([series("fire_outcome", "Fires out")], { breakdown: "outcome", display: "ActionsPie" }),
     },
     {
@@ -1077,7 +1362,9 @@ async function findInsight(name) {
   // answers that by CREATING one, which forks the tile. So when the exact name is
   // not on this page and the API says there are more, refuse rather than guess.
   if (!hit && page.next) {
-    throw new Error(`findInsight("${name}") did not find it in the first 100 search hits and more remain; refusing to risk a duplicate`);
+    throw new Error(
+      `findInsight("${name}") did not find it in the first 100 search hits and more remain; refusing to risk a duplicate`,
+    );
   }
   return hit;
 }
@@ -1213,9 +1500,13 @@ async function main() {
       process.exit(1);
     }
     const candidates = buildInsights({ newGame: 0 }).filter((s) => s.overview);
-    console.log(`[dry-run, no key] Candidate tiles for "${DASHBOARD_NAME}" (a run adds only the ones it does not already hold):`);
-    for (const s of candidates) console.log(`  - ${s.name}${s.shortId ? ` (added already as ${s.shortId}; never added again)` : ""}`);
-    if (UPDATE_VIEW) console.log(`  --update-view: checking the saved view "${SESSION_LENGTHS_VIEW.name}" needs the key`);
+    console.log(
+      `[dry-run, no key] Candidate tiles for "${DASHBOARD_NAME}" (a run adds only the ones it does not already hold):`,
+    );
+    for (const s of candidates)
+      console.log(`  - ${s.name}${s.shortId ? ` (added already as ${s.shortId}; never added again)` : ""}`);
+    if (UPDATE_VIEW)
+      console.log(`  --update-view: checking the saved view "${SESSION_LENGTHS_VIEW.name}" needs the key`);
     return;
   }
   const tag = DRY_RUN ? "[dry-run] " : "";
@@ -1223,7 +1514,9 @@ async function main() {
 
   const listed = (await listAll(`/dashboards/`)).find((d) => d.name === DASHBOARD_NAME && !d.deleted) || null;
   if (!listed) {
-    throw new Error(`No dashboard named "${DASHBOARD_NAME}". This script only adds to an existing dashboard; if it was renamed, update DASHBOARD_NAME.`);
+    throw new Error(
+      `No dashboard named "${DASHBOARD_NAME}". This script only adds to an existing dashboard; if it was renamed, update DASHBOARD_NAME.`,
+    );
   }
   const dashboard = await req("GET", `/dashboards/${listed.id}/`);
   const tiles = Array.isArray(dashboard?.tiles) ? dashboard.tiles : [];
@@ -1239,8 +1532,12 @@ async function main() {
   const plan = planAdditions(candidates, tiles, existingElsewhere);
   for (const name of plan.added) console.log(`  added by an earlier run (short id recorded), left as is: ${name}`);
   for (const name of plan.onDashboard) console.log(`  already on the dashboard, left as is: ${name}`);
-  for (const name of plan.elsewhere) console.log(`  SKIPPED, an insight with this name exists elsewhere in the project: ${name}`);
-  for (const { spec, layout } of plan.add) console.log(`  ${DRY_RUN ? "would add" : "adding"}: ${spec.name} (full width, rows ${layout.y} to ${layout.y + layout.h})`);
+  for (const name of plan.elsewhere)
+    console.log(`  SKIPPED, an insight with this name exists elsewhere in the project: ${name}`);
+  for (const { spec, layout } of plan.add)
+    console.log(
+      `  ${DRY_RUN ? "would add" : "adding"}: ${spec.name} (full width, rows ${layout.y} to ${layout.y + layout.h})`,
+    );
   const steps = runSteps(plan, UPDATE_VIEW);
   if (!steps.tiles) console.log("  nothing to add");
   if (!steps.view) return;
@@ -1258,7 +1555,8 @@ async function main() {
   for (const entry of plan.add) entry.spec = withAction.get(entry.spec.name) ?? entry.spec;
 
   const missingAction = plan.add.find(({ spec }) => usesAction(spec) && action.id == null);
-  if (missingAction) throw new Error(`"${missingAction.spec.name}" needs the action, which has no id; nothing was added`);
+  if (missingAction)
+    throw new Error(`"${missingAction.spec.name}" needs the action, which has no id; nothing was added`);
 
   // Create every insight on the dashboard, then place the new tiles in one write.
   const created = [];
@@ -1280,7 +1578,9 @@ async function main() {
   }
   if (placed.length) await req("PATCH", `/dashboards/${dashboard.id}/`, { tiles: placed });
   console.log(`Added ${created.length} tile(s). Dashboard: ${HOST}/project/${PROJECT_ID}/dashboard/${dashboard.id}`);
-  console.log("Record each short id on its spec as `shortId`, so a later run never adds the tile again after a rename:");
+  console.log(
+    "Record each short id on its spec as `shortId`, so a later run never adds the tile again after a rename:",
+  );
   for (const c of created) console.log(`  ${c.name}: shortId "${c.shortId}"`);
 }
 

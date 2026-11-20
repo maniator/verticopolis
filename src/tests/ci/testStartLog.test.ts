@@ -21,7 +21,10 @@ describe("the log in a real run", () => {
     const dir = mkdtempSync(resolve(tmpdir(), "start-log-"));
     try {
       const setup = resolve(repoRoot, "src/tests/ci/testStartLogSetup.ts");
-      writeFileSync(resolve(dir, "vitest.config.mjs"), `export default { test: { include: ['*.test.mjs'], setupFiles: [${JSON.stringify(setup)}] } };\n`);
+      writeFileSync(
+        resolve(dir, "vitest.config.mjs"),
+        `export default { test: { include: ['*.test.mjs'], setupFiles: [${JSON.stringify(setup)}] } };\n`,
+      );
       writeFileSync(
         resolve(dir, "spin.test.mjs"),
         `import { describe, it } from "vitest";
@@ -32,11 +35,22 @@ describe("group", () => {
 `,
       );
       // The run is killed as soon as the spinning test's line appears (its own group dies with it), which is the stall the log exists for; the spin only bounds a failure.
-      const child = spawn(process.execPath, [resolve(repoRoot, "node_modules/vitest/vitest.mjs"), "run", "--root", dir, "--config", resolve(dir, "vitest.config.mjs")], {
-        env: { ...process.env, VC_LOG_TEST_STARTS: "1" },
-        detached: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      const child = spawn(
+        process.execPath,
+        [
+          resolve(repoRoot, "node_modules/vitest/vitest.mjs"),
+          "run",
+          "--root",
+          dir,
+          "--config",
+          resolve(dir, "vitest.config.mjs"),
+        ],
+        {
+          env: { ...process.env, VC_LOG_TEST_STARTS: "1" },
+          detached: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
       let out = "";
       const seen = new Promise<void>((done) => {
         const take = (chunk: Buffer) => {

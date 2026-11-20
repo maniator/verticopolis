@@ -34,12 +34,14 @@ describe("categorize", () => {
 
 describe("precacheUrls", () => {
   it("reads both Workbox entry orders and de-duplicates", () => {
-    const sw = 's.precacheAndRoute([{url:"index.html",revision:"abc"},{url:"assets/a.js",revision:null},{revision:"x",url:"/b.png"},{url:"index.html",revision:"abc"}])';
+    const sw =
+      's.precacheAndRoute([{url:"index.html",revision:"abc"},{url:"assets/a.js",revision:null},{revision:"x",url:"/b.png"},{url:"index.html",revision:"abc"}])';
     expect(precacheUrls(sw)).toEqual(["assets/a.js", "b.png", "index.html"]);
   });
 
   it("reads entries that carry an integrity, in any key order", () => {
-    const sw = 's.precacheAndRoute([{url:"engine/a.js",revision:"1",integrity:"sha256-x"},{integrity:"sha256-y",revision:"2",url:"engine/b.wasm"},{revision:null,integrity:"sha256-z",url:"engine/BUILD.json"}])';
+    const sw =
+      's.precacheAndRoute([{url:"engine/a.js",revision:"1",integrity:"sha256-x"},{integrity:"sha256-y",revision:"2",url:"engine/b.wasm"},{revision:null,integrity:"sha256-z",url:"engine/BUILD.json"}])';
     expect(precacheUrls(sw)).toEqual(["engine/BUILD.json", "engine/a.js", "engine/b.wasm"]);
   });
 });
@@ -63,11 +65,17 @@ describe("wasmSections", () => {
     expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 1, 9, 0]))).toThrow(/past the end/);
     expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 1, 0x80]))).toThrow(/truncated/);
     // A custom section whose name claims more bytes than the section holds.
-    expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 0, 2, 9, 0x6e, 1, 0]))).toThrow(/name runs past/);
-    expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 1, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 1]))).toThrow(/too long/);
+    expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 0, 2, 9, 0x6e, 1, 0]))).toThrow(
+      /name runs past/,
+    );
+    expect(() =>
+      wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 1, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 1])),
+    ).toThrow(/too long/);
   });
   it("names an unknown section id", () => {
-    expect(wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 99, 0]))).toEqual([{ name: "unknown-99", bytes: 2 }]);
+    expect(wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 99, 0]))).toEqual([
+      { name: "unknown-99", bytes: 2 },
+    ]);
   });
 });
 
@@ -83,9 +91,19 @@ describe("analyzeBundle", () => {
     writeFileSync(join(dir, "assets/main-A.js.map"), "{}");
     writeFileSync(join(dir, "engine/verticopolis_engine_bg.wasm"), module());
     writeFileSync(join(dir, "engine/verticopolis_engine.js"), "export {};");
-    writeFileSync(join(dir, "sw.js"), 'p([{url:"index.html",revision:"1"},{url:"assets/main-A.js",revision:null},{url:"gone.js",revision:null}])');
+    writeFileSync(
+      join(dir, "sw.js"),
+      'p([{url:"index.html",revision:"1"},{url:"assets/main-A.js",revision:null},{url:"gone.js",revision:null}])',
+    );
     const r = analyzeBundle(dir);
-    expect(r.files.map((f) => f.path)).toEqual(["assets/main-A.js", "assets/main-A.js.map", "engine/verticopolis_engine.js", "engine/verticopolis_engine_bg.wasm", "index.html", "sw.js"]);
+    expect(r.files.map((f) => f.path)).toEqual([
+      "assets/main-A.js",
+      "assets/main-A.js.map",
+      "engine/verticopolis_engine.js",
+      "engine/verticopolis_engine_bg.wasm",
+      "index.html",
+      "sw.js",
+    ]);
     expect(r.precache.entries).toBe(3);
     expect(r.precache.missing).toEqual(["gone.js"]);
     expect(r.precache.raw).toBe(750 + 150);

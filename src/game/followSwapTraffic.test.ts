@@ -6,7 +6,10 @@ import { currentFileId, setCurrentFile } from "./currentFile";
 // Loading main.ts boots the game at module scope; this test only needs the
 // class, so the boot is stubbed out.
 vi.mock("../bootstrap", () => ({ bootGame: vi.fn() }));
-vi.mock("../analyticsTower", async (original) => ({ ...(await original<typeof import("../analyticsTower")>()), nextAnalyticsTower: vi.fn() }));
+vi.mock("../analyticsTower", async (original) => ({
+  ...(await original<typeof import("../analyticsTower")>()),
+  nextAnalyticsTower: vi.fn(),
+}));
 import { nextAnalyticsTower } from "../analyticsTower";
 import type { TrafficTier } from "@verticopolis/components/presentation/traffic";
 
@@ -53,8 +56,18 @@ function standIn(tier: TrafficTier, stepRaises = true, won = false) {
     renderSim: undefined as unknown,
     // followSwap builds the renderer's view over these two: the layout's heat
     // tables and the reader's tower, crowd and header are all it reads up front.
-    enginePort: { viewLayout: () => JSON.stringify({ heatModes: [], heatTints: [] }), evaluatedTower: vi.fn(() => won) },
-    reader: { update: vi.fn(() => void (tower.revision += stepRaises ? 1 : 0)), tower, rooms: [{}], structure: [], crowd: { people: [] }, header: { star: 1 } },
+    enginePort: {
+      viewLayout: () => JSON.stringify({ heatModes: [], heatTints: [] }),
+      evaluatedTower: vi.fn(() => won),
+    },
+    reader: {
+      update: vi.fn(() => void (tower.revision += stepRaises ? 1 : 0)),
+      tower,
+      rooms: [{}],
+      structure: [],
+      crowd: { people: [] },
+      header: { star: 1 },
+    },
     keyboard: { followTower: vi.fn() },
     ui: { resetLog: vi.fn(), update: vi.fn(), showInspector: vi.fn() },
     scheduleReview: { towerArrived: vi.fn() },
@@ -172,8 +185,15 @@ describe("followSwap and the selection through a step (#1802)", () => {
     const app = standIn(0);
     GameApp.prototype.followSwap.call(app as unknown as GameApp, "step");
     expect(app.inspector.clear).not.toHaveBeenCalled();
-    const stands = vi.mocked(app.inspector.followStep).mock.calls[0][0] as (t: { type: "unit" | "transport"; id: number }) => boolean;
-    expect([stands({ type: "unit", id: 7 }), stands({ type: "transport", id: 7 }), stands({ type: "unit", id: 8 })]).toEqual([true, true, false]);
+    const stands = vi.mocked(app.inspector.followStep).mock.calls[0][0] as (t: {
+      type: "unit" | "transport";
+      id: number;
+    }) => boolean;
+    expect([
+      stands({ type: "unit", id: 7 }),
+      stands({ type: "transport", id: 7 }),
+      stands({ type: "unit", id: 8 }),
+    ]).toEqual([true, true, false]);
     expect(app.personCard.close, "a person's card may name a room the step took").toHaveBeenCalledOnce();
   });
 });
@@ -250,7 +270,10 @@ describe("followSwap and a drag under way", () => {
       GameApp.prototype.followSwap.call(app as unknown as GameApp, follow);
       expect([app.paintAnchor, app.buildAnchor, app.transportStart], follow).toEqual([null, null, null]);
       expect(app.build.clearPaint, follow).toHaveBeenCalledOnce();
-      expect([app.buildRefusalShowing, app.inspectAnchor], `${follow}: the refusal card's latch`).toEqual([false, null]);
+      expect([app.buildRefusalShowing, app.inspectAnchor], `${follow}: the refusal card's latch`).toEqual([
+        false,
+        null,
+      ]);
       expect(app.ui.showInspector, `${follow}: the refusal card`).toHaveBeenCalledWith(null);
     }
   });
@@ -269,7 +292,11 @@ describe("followSwap and a drag under way", () => {
       app.keyboard.followTower.mockImplementation((tower: string) => void order.push(`follow: ${tower}`));
       GameApp.prototype.followSwap.call(app as unknown as GameApp, follow);
       expect(order[order.length - 1], follow).toBe(`follow: ${follow === "step" ? "same tower" : "another tower"}`);
-      expect(order.slice(0, -1).sort(), `${follow}: everything before the follow`).toEqual(["inspector", "refusal card", "reset"]);
+      expect(order.slice(0, -1).sort(), `${follow}: everything before the follow`).toEqual([
+        "inspector",
+        "refusal card",
+        "reset",
+      ]);
     }
   });
 });

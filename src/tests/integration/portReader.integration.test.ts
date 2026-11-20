@@ -57,7 +57,9 @@ describe.skipIf(noEngine)("ViewReader on the engine", () => {
     const e = readerTower();
     const r = newViewReader(e);
     const rooms = roomsOf(e);
-    expect(r.rooms.map((u) => [u.id, u.kind, u.floor, u.x, u.width])).toEqual(rooms.map((u) => [u.id, u.kind, u.floor, u.x, u.width]));
+    expect(r.rooms.map((u) => [u.id, u.kind, u.floor, u.x, u.width])).toEqual(
+      rooms.map((u) => [u.id, u.kind, u.floor, u.x, u.width]),
+    );
     // A save leaves a default name out; the frame carries the name shown.
     expect(r.rooms.map((u) => u.label)).toEqual(["Office", "Fast Food", "Single Room"]);
     expect(r.structure.map((s) => [s.kind, s.floor, s.x, s.count])).toEqual([
@@ -65,7 +67,12 @@ describe.skipIf(noEngine)("ViewReader on the engine", () => {
       ["floor", 2, 160, 120],
       ["floor", 3, 160, 120],
     ]);
-    expect([r.header.money, r.header.star, r.header.mode, r.header.pendingChoice]).toEqual([look(e).money, 3, "modern", null]);
+    expect([r.header.money, r.header.star, r.header.mode, r.header.pendingChoice]).toEqual([
+      look(e).money,
+      3,
+      "modern",
+      null,
+    ]);
     expect(r.tower.transports.map((t) => [t.kind, t.bottom, t.top, t.cars])).toEqual([["elevatorStandard", 1, 3, 1]]);
     for (let i = 0; i < 6; i++) {
       e.tick(60);
@@ -76,7 +83,9 @@ describe.skipIf(noEngine)("ViewReader on the engine", () => {
     // A save leaves a venue's head count out (it is the customers inside,
     // never saved), so the fast food's is read from the people dwelling in it.
     const inside = (id: number) =>
-      (look(e).crowd.people as { state: string; mealVenueId?: number }[]).filter((p) => p.state === "dwelling" && p.mealVenueId === id).length;
+      (look(e).crowd.people as { state: string; mealVenueId?: number }[]).filter(
+        (p) => p.state === "dwelling" && p.mealVenueId === id,
+      ).length;
     const want = roomsOf(e).map((u) => [u.state, u.kind === "fastFood" ? inside(u.id) : u.occupants]);
     expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(want));
   });
@@ -90,13 +99,32 @@ describe.skipIf(noEngine)("ViewReader on the engine", () => {
     const tiles = Float64Array.from([...Array(10).keys()].flatMap((i) => [160 + i, 180 + i]));
     expect(codes.slot(e.paintTiles(codes.kind("floor"), 4, tiles), "paintTiles", "placed")).toBe(20);
     const r = newViewReader(e);
-    expect([r.structureBeside(4, 175, -1), r.structureBeside(4, 175, 1)]).toEqual([{ x: 169, kind: "floor" }, { x: 180, kind: "floor" }]);
-    expect([r.structureBeside(2, 169, 1), r.structureBeside(2, 171, -1)]).toEqual([{ x: 170, kind: "floor" }, { x: 170, kind: "floor" }]);
+    expect([r.structureBeside(4, 175, -1), r.structureBeside(4, 175, 1)]).toEqual([
+      { x: 169, kind: "floor" },
+      { x: 180, kind: "floor" },
+    ]);
+    expect([r.structureBeside(2, 169, 1), r.structureBeside(2, 171, -1)]).toEqual([
+      { x: 170, kind: "floor" },
+      { x: 170, kind: "floor" },
+    ]);
     expect([r.structureBeside(1, 0, -1), r.structureBeside(1, 374, 1)]).toEqual([undefined, undefined]);
-    expect([r.structureBeside(1, 100, 1), r.structureBeside(1, 100, -1)]).toEqual([{ x: 160, kind: "lobby" }, undefined]);
-    expect([r.structureBeside(1, 200, -1), r.structureBeside(1, 200, 1)]).toEqual([{ x: 199, kind: "lobby" }, { x: 201, kind: "lobby" }]);
-    expect([r.structureBeside(3, 300, -1), r.structureBeside(3, 300, 1)]).toEqual([{ x: 279, kind: "floor" }, undefined]);
-    expect([r.structureBeside(2, 160, -1), r.structureBeside(2, 279, 1), r.structureBeside(9, 200, 1)]).toEqual([undefined, undefined, undefined]);
+    expect([r.structureBeside(1, 100, 1), r.structureBeside(1, 100, -1)]).toEqual([
+      { x: 160, kind: "lobby" },
+      undefined,
+    ]);
+    expect([r.structureBeside(1, 200, -1), r.structureBeside(1, 200, 1)]).toEqual([
+      { x: 199, kind: "lobby" },
+      { x: 201, kind: "lobby" },
+    ]);
+    expect([r.structureBeside(3, 300, -1), r.structureBeside(3, 300, 1)]).toEqual([
+      { x: 279, kind: "floor" },
+      undefined,
+    ]);
+    expect([r.structureBeside(2, 160, -1), r.structureBeside(2, 279, 1), r.structureBeside(9, 200, 1)]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
   });
 
   it("answers the point lookups and the expanded units", () => {
@@ -109,7 +137,11 @@ describe.skipIf(noEngine)("ViewReader on the engine", () => {
     expect([tile.kind, tile.x, Number.isNaN(tile.id)]).toEqual(["floor", 250, true]);
     expect(r.tower.unitAt(2, 400)).toBeUndefined();
     expect(r.tower.unitAt(9, 200)).toBeUndefined();
-    expect([r.tower.hasStructure(1, 200), r.tower.structureKindAt(1, 200), r.tower.hasStructure(5, 200)]).toEqual([true, "lobby", false]);
+    expect([r.tower.hasStructure(1, 200), r.tower.structureKindAt(1, 200), r.tower.hasStructure(5, 200)]).toEqual([
+      true,
+      "lobby",
+      false,
+    ]);
     expect(r.tower.getTransport(r.tower.transports[0].id)).toBe(r.tower.transports[0]);
     expect(r.tower.units.length).toBe(look(e).tower.units.length);
     expect(r.tower.units).toBe(r.tower.units);
@@ -161,10 +193,11 @@ describe.skipIf(noEngine)("ViewReader on the engine", () => {
       e.tick(45);
       e.viewFrame(false);
       r.update();
-      expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(roomsOf(e).map((u) => [u.state, u.occupants])));
+      expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(
+        plain(roomsOf(e).map((u) => [u.state, u.occupants])),
+      );
     }
   });
-
 });
 
 describe.skipIf(noEngine)("Cards.unit on the engine", () => {
@@ -173,9 +206,27 @@ describe.skipIf(noEngine)("Cards.unit on the engine", () => {
     const { cards } = cardsOf(e);
     const office = unitOf(e, "office");
     const card = cards.unit(office.id as number)!;
-    expect([card.id, card.kind, card.floor, card.x, card.width, card.state]).toEqual([office.id, "office", 2, 170, office.width, office.state]);
-    expect([card.label, card.subtype, card.noRate, card.everOccupied, card.filmPolicy, card.blockbuster]).toEqual(["Office", null, false, false, null, null]);
-    expect([card.served, card.reachable, card.floorHasLobby]).toEqual([look(e).tower.isFloorServed(2), true, look(e).tower.floorHasLobby(2)]);
+    expect([card.id, card.kind, card.floor, card.x, card.width, card.state]).toEqual([
+      office.id,
+      "office",
+      2,
+      170,
+      office.width,
+      office.state,
+    ]);
+    expect([card.label, card.subtype, card.noRate, card.everOccupied, card.filmPolicy, card.blockbuster]).toEqual([
+      "Office",
+      null,
+      false,
+      false,
+      null,
+      null,
+    ]);
+    expect([card.served, card.reachable, card.floorHasLobby]).toEqual([
+      look(e).tower.isFloorServed(2),
+      true,
+      look(e).tower.floorHasLobby(2),
+    ]);
     expect(card.price).toBe(unitPrice(catalogOn(e, "modern"), { kind: "office" as FacilityKind }));
   });
 
@@ -222,14 +273,26 @@ describe.skipIf(noEngine)("Cards.shaft on the engine", () => {
     const weekday = Array.from({ length: 24 }, (_, h) => h / 24);
     const ring = (): [number, number][][] => Array.from({ length: 24 }, () => []);
     const origins = { weekday: ring(), weekend: ring() };
-    origins.weekday[8] = [[1, 5], [2, 3]];
+    origins.weekday[8] = [
+      [1, 5],
+      [2, 3],
+    ];
     origins.weekend[20] = [[3, 7]];
     const telemetry = e as unknown as { elevatorTelemetry(): string; seedElevatorTelemetry(json: string): void };
     const doc = JSON.parse(telemetry.elevatorTelemetry()) as Record<string, unknown>;
-    telemetry.seedElevatorTelemetry(JSON.stringify({ ...doc, hourly: [[lift.id, { weekday, weekend: weekday.map((v) => 1 - v) }]], origins: [[lift.id, origins]] }));
+    telemetry.seedElevatorTelemetry(
+      JSON.stringify({
+        ...doc,
+        hourly: [[lift.id, { weekday, weekend: weekday.map((v) => 1 - v) }]],
+        origins: [[lift.id, origins]],
+      }),
+    );
     const card = cards.shaft(lift.id)!;
     expect(card.hourly).toEqual({ weekday, weekend: weekday.map((v) => 1 - v) });
-    expect(card.origins!.weekday[8]).toEqual([[1, 5], [2, 3]]);
+    expect(card.origins!.weekday[8]).toEqual([
+      [1, 5],
+      [2, 3],
+    ]);
     expect(card.origins!.weekend[20]).toEqual([[3, 7]]);
     expect(card.origins!.weekday[0]).toEqual([]);
     expect(card.origins!.weekday).toHaveLength(24);

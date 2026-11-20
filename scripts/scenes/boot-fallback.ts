@@ -19,11 +19,7 @@ export const BOOT_FALLBACK_SCENES: Scene[] = [
     // exactly like a browser with acceleration off or a driver blocklist.
     initScript: () => {
       const orig = HTMLCanvasElement.prototype.getContext;
-      HTMLCanvasElement.prototype.getContext = function (
-        this: HTMLCanvasElement,
-        type: string,
-        ...rest: unknown[]
-      ) {
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
         // `includes`, not a prefix match: the legacy "experimental-webgl"
         // alias must stay stubbed too, so a future hasWebGL() hardening that
         // probes it cannot silently un-stage this failure scene.

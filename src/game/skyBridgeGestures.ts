@@ -1,6 +1,14 @@
 import type { GameApp } from "../main";
 import { updateBuildPreview } from "./buildPreview";
-import { BRIDGE_LOOK_STEP, quoteSkyBridge, quotedTiles, SKY_BRIDGE_STEP, tapLays, type ArmedSkyBridge, type SkyBridgeClick } from "./skyBridgeTool";
+import {
+  BRIDGE_LOOK_STEP,
+  quoteSkyBridge,
+  quotedTiles,
+  SKY_BRIDGE_STEP,
+  tapLays,
+  type ArmedSkyBridge,
+  type SkyBridgeClick,
+} from "./skyBridgeTool";
 import { finishedSkyBridgeAt } from "@verticopolis/components/port/skyBridgeView";
 import { groupDigits } from "@verticopolis/components/windows/format";
 
@@ -56,7 +64,10 @@ export function tapSkyBridge(app: GameApp, tile: number, floor: number): void {
   if (q.ok) {
     armed.set(app, { floor, from: q.from, to: q.to });
     const tiles = quotedTiles(q);
-    app.ui.toast(`Sky bridge: ${tiles} ${tiles === 1 ? "tile" : "tiles"}, $${groupDigits(q.cost)}. Tap it again to build.`, "info");
+    app.ui.toast(
+      `Sky bridge: ${tiles} ${tiles === 1 ? "tile" : "tiles"}, $${groupDigits(q.cost)}. Tap it again to build.`,
+      "info",
+    );
   } else {
     armed.delete(app);
     if (q.reason) app.ui.toast(q.reason, "bad");

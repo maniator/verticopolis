@@ -148,7 +148,12 @@ function rendered(line: string): string {
 /** The HTML a bullet holding exactly `text` renders to: one list item with the
  *  text escaped for HTML and no other markup. */
 function literalBullet(text: string): string {
-  const html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
   return `<ul>\n<li>${html}</li>\n</ul>\n`;
 }
 
@@ -175,13 +180,26 @@ describe("releaseNoteLines", () => {
   });
 
   it("escapes a note that starts like a list, a rule, a heading or a quote", () => {
-    for (const text of ["- dash", "+ plus", "1. one", "12) twelve", "---", "***", "___", "# hash", "> quote", "1.5x faster"]) {
+    for (const text of [
+      "- dash",
+      "+ plus",
+      "1. one",
+      "12) twelve",
+      "---",
+      "***",
+      "___",
+      "# hash",
+      "> quote",
+      "1.5x faster",
+    ]) {
       expect(rendered(`- ${escapeMarkdown(text)}`), text).toBe(literalBullet(text));
     }
   });
 
   it("collapses a note's whitespace to one line", () => {
-    expect(releaseNoteLines("## 3.0.0\n\n- First line  \n  second line\n", "3.0.0")).toEqual(["- First line second line"]);
+    expect(releaseNoteLines("## 3.0.0\n\n- First line  \n  second line\n", "3.0.0")).toEqual([
+      "- First line second line",
+    ]);
   });
 
   it("is empty for a version with no player notes", () => {
@@ -191,12 +209,18 @@ describe("releaseNoteLines", () => {
   it("splits the plain text GitHub would link with an invisible joiner", () => {
     const J = "\u2060";
     expect(escapeMarkdown("Thanks @maniator for #12 :tada:")).toBe(`Thanks @${J}maniator for \\#${J}12 :${J}tada:`);
-    expect(escapeMarkdown("See www.example.com or https://example.com")).toBe(`See www${J}.example.com or https:${J}//example.com`);
+    expect(escapeMarkdown("See www.example.com or https://example.com")).toBe(
+      `See www${J}.example.com or https:${J}//example.com`,
+    );
     expect(escapeMarkdown("Built from 1a2b3c4d5e")).toBe(`Built from 1a2b${J}3c4d5e`);
     expect(escapeMarkdown("Thumbs :+1: and :100: for GH-12")).toBe(`Thumbs :${J}+1: and :${J}100: for GH-${J}12`);
     expect(escapeMarkdown("Opens at 3:00 and 10:30")).toBe("Opens at 3:00 and 10:30");
     expect(escapeMarkdown("Won :1st_place_medal:")).toBe(`Won :${J}1st\\_place\\_medal:`);
-    for (const text of ["Thanks @maniator for #12 :tada:", "See www.example.com or https://example.com", "mail me@example.com"]) {
+    for (const text of [
+      "Thanks @maniator for #12 :tada:",
+      "See www.example.com or https://example.com",
+      "mail me@example.com",
+    ]) {
       expect(rendered(`- ${escapeMarkdown(text)}`), text).toBe(literalBullet(text));
     }
     // Words that only look like hex, and short hex, stay whole.
@@ -328,7 +352,10 @@ describe("contributors", () => {
 `;
 
   it("reads the Contributors list of the matching section only", () => {
-    expect(contributorsForVersion(CREDITED, "4.0.0")).toEqual(["Sam reported the Esc discard guard (#670).", "@trvorth extended the room-capacity sweep (#2198)."]);
+    expect(contributorsForVersion(CREDITED, "4.0.0")).toEqual([
+      "Sam reported the Esc discard guard (#670).",
+      "@trvorth extended the room-capacity sweep (#2198).",
+    ]);
     expect(contributorsForVersion(CREDITED, "3.12.3")).toEqual([]);
   });
 
@@ -338,7 +365,14 @@ describe("contributors", () => {
 
   it("gives the release notes page each version's credits", () => {
     expect(allReleaseNotes(CREDITED)).toEqual([
-      { version: "4.0.0", notes: ["A menu bar replaces the sidebar."], contributors: ["Sam reported the Esc discard guard (#670).", "@trvorth extended the room-capacity sweep (#2198)."] },
+      {
+        version: "4.0.0",
+        notes: ["A menu bar replaces the sidebar."],
+        contributors: [
+          "Sam reported the Esc discard guard (#670).",
+          "@trvorth extended the room-capacity sweep (#2198).",
+        ],
+      },
       { version: "3.12.3", notes: ["Old note."] },
     ]);
   });
@@ -353,7 +387,10 @@ describe("contributors", () => {
   it("reads an older section's notes, not credits, below a credited one", () => {
     expect(notesForVersion(CREDITED, "3.12.3")).toEqual(["Old note."]);
     expect(recentReleaseNotes(CREDITED, "4.0.0", 10).map((r) => r.version)).toEqual(["4.0.0", "3.12.3"]);
-    const twoCredited = CREDITED.replace("- Old note.\n", "- Old note.\n\n### Contributors\n\n- Ana helped.\n\n## 3.12.2\n\n- Older note.\n");
+    const twoCredited = CREDITED.replace(
+      "- Old note.\n",
+      "- Old note.\n\n### Contributors\n\n- Ana helped.\n\n## 3.12.2\n\n- Older note.\n",
+    );
     expect(contributorsForVersion(twoCredited, "3.12.3")).toEqual(["Ana helped."]);
     expect(contributorsForVersion(twoCredited, "3.12.2")).toEqual([]);
     expect(notesForVersion(twoCredited, "3.12.2")).toEqual(["Older note."]);

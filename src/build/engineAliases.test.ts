@@ -18,7 +18,8 @@ function sources(dir: string, out: string[] = []): string[] {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) {
       if (name !== "public" && name !== "tests") sources(p, out);
-    } else if (/\.[mc]?tsx?$/.test(name) && !/\.(test|spec)\.[mc]?tsx?$/.test(name) && !name.endsWith(".d.ts")) out.push(p);
+    } else if (/\.[mc]?tsx?$/.test(name) && !/\.(test|spec)\.[mc]?tsx?$/.test(name) && !name.endsWith(".d.ts"))
+      out.push(p);
   }
   return out;
 }
@@ -41,7 +42,10 @@ function names(file: string, spec: string, target: string): boolean {
   // Relative to the importer, or root-absolute as Vite resolves "/src/...".
   if (!spec.startsWith(".") && !spec.startsWith("/")) return false;
   const base = spec.startsWith("/") ? resolve(ROOT, spec.slice(1)) : resolve(ROOT, file, "..", spec);
-  const resolved = relative(ROOT, base).split("\\").join("/").replace(/\.[mc]?[jt]sx?$/, "");
+  const resolved = relative(ROOT, base)
+    .split("\\")
+    .join("/")
+    .replace(/\.[mc]?[jt]sx?$/, "");
   return resolved === target;
 }
 
@@ -50,7 +54,11 @@ const files = sources(SRC).map((f) => ({ file: relative(ROOT, f).split("\\").joi
 describe("the engine aliases' specifiers", () => {
   it("only main.ts imports ./game/toolingSim, and no app code reaches the tooling tower another way", () => {
     expect(files.filter((f) => f.specs.includes("./game/toolingSim")).map((f) => f.file)).toEqual(["src/main.ts"]);
-    const other = files.filter((f) => f.specs.some((s) => names(f.file, s, "src/game/toolingSim") && !(f.file === "src/main.ts" && s === "./game/toolingSim")));
+    const other = files.filter((f) =>
+      f.specs.some(
+        (s) => names(f.file, s, "src/game/toolingSim") && !(f.file === "src/main.ts" && s === "./game/toolingSim"),
+      ),
+    );
     expect(other.map((f) => f.file)).toEqual([]);
   });
 });

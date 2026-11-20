@@ -72,8 +72,7 @@ const filled = (overrides: Record<string, string | undefined> = {}): string =>
     "Build version": "v1.2.3",
     "Anything else?": NO_RESPONSE,
     "Game mode": "Classic",
-    "Before submitting":
-      "- [ ] I tried the live build.\n- [X] I searched existing issues.",
+    "Before submitting": "- [ ] I tried the live build.\n- [X] I searched existing issues.",
     ...overrides,
   });
 
@@ -81,67 +80,39 @@ describe("parseIssueForm", () => {
   it("reads the name, labels and every field", () => {
     expect(sample.name).toBe("🧪 Sample");
     expect(sample.labels).toEqual(["bug", "needs-triage"]);
-    expect(
-      sample.fields.map((f) => [
-        f.type,
-        f.id,
-        f.label,
-        f.required,
-        f.requiredOptions,
-      ]),
-    ).toEqual([
+    expect(sample.fields.map((f) => [f.type, f.id, f.label, f.required, f.requiredOptions])).toEqual([
       ["markdown", "", "", false, []],
       ["input", "version", "Build version", true, []],
       ["textarea", "notes", "Anything else?", false, []],
       ["dropdown", "mode", "Game mode", true, []],
-      [
-        "checkboxes",
-        "checks",
-        "Before submitting",
-        false,
-        ["I searched existing issues."],
-      ],
+      ["checkboxes", "checks", "Before submitting", false, ["I searched existing issues."]],
     ]);
   });
 
   it("reads a dropdown's choices and leaves other fields without any", () => {
-    expect(sample.fields.find((f) => f.id === "mode")?.options).toEqual([
-      "Classic",
-      "Modern",
-    ]);
+    expect(sample.fields.find((f) => f.id === "mode")?.options).toEqual(["Classic", "Modern"]);
     expect(sample.fields.find((f) => f.id === "checks")?.options).toEqual([]);
   });
 
   it("throws on a form it cannot read", () => {
-    expect(() => parseIssueForm("name: Empty\nlabels: []\nbody:\n")).toThrow(
-      /cannot read/,
-    );
+    expect(() => parseIssueForm("name: Empty\nlabels: []\nbody:\n")).toThrow(/cannot read/);
     expect(() =>
-      parseIssueForm(
-        "name: X\nbody:\n  - type: input\n    id: a\n    attributes:\n      description: no label\n",
-      ),
+      parseIssueForm("name: X\nbody:\n  - type: input\n    id: a\n    attributes:\n      description: no label\n"),
     ).toThrow(/without a label/);
   });
 
-  it.each(realForms)(
-    "reads $file with labels and labeled fields",
-    ({ text }) => {
-      const form = parseIssueForm(text);
-      expect(form.labels.length).toBeGreaterThan(0);
-      const asked = form.fields.filter((f) => f.type !== "markdown");
-      expect(asked.length).toBeGreaterThan(0);
-      expect(asked.every((f) => f.label.length > 0 && f.id.length > 0)).toBe(
-        true,
-      );
-    },
-  );
+  it.each(realForms)("reads $file with labels and labeled fields", ({ text }) => {
+    const form = parseIssueForm(text);
+    expect(form.labels.length).toBeGreaterThan(0);
+    const asked = form.fields.filter((f) => f.type !== "markdown");
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked.every((f) => f.label.length > 0 && f.id.length > 0)).toBe(true);
+  });
 });
 
 describe("answers", () => {
   it("keys each answer by its ### heading and skips headings in code fences", () => {
-    const got = answers(
-      "### One\n\nfirst\n\n```\n### Not a field\n```\n\n### Two\n\nsecond",
-    );
+    const got = answers("### One\n\nfirst\n\n```\n### Not a field\n```\n\n### Two\n\nsecond");
     expect([...got.keys()]).toEqual(["One", "Two"]);
     expect(got.get("One")).toContain("### Not a field");
     expect(got.get("Two")).toBe("second");
@@ -158,12 +129,7 @@ describe("checkIssueBody", () => {
   });
 
   it("names each missing section, optional ones included", () => {
-    expect(
-      checkIssueBody(
-        filled({ "Game mode": undefined, "Anything else?": undefined }),
-        sample,
-      ),
-    ).toEqual([
+    expect(checkIssueBody(filled({ "Game mode": undefined, "Anything else?": undefined }), sample)).toEqual([
       'missing section "### Anything else?"',
       'missing section "### Game mode"',
     ]);
@@ -171,26 +137,21 @@ describe("checkIssueBody", () => {
 
   it("flags a required field left empty or with no response", () => {
     for (const empty of ["", NO_RESPONSE]) {
-      expect(
-        checkIssueBody(filled({ "Build version": empty }), sample),
-      ).toEqual(['"### Build version" is required but has no answer']);
+      expect(checkIssueBody(filled({ "Build version": empty }), sample)).toEqual([
+        '"### Build version" is required but has no answer',
+      ]);
     }
   });
 
   it("flags a required checkbox left unticked", () => {
-    const unticked =
-      "- [x] I tried the live build.\n- [ ] I searched existing issues.";
-    expect(
-      checkIssueBody(filled({ "Before submitting": unticked }), sample),
-    ).toEqual([
+    const unticked = "- [x] I tried the live build.\n- [ ] I searched existing issues.";
+    expect(checkIssueBody(filled({ "Before submitting": unticked }), sample)).toEqual([
       '"### Before submitting" does not tick "- [x] I searched existing issues."',
     ]);
   });
 
   it("fails a free-form body with no form sections", () => {
-    expect(
-      checkIssueBody("Some notes about a bug.\n\n## Details\n\nMore.", sample),
-    ).toHaveLength(4);
+    expect(checkIssueBody("Some notes about a bug.\n\n## Details\n\nMore.", sample)).toHaveLength(4);
   });
 });
 
@@ -209,14 +170,11 @@ describe("formForLabels", () => {
 
   it("picks the first form in order whose type label the issue carries", () => {
     expect(formForLabels(["bug", "parity", "P2"], forms)?.name).toBe("parity");
-    expect(formForLabels(["enhancement", "modern"], forms)?.name).toBe(
-      "feature",
-    );
+    expect(formForLabels(["enhancement", "modern"], forms)?.name).toBe("feature");
   });
 
   it("files every internal-work label under the Task form", () => {
-    for (const label of TASK_TYPE_LABELS)
-      expect(formForLabels([label, "P3"], forms)?.name).toBe("task");
+    for (const label of TASK_TYPE_LABELS) expect(formForLabels([label, "P3"], forms)?.name).toBe("task");
   });
 
   it("finds no form for an issue with no type label", () => {

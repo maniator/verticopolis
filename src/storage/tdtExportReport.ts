@@ -92,19 +92,11 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
     );
   }
   if (money !== balance * 100) {
-    staysBehind.push(
-      "Funds round to the nearest $100 (the format stores hundreds).",
-    );
+    staysBehind.push("Funds round to the nearest $100 (the format stores hundreds).");
   }
-  staysBehind.push(
-    "The income ledger and finance history start fresh in 1994.",
-  );
-  staysBehind.push(
-    "People in transit are not carried; the crowd re-simulates on load.",
-  );
-  staysBehind.push(
-    "Satisfaction detail resets; tenants re-judge the tower as it runs.",
-  );
+  staysBehind.push("The income ledger and finance history start fresh in 1994.");
+  staysBehind.push("People in transit are not carried; the crowd re-simulates on load.");
+  staysBehind.push("Satisfaction detail resets; tenants re-judge the tower as it runs.");
 
   return {
     towerName,

@@ -96,10 +96,14 @@ describe.skipIf(!hasWasmPackage())("replayCompare", () => {
   it("keeps a refusal of one command apart from a refusal of another", () => {
     expect(throwSignature("build floor @ 2,170 succeeded but was expected to fail")).toBe("threw:build:floor");
     expect(throwSignature("build fitnessClub @ 4,196 failed: no money")).toBe("threw:build:fitnessClub");
-    expect(throwSignature("buildTransport elevatorExpress @ x212 failed: cap")).toBe("threw:buildTransport:elevatorExpress");
+    expect(throwSignature("buildTransport elevatorExpress @ x212 failed: cap")).toBe(
+      "threw:buildTransport:elevatorExpress",
+    );
     expect(throwSignature("resolveChoice: cannot pay 500")).toBe("threw:resolveChoice");
     expect(throwSignature("reload changed the saved state")).toBe("threw");
-    expect(throwSignature("build fitnessClub @ 4,196 failed: x")).not.toBe(throwSignature("build floor @ 4,196 failed: x"));
+    expect(throwSignature("build fitnessClub @ 4,196 failed: x")).not.toBe(
+      throwSignature("build floor @ 4,196 failed: x"),
+    );
   });
 
   it("reads missing, malformed and mismatched records as harness failures", () => {
@@ -118,7 +122,15 @@ describe.skipIf(!hasWasmPackage())("replayCompare", () => {
 
   it("reads an unreadable scenario as a harness failure", () => {
     const file = join(dir, "bad.json");
-    writeFileSync(file, JSON.stringify({ id: "bad", description: "d", start: { newGame: { seed: 1, mode: "classic" } }, commands: [{ op: "nope" }] }));
+    writeFileSync(
+      file,
+      JSON.stringify({
+        id: "bad",
+        description: "d",
+        start: { newGame: { seed: 1, mode: "classic" } },
+        commands: [{ op: "nope" }],
+      }),
+    );
     writeFileSync(join(dir, "bad.rs.json"), "[]");
     writeFileSync(join(dir, "bad.rs.detail.json"), "[]");
     expect(replayCompare(file)).toMatchObject({ status: "harness" });
@@ -154,8 +166,8 @@ describe.skipIf(!hasWasmPackage())("replayCompare", () => {
 describe("isWasmTrap", () => {
   // (module (func (export "f") unreachable)): the trap a Rust panic becomes in the shipped build.
   const trapping = new Uint8Array([
-    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x04, 0x01, 0x60, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00,
-    0x07, 0x05, 0x01, 0x01, 0x66, 0x00, 0x00, 0x0a, 0x05, 0x01, 0x03, 0x00, 0x00, 0x0b,
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x04, 0x01, 0x60, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00, 0x07,
+    0x05, 0x01, 0x01, 0x66, 0x00, 0x00, 0x0a, 0x05, 0x01, 0x03, 0x00, 0x00, 0x0b,
   ]);
 
   it("knows a real trap, and an exhausted stack", () => {
@@ -180,13 +192,24 @@ describe("isWasmTrap", () => {
 });
 
 describe.skipIf(!hasWasmPackage())("a trap during a run", () => {
-  const trapping = (where: "detail" | "command"): EngineStart =>
+  const trapping =
+    (where: "detail" | "command"): EngineStart =>
     (start) => {
       const e = startWasmEngine(start);
       const trap = () => new WebAssembly.RuntimeError("unreachable");
       return {
         ...e,
-        ...(where === "detail" ? { detail: () => { throw trap(); } } : { tick: () => { throw trap(); } }),
+        ...(where === "detail"
+          ? {
+              detail: () => {
+                throw trap();
+              },
+            }
+          : {
+              tick: () => {
+                throw trap();
+              },
+            }),
         // A poisoned instance's free throws a plain error of its own.
         free: () => {
           e.free?.();
@@ -196,7 +219,15 @@ describe.skipIf(!hasWasmPackage())("a trap during a run", () => {
     };
   const scenario = () => {
     const file = join(dir, "trap.json");
-    writeFileSync(file, JSON.stringify({ id: "trap", description: "t", start: { newGame: { seed: 1, mode: "classic" } }, commands: [{ op: "tick", dt: 30, times: 1 }] }));
+    writeFileSync(
+      file,
+      JSON.stringify({
+        id: "trap",
+        description: "t",
+        start: { newGame: { seed: 1, mode: "classic" } },
+        commands: [{ op: "tick", dt: 30, times: 1 }],
+      }),
+    );
     return loadScenario(file);
   };
 
@@ -215,13 +246,31 @@ describe.skipIf(!hasWasmPackage())("a trap during a run", () => {
   it("still lets a free that fails after a clean run through", () => {
     const e: EngineStart = (start) => {
       const engine = startWasmEngine(start);
-      return { ...engine, free: () => { engine.free?.(); throw new Error("free failed"); } };
+      return {
+        ...engine,
+        free: () => {
+          engine.free?.();
+          throw new Error("free failed");
+        },
+      };
     };
     expect(() => runScenario(scenario(), e, [])).toThrow("free failed");
   });
 
   it("keeps a detail error that is not a trap a harness failure", () => {
-    expect(() => requireDetail({ detail: () => { throw new Error("no digest"); } })).toThrow(DetailError);
-    expect(() => requireDetail({ detail: () => { throw new WebAssembly.RuntimeError("unreachable"); } })).toThrow(WebAssembly.RuntimeError);
+    expect(() =>
+      requireDetail({
+        detail: () => {
+          throw new Error("no digest");
+        },
+      }),
+    ).toThrow(DetailError);
+    expect(() =>
+      requireDetail({
+        detail: () => {
+          throw new WebAssembly.RuntimeError("unreachable");
+        },
+      }),
+    ).toThrow(WebAssembly.RuntimeError);
   });
 });

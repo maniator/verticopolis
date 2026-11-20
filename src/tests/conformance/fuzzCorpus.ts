@@ -55,5 +55,7 @@ export function corpusExit(failed: readonly string[], harness: boolean): 0 | 1 |
 /** Entries to add to `failed` once the loop is done: the run as a whole must
  *  not outlast the budget even when no single entry was cut off. */
 export function lateFailure(elapsedSeconds: number, budgetSeconds: number, failed: readonly string[]): string[] {
-  return elapsedSeconds > budgetSeconds && !failed.some((f) => f.endsWith("(over budget)")) ? ["(the last entry ran past the budget)"] : [];
+  return elapsedSeconds > budgetSeconds && !failed.some((f) => f.endsWith("(over budget)"))
+    ? ["(the last entry ran past the budget)"]
+    : [];
 }

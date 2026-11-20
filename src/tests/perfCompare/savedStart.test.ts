@@ -38,7 +38,9 @@ describe("checkAutosaveSeeds", () => {
     // A packed value the boot cannot read (a fresh save text, so no seed is cached).
     const pack = vi.spyOn(SaveGame, "packSync").mockReturnValue("VCZ1:not a packed save");
     try {
-      expect(() => checkAutosaveSeeds([{ ...sc, save: `${sc.save} ` }])).toThrow(/small: the autosave seed does not load back \(no tower, read as corrupt\)/);
+      expect(() => checkAutosaveSeeds([{ ...sc, save: `${sc.save} ` }])).toThrow(
+        /small: the autosave seed does not load back \(no tower, read as corrupt\)/,
+      );
     } finally {
       pack.mockRestore();
     }
@@ -49,6 +51,9 @@ describe("checkAutosaveSeeds", () => {
 describe("autosaveState", () => {
   it("puts the seed in the autosave slot of the app's origin", () => {
     const seed = autosaveSeed(small());
-    expect(autosaveState("http://127.0.0.1:4173", seed)).toEqual({ cookies: [], origins: [{ origin: "http://127.0.0.1:4173", localStorage: [{ name: AUTOSAVE_KEY, value: seed.value }] }] });
+    expect(autosaveState("http://127.0.0.1:4173", seed)).toEqual({
+      cookies: [],
+      origins: [{ origin: "http://127.0.0.1:4173", localStorage: [{ name: AUTOSAVE_KEY, value: seed.value }] }],
+    });
   });
 });

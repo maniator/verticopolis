@@ -3,13 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import measured from "./e2eShardSeconds.json";
-import {
-  fileSeconds,
-  listedFiles,
-  measuredSeconds,
-  planShards,
-  UNMEASURED_SECONDS_PER_TEST,
-} from "./e2eShards";
+import { fileSeconds, listedFiles, measuredSeconds, planShards, UNMEASURED_SECONDS_PER_TEST } from "./e2eShards";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -39,22 +33,14 @@ describe("planShards", () => {
 
   it("puts every listed file in exactly one shard", () => {
     for (const total of [1, 2, 3, 4, 5]) {
-      const placed = planShards(files, total, seconds).flatMap(
-        (shard) => shard.files,
-      );
+      const placed = planShards(files, total, seconds).flatMap((shard) => shard.files);
       expect(placed.slice().sort()).toEqual(files.map(({ file }) => file));
     }
   });
 
   it("keeps Playwright's list order inside a shard", () => {
     const [only] = planShards(files, 1, seconds);
-    expect(only.files).toEqual([
-      "a.spec.ts",
-      "b.spec.ts",
-      "c.spec.ts",
-      "d.spec.ts",
-      "e.spec.ts",
-    ]);
+    expect(only.files).toEqual(["a.spec.ts", "b.spec.ts", "c.spec.ts", "d.spec.ts", "e.spec.ts"]);
   });
 
   it("breaks a tie between equal files by list order, so every shard computes the same split", () => {
@@ -66,48 +52,31 @@ describe("planShards", () => {
   });
 
   it("refuses a split that would leave a shard with nothing to run", () => {
-    expect(() => planShards(files.slice(0, 3), 4, seconds)).toThrow(
-      "3 spec files cannot fill 4 shards",
-    );
+    expect(() => planShards(files.slice(0, 3), 4, seconds)).toThrow("3 spec files cannot fill 4 shards");
   });
 
   it("refuses a file listed twice", () => {
-    expect(() => planShards([...files, files[0]], 2, seconds)).toThrow(
-      "a.spec.ts is listed twice",
-    );
+    expect(() => planShards([...files, files[0]], 2, seconds)).toThrow("a.spec.ts is listed twice");
   });
 
   it.each([0, -1, 1.5, Number.NaN])("refuses a shard total of %s", (total) => {
-    expect(() => planShards(files, total, seconds)).toThrow(
-      "the shard total must be a whole number above 0",
-    );
+    expect(() => planShards(files, total, seconds)).toThrow("the shard total must be a whole number above 0");
   });
 });
 
 describe("fileSeconds", () => {
   it("uses the measured time when there is one", () => {
-    expect(
-      fileSeconds({ file: "a.spec.ts", tests: 9 }, { "a.spec.ts": 12 }),
-    ).toBe(12);
+    expect(fileSeconds({ file: "a.spec.ts", tests: 9 }, { "a.spec.ts": 12 })).toBe(12);
   });
 
   it("estimates an unmeasured file from its test count", () => {
-    expect(
-      fileSeconds({ file: "new.spec.ts", tests: 3 }, { "a.spec.ts": 12 }),
-    ).toBe(3 * UNMEASURED_SECONDS_PER_TEST);
+    expect(fileSeconds({ file: "new.spec.ts", tests: 3 }, { "a.spec.ts": 12 })).toBe(3 * UNMEASURED_SECONDS_PER_TEST);
   });
 
   it("estimates a file whose measured time is not a usable number", () => {
-    const broken = { "a.spec.ts": -1, "b.spec.ts": Number.NaN } as Record<
-      string,
-      number
-    >;
-    expect(fileSeconds({ file: "a.spec.ts", tests: 2 }, broken)).toBe(
-      2 * UNMEASURED_SECONDS_PER_TEST,
-    );
-    expect(fileSeconds({ file: "b.spec.ts", tests: 1 }, broken)).toBe(
-      UNMEASURED_SECONDS_PER_TEST,
-    );
+    const broken = { "a.spec.ts": -1, "b.spec.ts": Number.NaN } as Record<string, number>;
+    expect(fileSeconds({ file: "a.spec.ts", tests: 2 }, broken)).toBe(2 * UNMEASURED_SECONDS_PER_TEST);
+    expect(fileSeconds({ file: "b.spec.ts", tests: 1 }, broken)).toBe(UNMEASURED_SECONDS_PER_TEST);
   });
 });
 
@@ -146,9 +115,7 @@ describe("listedFiles", () => {
   });
 
   it("refuses a suite with no file", () => {
-    expect(() =>
-      listedFiles({ suites: [{ specs: [{ tests: [{}] }] }] }),
-    ).toThrow("a listed suite has no file");
+    expect(() => listedFiles({ suites: [{ specs: [{ tests: [{}] }] }] })).toThrow("a listed suite has no file");
   });
 });
 

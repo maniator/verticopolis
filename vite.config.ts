@@ -7,12 +7,22 @@ import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion, recentReleaseNotes, type ReleaseNotes } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
-import { entryWithIntegrity, pageLastTransform, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
+import {
+  entryWithIntegrity,
+  pageLastTransform,
+  precacheIntegrityTransform,
+  readExpectedPackage,
+} from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "@verticopolis/components/host/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
-import { assembleToolingPublicDir, choosePublicDir, hasEnginePackage, toolingEngineFile } from "./src/build/toolingPublicDir";
+import {
+  assembleToolingPublicDir,
+  choosePublicDir,
+  hasEnginePackage,
+  toolingEngineFile,
+} from "./src/build/toolingPublicDir";
 import { helpMarkdown } from "./src/build/helpMarkdown";
 import { isPreviewDeploy } from "./src/build/previewDeploy";
 
@@ -22,7 +32,8 @@ const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "
  *  About this game, or "" when the package is not installed. */
 function componentsVersion(): string {
   try {
-    return JSON.parse(readFileSync(resolve(__dirname, "node_modules/@verticopolis/components/package.json"), "utf8")).version as string;
+    return JSON.parse(readFileSync(resolve(__dirname, "node_modules/@verticopolis/components/package.json"), "utf8"))
+      .version as string;
   } catch {
     return "";
   }
@@ -87,7 +98,10 @@ interface EngineChoice {
 function engineChoiceFor(command: "build" | "serve"): EngineChoice {
   const raw = process.env.VC_PUBLIC_DIR;
   if (raw !== undefined && raw !== "") {
-    if (process.env.VERCEL) throw new Error("VC_PUBLIC_DIR is set in a Vercel build. Deploys build from src/public; remove VC_PUBLIC_DIR from the Vercel environment.");
+    if (process.env.VERCEL)
+      throw new Error(
+        "VC_PUBLIC_DIR is set in a Vercel build. Deploys build from src/public; remove VC_PUBLIC_DIR from the Vercel environment.",
+      );
     // The offline e2e copies the first build's package, so it is the tooling
     // package exactly when this is a tooling build.
     return { publicDir: resolve(raw), toolingEngine: TOOLING_BUILD };
@@ -105,7 +119,10 @@ function engineChoiceFor(command: "build" | "serve"): EngineChoice {
   });
   if (choice.kind === "missing-tooling") throw new Error(choice.why);
   if (choice.kind === "player") {
-    if (command === "serve" && !process.env.VITEST) console.warn("[serve] @verticopolis/engine/tooling is not installed, so this serve runs the player engine package: window.game's raw edits will fail. Run npm ci.");
+    if (command === "serve" && !process.env.VITEST)
+      console.warn(
+        "[serve] @verticopolis/engine/tooling is not installed, so this serve runs the player engine package: window.game's raw edits will fail. Run npm ci.",
+      );
     return { publicDir: base, toolingEngine: false };
   }
   // A dev serve (and `vite preview`, which serves dist/ and ignores both)
@@ -212,7 +229,14 @@ function emitVersionJson(fingerprint: BuildFingerprint): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), releases: changelogReleases(), shell: fingerprint.shell, engine: fingerprint.engine }),
+        source: JSON.stringify({
+          version: pkgVersion,
+          sha: gitShortSha(),
+          notes: changelogNotes(),
+          releases: changelogReleases(),
+          shell: fingerprint.shell,
+          engine: fingerprint.engine,
+        }),
       });
     },
   };
@@ -236,7 +260,8 @@ function noUnlistedPackageFiles(): Plugin {
     transform(_code, id) {
       // A stylesheet's extension can also sit in the query (a component's
       // `?type=style&lang.css` block), so the whole id is checked too.
-      if (isPackagePath(id, PACKAGE_STYLESHEET) || (isPackagePath(id) && PACKAGE_STYLESHEET.test(id))) this.error(refuse(id));
+      if (isPackagePath(id, PACKAGE_STYLESHEET) || (isPackagePath(id) && PACKAGE_STYLESHEET.test(id)))
+        this.error(refuse(id));
     },
     generateBundle(_options, bundle) {
       // A CSS @import, or a small image or font inlined as a data URL, never
@@ -336,14 +361,20 @@ function enginePreload(): Plugin {
         // A build without the engine package (VC_ALLOW_NO_ENGINE=1, which cannot run
         // the game) has nothing to preload; the links would be three 404s.
         if (!existsSync(resolve(publicDir("build"), ENGINE_DIR, ENGINE_BUILD_RECORD))) return [];
-        return ENGINE_PRELOAD_FILES.map((file) => ({ tag: "link", attrs: enginePreloadAttrs(file), injectTo: "head-prepend" as const }));
+        return ENGINE_PRELOAD_FILES.map((file) => ({
+          tag: "link",
+          attrs: enginePreloadAttrs(file),
+          injectTo: "head-prepend" as const,
+        }));
       },
     },
   };
 }
 
-const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(command), command === "build" ? "build" : "other");
-const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(__dirname, "src"), expectedPackage(command));
+const expectedPackage = (command: "build" | "serve") =>
+  readExpectedPackage(publicDir(command), command === "build" ? "build" : "other");
+const fingerprintOf = (command: "build" | "serve") =>
+  buildFingerprint(resolve(__dirname, "src"), expectedPackage(command));
 
 export default defineConfig(({ command }) => ({
   root: "src",
@@ -457,7 +488,10 @@ export default defineConfig(({ command }) => ({
         // integrity here, just before the worker is generated (#1345).
         beforeBuildServiceWorker(options) {
           const extra = options.workbox.additionalManifestEntries;
-          if (extra) options.workbox.additionalManifestEntries = extra.map((e) => (typeof e === "string" ? e : entryWithIntegrity(e, builtDistDir)));
+          if (extra)
+            options.workbox.additionalManifestEntries = extra.map((e) =>
+              typeof e === "string" ? e : entryWithIntegrity(e, builtDistDir),
+            );
         },
       },
       workbox: {
@@ -535,7 +569,19 @@ export default defineConfig(({ command }) => ({
         // `help-bridge.html` and its `helpBridge-*.js` entry are the frame the
         // manual's Help bar reaches the game through (#2035), only ever loaded
         // inside the manual, so they stay out of the precache too.
-        globIgnores: ["**/gallery*", "**/404.html", "**/notFound-*.js", "**/preview*", "**/og-image*", "help/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js", "**/debugHud-*.js", "**/help-bridge.html", "**/helpBridge-*.js"],
+        globIgnores: [
+          "**/gallery*",
+          "**/404.html",
+          "**/notFound-*.js",
+          "**/preview*",
+          "**/og-image*",
+          "help/**",
+          "**/icon-1024x1024.png",
+          "**/sw-navigation-fallback.js",
+          "**/debugHud-*.js",
+          "**/help-bridge.html",
+          "**/helpBridge-*.js",
+        ],
         // The worker's own helper, loaded by importScripts and updated with it,
         // so it stays out of the precache.
         importScripts: ["sw-navigation-fallback.js"],

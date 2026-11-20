@@ -8,7 +8,10 @@ const pagesDir = resolve(__dirname, "../..", HELP_PAGES_DIR);
 
 /** The page file for a manual path, /help/rooms/services/ -> rooms/services.mdx. */
 function pageFile(path: string): string | undefined {
-  const slug = path.replace(/^\/help\/?/, "").replace(/[#?].*$/, "").replace(/\/$/, "");
+  const slug = path
+    .replace(/^\/help\/?/, "")
+    .replace(/[#?].*$/, "")
+    .replace(/\/$/, "");
   return [`${slug}.md`, `${slug}.mdx`, `${slug}/index.mdx`].map((f) => resolve(pagesDir, f)).find((f) => existsSync(f));
 }
 
@@ -61,7 +64,8 @@ describe("the problem lines' help topics", () => {
     expect(gripeTopic("homeParking")).toBe("parking");
     expect(gripeTopic("congestion", "elevator")).toBe("elevatorWaits");
     expect(gripeTopic("congestion", "none")).toBe("elevatorWaits");
-    for (const binding of ["walkways", "stairs", "escalator"]) expect(gripeTopic("congestion", binding)).toBe("walkwayWaits");
+    for (const binding of ["walkways", "stairs", "escalator"])
+      expect(gripeTopic("congestion", binding)).toBe("walkwayWaits");
     expect(gripeTopic("relocation")).toBeUndefined();
   });
 });

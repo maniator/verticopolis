@@ -29,7 +29,8 @@ describe("congratsTemplate", () => {
   });
 
   it("stands the wedding hall on the tower's top floor (#1987)", () => {
-    const text = (topFloor: number) => (renderToFragment(congratsTemplate(topFloor, () => {})).textContent ?? "").replace(/\s+/g, " ");
+    const text = (topFloor: number) =>
+      (renderToFragment(congratsTemplate(topFloor, () => {})).textContent ?? "").replace(/\s+/g, " ");
     expect(text(100)).toContain("wedding hall on the 100th floor");
     expect(text(120), "a taller tower").toContain("wedding hall on the 120th floor");
   });

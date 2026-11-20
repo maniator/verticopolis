@@ -43,14 +43,24 @@ describe("syncLobbyHeightStrip", () => {
 describe("lobbyPickerFor", () => {
   it("picks on the choice, then redraws the card and the strip with the new pick", () => {
     let picked = 1;
-    const choice = { get picked() { return picked; }, pick: vi.fn((h: number) => (picked = h)) };
+    const choice = {
+      get picked() {
+        return picked;
+      },
+      pick: vi.fn((h: number) => (picked = h)),
+    };
     const toolInfo = document.createElement("div");
-    const ui = { cb: { lobbyHeight: () => choice, getCatalog: () => catalog }, tool: { type: "build", kind: "lobby" }, el: { toolInfo } } as unknown as UI;
+    const ui = {
+      cb: { lobbyHeight: () => choice, getCatalog: () => catalog },
+      tool: { type: "build", kind: "lobby" },
+      el: { toolInfo },
+    } as unknown as UI;
     const picker = lobbyPickerFor(ui);
     expect(picker.picked).toBe(1);
     picker.pick(3);
     expect(choice.pick).toHaveBeenCalledExactlyOnceWith(3);
-    const pressed = (root: ParentNode) => [...root.querySelectorAll("button")].map((b) => b.getAttribute("aria-pressed"));
+    const pressed = (root: ParentNode) =>
+      [...root.querySelectorAll("button")].map((b) => b.getAttribute("aria-pressed"));
     expect(pressed(toolInfo.querySelector(".ti-lobby-height")!)).toEqual(["false", "false", "true"]);
     expect(pressed(strip)).toEqual(["false", "false", "true"]);
   });

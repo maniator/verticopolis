@@ -38,9 +38,7 @@ const good = "var(--good)";
  *  the line names a problem the manual answers. */
 function line(copy: string, color?: string, topic?: HelpTopic): TemplateResult {
   const help = topic ? helpTopicLink(topic, "inspector") : "";
-  return color
-    ? html`<div style="color:${color}">${copy}${help}</div>`
-    : html`<div>${copy}${help}</div>`;
+  return color ? html`<div style="color:${color}">${copy}${help}</div>` : html`<div>${copy}${help}</div>`;
 }
 
 /** Lines from another fact record and where the card puts them: `lines`
@@ -116,7 +114,11 @@ export function createPortUnitParts(
 
   /** Engine supplies cause and contributing flags, never a TypeScript
    *  recomputation. The words, and the manual page that answers them. */
-  const cause = (r: PortRecord, prefix: "gripe" | "leaseGripe", advises: boolean): { copy: string; topic?: HelpTopic } | undefined => {
+  const cause = (
+    r: PortRecord,
+    prefix: "gripe" | "leaseGripe",
+    advises: boolean,
+  ): { copy: string; topic?: HelpTopic } | undefined => {
     if (!flag(r, prefix)) return undefined;
     const reason = named(layout.vacateReasons, at(r, `${prefix}Cause`));
     if (!reason) return undefined;

@@ -29,9 +29,7 @@ describe("canon: transport pools (tdt-format.md §8)", () => {
     const elevators = pool("elevators");
     expect(elevators).toBeDefined();
     expect(elevators!.cap).toBe(24);
-    expect([...elevators!.kinds].sort()).toEqual(
-      ["elevatorExpress", "elevatorService", "elevatorStandard"].sort(),
-    );
+    expect([...elevators!.kinds].sort()).toEqual(["elevatorExpress", "elevatorService", "elevatorStandard"].sort());
   });
 
   it("stairs and escalators share one 64-link pool", () => {
@@ -120,23 +118,11 @@ describe("canon: retail subtypes (tdt-format.md §7)", () => {
   // string, so an index change here would silently reinterpret every legacy
   // save's variants. Match the canon doc §7 lists verbatim.
   it("has 5 restaurant variants in §7 order", () => {
-    expect(RESTAURANT_SUBTYPES).toEqual([
-      "English Pub",
-      "French",
-      "Chinese",
-      "Sushi Bar",
-      "Steak House",
-    ]);
+    expect(RESTAURANT_SUBTYPES).toEqual(["English Pub", "French", "Chinese", "Sushi Bar", "Steak House"]);
   });
 
   it("has 5 fast-food variants in §7 order", () => {
-    expect(FASTFOOD_SUBTYPES).toEqual([
-      "Japanese Soba",
-      "Chinese Cafe",
-      "Hamburger Stand",
-      "Ice Cream",
-      "Coffee Shop",
-    ]);
+    expect(FASTFOOD_SUBTYPES).toEqual(["Japanese Soba", "Chinese Cafe", "Hamburger Stand", "Ice Cream", "Coffee Shop"]);
   });
 
   it("has 11 shop variants in §7 order", () => {

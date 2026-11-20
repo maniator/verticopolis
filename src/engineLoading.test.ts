@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ENGINE_LOADING_DELAY_MS, ENGINE_LOADING_TEXT, ENGINE_SLOW_AFTER_MS, ENGINE_SLOW_TEXT, showEngineLoading } from "./engineLoading";
+import {
+  ENGINE_LOADING_DELAY_MS,
+  ENGINE_LOADING_TEXT,
+  ENGINE_SLOW_AFTER_MS,
+  ENGINE_SLOW_TEXT,
+  showEngineLoading,
+} from "./engineLoading";
 
 const line = () => document.querySelector("#boot-cover .boot-loading");
 const live = () => document.getElementById("a11y-live")?.textContent;

@@ -200,7 +200,9 @@ export async function openSaveStore(keys: SaveStoreKeys, opts: OpenOptions): Pro
   if (!factory) return false;
   const connecting = connect(factory, keys, opts);
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<"late">((resolve) => (timer = setTimeout(() => resolve("late"), opts.timeoutMs ?? OPEN_TIMEOUT_MS)));
+  const late = new Promise<"late">(
+    (resolve) => (timer = setTimeout(() => resolve("late"), opts.timeoutMs ?? OPEN_TIMEOUT_MS)),
+  );
   const answer = await Promise.race([connecting, late]);
   clearTimeout(timer);
   if (answer === "late") {
@@ -210,7 +212,14 @@ export async function openSaveStore(keys: SaveStoreKeys, opts: OpenOptions): Pro
   }
   if (!answer) return false;
   const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(CHANNEL);
-  const o: Open = { db: answer.db, values: answer.values, keys, channel, pending: Promise.resolve(), failed: undefined };
+  const o: Open = {
+    db: answer.db,
+    values: answer.values,
+    keys,
+    channel,
+    pending: Promise.resolve(),
+    failed: undefined,
+  };
   open = o;
   if (channel) channel.onmessage = (e: MessageEvent<{ key?: unknown; value?: unknown }>) => heard(e.data);
   // A tab whose store is not open (an older build, an open that timed out)
@@ -243,7 +252,11 @@ function heardLocal(e: StorageEvent): void {
 }
 
 /** The database and every managed key's value, or null (see {@link openSaveStore}). */
-async function connect(factory: IDBFactory, keys: SaveStoreKeys, opts: OpenOptions): Promise<{ db: IDBDatabase; values: Map<string, string> } | null> {
+async function connect(
+  factory: IDBFactory,
+  keys: SaveStoreKeys,
+  opts: OpenOptions,
+): Promise<{ db: IDBDatabase; values: Map<string, string> } | null> {
   let db: IDBDatabase | undefined;
   try {
     db = await openDb(factory);
@@ -291,14 +304,13 @@ function heard(data: { key?: unknown; value?: unknown }): void {
 /** Queue `key`'s new value (null deletes) for the database, after the writes before it. */
 function persist(o: Open, key: string, value: string | null, packed?: Uint8Array): void {
   o.channel?.postMessage({ key, value });
-  o.pending = o.pending.then(
-    () =>
-      writeAll(o.db, [[key, value, packed]]).catch((err: unknown) => {
-        o.failed ??= err;
-        // A mirrored key is still whole in localStorage, which wins at boot
-        // when the database copy is older, so only the others are reported.
-        if (value !== null && !o.keys.mirrored.includes(key)) for (const listener of failureListeners) listener(err, key);
-      }),
+  o.pending = o.pending.then(() =>
+    writeAll(o.db, [[key, value, packed]]).catch((err: unknown) => {
+      o.failed ??= err;
+      // A mirrored key is still whole in localStorage, which wins at boot
+      // when the database copy is older, so only the others are reported.
+      if (value !== null && !o.keys.mirrored.includes(key)) for (const listener of failureListeners) listener(err, key);
+    }),
   );
 }
 

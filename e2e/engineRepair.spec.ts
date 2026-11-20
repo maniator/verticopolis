@@ -15,7 +15,10 @@ test.setTimeout(90_000);
 
 const repairButton = (page: Page) => page.locator('#engine-failure [data-act="repair-engine"]');
 const status = (page: Page) => page.locator("#engine-failure .engine-failure-repair-status");
-const refused = (page: Page) => page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, { timeout: 30_000 });
+const refused = (page: Page) =>
+  page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, {
+    timeout: 30_000,
+  });
 
 /** The engine entries of the cache, as cache and url -> SHA-256 of the body. */
 async function engineEntries(page: Page): Promise<Record<string, string>> {
@@ -26,7 +29,9 @@ async function engineEntries(page: Page): Promise<Record<string, string>> {
       const cache = await caches.open(name);
       for (const request of await cache.keys()) {
         if (!new URL(request.url).pathname.startsWith("/engine/")) continue;
-        out[`${name} ${request.url}`] = hex(await crypto.subtle.digest("SHA-256", await (await cache.match(request))!.arrayBuffer()));
+        out[`${name} ${request.url}`] = hex(
+          await crypto.subtle.digest("SHA-256", await (await cache.match(request))!.arrayBuffer()),
+        );
       }
     }
     return out;
@@ -105,7 +110,9 @@ test("a network that serves another build's binary is refused and nothing is wri
       window.fetch = async (input, init) => {
         const response = await real(input, init);
         if (!String(input).includes(`${path}?vc-repair=`)) return response;
-        return new Response(new Uint8Array([...new Uint8Array(await response.arrayBuffer()), ...salt]), { status: 200 });
+        return new Response(new Uint8Array([...new Uint8Array(await response.arrayBuffer()), ...salt]), {
+          status: 200,
+        });
       };
     },
     [ENGINE_PATH.wasm, SALT_SECTION] as const,
@@ -125,7 +132,9 @@ test("other cache entries are left alone", async ({ page }) => {
         for (const request of await cache.keys()) {
           if (new URL(request.url).pathname.startsWith("/engine/")) continue;
           const body = await (await cache.match(request))!.arrayBuffer();
-          const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", body))].map((x) => x.toString(16).padStart(2, "0")).join("");
+          const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", body))]
+            .map((x) => x.toString(16).padStart(2, "0"))
+            .join("");
           out.push(`${name} ${request.url} ${digest}`);
         }
       }

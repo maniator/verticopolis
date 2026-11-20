@@ -17,7 +17,16 @@
  * text and one post a second.
  */
 
-import { ANSWER_FOR_MS, STATUS_EVERY_MS, isBarMessage, newTabId, openBarChannel, type BarChannel, type GameStatus, type HelpBarHud } from "./helpBarProtocol";
+import {
+  ANSWER_FOR_MS,
+  STATUS_EVERY_MS,
+  isBarMessage,
+  newTabId,
+  openBarChannel,
+  type BarChannel,
+  type GameStatus,
+  type HelpBarHud,
+} from "./helpBarProtocol";
 
 /** What the host needs from the game, so tests can stand in. */
 export interface HelpBarHostDeps {

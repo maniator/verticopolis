@@ -123,7 +123,9 @@ export const FEATURE_SCENES: Scene[] = [
           await page.waitForSelector("#modal .stats-grid", { timeout: 4000 });
           await page.evaluate(() => {
             const box = document.querySelector("#modal .modal-box") as HTMLElement;
-            const sec = [...box.querySelectorAll(".stats-section")].find((h) => /Transport/.test(h.textContent || "")) as HTMLElement | undefined;
+            const sec = [...box.querySelectorAll(".stats-section")].find((h) =>
+              /Transport/.test(h.textContent || ""),
+            ) as HTMLElement | undefined;
             if (sec) box.scrollTop = sec.offsetTop - box.offsetTop - 8;
           });
         },
@@ -139,7 +141,8 @@ export const FEATURE_SCENES: Scene[] = [
           await page.waitForSelector("#modal .stats-grid", { timeout: 4000 });
           await page.evaluate(() => {
             const box = document.querySelector("#modal .modal-box") as HTMLElement;
-            const sec = [...box.querySelectorAll(".stats-section")].find((h) => /Income/.test(h.textContent || "")) as HTMLElement | undefined;
+            const sec = [...box.querySelectorAll(".stats-section")].find((h) => /Income/.test(h.textContent || "")) as
+              HTMLElement | undefined;
             if (sec) box.scrollTop = sec.offsetTop - box.offsetTop - 8;
           });
         },
@@ -205,7 +208,8 @@ export const FEATURE_SCENES: Scene[] = [
             const offices = g.sim.tower.units
               .filter((u: any) => u.kind === "office")
               .sort((a: any, b: any) => a.floor - b.floor || a.x - b.x);
-            if (offices.length < 5) throw new Error(`stats tower staged only ${offices.length} offices (need 5 for the vacancy split)`);
+            if (offices.length < 5)
+              throw new Error(`stats tower staged only ${offices.length} offices (need 5 for the vacancy split)`);
             for (let i = 0; i < 5; i++) {
               const u = offices[i];
               u.state = "empty";
@@ -224,9 +228,11 @@ export const FEATURE_SCENES: Scene[] = [
           // committing a picture of the wrong thing.
           await page.evaluate(() => {
             const box = document.querySelector("#modal .modal-box") as HTMLElement;
-            const sec = [...box.querySelectorAll(".stats-section")].find((h) => /Tenancy/.test(h.textContent || "")) as HTMLElement | undefined;
+            const sec = [...box.querySelectorAll(".stats-section")].find((h) => /Tenancy/.test(h.textContent || "")) as
+              HTMLElement | undefined;
             if (!sec) throw new Error("stats dialog has no Tenancy section to frame");
-            if (!/off-market/.test(box.textContent || "")) throw new Error("the staged off-market Vacancies split did not render");
+            if (!/off-market/.test(box.textContent || ""))
+              throw new Error("the staged off-market Vacancies split did not render");
             box.scrollTop = sec.offsetTop - box.offsetTop - 8;
           });
         },

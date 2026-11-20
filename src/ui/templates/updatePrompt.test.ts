@@ -24,15 +24,22 @@ describe("updatePromptTemplate update kind", () => {
   });
 
   it("shows the engine line above the build line, and neither when absent", () => {
-    const frag = renderToFragment(updatePromptTemplate(info({ kind: "engine", engineLine: "Rust engine 0.24.0 → 0.25.0" }), noop));
-    expect([...frag.querySelectorAll(".build-id")].map((p) => p.textContent)).toEqual(["Rust engine 0.24.0 → 0.25.0", "Build 1.6.0 · abc1234"]);
+    const frag = renderToFragment(
+      updatePromptTemplate(info({ kind: "engine", engineLine: "Rust engine 0.24.0 → 0.25.0" }), noop),
+    );
+    expect([...frag.querySelectorAll(".build-id")].map((p) => p.textContent)).toEqual([
+      "Rust engine 0.24.0 → 0.25.0",
+      "Build 1.6.0 · abc1234",
+    ]);
     const plain = renderToFragment(updatePromptTemplate(info(), noop));
     expect(plain.querySelector(".update-kind")).toBeNull();
     expect(plain.querySelectorAll(".build-id")).toHaveLength(1);
   });
 
   it("renders the engine line as text", () => {
-    const frag = renderToFragment(updatePromptTemplate(info({ kind: "engine", engineLine: "<img src=x onerror=alert(1)>" }), noop));
+    const frag = renderToFragment(
+      updatePromptTemplate(info({ kind: "engine", engineLine: "<img src=x onerror=alert(1)>" }), noop),
+    );
     expect(frag.querySelector("img")).toBeNull();
   });
 });
@@ -125,7 +132,9 @@ describe("updatePromptTemplate skipped versions (#1897)", () => {
   const rel = (version: string, ...notes: string[]) => ({ version, notes });
 
   it("keeps the single-list look when only the incoming version is new", () => {
-    const frag = renderToFragment(updatePromptTemplate(info({ notes: ["One."], releases: [rel("1.6.0", "One.")], since: "1.5.0" }), noop));
+    const frag = renderToFragment(
+      updatePromptTemplate(info({ notes: ["One."], releases: [rel("1.6.0", "One.")], since: "1.5.0" }), noop),
+    );
     expect(frag.querySelector(".whatsnew-log")).toBeNull();
     expect(frag.querySelector(".whatsnew h3")?.textContent).toBe("What's new");
     expect([...frag.querySelectorAll(".whatsnew li")].map((li) => li.textContent)).toEqual(["One."]);
@@ -133,7 +142,14 @@ describe("updatePromptTemplate skipped versions (#1897)", () => {
 
   it("lists every skipped version newest first in a labeled, focusable log", () => {
     const frag = renderToFragment(
-      updatePromptTemplate(info({ notes: ["New."], releases: [rel("1.6.0", "New."), rel("1.5.1", "Fix."), rel("1.5.0", "A.", "B.")], since: "1.4.0" }), noop),
+      updatePromptTemplate(
+        info({
+          notes: ["New."],
+          releases: [rel("1.6.0", "New."), rel("1.5.1", "Fix."), rel("1.5.0", "A.", "B.")],
+          since: "1.4.0",
+        }),
+        noop,
+      ),
     );
     expect(frag.querySelector(".whatsnew h3")?.textContent).toBe("What's new since 1.4.0");
     const log = frag.querySelector(".whatsnew-log");
@@ -144,23 +160,35 @@ describe("updatePromptTemplate skipped versions (#1897)", () => {
     expect(frag.querySelector('[data-act="later"]')?.hasAttribute("autofocus")).toBe(true);
     expect(frag.getElementById("whatsnew-title")).not.toBeNull();
     expect([...frag.querySelectorAll(".whatsnew-ver")].map((h) => h.textContent)).toEqual(["1.6.0", "1.5.1", "1.5.0"]);
-    expect([...frag.querySelectorAll(".whatsnew-log li")].map((li) => li.textContent)).toEqual(["New.", "Fix.", "A.", "B."]);
+    expect([...frag.querySelectorAll(".whatsnew-log li")].map((li) => li.textContent)).toEqual([
+      "New.",
+      "Fix.",
+      "A.",
+      "B.",
+    ]);
     expect(frag.querySelector(".whatsnew-more")).toBeNull();
   });
 
   it("labels a lone skipped version when the incoming build has no notes of its own", () => {
-    const frag = renderToFragment(updatePromptTemplate(info({ notes: [], releases: [rel("1.5.1", "Fix.")], since: "1.5.0" }), noop));
+    const frag = renderToFragment(
+      updatePromptTemplate(info({ notes: [], releases: [rel("1.5.1", "Fix.")], since: "1.5.0" }), noop),
+    );
     expect([...frag.querySelectorAll(".whatsnew-ver")].map((h) => h.textContent)).toEqual(["1.5.1"]);
   });
 
   it("says when earlier updates are not listed", () => {
-    const frag = renderToFragment(updatePromptTemplate(info({ releases: [rel("1.6.0", "N."), rel("1.5.0", "O.")], more: true }), noop));
+    const frag = renderToFragment(
+      updatePromptTemplate(info({ releases: [rel("1.6.0", "N."), rel("1.5.0", "O.")], more: true }), noop),
+    );
     expect(frag.querySelector(".whatsnew-more")?.textContent).toBe("Earlier updates are not listed here.");
   });
 
   it("renders a hostile version and note as text", () => {
     const frag = renderToFragment(
-      updatePromptTemplate(info({ releases: [rel("<img src=x>", "<script>x</script>"), rel("1.5.0", "<b>o</b>")], since: "<i>1</i>" }), noop),
+      updatePromptTemplate(
+        info({ releases: [rel("<img src=x>", "<script>x</script>"), rel("1.5.0", "<b>o</b>")], since: "<i>1</i>" }),
+        noop,
+      ),
     );
     expect(frag.querySelector("img, script, b, i")).toBeNull();
   });
@@ -189,8 +217,17 @@ describe("updatePromptTemplate release notes link", () => {
   });
 
   it("also follows the skipped-versions log", () => {
-    const skipped = info({ notes: ["New."], releases: [{ version: "1.6.0", notes: ["New."] }, { version: "1.5.0", notes: ["Old."] }], since: "1.4.0" });
-    expect(link(renderToFragment(updatePromptTemplate(skipped, noop, { releaseNotesLink: true })))?.getAttribute("href")).toBe("/help/changelog?from=game&via=update_prompt#1.6.0");
+    const skipped = info({
+      notes: ["New."],
+      releases: [
+        { version: "1.6.0", notes: ["New."] },
+        { version: "1.5.0", notes: ["Old."] },
+      ],
+      since: "1.4.0",
+    });
+    expect(
+      link(renderToFragment(updatePromptTemplate(skipped, noop, { releaseNotesLink: true })))?.getAttribute("href"),
+    ).toBe("/help/changelog?from=game&via=update_prompt#1.6.0");
   });
 
   it("is absent unless the controller asks for it (the installed app)", () => {

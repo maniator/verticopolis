@@ -6,8 +6,18 @@ vi.mock("../analytics", () => ({ trackAppAction: m.track }));
 import { AFTER_LIFT_MS, ROW_HOLD_MS, ROW_HOLD_SLOP, rowPress } from "./fileDialogPress";
 
 const finger = (type: string, x = 40, y = 60, init: PointerEventInit = {}) =>
-  new PointerEvent(type, { clientX: x, clientY: y, pointerType: "touch", pointerId: 7, isPrimary: true, bubbles: true, cancelable: true, ...init });
-const rightClick = (x = 40, y = 60) => new MouseEvent("contextmenu", { clientX: x, clientY: y, bubbles: true, cancelable: true });
+  new PointerEvent(type, {
+    clientX: x,
+    clientY: y,
+    pointerType: "touch",
+    pointerId: 7,
+    isPrimary: true,
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
+const rightClick = (x = 40, y = 60) =>
+  new MouseEvent("contextmenu", { clientX: x, clientY: y, bubbles: true, cancelable: true });
 /** A click as a finger or a mouse makes it (detail 1); a keyboard's has 0. */
 const click = (detail = 1) => new MouseEvent("click", { detail, bubbles: true, cancelable: true });
 

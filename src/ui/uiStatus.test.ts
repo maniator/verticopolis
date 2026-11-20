@@ -144,17 +144,37 @@ describe("toast rail", () => {
 });
 
 /** The header the HUD reads: a 1-star Classic tower at 07:00 on day one. */
-const HEADER = { money: 2_000_000, star: 1, mode: "classic", logSeq: 0, minutes: 420, day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2 };
+const HEADER = {
+  money: 2_000_000,
+  star: 1,
+  mode: "classic",
+  logSeq: 0,
+  minutes: 420,
+  day: 0,
+  dayOfWeek: 0,
+  isWeekend: false,
+  quarter: 0,
+  year: 0,
+  weekDays: 7,
+  weekendDays: 2,
+};
 
 /** A HUD source over a mock port: the strip, the log and the steps it answers,
  *  and a reader whose header a test states. */
-function source(header: Partial<typeof HEADER> = {}, strip: Record<string, number> = { population: 6 }, depths: number[] = [0, 0]) {
+function source(
+  header: Partial<typeof HEADER> = {},
+  strip: Record<string, number> = { population: 6 },
+  depths: number[] = [0, 0],
+) {
   const port = mockPort({
     statsStrip: () => record("statsStrip", strip),
     logAfter: () => new Float64Array(0),
     undoDepths: () => Float64Array.from(depths),
   });
-  const reader = { header: { ...HEADER, ...header }, tower: { towerName: "Tower One" } } as unknown as Pick<SimView, "header" | "tower">;
+  const reader = { header: { ...HEADER, ...header }, tower: { towerName: "Tower One" } } as unknown as Pick<
+    SimView,
+    "header" | "tower"
+  >;
   const src: HudSource = { reader, port, codes: new PortCodes(port) };
   return { src, port };
 }
@@ -163,7 +183,10 @@ function source(header: Partial<typeof HEADER> = {}, strip: Record<string, numbe
  *  already match `header`, so only the status bar, the mode badge, the stats
  *  grid and the Undo and Redo buttons draw. */
 function hud(header: Partial<typeof HEADER> = {}) {
-  const made: Record<string, HTMLElement> = { undo: document.createElement("button"), redo: document.createElement("button") };
+  const made: Record<string, HTMLElement> = {
+    undo: document.createElement("button"),
+    redo: document.createElement("button"),
+  };
   const el = new Proxy(made, {
     get: (target, key: string) => (target[key] ??= document.createElement("div")),
   });
@@ -171,7 +194,16 @@ function hud(header: Partial<typeof HEADER> = {}) {
   const catalog = catalogFor("classic");
   let scanKey = h.mode + ":" + h.star;
   for (const f of catalog.facilities) scanKey += h.money >= f.cost ? "1" : "0";
-  const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: h.logSeq, tool: { type: "inspect" }, setTowerName: () => {}, lobbyPicker: () => undefined } as unknown as UI;
+  const ui = {
+    el,
+    cb: { getCatalog: () => catalog },
+    paletteCatalog: catalog,
+    paletteScanKey: scanKey,
+    lastLogSeq: h.logSeq,
+    tool: { type: "inspect" },
+    setTowerName: () => {},
+    lobbyPicker: () => undefined,
+  } as unknown as UI;
   return { ui, el };
 }
 
@@ -192,7 +224,11 @@ describe("resetLog", () => {
   it("leaves a log the engine already wrote (a new tower's welcome) as its own words", () => {
     const { ui, el } = hud();
     const { src } = source();
-    const port = { ...src.port, logAfter: () => Float64Array.from([7, 0, 420]), logText: () => "Welcome! Lay a lobby." };
+    const port = {
+      ...src.port,
+      logAfter: () => Float64Array.from([7, 0, 420]),
+      logText: () => "Welcome! Lay a lobby.",
+    };
     resetLog(ui, { ...src, port } as HudSource, "Skyspire is open for business.");
     expect(el.log.textContent).toBe("Welcome! Lay a lobby.");
     expect(ui.lastLogSeq).toBe(7);
@@ -236,13 +272,25 @@ describe("update", () => {
     const { ui, el } = hud();
     const grayed = () => [el.undo, el.redo].map((b) => b.getAttribute("aria-disabled") === "true");
     const pumped: boolean[][] = [];
-    for (const depths of [[0, 0], [1, 0], [0, 1], [1, 0], [0, 0]]) {
+    for (const depths of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 0],
+      [0, 0],
+    ]) {
       const { src, port } = source({}, { population: 6 }, depths);
       update(ui, src);
       expect(port.undoDepths).toHaveBeenCalledOnce();
       pumped.push(grayed());
     }
-    expect(pumped).toEqual([[true, true], [false, true], [true, false], [false, true], [true, true]]);
+    expect(pumped).toEqual([
+      [true, true],
+      [false, true],
+      [true, false],
+      [false, true],
+      [true, true],
+    ]);
   });
 });
 
@@ -285,7 +333,13 @@ describe("the Undo and Redo buttons", () => {
     const { undo, ui } = buttons();
     const set = vi.spyOn(undo, "setAttribute");
     const clear = vi.spyOn(undo, "removeAttribute");
-    for (const depths of [[0, 0], [0, 0], [1, 0], [1, 0]]) setHistoryButtons(ui, holding(depths));
+    for (const depths of [
+      [0, 0],
+      [0, 0],
+      [1, 0],
+      [1, 0],
+    ])
+      setHistoryButtons(ui, holding(depths));
     expect([set.mock.calls.length, clear.mock.calls.length]).toEqual([1, 1]);
   });
 
@@ -338,8 +392,19 @@ describe("the palette's lock scan", () => {
     const el = new Proxy({ palette } as Record<string, HTMLElement>, {
       get: (made, key: string) => (made[key] ??= document.createElement("div")),
     });
-    const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: "", lastLogSeq: 0, tool: { type: "inspect" }, setTowerName: () => {}, lobbyPicker: () => undefined } as unknown as UI;
-    ui.selectTool = (tool) => { ui.tool = tool; };
+    const ui = {
+      el,
+      cb: { getCatalog: () => catalog },
+      paletteCatalog: catalog,
+      paletteScanKey: "",
+      lastLogSeq: 0,
+      tool: { type: "inspect" },
+      setTowerName: () => {},
+      lobbyPicker: () => undefined,
+    } as unknown as UI;
+    ui.selectTool = (tool) => {
+      ui.tool = tool;
+    };
     const pump = () => update(ui, source({ mode, star: 5, money: 1e9 }).src);
     pump();
     return {
@@ -353,7 +418,10 @@ describe("the palette's lock scan", () => {
       },
     };
   };
-  const withoutOffice = (c: Catalog): Catalog => ({ ...c, facilities: c.facilities.map((f) => (f.key === "office" ? { ...f, available: false } : f)) });
+  const withoutOffice = (c: Catalog): Catalog => ({
+    ...c,
+    facilities: c.facilities.map((f) => (f.key === "office" ? { ...f, available: false } : f)),
+  });
 
   for (const mode of ["classic", "modern"] as const) {
     it(`${mode}: the Food Hall is ${mode === "classic" ? "locked" : "unlocked"} at five stars`, () => {

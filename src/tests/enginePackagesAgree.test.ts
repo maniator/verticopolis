@@ -13,7 +13,8 @@ const root = (pkg: string) => dirname(require.resolve(`${pkg}/package.json`));
 const engine = root("@verticopolis/engine");
 const components = root("@verticopolis/components");
 const tooling = resolve(engine, "tooling");
-const json = (file: string): Record<string, unknown> => JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+const json = (file: string): Record<string, unknown> =>
+  JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
 
 describe("the installed engine and components packages", () => {
   it("carry the same gameplay event types", () => {
@@ -40,7 +41,9 @@ describe("the installed engine and components packages", () => {
   });
 
   it("satisfy the components' engine peer range", () => {
-    const peer = JSON.parse(readFileSync(resolve(components, "package.json"), "utf8")).peerDependencies["@verticopolis/engine"] as string;
+    const peer = JSON.parse(readFileSync(resolve(components, "package.json"), "utf8")).peerDependencies[
+      "@verticopolis/engine"
+    ] as string;
     const version = JSON.parse(readFileSync(resolve(engine, "package.json"), "utf8")).version as string;
     const [major, minor, patch] = version.split(".").map(Number);
     const m = /^\^(\d+)\.(\d+)\.(\d+)$/.exec(peer);

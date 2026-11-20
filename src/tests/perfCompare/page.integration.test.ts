@@ -9,7 +9,13 @@ import { buildScenarios, loadFixtureSave } from "./scenarios";
 
 const needsEngine = !hasWasmPackage();
 
-const g = globalThis as unknown as { window?: { __perfStash?: Record<string, unknown>; __perfSaves?: Record<string, string>; __perfStoredSaves?: Record<string, string> } };
+const g = globalThis as unknown as {
+  window?: {
+    __perfStash?: Record<string, unknown>;
+    __perfSaves?: Record<string, string>;
+    __perfStoredSaves?: Record<string, string>;
+  };
+};
 
 afterEach(() => {
   delete g.window;
@@ -40,7 +46,9 @@ describe("digestStashed", () => {
   });
 
   it.skipIf(needsEngine)("equals it for a player fixture with a pending choice and log prose", async () => {
-    const data = loadFixtureSave("node_modules/@verticopolis/engine/conformance/fixtures/sixseven_2.vctower") as unknown as { events: { pending: unknown }; log?: unknown[] };
+    const data = loadFixtureSave(
+      "node_modules/@verticopolis/engine/conformance/fixtures/sixseven_2.vctower",
+    ) as unknown as { events: { pending: unknown }; log?: unknown[] };
     data.events.pending = { kind: "bombThreat", message: "Pay $1,000?", cost: 1000 };
     data.log = [...(data.log ?? []), { minute: 1, text: "prose that stays out", kind: "info" }];
     const loaded = engineOn(JSON.stringify(data));
@@ -60,24 +68,27 @@ describe("digestStashed", () => {
 });
 
 describe("stashSave", () => {
-  it.skipIf(needsEngine)("gives the hosted runs a copy their stored-source load starts from the raw run's state", async () => {
-    const save = buildScenarios(["small"])[0].save;
-    const raw = engineOn(save);
-    g.window = {};
-    stashSave({ name: "small", save });
-    expect(g.window.__perfSaves?.small).toBe(save);
-    const loadStored = (text: string): unknown => {
-      const e = wasm().Engine.newGame(3, "modern");
-      try {
-        expect(e.loadSave(text)[0]).toBe(1);
-        return JSON.parse(e.serializeUnfolded());
-      } finally {
-        e.free();
-      }
-    };
-    // The stamped copy loads as this build's tower; the bare save would load
-    // as a founder's (the stored source's rule for a save with no stamp).
-    expect(await browserDigest(loadStored(g.window.__perfStoredSaves!.small))).toBe(raw.digest);
-    expect(await browserDigest(loadStored(save))).not.toBe(raw.digest);
-  });
+  it.skipIf(needsEngine)(
+    "gives the hosted runs a copy their stored-source load starts from the raw run's state",
+    async () => {
+      const save = buildScenarios(["small"])[0].save;
+      const raw = engineOn(save);
+      g.window = {};
+      stashSave({ name: "small", save });
+      expect(g.window.__perfSaves?.small).toBe(save);
+      const loadStored = (text: string): unknown => {
+        const e = wasm().Engine.newGame(3, "modern");
+        try {
+          expect(e.loadSave(text)[0]).toBe(1);
+          return JSON.parse(e.serializeUnfolded());
+        } finally {
+          e.free();
+        }
+      };
+      // The stamped copy loads as this build's tower; the bare save would load
+      // as a founder's (the stored source's rule for a save with no stamp).
+      expect(await browserDigest(loadStored(g.window.__perfStoredSaves!.small))).toBe(raw.digest);
+      expect(await browserDigest(loadStored(save))).not.toBe(raw.digest);
+    },
+  );
 });

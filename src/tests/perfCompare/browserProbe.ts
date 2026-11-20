@@ -22,7 +22,11 @@ export interface BrowserProbe {
  * build or adapter is not the one the run started on (both go in the
  * machine identity).
  */
-export async function probeBrowser(executablePath: string | null, launch: BrowserLaunch, timeoutMs = PROBE_TIMEOUT_MS): Promise<BrowserProbe> {
+export async function probeBrowser(
+  executablePath: string | null,
+  launch: BrowserLaunch,
+  timeoutMs = PROBE_TIMEOUT_MS,
+): Promise<BrowserProbe> {
   let browser: Browser | undefined;
   let abandoned = false;
   let timer: NodeJS.Timeout | undefined;
@@ -32,7 +36,11 @@ export async function probeBrowser(executablePath: string | null, launch: Browse
   const hung = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       abandoned = true;
-      reject(new Error(`the browser probe did not finish in ${timeoutMs / 1000} s (a GPU driver that hangs at context creation looks like this)`));
+      reject(
+        new Error(
+          `the browser probe did not finish in ${timeoutMs / 1000} s (a GPU driver that hangs at context creation looks like this)`,
+        ),
+      );
     }, timeoutMs);
   });
   const probe = async (): Promise<BrowserProbe> => {
@@ -72,8 +80,16 @@ async function read(browser: Browser): Promise<BrowserProbe> {
  * unknown renderer stops before the builds. Returns the warnings to print;
  * throws on an error.
  */
-export function gateBrowser(probe: BrowserProbe, quick: boolean, launch: BrowserLaunch, executablePath: string | null = null): string[] {
+export function gateBrowser(
+  probe: BrowserProbe,
+  quick: boolean,
+  launch: BrowserLaunch,
+  executablePath: string | null = null,
+): string[] {
   const f = rendererFinding([probe.renderer], [probe.renderer], { quick, exception: launch.rendererException });
-  if (f.errors.length) throw new Error(`the browser cannot be used for this run (${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? `, channel ${launch.channel}` : ""}):\n  - ${f.errors.join("\n  - ")}`);
+  if (f.errors.length)
+    throw new Error(
+      `the browser cannot be used for this run (${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? `, channel ${launch.channel}` : ""}):\n  - ${f.errors.join("\n  - ")}`,
+    );
   return f.warnings;
 }

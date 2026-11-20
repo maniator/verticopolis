@@ -17,10 +17,7 @@ import { NO_RESPONSE, checkIssueBody, type IssueForm } from "./issueForms.ts";
 export const FORMS_DATE = "2026-11-12";
 
 /** The game-mode choice a pair of mode labels stands for, if any. */
-export function modeFromLabels(
-  labels: string[],
-  options: string[],
-): string | undefined {
+export function modeFromLabels(labels: string[], options: string[]): string | undefined {
   const classic = labels.includes("classic");
   const modern = labels.includes("modern");
   const pick = (prefix: string) => options.find((o) => o.startsWith(prefix));
@@ -39,12 +36,7 @@ export function demoteFieldHeadings(body: string): string {
   const lines = body.split(/\r?\n/).map((line) => {
     const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
     if (fence === null && marker) fence = marker;
-    else if (
-      fence !== null &&
-      marker?.[0] === fence[0] &&
-      marker.length >= fence.length
-    )
-      fence = null;
+    else if (fence !== null && marker?.[0] === fence[0] && marker.length >= fence.length) fence = null;
     return fence === null && /^###\s/.test(line) ? `#${line}` : line;
   });
   if (fence !== null) lines.push(fence);
@@ -57,21 +49,13 @@ export function hasFormLayout(body: string, form: IssueForm): boolean {
 }
 
 /** The body laid out in the form's fields, with the original kept whole. */
-export function reshapeIssueBody(
-  body: string,
-  labels: string[],
-  form: IssueForm,
-): string {
+export function reshapeIssueBody(body: string, labels: string[], form: IssueForm): string {
   const asked = form.fields.filter((f) => f.type !== "markdown");
   const primary = asked.find((f) => f.required && f.type === "textarea");
-  if (!primary)
-    throw new Error(`the "${form.name}" form has no required text field`);
+  if (!primary) throw new Error(`the "${form.name}" form has no required text field`);
   const na = `n/a: filed before the issue forms (${FORMS_DATE}). The original report is under "${primary.label}".`;
   const sections = asked.map((field) => {
-    const mode =
-      field.type === "dropdown"
-        ? modeFromLabels(labels, field.options)
-        : undefined;
+    const mode = field.type === "dropdown" ? modeFromLabels(labels, field.options) : undefined;
     let answer: string;
     if (field === primary) answer = demoteFieldHeadings(body.trim()) || na;
     else if (field.type === "checkboxes") answer = NO_RESPONSE;

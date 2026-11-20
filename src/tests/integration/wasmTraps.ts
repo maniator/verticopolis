@@ -19,7 +19,8 @@ const poisoned: WasmEngine[] = [];
 export function freePoisoned(): void {
   for (const engine of poisoned.splice(0)) {
     for (const name of Object.getOwnPropertyNames(engine)) {
-      if (typeof (engine as unknown as Record<string, unknown>)[name] === "function") delete (engine as unknown as Record<string, unknown>)[name];
+      if (typeof (engine as unknown as Record<string, unknown>)[name] === "function")
+        delete (engine as unknown as Record<string, unknown>)[name];
     }
     if ((engine as unknown as { __wbg_ptr: number }).__wbg_ptr !== 0) engine.free();
   }
@@ -33,7 +34,12 @@ export function trapAfter(engine: WasmEngine, method: keyof WasmEngine & string,
   const poison = () => {
     for (const name of Object.getOwnPropertyNames(proto)) {
       // wasm-bindgen's `__destroy_into_raw` is JavaScript only and never traps.
-      if (name === "constructor" || name === "__destroy_into_raw" || typeof Object.getOwnPropertyDescriptor(proto, name)?.value !== "function") continue;
+      if (
+        name === "constructor" ||
+        name === "__destroy_into_raw" ||
+        typeof Object.getOwnPropertyDescriptor(proto, name)?.value !== "function"
+      )
+        continue;
       Object.defineProperty(engine, name, {
         value: () => {
           throw new Error(POISONED);

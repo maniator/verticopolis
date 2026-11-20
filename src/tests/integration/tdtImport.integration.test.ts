@@ -183,9 +183,7 @@ describeWithCodec("parseTDT: golden mappings", () => {
 
   it("the report writes negative funds minus-first, matching the stats panel", () => {
     expect(parse({ balance: -500 }).report.broughtOver.join(" ")).toContain("-$50,000 in funds");
-    expect(parse({ balance: 20000 }).report.broughtOver.join(" ")).toContain(
-      "$2,000,000 in funds",
-    );
+    expect(parse({ balance: 20000 }).report.broughtOver.join(" ")).toContain("$2,000,000 in funds");
   });
 
   it("tick 0 lands on 7:00 AM of the header's day", () => {
@@ -331,8 +329,20 @@ describeWithCodec("parseTDT: golden mappings", () => {
       floors: [
         // Each story: a 7-tile screen piece on the left and the auditorium on
         // its right, as every theater in the real saves is written.
-        { index: 20, tenants: [{ left: 100, right: 107, type: 35 }, { left: 107, right: 131, type: 19 }] },
-        { index: 21, tenants: [{ left: 100, right: 107, type: 34 }, { left: 107, right: 131, type: 18 }] },
+        {
+          index: 20,
+          tenants: [
+            { left: 100, right: 107, type: 35 },
+            { left: 107, right: 131, type: 19 },
+          ],
+        },
+        {
+          index: 21,
+          tenants: [
+            { left: 100, right: 107, type: 34 },
+            { left: 107, right: 131, type: 18 },
+          ],
+        },
       ],
     });
     const cinemas = save.units.filter((u) => u.kind === "cinema");
@@ -454,7 +464,15 @@ describeWithCodec("parseTDT: golden mappings", () => {
     // Parking stall + ramp forged onto our floor 11: functional above-ground
     // parking would bypass Tower.roomPlacementReason's basement rule.
     const { save, report } = parse({
-      floors: [{ index: 20, tenants: [{ left: 100, right: 116, type: 44 }, { left: 116, right: 120, type: 11 }] }],
+      floors: [
+        {
+          index: 20,
+          tenants: [
+            { left: 100, right: 116, type: 44 },
+            { left: 116, right: 120, type: 11 },
+          ],
+        },
+      ],
     });
     expect(save.units.filter((u) => u.kind === "parking" || u.kind === "parkingRamp")).toHaveLength(0);
     expect(report.couldNotBring.join(" ")).toMatch(/floor its kind can't occupy/);
@@ -947,7 +965,15 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     // used to be rebuilt from the floor map. The express is 16 entries here for 8 stops.
     const spec: TdtSpec = {
       elevators: [
-        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 25, 40, 55, 70, 85, 99, 100], payloadFloors: 16 },
+        {
+          type: 0,
+          cars: 8,
+          x: 175,
+          bottomFloor: 10,
+          topFloor: 100,
+          serviced: [10, 25, 40, 55, 70, 85, 99, 100],
+          payloadFloors: 16,
+        },
         { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
         { type: 0, cars: 8, x: 321, bottomFloor: 10, topFloor: 100, serviced: [10, 40, 70, 100], payloadFloors: 16 },
         { type: 2, cars: 3, x: 209, bottomFloor: 39, topFloor: 54 },
@@ -967,7 +993,15 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
   it("empty slots skipped over by the resync are counted, so the parking block is still found", () => {
     const spec: TdtSpec = {
       elevators: [
-        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 25, 40, 55, 70, 85, 99, 100], payloadFloors: 16 },
+        {
+          type: 0,
+          cars: 8,
+          x: 175,
+          bottomFloor: 10,
+          topFloor: 100,
+          serviced: [10, 25, 40, 55, 70, 85, 99, 100],
+          payloadFloors: 16,
+        },
         null,
         { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
         null,
@@ -1011,7 +1045,15 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
   it("an odd express with no shaft header behind it is still refused, not guessed", () => {
     const spec: TdtSpec = {
       elevators: [
-        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 25, 40, 55, 70, 85, 99, 100], payloadFloors: 16 },
+        {
+          type: 0,
+          cars: 8,
+          x: 175,
+          bottomFloor: 10,
+          topFloor: 100,
+          serviced: [10, 25, 40, 55, 70, 85, 99, 100],
+          payloadFloors: 16,
+        },
       ],
       stairs: [{ type: 1, x: 120, floor: 10 }],
       routingTailBytes: 20_000,
@@ -1048,7 +1090,10 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     ] as const) {
       const walked = parseTdtBinary(bytes);
       expect(walked.warnings, label).toEqual([]);
-      expect(walked.elevators!.map((e) => e.x), label).toEqual([175, 145]);
+      expect(
+        walked.elevators!.map((e) => e.x),
+        label,
+      ).toEqual([175, 145]);
       expect(walked.parkingConnected, label).toBe(7);
     }
   });
@@ -1074,7 +1119,6 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     expect(walked.warnings).toEqual([]);
   });
 
-
   it("an unstamped span-sized express with NOTHING to anchor on is still read", () => {
     // The shape that made the shorter layout dangerous as a fallback: a v2.12.0
     // export (span-sized express, no trailer) that is stairless AND cut inside
@@ -1097,12 +1141,14 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
       // The longest walk that completes IS the right one here, so this shape
       // reads correctly rather than merely failing loudly. The weaker promise
       // is the floor: never a confident table with parking read from zero fill.
-      expect(walked.elevators!.map((e) => e.x), `tail ${tailBytes}`).toEqual([175, 145]);
+      expect(
+        walked.elevators!.map((e) => e.x),
+        `tail ${tailBytes}`,
+      ).toEqual([175, 145]);
       expect(walked.parkingConnected, `tail ${tailBytes}`).toBe(7);
       expect(walked.warnings, `tail ${tailBytes}`).toEqual([]);
     }
   });
-
 
   it("an express with NO stops recorded does not get the default handed to it", () => {
     // The layouts disagree most at zero stops: the stop-based ones floor the
@@ -1146,7 +1192,10 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     for (const generation of [4, 7, 0, 0xffff]) {
       const walked = parseTdtBinary(withStamp(base, generation));
       expect(walked.elevators, `generation ${generation}`).toHaveLength(2);
-      expect(walked.elevators!.map((e) => e.x), `generation ${generation}`).toEqual([100, 140]);
+      expect(
+        walked.elevators!.map((e) => e.x),
+        `generation ${generation}`,
+      ).toEqual([100, 140]);
       expect(walked.warnings, `generation ${generation}`).toEqual([]);
     }
   });
@@ -1461,7 +1510,10 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     expect(stairs).toHaveLength(3); // 1 + 2 stacked
     expect(escalators).toHaveLength(4); // 1 + 3 stacked
     const stacked = stairs.filter((t) => t.x === 140);
-    expect(stacked.map((t) => [t.bottom, t.top])).toEqual([[1, 2], [2, 3]]); // exact-footprint stack
+    expect(stacked.map((t) => [t.bottom, t.top])).toEqual([
+      [1, 2],
+      [2, 3],
+    ]); // exact-footprint stack
     for (const t of flights) expect(t.top - t.bottom).toBe(1);
   });
 

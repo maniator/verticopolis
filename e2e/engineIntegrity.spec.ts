@@ -26,13 +26,28 @@ const dist = new URL("../dist/engine/BUILD.json", import.meta.url);
 type BuildRecord = { package: string; files: Record<string, { sha256: string; bytes: number }> };
 // Read on first use, so a project that skips the file never needs dist/engine.
 let record: BuildRecord | undefined;
-const built = new Proxy({} as BuildRecord, { get: (_, key: keyof BuildRecord) => (record ??= JSON.parse(readFileSync(dist, "utf8")) as BuildRecord)[key] });
+const built = new Proxy({} as BuildRecord, {
+  get: (_, key: keyof BuildRecord) => (record ??= JSON.parse(readFileSync(dist, "utf8")) as BuildRecord)[key],
+});
 const short = (id: string) => id.slice(0, 12);
 
 interface Boot {
   build: string;
   engine: string;
-  failure: { stage: string; reason: string; message: string; package?: { kind: string; file: string | null; expected: string | null; found: string | null; expectedPackage: string | null; servedPackage: string | null; controlled: boolean } } | null;
+  failure: {
+    stage: string;
+    reason: string;
+    message: string;
+    package?: {
+      kind: string;
+      file: string | null;
+      expected: string | null;
+      found: string | null;
+      expectedPackage: string | null;
+      servedPackage: string | null;
+      controlled: boolean;
+    };
+  } | null;
 }
 
 const bootState = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot as Boot);
@@ -66,26 +81,39 @@ async function spy(page: Page): Promise<void> {
   });
 }
 
-const spied = (page: Page) => page.evaluate(() => ({ ...(window as any).__engineSpy }) as { instantiate: number; scriptBlobs: number });
+const spied = (page: Page) =>
+  page.evaluate(() => ({ ...(window as any).__engineSpy }) as { instantiate: number; scriptBlobs: number });
 
 /** The page refused the engine: the boot state says why, nothing was
  *  instantiated, and what the player sees matches the build. A file that arrives
  *  longer than the shell expects is refused while it streams, which can happen
  *  before the record has been read whole; only then (`oversize`) is the served
  *  package id allowed to be missing, and the screen must say exactly which. */
-async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record", opts: { oversize?: boolean } = {}): Promise<NonNullable<Boot["failure"]>> {
+async function expectRefused(
+  page: Page,
+  file: "glue" | "wasm" | "build-record",
+  opts: { oversize?: boolean } = {},
+): Promise<NonNullable<Boot["failure"]>> {
   await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 30_000 });
   const state = await bootState(page);
-  expect(state.failure, "the boot state names the refusal").toMatchObject({ stage: "load", reason: "package-mismatch", package: { kind: "mismatch", file, expectedPackage: short(built.package) } });
+  expect(state.failure, "the boot state names the refusal").toMatchObject({
+    stage: "load",
+    reason: "package-mismatch",
+    package: { kind: "mismatch", file, expectedPackage: short(built.package) },
+  });
   expect(state.engine).toBe("none");
-  expect(await spied(page), "nothing was compiled or imported from the refused bytes").toEqual({ instantiate: 0, scriptBlobs: 0 });
+  expect(await spied(page), "nothing was compiled or imported from the refused bytes").toEqual({
+    instantiate: 0,
+    scriptBlobs: 0,
+  });
   expect(await page.evaluate(() => !!(window as any).__vcEngine?.status?.hosted)).toBe(false);
   const failure = page.locator("#engine-failure");
   await expect(failure).toBeVisible();
   await expect(failure).toHaveAttribute("role", "alert");
   await expect(page.locator("#boot-fallback button:not([data-act])")).toBeFocused();
   const served = state.failure!.package?.servedPackage ?? null;
-  if (served === null) expect(opts.oversize, "the served package id is missing only when an oversize file was refused first").toBe(true);
+  if (served === null)
+    expect(opts.oversize, "the served package id is missing only when an oversize file was refused first").toBe(true);
   else expect(served, "the served package id is a 12-hex prefix").toMatch(/^[0-9a-f]{12}$/);
   await expect(failure, "the screen says what is wrong and carries the ids, or the file that differs").toContainText(
     /The engine files do not match this version of the game\. The engine was not started\. \((expected [0-9a-f]{12}, found ([0-9a-f]{12}|unavailable)|[a-z ]+ differs from the record)\)/,
@@ -105,22 +133,31 @@ function navigations(page: Page): { count: number } {
 
 test("the precache holds exactly the package the shell was built with, and the page checks it", async ({ page }) => {
   await spy(page);
-  const record = page.waitForResponse((r) => new URL(r.url()).pathname === "/engine/BUILD.json" && r.fromServiceWorker(), { timeout: 30_000 });
+  const record = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === "/engine/BUILD.json" && r.fromServiceWorker(),
+    { timeout: 30_000 },
+  );
   await installed(page);
   await hostedGame(page);
   expect((await record).ok(), "the page read BUILD.json through the worker's precache").toBe(true);
-  const cached = await page.evaluate(async (paths) => {
-    const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
-    const out: Record<string, { sha256: string; bytes: number }> = {};
-    for (const path of paths) {
-      const response = await caches.match(new URL(path, document.baseURI).href, { ignoreSearch: true });
-      const body = await response!.arrayBuffer();
-      out[path] = { sha256: hex(await crypto.subtle.digest("SHA-256", body)), bytes: body.byteLength };
-    }
-    return out;
-  }, [ENGINE_PATH.glue, ENGINE_PATH.wasm, ENGINE_PATH.record]);
+  const cached = await page.evaluate(
+    async (paths) => {
+      const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+      const out: Record<string, { sha256: string; bytes: number }> = {};
+      for (const path of paths) {
+        const response = await caches.match(new URL(path, document.baseURI).href, { ignoreSearch: true });
+        const body = await response!.arrayBuffer();
+        out[path] = { sha256: hex(await crypto.subtle.digest("SHA-256", body)), bytes: body.byteLength };
+      }
+      return out;
+    },
+    [ENGINE_PATH.glue, ENGINE_PATH.wasm, ENGINE_PATH.record],
+  );
   const onDisk = readFileSync(dist);
-  expect(cached[ENGINE_PATH.record], "the cached record is the one dist/ was built with").toEqual({ sha256: createHash("sha256").update(onDisk).digest("hex"), bytes: onDisk.byteLength });
+  expect(cached[ENGINE_PATH.record], "the cached record is the one dist/ was built with").toEqual({
+    sha256: createHash("sha256").update(onDisk).digest("hex"),
+    bytes: onDisk.byteLength,
+  });
   expect(cached["engine/verticopolis_engine.js"]).toEqual(built.files["verticopolis_engine.js"]);
   expect(cached["engine/verticopolis_engine_bg.wasm"]).toEqual(built.files["verticopolis_engine_bg.wasm"]);
   // A good boot moves the spies, so the refusals below are not passing on a dead spy.
@@ -141,7 +178,8 @@ test.describe("a tampered precache is refused", () => {
     expect(failure.package?.found).toBeNull();
     // If BUILD.json finished before the size refusal, its package id is attached, and it is the shell's own.
     const served = failure.package?.servedPackage;
-    if (served !== null) expect(served, "the record that came with it names the shell's own package").toBe(short(built.package));
+    if (served !== null)
+      expect(served, "the record that came with it names the shell's own package").toBe(short(built.package));
     expect(failure.package?.expected).toBe(short(built.files["verticopolis_engine_bg.wasm"].sha256));
     expect(failure.package?.controlled).toBe(true);
   });
@@ -191,10 +229,16 @@ test.describe("an uncontrolled page", () => {
       const response = await route.fetch();
       const body = Buffer.concat([await response.body(), Buffer.from(SALT_SECTION)]);
       // The new length goes in the header, so the refusal is the body being longer than the build's file, not a cut body.
-      await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
+      await route.fulfill({
+        response,
+        body,
+        headers: { ...response.headers(), "content-length": String(body.length) },
+      });
     });
     await page.goto("/");
-    await expect.poll(() => seen.count, { message: "the page reloads once by itself for another build's files" }).toBe(2);
+    await expect
+      .poll(() => seen.count, { message: "the page reloads once by itself for another build's files" })
+      .toBe(2);
     const failure = await expectRefused(page, "wasm", { oversize: true });
     expect(failure.package?.controlled, "no worker controlled this page").toBe(false);
   });
@@ -205,7 +249,11 @@ test.describe("an uncontrolled page", () => {
     await page.route("**/engine/verticopolis_engine.js", async (route) => {
       const response = await route.fetch();
       const body = Buffer.from(`${await response.text()}\n// another build\n`);
-      await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
+      await route.fulfill({
+        response,
+        body,
+        headers: { ...response.headers(), "content-length": String(body.length) },
+      });
     });
     await page.goto("/");
     await expect.poll(() => seen.count).toBe(2);
@@ -218,7 +266,11 @@ test.describe("an uncontrolled page", () => {
     await page.route("**/engine/verticopolis_engine_bg.wasm", async (route) => {
       const response = await route.fetch();
       const body = Buffer.concat([await response.body(), Buffer.from(SALT_SECTION)]);
-      await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
+      await route.fulfill({
+        response,
+        body,
+        headers: { ...response.headers(), "content-length": String(body.length) },
+      });
     });
     const seen = navigations(page);
     await page.goto("/");

@@ -18,9 +18,31 @@ export const ring = (hours: readonly (readonly [number, number])[]): number[] =>
   for (const [h, v] of hours) r[h] = v;
   return r;
 };
-export const WARM = ring([[7, 0.9], [8, 1], [9, 0.8], [12, 0.4], [17, 0.95], [18, 0.7]]);
-export const COLD = ring([[8, 0.5], [9, 0.5], [10, 0.5], [11, 0.5], [12, 0.5]]); // five hours: still cold
-export const MIXED = ring([[6, 0.02], [7, 0.3], [8, 0.6], [9, 1], [10, 2.5], [11, 0.55], [14, 0.45], [20, 0.15]]);
+export const WARM = ring([
+  [7, 0.9],
+  [8, 1],
+  [9, 0.8],
+  [12, 0.4],
+  [17, 0.95],
+  [18, 0.7],
+]);
+export const COLD = ring([
+  [8, 0.5],
+  [9, 0.5],
+  [10, 0.5],
+  [11, 0.5],
+  [12, 0.5],
+]); // five hours: still cold
+export const MIXED = ring([
+  [6, 0.02],
+  [7, 0.3],
+  [8, 0.6],
+  [9, 1],
+  [10, 2.5],
+  [11, 0.55],
+  [14, 0.45],
+  [20, 0.15],
+]);
 
 /** The binding calls the schedule suites make beyond the port. */
 export type RustPort = EnginePort & {
@@ -70,7 +92,11 @@ export function tower(mode: GameMode): Fixture {
   };
   for (let x = 0; x < WIDTH; x++) put("lobby", 1, x);
   for (let f = 2; f <= TOP; f++) for (let x = 0; x < WIDTH; x++) put(f === SKY_LOBBY ? "lobby" : "floor", f, x);
-  const shaft = (kind: "elevatorStandard" | "elevatorService" | "elevatorExpress" | "stairs", x: number, top: number): number => {
+  const shaft = (
+    kind: "elevatorStandard" | "elevatorService" | "elevatorExpress" | "stairs",
+    x: number,
+    top: number,
+  ): number => {
     const r = draft.tower.placeTransport(kind, x, 1, top);
     if (!r.ok || r.transportId === undefined) throw new Error(`${kind}: ${r.reason}`);
     return r.transportId;
@@ -87,10 +113,18 @@ export type Slots = readonly [number[], number[]];
 
 /** Floors the shaft's boarding mass sits on, one slot of the day. */
 const origins = (floors: Record<number, number>): Map<number, number>[] =>
-  Array.from({ length: 24 }, (_, h) => (h === 9 ? new Map(Object.entries(floors).map(([f, n]) => [Number(f), n])) : new Map()));
+  Array.from({ length: 24 }, (_, h) =>
+    h === 9 ? new Map(Object.entries(floors).map(([f, n]) => [Number(f), n])) : new Map(),
+  );
 
 /** Record a shaft's measured curves and boarding floors on the fixture. */
-export function measure(f: Fixture, id: number, [weekday, weekend]: Slots, weekdayOrigins: Record<number, number>, weekendOrigins: Record<number, number>): void {
+export function measure(
+  f: Fixture,
+  id: number,
+  [weekday, weekend]: Slots,
+  weekdayOrigins: Record<number, number>,
+  weekendOrigins: Record<number, number>,
+): void {
   f.telemetry.hourly.set(id, { weekday: [...weekday], weekend: [...weekend] });
   f.telemetry.origins.set(id, { weekday: origins(weekdayOrigins), weekend: origins(weekendOrigins) });
 }
@@ -100,7 +134,11 @@ export function measure(f: Fixture, id: number, [weekday, weekend]: Slots, weekd
 export function openEngine(f: Fixture): RustPort {
   const engine = wasm().Engine.fromSave(f.draft.saveText()) as unknown as RustPort;
   engine.markStop(f.standard, SKIPPED_FLOOR, false);
-  const stores = { elevatorUtil: new Map<number, number>(), elevatorHourly: f.telemetry.hourly, elevatorOrigins: f.telemetry.origins };
+  const stores = {
+    elevatorUtil: new Map<number, number>(),
+    elevatorHourly: f.telemetry.hourly,
+    elevatorOrigins: f.telemetry.origins,
+  };
   engine.seedElevatorTelemetry(JSON.stringify(telemetryDocument(stores)));
   return engine;
 }

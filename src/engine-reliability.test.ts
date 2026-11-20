@@ -131,26 +131,110 @@ describe("the page-lives query", () => {
 describe("pageLivesFromRows", () => {
   it("normalizes the query's rows, keeping a placeholder for a missing value", () => {
     const [a, b] = pageLivesFromRows([
-      { session_id: "s", page_life: "p", version: "2.36.0", sha: "abc", build: "switchable", requested: "wasm", assigned_arm: null, size_gated: 1, fallbacks: "2", settle_fallbacks: 1, reasons: ["none", "attach-refused", ""], writer_latched: "true" },
+      {
+        session_id: "s",
+        page_life: "p",
+        version: "2.36.0",
+        sha: "abc",
+        build: "switchable",
+        requested: "wasm",
+        assigned_arm: null,
+        size_gated: 1,
+        fallbacks: "2",
+        settle_fallbacks: 1,
+        reasons: ["none", "attach-refused", ""],
+        writer_latched: "true",
+      },
       { session_id: "t", page_life: "q" },
     ]);
-    expect(a).toEqual({ session: "s", pageLife: "p", version: "2.36.0", sha: "abc", build: "switchable", requested: "wasm", stage: "none", assignedArm: "none", selectedBy: "default", safetySuppressed: false, sizeGated: true, fallbacks: 2, settleFallbacks: 1, reasons: ["attach-refused"], writerLatched: true, settled: true, attempted: false, engaged: false, engagedEngine: "none", engagedBy: "none", firstSeen: "" });
-    expect(b).toMatchObject({ version: "unknown", sha: "unknown", build: "unknown", requested: "unknown", assignedArm: "none", selectedBy: "default", sizeGated: false, fallbacks: 0, settleFallbacks: 0, reasons: [], writerLatched: false });
+    expect(a).toEqual({
+      session: "s",
+      pageLife: "p",
+      version: "2.36.0",
+      sha: "abc",
+      build: "switchable",
+      requested: "wasm",
+      stage: "none",
+      assignedArm: "none",
+      selectedBy: "default",
+      safetySuppressed: false,
+      sizeGated: true,
+      fallbacks: 2,
+      settleFallbacks: 1,
+      reasons: ["attach-refused"],
+      writerLatched: true,
+      settled: true,
+      attempted: false,
+      engaged: false,
+      engagedEngine: "none",
+      engagedBy: "none",
+      firstSeen: "",
+    });
+    expect(b).toMatchObject({
+      version: "unknown",
+      sha: "unknown",
+      build: "unknown",
+      requested: "unknown",
+      assignedArm: "none",
+      selectedBy: "default",
+      sizeGated: false,
+      fallbacks: 0,
+      settleFallbacks: 0,
+      reasons: [],
+      writerLatched: false,
+    });
   });
 
   it("reads an empty string, which argMinIf gives a page life with no engaged row, as the default", () => {
-    const [a] = pageLivesFromRows([{ session_id: "s", page_life: "p", stage: "", assigned_arm: "", selected_by: "", engaged_engine: "", engaged_by: "" }]);
-    expect(a).toMatchObject({ stage: "none", assignedArm: "none", selectedBy: "default", engagedEngine: "none", engagedBy: "none" });
+    const [a] = pageLivesFromRows([
+      {
+        session_id: "s",
+        page_life: "p",
+        stage: "",
+        assigned_arm: "",
+        selected_by: "",
+        engaged_engine: "",
+        engaged_by: "",
+      },
+    ]);
+    expect(a).toMatchObject({
+      stage: "none",
+      assignedArm: "none",
+      selectedBy: "default",
+      engagedEngine: "none",
+      engagedBy: "none",
+    });
   });
 
   it("never passes a forged value through to the report", () => {
     // The rows come from a public ingest route.
-    const [pl] = pageLivesFromRows([{ session: "s", page_life: "p", version: "2.36.0 | [x](http://e.vil)", sha: "abc\n# hi", build: "<b>", reasons: ["boot-error", "![i](x)"] }]);
-    expect(pl).toMatchObject({ version: "unrecognized", sha: "unrecognized", build: "unrecognized", reasons: ["boot-error", "unrecognized"] });
+    const [pl] = pageLivesFromRows([
+      {
+        session: "s",
+        page_life: "p",
+        version: "2.36.0 | [x](http://e.vil)",
+        sha: "abc\n# hi",
+        build: "<b>",
+        reasons: ["boot-error", "![i](x)"],
+      },
+    ]);
+    expect(pl).toMatchObject({
+      version: "unrecognized",
+      sha: "unrecognized",
+      build: "unrecognized",
+      reasons: ["boot-error", "unrecognized"],
+    });
   });
 
   it("marks a fallback count that is not a whole number of zero or more", () => {
-    const lives = pageLivesFromRows([-1, 0.5, Infinity, "abc"].map((fallbacks) => ({ session_id: "s", page_life: "p", fallbacks, settle_fallbacks: 0 })));
+    const lives = pageLivesFromRows(
+      [-1, 0.5, Infinity, "abc"].map((fallbacks) => ({
+        session_id: "s",
+        page_life: "p",
+        fallbacks,
+        settle_fallbacks: 0,
+      })),
+    );
     for (const pl of lives) expect(pl.fallbacks).toBeNaN();
     const [settle] = pageLivesFromRows([{ session_id: "s", page_life: "p", fallbacks: 1, settle_fallbacks: -2 }]);
     expect(settle.settleFallbacks).toBeNaN();
@@ -192,7 +276,11 @@ describe("summarizeReliability", () => {
 
   it("counts only the wasm host by default; the experimental hosts are measurement only", () => {
     expect(DEFAULT_HOSTS).toEqual(["wasm"]);
-    const lives = [life({ session: "a", requested: "ts" }), life({ session: "b", requested: "wasm-worker", fallbacks: 1, reasons: ["boot-error"] }), life({ session: "c" })];
+    const lives = [
+      life({ session: "a", requested: "ts" }),
+      life({ session: "b", requested: "wasm-worker", fallbacks: 1, reasons: ["boot-error"] }),
+      life({ session: "c" }),
+    ];
     expect(summarizeReliability(lives)).toMatchObject({ n: 1, faults: 0 });
     expect(summarizeReliability(lives, { hosts: ["wasm-worker"] })).toMatchObject({ n: 1, faults: 1 });
   });
@@ -207,7 +295,14 @@ describe("summarizeReliability", () => {
       // c: the first tower ran on the engine; a later tower met the mismatch.
       life({ session: "c", fallbacks: 1, settleFallbacks: 0, reasons: ["package-mismatch"] }),
     ]);
-    expect(s).toMatchObject({ n: 2, faults: 0, pageLives: 2, mismatchSessions: 3, mismatchPageLives: 3, mismatchNeverRan: 2 });
+    expect(s).toMatchObject({
+      n: 2,
+      faults: 0,
+      pageLives: 2,
+      mismatchSessions: 3,
+      mismatchPageLives: 3,
+      mismatchNeverRan: 2,
+    });
     // The mismatch has its own line, never the by-reason table.
     expect(s.byReason).toEqual([]);
   });
@@ -222,18 +317,42 @@ describe("summarizeReliability", () => {
       // c: with another reason it is a fault, listed by that reason alone.
       life({ session: "c", fallbacks: 2, settleFallbacks: 1, reasons: ["unverifiable", "attach-refused"] }),
     ]);
-    expect(s).toMatchObject({ n: 2, faults: 1, pageLives: 2, unverifiableSessions: 3, unverifiablePageLives: 3, unverifiableNeverRan: 2, mismatchPageLives: 0 });
+    expect(s).toMatchObject({
+      n: 2,
+      faults: 1,
+      pageLives: 2,
+      unverifiableSessions: 3,
+      unverifiablePageLives: 3,
+      unverifiableNeverRan: 2,
+      mismatchPageLives: 0,
+    });
     expect(s.byReason).toEqual([{ reason: "attach-refused", pageLives: 1 }]);
-    expect(renderReliabilityMarkdown(s, { windowLabel: "last 30 days", until: "2026-10-20 12:00", hosts: ["wasm"], builds: "all", arms: "all", truncated: false })).toContain("Cannot verify the engine files (outside the rate) | 3 sessions, 3 page lives, 2 of them never ran the engine");
+    expect(
+      renderReliabilityMarkdown(s, {
+        windowLabel: "last 30 days",
+        until: "2026-10-20 12:00",
+        hosts: ["wasm"],
+        builds: "all",
+        arms: "all",
+        truncated: false,
+      }),
+    ).toContain(
+      "Cannot verify the engine files (outside the rate) | 3 sessions, 3 page lives, 2 of them never ran the engine",
+    );
   });
 
   it("counts a writer latch-off in a mismatch that never ran the engine", () => {
-    const s = summarizeReliability([life({ session: "a", fallbacks: 1, settleFallbacks: 1, reasons: ["package-mismatch"], writerLatched: true }), life({ session: "b" })]);
+    const s = summarizeReliability([
+      life({ session: "a", fallbacks: 1, settleFallbacks: 1, reasons: ["package-mismatch"], writerLatched: true }),
+      life({ session: "b" }),
+    ]);
     expect(s).toMatchObject({ n: 1, mismatchNeverRan: 1, latchedSessions: 1, latchedPageLives: 1 });
   });
 
   it("counts a mismatch that came with another reason as a fault, listing only the fault's reason", () => {
-    const s = summarizeReliability([life({ fallbacks: 2, settleFallbacks: 1, reasons: ["package-mismatch", "attach-refused"] })]);
+    const s = summarizeReliability([
+      life({ fallbacks: 2, settleFallbacks: 1, reasons: ["package-mismatch", "attach-refused"] }),
+    ]);
     expect(s).toMatchObject({ n: 1, faults: 1, mismatchSessions: 1, mismatchNeverRan: 0 });
     expect(s.byReason).toEqual([{ reason: "attach-refused", pageLives: 1 }]);
   });
@@ -272,7 +391,14 @@ describe("summarizeReliability", () => {
       life({ session: "e", fallbacks: 1, settleFallbacks: -1, reasons: ["package-mismatch"] }),
       life({ session: "f" }),
     ]);
-    expect(s).toMatchObject({ n: 1, faults: 0, unrecognizedPageLives: 5, totalFallbacks: 0, maxFallbacks: 0, mismatchPageLives: 0 });
+    expect(s).toMatchObject({
+      n: 1,
+      faults: 0,
+      unrecognizedPageLives: 5,
+      totalFallbacks: 0,
+      maxFallbacks: 0,
+      mismatchPageLives: 0,
+    });
   });
 
   it("binds its closed lists to the values the game sends", () => {
@@ -290,15 +416,31 @@ describe("summarizeReliability", () => {
   });
 
   it("leaves safety-suppressed page lives out of the rate and counts the crash loops among them", () => {
-    const loop = (session: string, over: Partial<PageLife> = {}) => life({ session, selectedBy: "safety-device", safetySuppressed: true, reasons: ["unclean-exit"], ...over });
+    const loop = (session: string, over: Partial<PageLife> = {}) =>
+      life({ session, selectedBy: "safety-device", safetySuppressed: true, reasons: ["unclean-exit"], ...over });
     // A flag alone, or a safety selection alone, is a suppression.
-    expect(summarizeReliability([life({ session: "a", safetySuppressed: true }), life({ session: "b", selectedBy: "safety-build" })])).toMatchObject({ n: 0, safetySuppressedPageLives: 2, crashLoopPageLives: 0 });
+    expect(
+      summarizeReliability([
+        life({ session: "a", safetySuppressed: true }),
+        life({ session: "b", selectedBy: "safety-build" }),
+      ]),
+    ).toMatchObject({ n: 0, safetySuppressedPageLives: 2, crashLoopPageLives: 0 });
     // A suppressed page life with an engine reason, or a fallback whose reason rows were lost, is a crash loop.
-    expect(summarizeReliability([loop("c"), loop("d", { reasons: [], fallbacks: 1 }), loop("e", { reasons: ["package-mismatch"] })])).toMatchObject({ n: 0, faults: 0, safetySuppressedPageLives: 3, crashLoopPageLives: 2 });
+    expect(
+      summarizeReliability([
+        loop("c"),
+        loop("d", { reasons: [], fallbacks: 1 }),
+        loop("e", { reasons: ["package-mismatch"] }),
+      ]),
+    ).toMatchObject({ n: 0, faults: 0, safetySuppressedPageLives: 3, crashLoopPageLives: 2 });
   });
 
   it("keeps a loop's size: the fallbacks sent in all and the most in one page life", () => {
-    const s = summarizeReliability([life({ session: "a", fallbacks: 50, reasons: ["attach-refused"] }), life({ session: "b", fallbacks: 2, reasons: ["boot-error"] }), life({ session: "c" })]);
+    const s = summarizeReliability([
+      life({ session: "a", fallbacks: 50, reasons: ["attach-refused"] }),
+      life({ session: "b", fallbacks: 2, reasons: ["boot-error"] }),
+      life({ session: "c" }),
+    ]);
     expect(s).toMatchObject({ n: 3, faults: 2, totalFallbacks: 52, maxFallbacks: 50 });
   });
 
@@ -320,7 +462,11 @@ describe("summarizeReliability", () => {
   });
 
   it("matches a commit by prefix either way, so short commits of another length still match", () => {
-    const lives = [life({ session: "a", sha: "abc1234" }), life({ session: "b", sha: "abc12345678" }), life({ session: "c", sha: "unknown" })];
+    const lives = [
+      life({ session: "a", sha: "abc1234" }),
+      life({ session: "b", sha: "abc12345678" }),
+      life({ session: "c", sha: "unknown" }),
+    ];
     expect(summarizeReliability(lives, { shas: ["abc1234"] })).toMatchObject({ n: 2 });
     expect(summarizeReliability(lives, { shas: ["abc12345678ff"] })).toMatchObject({ n: 2 }); // a full commit matches its short form
     expect(summarizeReliability(lives, { shas: ["abc1299"] })).toMatchObject({ n: 0 });
@@ -330,24 +476,42 @@ describe("summarizeReliability", () => {
 
   it("leaves out the override and unassigned arms unless they are asked for", () => {
     expect(EXCLUDED_ARMS).toEqual(["override", "unassigned"]);
-    const lives = [life({ session: "a", selectedBy: "setting", fallbacks: 1, reasons: ["boot-error"] }), life({ session: "b", assignedArm: "unassigned" }), life({ session: "c", assignedArm: "wasm" }), life({ session: "d" })];
+    const lives = [
+      life({ session: "a", selectedBy: "setting", fallbacks: 1, reasons: ["boot-error"] }),
+      life({ session: "b", assignedArm: "unassigned" }),
+      life({ session: "c", assignedArm: "wasm" }),
+      life({ session: "d" }),
+    ];
     expect(summarizeReliability(lives)).toMatchObject({ n: 2, faults: 0 });
     expect(summarizeReliability(lives, { arms: ["override"] })).toMatchObject({ n: 1, faults: 1 });
   });
 
   it("leaves a marker-blocked page life outside the rate on its own line", () => {
     const lives = [life({ session: "a", reasons: ["marker-blocked"] }), life({ session: "b" })];
-    expect(summarizeReliability(lives)).toMatchObject({ n: 1, faults: 0, markerBlockedPageLives: 1, unrecognizedPageLives: 0 });
+    expect(summarizeReliability(lives)).toMatchObject({
+      n: 1,
+      faults: 0,
+      markerBlockedPageLives: 1,
+      unrecognizedPageLives: 0,
+    });
   });
 
   it("leaves a size-gated page life outside the rate and counts it under the same filters", () => {
-    const lives = [life({ session: "a", sizeGated: true, fallbacks: 1, reasons: ["boot-timeout"] }), life({ session: "b" }), life({ session: "c", sizeGated: true, sha: "0dd0000" })];
+    const lives = [
+      life({ session: "a", sizeGated: true, fallbacks: 1, reasons: ["boot-timeout"] }),
+      life({ session: "b" }),
+      life({ session: "c", sizeGated: true, sha: "0dd0000" }),
+    ];
     expect(summarizeReliability(lives)).toMatchObject({ n: 1, faults: 0, sizeGatedPageLives: 2 });
     expect(summarizeReliability(lives, { shas: ["abc1234"] })).toMatchObject({ sizeGatedPageLives: 1 });
   });
 
   it("reports by arm as it reports by build", () => {
-    const s = summarizeReliability([life({ session: "a", assignedArm: "wasm", fallbacks: 1, reasons: ["trap-tick"] }), life({ session: "b", assignedArm: "wasm" }), life({ session: "c", assignedArm: "ts" })]);
+    const s = summarizeReliability([
+      life({ session: "a", assignedArm: "wasm", fallbacks: 1, reasons: ["trap-tick"] }),
+      life({ session: "b", assignedArm: "wasm" }),
+      life({ session: "c", assignedArm: "ts" }),
+    ]);
     expect(s.byArm).toEqual([
       { arm: "ts", sessions: 1, faults: 0, pageLives: 1, faultPageLives: 0, upper95: upperBound(0, 1) },
       { arm: "wasm", sessions: 2, faults: 1, pageLives: 2, faultPageLives: 1, upper95: upperBound(1, 2) },
@@ -364,12 +528,23 @@ describe("summarizeReliability", () => {
     expect(s).toMatchObject({ n: 2, faults: 1 });
     expect(s.byBuild).toEqual([
       { build: "2.36.0 (abc1234, switchable)", sessions: 1, faults: 1, pageLives: 1, faultPageLives: 1, upper95: 1 },
-      { build: "2.37.0 (def5678, switchable)", sessions: 2, faults: 0, pageLives: 2, faultPageLives: 0, upper95: upperBound(0, 2) },
+      {
+        build: "2.37.0 (def5678, switchable)",
+        sessions: 2,
+        faults: 0,
+        pageLives: 2,
+        faultPageLives: 0,
+        upper95: upperBound(0, 2),
+      },
     ]);
   });
 
   it("counts writer latch-offs by session and page life, separately from faults", () => {
-    const s = summarizeReliability([life({ session: "a", writerLatched: true }), life({ session: "a", writerLatched: true }), life({ session: "b" })]);
+    const s = summarizeReliability([
+      life({ session: "a", writerLatched: true }),
+      life({ session: "a", writerLatched: true }),
+      life({ session: "b" }),
+    ]);
     expect(s).toMatchObject({ n: 2, faults: 0, latchedSessions: 1, latchedPageLives: 2 });
   });
 
@@ -393,8 +568,25 @@ describe("summarizeReliability", () => {
 
 describe("the command line", () => {
   it("reads the window and the lists", () => {
-    expect(parseArgs([])).toEqual({ window: { hours: 720, label: "30 days" }, opts: { hosts: ["wasm"], shas: null, versions: null, builds: null, arms: null } });
-    expect(parseArgs(["--window=7", "--shas", "abc1234, def5678a", "--arms", "wasm", "--hosts", "wasm,wasm-frame", "--builds", "wasm-only", "--versions", "2.36.0"]).opts).toEqual({
+    expect(parseArgs([])).toEqual({
+      window: { hours: 720, label: "30 days" },
+      opts: { hosts: ["wasm"], shas: null, versions: null, builds: null, arms: null },
+    });
+    expect(
+      parseArgs([
+        "--window=7",
+        "--shas",
+        "abc1234, def5678a",
+        "--arms",
+        "wasm",
+        "--hosts",
+        "wasm,wasm-frame",
+        "--builds",
+        "wasm-only",
+        "--versions",
+        "2.36.0",
+      ]).opts,
+    ).toEqual({
       hosts: ["wasm", "wasm-frame"],
       shas: ["abc1234", "def5678a"],
       versions: ["2.36.0"],
@@ -430,7 +622,9 @@ describe("responseRows", () => {
   it("reads the results table and flags a full page or more to come", () => {
     expect(responseRows({ columns: ["a"], results: [[1]] })).toEqual({ rows: [{ a: 1 }], truncated: false });
     expect(responseRows({ columns: ["a"], results: [[1]], hasMore: true }).truncated).toBe(true);
-    expect(responseRows({ columns: ["a"], results: Array.from({ length: ROW_LIMIT }, () => [1]) }).truncated).toBe(true);
+    expect(responseRows({ columns: ["a"], results: Array.from({ length: ROW_LIMIT }, () => [1]) }).truncated).toBe(
+      true,
+    );
   });
 
   it("fails on a body that is not a results table, so it never prints as an empty window", () => {
@@ -440,14 +634,27 @@ describe("responseRows", () => {
 });
 
 describe("renderReliabilityMarkdown", () => {
-  const meta = { windowLabel: "last 30 days", until: "2026-10-20 12:00", hosts: ["wasm"], builds: "all", arms: "all", truncated: false };
+  const meta = {
+    windowLabel: "last 30 days",
+    until: "2026-10-20 12:00",
+    hosts: ["wasm"],
+    builds: "all",
+    arms: "all",
+    truncated: false,
+  };
 
   it("puts the snapshot window, the live source and the lower-bound caveat above every figure", () => {
     const md = renderReliabilityMarkdown(summarizeReliability([life()]), meta);
     const firstFigure = md.indexOf("| Measure |");
     // The overall rate is early telemetry, which plan 4.1 (OD-2) never
     // publishes as a reliability figure.
-    for (const lead of ["**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only", "node scripts/engine-reliability.mjs", "src/engine-reliability.test.ts", "**This overall rate is early telemetry**", "**Coverage-limited.**"]) {
+    for (const lead of [
+      "**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only",
+      "node scripts/engine-reliability.mjs",
+      "src/engine-reliability.test.ts",
+      "**This overall rate is early telemetry**",
+      "**Coverage-limited.**",
+    ]) {
       const at = md.indexOf(lead);
       expect(at, lead).toBeGreaterThan(-1);
       expect(at, lead).toBeLessThan(firstFigure);
@@ -462,7 +669,10 @@ describe("renderReliabilityMarkdown", () => {
   });
 
   it("prints the rate and its bound", () => {
-    const md = renderReliabilityMarkdown(summarizeReliability([life({ session: "a", fallbacks: 1, reasons: ["boot-error"] }), life({ session: "b" })]), meta);
+    const md = renderReliabilityMarkdown(
+      summarizeReliability([life({ session: "a", fallbacks: 1, reasons: ["boot-error"] }), life({ session: "b" })]),
+      meta,
+    );
     expect(md).toContain("| Engine sessions (N) | 2 |");
     expect(md).toContain("| Sessions with an engine-fault fallback | 1 |");
     expect(md).toContain("| Fault rate | 50.000% |");

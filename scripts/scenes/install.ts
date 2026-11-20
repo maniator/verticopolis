@@ -86,10 +86,12 @@ export const INSTALL_SCENES: Scene[] = [
             () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
           );
           await page.evaluate(() =>
-            (window as { game?: { engine: { setCamera: (x: number, y: number, z: number) => void }; grid: { width: number } } }).game!.engine.setCamera(
-              Math.floor(
-                (window as { game?: { grid: { width: number } } }).game!.grid.width / 2,
-              ),
+            (
+              window as {
+                game?: { engine: { setCamera: (x: number, y: number, z: number) => void }; grid: { width: number } };
+              }
+            ).game!.engine.setCamera(
+              Math.floor((window as { game?: { grid: { width: number } } }).game!.grid.width / 2),
               18,
               0.32,
             ),

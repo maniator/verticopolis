@@ -1,8 +1,23 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { analyzeBundle } from "./bundle";
-import { BASELINE_DIST, buildBaseline, requireBaselineCommit, requireBaselineDist, startArmServers, TS_BASELINE, type BaselineRecord } from "./baseline";
-import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
+import {
+  BASELINE_DIST,
+  buildBaseline,
+  requireBaselineCommit,
+  requireBaselineDist,
+  startArmServers,
+  TS_BASELINE,
+  type BaselineRecord,
+} from "./baseline";
+import {
+  buildTree,
+  collectEnvironment,
+  ENGINE_PACKAGE_FILES,
+  packageState,
+  type Environment,
+  type PackageState,
+} from "./env";
 import { buildLimitations } from "./limitations";
 import { networkFolderProblem, networkMarker, parseNetwork } from "./network";
 import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
@@ -47,7 +62,17 @@ export interface Args {
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null, network: null, aa: null };
+  const a: Args = {
+    reps: 10,
+    quick: false,
+    skipBuild: false,
+    out: null,
+    resume: null,
+    scenarios: null,
+    throttles: null,
+    network: null,
+    aa: null,
+  };
   let repsSet = false;
   const seen = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
@@ -73,18 +98,25 @@ export function parseArgs(argv: readonly string[]): Args {
       if (new Set(a.scenarios).size !== a.scenarios.length) throw new Error("--scenarios names a scenario twice");
     } else if (arg === "--throttles") {
       a.throttles = next().split(",").map(Number);
-      if (a.throttles.some((t) => !Number.isFinite(t) || t < 1 || t > 20)) throw new Error("--throttles takes rates from 1 to 20, comma separated");
+      if (a.throttles.some((t) => !Number.isFinite(t) || t < 1 || t > 20))
+        throw new Error("--throttles takes rates from 1 to 20, comma separated");
       if (new Set(a.throttles).size !== a.throttles.length) throw new Error("--throttles names a rate twice");
     } else if (arg === "--network") a.network = parseNetwork(next());
     else if (arg === "--aa") {
       const v = next();
       if (v !== "ts" && v !== "wasm") throw new Error("--aa takes the engine to run in both slots: ts or wasm");
       a.aa = v;
-    } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --throttles 1,4, --network 10,40, --aa ts|wasm`);
+    } else
+      throw new Error(
+        `unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --throttles 1,4, --network 10,40, --aa ts|wasm`,
+      );
   }
   if (a.quick && !repsSet) a.reps = 2;
   if (a.resume && a.out) throw new Error("--resume continues its own folder; it takes no --out");
-  if (a.aa && a.network) throw new Error("--network cannot be combined with --aa: an A/A pass feeds perf:calibrate, which leaves a limited pass out");
+  if (a.aa && a.network)
+    throw new Error(
+      "--network cannot be combined with --aa: an A/A pass feeds perf:calibrate, which leaves a limited pass out",
+    );
   return a;
 }
 
@@ -126,7 +158,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const distTs = join(repo, BASELINE_DIST);
   // The TypeScript arm runs the pinned pre-cutover build (issue #1597), so an A/A pass of WASM does not need it.
   const needsBaseline = args.aa !== "wasm";
-  const tsBaseline: BaselineRecord | null = needsBaseline ? { commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion } : null;
+  const tsBaseline: BaselineRecord | null = needsBaseline
+    ? { commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion }
+    : null;
   // The browser is settled first: launch settings are parsed and the adapter
   // is read before any build or results folder exists, so a setting that does
   // not reach the GPU fails in seconds.
@@ -134,9 +168,13 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const executablePath = process.env.PW_CHROMIUM_PATH || null;
   const probe = await probeBrowser(executablePath, launch);
   for (const w of gateBrowser(probe, args.quick, launch, executablePath)) log(`perf:compare: warning: ${w}`);
-  log(`perf:compare: ${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
+  log(
+    `perf:compare: ${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`,
+  );
   if (!existsSync(join(repo, "src/public/engine/verticopolis_engine_bg.wasm"))) {
-    throw new Error("the engine package src/public/engine/ is missing: run npm install, which copies it from @verticopolis/engine");
+    throw new Error(
+      "the engine package src/public/engine/ is missing: run npm install, which copies it from @verticopolis/engine",
+    );
   }
   // Which tree the builds came from, stamped beside them (gitignored), so a
   // --skip-build run can prove its builds are this commit's.
@@ -151,19 +189,24 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     if (needsBaseline) buildBaseline(repo, log);
     for (const p of stampPaths) writeFileSync(p, JSON.stringify(tree) + "\n");
   }
-  for (const d of [dist, distPerf]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
+  for (const d of [dist, distPerf])
+    if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
   if (needsBaseline) requireBaselineDist(distTs);
 
   const unknown = unknownScenarios(args.scenarios ?? []);
   if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
   const scenarios = buildScenarios(args.scenarios);
-  const config = makeConfig(args, scenarios.map((s) => s.name));
+  const config = makeConfig(
+    args,
+    scenarios.map((s) => s.name),
+  );
   const sourceHash = pinnedEngineSources(repo);
   const environment = collectEnvironment(repo, distPerf, sourceHash);
   // Fail closed before measuring anything: a run on a package that cannot
   // be tied to these sources would spend hours on numbers that cannot pass.
   const packageProblems = packageErrors(packageState(distPerf), packageState(dist), sourceHash);
-  if (packageProblems.length) throw new Error(`the engine package cannot be tied to this tree:\n  - ${packageProblems.join("\n  - ")}`);
+  if (packageProblems.length)
+    throw new Error(`the engine package cannot be tied to this tree:\n  - ${packageProblems.join("\n  - ")}`);
 
   // The results folder is chosen up front: every finished process run is
   // checkpointed into it, so a run cut short (a killed shell, a restarted
@@ -197,26 +240,41 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     interruptedAttempts = cp.interrupted;
     resumes.push(...cp.resumes, { at: startedAt, runsFromCheckpoint: cp.runs.length });
     meta.startedAt = cp.startedAt;
-    appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ resumed: startedAt, runsFromCheckpoint: cp.runs.length }) + "\n");
-    log(`perf:compare: resuming ${out} with ${runs.length} finished process run(s)${interruptedAttempts.length ? `; ${interruptedAttempts.length} attempt(s) were interrupted and run again` : ""}`);
+    appendFileSync(
+      join(out, CHECKPOINT_RUNS),
+      JSON.stringify({ resumed: startedAt, runsFromCheckpoint: cp.runs.length }) + "\n",
+    );
+    log(
+      `perf:compare: resuming ${out} with ${runs.length} finished process run(s)${interruptedAttempts.length ? `; ${interruptedAttempts.length} attempt(s) were interrupted and run again` : ""}`,
+    );
   } else {
     out = outputDir(repo, args, startedAt.slice(0, 10), environment, existsSync, launch.rendererException);
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, CHECKPOINT_META), JSON.stringify(meta, null, 1) + "\n");
     writeFileSync(join(out, CHECKPOINT_RUNS), "");
   }
-  log(`perf:compare: measuring ${environment.commit}${environment.dirty ? " (dirty tree)" : ""}; origin/main is ${environment.mainCommit ?? "unknown"}${environment.behindMain !== null ? `, ${environment.behindMain} commit(s) not in this tree` : ""}`);
+  log(
+    `perf:compare: measuring ${environment.commit}${environment.dirty ? " (dirty tree)" : ""}; origin/main is ${environment.mainCommit ?? "unknown"}${environment.behindMain !== null ? `, ${environment.behindMain} commit(s) not in this tree` : ""}`,
+  );
   log("perf:compare: Node conformance check of both engines on every scenario");
   const mod = await loadWebPackage(join(distPerf, "engine"));
   const nodeChecks = scenarios.map((sc) => checkScenario(mod, sc, config.steps, config.dt, config.warmSteps));
-  for (const c of nodeChecks) log(`  ${c.scenario}: end state ${c.end.state} (Node: wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
+  for (const c of nodeChecks)
+    log(`  ${c.scenario}: end state ${c.end.state} (Node: wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
   // Hourly save churn on the WASM engine; no TypeScript side, so an A/A pass
   // of TypeScript has nothing to add and an A/A pass of WASM repeats it.
-  const churn = scenarios.map((sc) => measureChurn(mod, sc, Math.max(1, Math.floor((config.steps * config.dt) / 60)), config.dt, config.warmSteps));
-  for (const c of churn) log(`  ${c.scenario}: hourly save churn median ${(c.medianShare * 100).toFixed(1)}%, p95 ${(c.p95Share * 100).toFixed(1)}% of ${c.saveChars} characters`);
+  const churn = scenarios.map((sc) =>
+    measureChurn(mod, sc, Math.max(1, Math.floor((config.steps * config.dt) / 60)), config.dt, config.warmSteps),
+  );
+  for (const c of churn)
+    log(
+      `  ${c.scenario}: hourly save churn median ${(c.medianShare * 100).toFixed(1)}%, p95 ${(c.p95Share * 100).toFixed(1)}% of ${c.saveChars} characters`,
+    );
   // The saved-tower starts' seeds, packed and read back before any browser runs (#1254).
   checkAutosaveSeeds(scenarios);
-  log(`perf:compare: each scenario's autosave seed loads back as its tower (${scenarios.map((s) => `${s.name} ${autosaveSeed(s).sha256.slice(0, 12)}`).join(", ")})`);
+  log(
+    `perf:compare: each scenario's autosave seed loads back as its tower (${scenarios.map((s) => `${s.name} ${autosaveSeed(s).sha256.slice(0, 12)}`).join(", ")})`,
+  );
 
   const servers = await startArmServers(distPerf, distTs, needsBaseline);
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;
@@ -229,8 +287,16 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
         log(`perf:compare: rep ${rep + 1}/${config.reps}, ${engine}`);
         // A marker first, so an attempt killed mid-way is reported, never
         // silently replaced by its rerun.
-        appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ started: { rep, engine, at: new Date().toISOString() } }) + "\n");
-        const run = await runProcess({ servers, config, scenarios, executablePath, launch, log }, rep, engine, position);
+        appendFileSync(
+          join(out, CHECKPOINT_RUNS),
+          JSON.stringify({ started: { rep, engine, at: new Date().toISOString() } }) + "\n",
+        );
+        const run = await runProcess(
+          { servers, config, scenarios, executablePath, launch, log },
+          rep,
+          engine,
+          position,
+        );
         browserVersion ??= run.browserVersion;
         runs.push(run);
         appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify(run) + "\n");
@@ -243,16 +309,39 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const validation = validateResults(config, runs, nodeChecks, launch.rendererException);
   // Checked again after the runs, against the package recorded before them
   // (the two ends only).
-  for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) validation.errors.push(e);
-  if (environment.commit === "unknown") validation.errors.push("the commit could not be read (git failed), so the results cannot be tied to a tree");
+  for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, {
+    files: environment.enginePackage,
+    buildHash: environment.engineBuildHash,
+  }))
+    validation.errors.push(e);
+  if (environment.commit === "unknown")
+    validation.errors.push("the commit could not be read (git failed), so the results cannot be tied to a tree");
   const treeError = incompleteTreeError(environment.tree);
   if (treeError) validation.errors.push(treeError);
-  if (environment.mainCommit && !environment.mainFetched) validation.warnings.push(`origin/main could not be fetched just now, so ${environment.mainCommit} is the ref as last fetched and may not be the latest main`);
-  if (!environment.mainCommit) validation.warnings.push("origin/main is unknown here (no remote or no fetch), so whether this is a baseline of the latest main was not checked");
-  for (const a of interruptedAttempts) validation.warnings.push(`rep ${a.rep} ${a.engine}: an attempt started at ${a.at} was interrupted (the run was stopped and resumed) and ran again; its partial measurements were not kept`);
-  if (resumes.length) validation.warnings.push(`the run was resumed ${resumes.length} time(s) (${resumes.map((r) => r.at).join(", ")}); the checkpoint proved the same commit, build mode, configuration, engine bytes, scenarios, machine and toolchain, and validation checked that every process ran the same browser build`);
-  if (environment.dirty) validation.warnings.push("the working tree had uncommitted or untracked changes; the results folder is marked -dirty");
-  if (environment.behindMain) validation.warnings.push(`the measured tree lacks ${environment.behindMain} commit(s) of origin/main (${environment.mainCommit}); it is not a baseline of the latest main`);
+  if (environment.mainCommit && !environment.mainFetched)
+    validation.warnings.push(
+      `origin/main could not be fetched just now, so ${environment.mainCommit} is the ref as last fetched and may not be the latest main`,
+    );
+  if (!environment.mainCommit)
+    validation.warnings.push(
+      "origin/main is unknown here (no remote or no fetch), so whether this is a baseline of the latest main was not checked",
+    );
+  for (const a of interruptedAttempts)
+    validation.warnings.push(
+      `rep ${a.rep} ${a.engine}: an attempt started at ${a.at} was interrupted (the run was stopped and resumed) and ran again; its partial measurements were not kept`,
+    );
+  if (resumes.length)
+    validation.warnings.push(
+      `the run was resumed ${resumes.length} time(s) (${resumes.map((r) => r.at).join(", ")}); the checkpoint proved the same commit, build mode, configuration, engine bytes, scenarios, machine and toolchain, and validation checked that every process ran the same browser build`,
+    );
+  if (environment.dirty)
+    validation.warnings.push(
+      "the working tree had uncommitted or untracked changes; the results folder is marked -dirty",
+    );
+  if (environment.behindMain)
+    validation.warnings.push(
+      `the measured tree lacks ${environment.behindMain} commit(s) of origin/main (${environment.mainCommit}); it is not a baseline of the latest main`,
+    );
   const metrics = aggregate(runs, config.scenarios, config.throttles, config.aa);
   // Pairs with a zero TypeScript median (WASM-only bytes, no clamped
   // frames) get no ratio; the report lists them per engine instead.
@@ -261,7 +350,14 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   validation.ok = validation.errors.length === 0;
   const bundle = analyzeBundle(dist);
   const toolingBundle = analyzeBundle(distPerf);
-  const renderers = [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd, r.rendererEndCold]).filter((x): x is string => !!x))];
+  const renderers = [
+    ...new Set(
+      runs
+        .filter((r) => r.ok)
+        .flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd, r.rendererEndCold])
+        .filter((x): x is string => !!x),
+    ),
+  ];
   const results: CompareResults = {
     schema: 1,
     startedAt: meta.startedAt,
@@ -272,8 +368,31 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     config,
     environment,
     tsBaseline,
-    browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, rendererExceptionCommit: launch.rendererExceptionCommit, gpuVerified: recordedGpuVerified(launch.rendererException, runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd), runs.filter((r) => r.ok).map((r) => r.rendererEndCold)) },
-    scenarios: scenarios.map((s) => ({ name: s.name, description: s.description, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
+    browser: {
+      version: browserVersion,
+      headless: true,
+      executable: executablePath,
+      channel: launch.channel,
+      args: launch.args,
+      rendererException: launch.rendererException,
+      rendererExceptionSha256: launch.rendererExceptionSha256,
+      rendererExceptionCommit: launch.rendererExceptionCommit,
+      gpuVerified: recordedGpuVerified(
+        launch.rendererException,
+        runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer),
+        runs.filter((r) => r.ok).map((r) => r.rendererEnd),
+        runs.filter((r) => r.ok).map((r) => r.rendererEndCold),
+      ),
+    },
+    scenarios: scenarios.map((s) => ({
+      name: s.name,
+      description: s.description,
+      sha256: s.sha256,
+      population: s.population,
+      units: s.units,
+      transports: s.transports,
+      saveBytes: s.save.length,
+    })),
     nodeChecks,
     churn,
     runs,
@@ -282,7 +401,15 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     metrics,
     comparisons,
     validation,
-    limitations: buildLimitations(config.aa, environment.appVersion, renderers, launch.rendererException, tsBaseline, config.network ?? null, config.throttles),
+    limitations: buildLimitations(
+      config.aa,
+      environment.appVersion,
+      renderers,
+      launch.rendererException,
+      tsBaseline,
+      config.network ?? null,
+      config.throttles,
+    ),
   };
 
   writeResultFiles(out, results);
@@ -311,25 +438,53 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
  * fails, since then nothing proves which engine ran. `recorded`, given after
  * the runs, is the package recorded before them.
  */
-export function packageErrors(perf: PackageState, prod: PackageState, sourceHash: string | null, recorded?: Pick<PackageState, "files" | "buildHash">): string[] {
+export function packageErrors(
+  perf: PackageState,
+  prod: PackageState,
+  sourceHash: string | null,
+  recorded?: Pick<PackageState, "files" | "buildHash">,
+): string[] {
   const errors: string[] = [];
-  const sorted = (files: Record<string, string>) => JSON.stringify(Object.entries(files).sort(([a], [b]) => Number(a > b) - Number(a < b)));
+  const sorted = (files: Record<string, string>) =>
+    JSON.stringify(Object.entries(files).sort(([a], [b]) => Number(a > b) - Number(a < b)));
   const why = (b: PackageState) => b.buildProblem ?? "has no source hash";
-  for (const [name, build] of [["dist-perf/", perf], ["dist/", prod]] as const) {
+  for (const [name, build] of [
+    ["dist-perf/", perf],
+    ["dist/", prod],
+  ] as const) {
     const missing = ENGINE_PACKAGE_FILES.filter((f) => !(f in build.files));
-    if (missing.length === ENGINE_PACKAGE_FILES.length) errors.push(`${name} serves no engine package, so the WASM engine could not have run`);
-    else if (missing.length) errors.push(`${name} serves an incomplete engine package (missing or unreadable: ${missing.join(", ")})`);
+    if (missing.length === ENGINE_PACKAGE_FILES.length)
+      errors.push(`${name} serves no engine package, so the WASM engine could not have run`);
+    else if (missing.length)
+      errors.push(`${name} serves an incomplete engine package (missing or unreadable: ${missing.join(", ")})`);
   }
-  if (sorted(perf.files) !== sorted(prod.files)) errors.push(`dist/ and dist-perf/ serve different engine bytes (${sorted(prod.files)} vs ${sorted(perf.files)})`);
-  if (!sourceHash) errors.push("no installed @verticopolis/engine records its sources hash, so the served package cannot be tied to the pinned engine; run npm install");
-  if (!perf.buildHash) errors.push(`the served engine package (dist-perf/) ${why(perf)}, so which sources it came from is unknown`);
-  else if (sourceHash && perf.buildHash !== sourceHash) errors.push(`the served engine package (${perf.buildHash}) is not the pinned @verticopolis/engine package (${sourceHash}); run npm install and rebuild`);
-  if (!prod.buildHash && !perf.buildHash) errors.push(`the sizes build (dist/) ${why(prod)}${why(prod) === why(perf) ? " too" : ""}; rebuild without --skip-build`);
-  if (prod.buildHash !== perf.buildHash) errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prod.buildHash ?? `none: dist/ ${why(prod)}`} vs ${perf.buildHash ?? `none: dist-perf/ ${why(perf)}`}); rebuild without --skip-build`);
+  if (sorted(perf.files) !== sorted(prod.files))
+    errors.push(`dist/ and dist-perf/ serve different engine bytes (${sorted(prod.files)} vs ${sorted(perf.files)})`);
+  if (!sourceHash)
+    errors.push(
+      "no installed @verticopolis/engine records its sources hash, so the served package cannot be tied to the pinned engine; run npm install",
+    );
+  if (!perf.buildHash)
+    errors.push(`the served engine package (dist-perf/) ${why(perf)}, so which sources it came from is unknown`);
+  else if (sourceHash && perf.buildHash !== sourceHash)
+    errors.push(
+      `the served engine package (${perf.buildHash}) is not the pinned @verticopolis/engine package (${sourceHash}); run npm install and rebuild`,
+    );
+  if (!prod.buildHash && !perf.buildHash)
+    errors.push(
+      `the sizes build (dist/) ${why(prod)}${why(prod) === why(perf) ? " too" : ""}; rebuild without --skip-build`,
+    );
+  if (prod.buildHash !== perf.buildHash)
+    errors.push(
+      `dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prod.buildHash ?? `none: dist/ ${why(prod)}`} vs ${perf.buildHash ?? `none: dist-perf/ ${why(perf)}`}); rebuild without --skip-build`,
+    );
   // After the runs: the timed build's package must still be the one recorded
   // before them. This compares the two ends only; a build swapped and
   // restored between them is not caught.
-  if (recorded && (sorted(recorded.files) !== sorted(perf.files) || recorded.buildHash !== perf.buildHash)) errors.push(`the engine package in dist-perf/ changed during the run (recorded ${sorted(recorded.files)} with ${recorded.buildHash ?? "no source hash"}, now ${sorted(perf.files)} with ${perf.buildHash ?? "no source hash"})`);
+  if (recorded && (sorted(recorded.files) !== sorted(perf.files) || recorded.buildHash !== perf.buildHash))
+    errors.push(
+      `the engine package in dist-perf/ changed during the run (recorded ${sorted(recorded.files)} with ${recorded.buildHash ?? "no source hash"}, now ${sorted(perf.files)} with ${perf.buildHash ?? "no source hash"})`,
+    );
   return errors;
 }
 
@@ -340,7 +495,14 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
  * and commit gets -2, -3, and so on, so no result is overwritten. An
  * explicit --out must not exist yet either.
  */
-export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa" | "network">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync, rendererException: string | null = null): string {
+export function outputDir(
+  repo: string,
+  args: Pick<Args, "out" | "quick" | "skipBuild" | "aa" | "network">,
+  day: string,
+  env: Pick<Environment, "commitShort" | "dirty">,
+  exists: (p: string) => boolean = existsSync,
+  rendererException: string | null = null,
+): string {
   if (args.out) {
     // Only the folder's own name counts, and in lower case, because the results are written on case-insensitive disks too.
     const name = basename(resolve(repo, args.out));
@@ -348,16 +510,27 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
     checkExceptionFolder(name, rendererException);
     if (args.aa) {
       const other = args.aa === "ts" ? "wasm" : "ts";
-      if (!lower.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out folder name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
-      if (lower.includes(`aa-${other}`)) throw new Error(`--aa ${args.aa} cannot write to ${name}, which also names the aa-${other} marker`);
-    } else if (/aa-(ts|wasm)/.test(lower)) throw new Error(`--out ${name} names an A/A folder, but this run is a comparison; pass --aa ts|wasm or pick another name`);
+      if (!lower.includes(`aa-${args.aa}`))
+        throw new Error(
+          `--aa ${args.aa} needs an --out folder name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`,
+        );
+      if (lower.includes(`aa-${other}`))
+        throw new Error(`--aa ${args.aa} cannot write to ${name}, which also names the aa-${other} marker`);
+    } else if (/aa-(ts|wasm)/.test(lower))
+      throw new Error(
+        `--out ${name} names an A/A folder, but this run is a comparison; pass --aa ts|wasm or pick another name`,
+      );
     const networkProblem = networkFolderProblem(name, args.network);
     if (networkProblem) throw new Error(networkProblem);
     const out = resolve(repo, args.out);
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
   }
-  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.network ? `-${networkMarker(args.network)}` : ""}${args.skipBuild ? "-skipbuild" : ""}${rendererException ? `-${exceptionMarker(rendererException)}` : ""}${env.dirty ? "-dirty" : ""}`);
+  const base = resolve(
+    repo,
+    "docs/performance/results",
+    `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.network ? `-${networkMarker(args.network)}` : ""}${args.skipBuild ? "-skipbuild" : ""}${rendererException ? `-${exceptionMarker(rendererException)}` : ""}${env.dirty ? "-dirty" : ""}`,
+  );
   let out = base;
   for (let n = 2; exists(out); n++) out = `${base}-${n}`;
   return out;
@@ -366,7 +539,11 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
 /** What is wrong with the build stamps for a --skip-build run, if
  *  anything: each build (dist/ for the sizes, dist-perf/ for the timings)
  *  must carry a readable stamp from this same clean commit. */
-export function stampErrors(paths: readonly string[], tree: { commit: string; dirty: boolean }, read: (p: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null)): string[] {
+export function stampErrors(
+  paths: readonly string[],
+  tree: { commit: string; dirty: boolean },
+  read: (p: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null),
+): string[] {
   const out: string[] = [];
   for (const p of paths) {
     let text: string | null;
@@ -379,7 +556,9 @@ export function stampErrors(paths: readonly string[], tree: { commit: string; di
       continue;
     }
     if (text === null) {
-      out.push(`--skip-build: ${p} is missing, so which tree that build came from is unknown; run once without --skip-build`);
+      out.push(
+        `--skip-build: ${p} is missing, so which tree that build came from is unknown; run once without --skip-build`,
+      );
       continue;
     }
     let stamp: { commit?: unknown; dirty?: unknown };
@@ -389,8 +568,12 @@ export function stampErrors(paths: readonly string[], tree: { commit: string; di
       out.push(`--skip-build: ${p} is unreadable; run once without --skip-build`);
       continue;
     }
-    if (typeof stamp.commit !== "string" || typeof stamp.dirty !== "boolean") out.push(`--skip-build: ${p} is not a build stamp this harness wrote; run once without --skip-build`);
-    else if (stamp.commit !== tree.commit || stamp.dirty || tree.dirty) out.push(`--skip-build: ${p} came from ${stamp.commit}${stamp.dirty ? " (dirty)" : ""}, the tree is ${tree.commit}${tree.dirty ? " (dirty)" : ""}; rebuild without --skip-build`);
+    if (typeof stamp.commit !== "string" || typeof stamp.dirty !== "boolean")
+      out.push(`--skip-build: ${p} is not a build stamp this harness wrote; run once without --skip-build`);
+    else if (stamp.commit !== tree.commit || stamp.dirty || tree.dirty)
+      out.push(
+        `--skip-build: ${p} came from ${stamp.commit}${stamp.dirty ? " (dirty)" : ""}, the tree is ${tree.commit}${tree.dirty ? " (dirty)" : ""}; rebuild without --skip-build`,
+      );
   }
   return out;
 }
@@ -416,7 +599,12 @@ export interface CheckpointMeta {
 }
 
 /** The machine and toolchain fields a resume must match. */
-export function machineOf(env: Env, executablePath: string | null, launch?: BrowserLaunch, probe?: BrowserProbe): Record<string, string | number | null> {
+export function machineOf(
+  env: Env,
+  executablePath: string | null,
+  launch?: BrowserLaunch,
+  probe?: BrowserProbe,
+): Record<string, string | number | null> {
   // The launch settings, the browser build and the adapter are part of the
   // identity: a resume with a different channel, switch, browser update or
   // renderer would mix incompatible processes in one results folder.
@@ -427,7 +615,19 @@ export function machineOf(env: Env, executablePath: string | null, launch?: Brow
     browser.browserVersion = probe.version;
     browser.renderer = probe.renderer;
   }
-  return { ...browser, cpuModel: env.cpuModel, logicalCpus: env.logicalCpus, totalMemoryBytes: env.totalMemoryBytes, os: env.os, kernel: env.kernel, arch: env.arch, node: env.node, rust: env.rust, playwright: env.playwright, executablePath };
+  return {
+    ...browser,
+    cpuModel: env.cpuModel,
+    logicalCpus: env.logicalCpus,
+    totalMemoryBytes: env.totalMemoryBytes,
+    os: env.os,
+    kernel: env.kernel,
+    arch: env.arch,
+    node: env.node,
+    rust: env.rust,
+    playwright: env.playwright,
+    executablePath,
+  };
 }
 
 /**
@@ -447,18 +647,28 @@ export function loadCheckpoint(
   // In place: shortening the file never empties it, so a stop during the
   // cut cannot lose the finished runs before the cut.
   cut: (p: string, length: number) => void = (p, length) => truncateSync(p, length),
-): { runs: ProcessRun[]; interrupted: { rep: number; engine: string; at: string }[]; resumes: { at: string; runsFromCheckpoint: number }[]; startedAt: string } {
-  if (read(join(dir, "results.json")) !== null) throw new Error(`${dir} already holds final results; nothing to resume`);
+): {
+  runs: ProcessRun[];
+  interrupted: { rep: number; engine: string; at: string }[];
+  resumes: { at: string; runsFromCheckpoint: number }[];
+  startedAt: string;
+} {
+  if (read(join(dir, "results.json")) !== null)
+    throw new Error(`${dir} already holds final results; nothing to resume`);
   const metaText = read(join(dir, CHECKPOINT_META));
   if (metaText === null) throw new Error(`${dir} has no ${CHECKPOINT_META}; nothing to resume`);
   const meta = JSON.parse(metaText) as CheckpointMeta;
-  if (meta.dirty) throw new Error(`cannot resume ${dir}: it started on a dirty tree, so its first runs measured uncommitted code`);
+  if (meta.dirty)
+    throw new Error(`cannot resume ${dir}: it started on a dirty tree, so its first runs measured uncommitted code`);
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   for (const key of ["commit", "skipBuild", "config", "enginePackage", "scenarios", "tsBaseline", "machine"] as const) {
     // A checkpoint from before the baseline existed names none, which is what a run without a TypeScript arm records.
     const stored = key === "tsBaseline" ? (meta.tsBaseline ?? null) : meta[key];
     const wanted = key === "tsBaseline" ? (expected.tsBaseline ?? null) : expected[key];
-    if (!same(stored, wanted)) throw new Error(`cannot resume ${dir}: its ${key} differs from this run's (${JSON.stringify(stored)} vs ${JSON.stringify(wanted)})`);
+    if (!same(stored, wanted))
+      throw new Error(
+        `cannot resume ${dir}: its ${key} differs from this run's (${JSON.stringify(stored)} vs ${JSON.stringify(wanted)})`,
+      );
   }
   const path = join(dir, CHECKPOINT_RUNS);
   let text = read(path) ?? "";
@@ -477,18 +687,33 @@ export function loadCheckpoint(
     } catch {
       throw new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} is not JSON`);
     }
-    const bad = () => new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} is neither a run, a start marker nor a resume record`);
+    const bad = () =>
+      new Error(
+        `cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} is neither a run, a start marker nor a resume record`,
+      );
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) throw bad();
     if (entry.started) started.push(entry.started as { rep: number; engine: string; at: string });
-    else if (entry.resumed) resumes.push({ at: String(entry.resumed), runsFromCheckpoint: Number(entry.runsFromCheckpoint) });
-    else if (typeof entry.rep === "number" && (entry.engine === "ts" || entry.engine === "wasm") && typeof entry.scenarios === "object" && entry.scenarios !== null) {
+    else if (entry.resumed)
+      resumes.push({ at: String(entry.resumed), runsFromCheckpoint: Number(entry.runsFromCheckpoint) });
+    else if (
+      typeof entry.rep === "number" &&
+      (entry.engine === "ts" || entry.engine === "wasm") &&
+      typeof entry.scenarios === "object" &&
+      entry.scenarios !== null
+    ) {
       const ran = entry.ranEngine ?? entry.engine;
-      if (ran !== (expected.config.aa ?? entry.engine)) throw new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} ran ${String(ran)} where this run's configuration calls for ${expected.config.aa ?? entry.engine}`);
+      if (ran !== (expected.config.aa ?? entry.engine))
+        throw new Error(
+          `cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} ran ${String(ran)} where this run's configuration calls for ${expected.config.aa ?? entry.engine}`,
+        );
       runs.push(entry as unknown as ProcessRun);
-    }
-    else throw bad();
+    } else throw bad();
   });
   // An attempt with no run after it was interrupted.
-  const interrupted = started.filter((s, i) => !runs.some((r) => r.rep === s.rep && r.engine === s.engine) || started.slice(i + 1).some((t) => t.rep === s.rep && t.engine === s.engine));
+  const interrupted = started.filter(
+    (s, i) =>
+      !runs.some((r) => r.rep === s.rep && r.engine === s.engine) ||
+      started.slice(i + 1).some((t) => t.rep === s.rep && t.engine === s.engine),
+  );
   return { runs, interrupted, resumes, startedAt: meta.startedAt };
 }

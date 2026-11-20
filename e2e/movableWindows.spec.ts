@@ -60,7 +60,9 @@ async function touchDrag(page: Page, from: { x: number; y: number }, to: { x: nu
 
 /** Wait two animation frames, so the per-frame panel anchoring runs. */
 async function nextFrames(page: Page): Promise<void> {
-  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  await page.evaluate(
+    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
+  );
 }
 
 const MAP = "#overview-map";
@@ -69,7 +71,9 @@ const MAP_TITLE = "#overview-map > .win-title";
 test.describe("movable windows", () => {
   test.use({ viewport: DESKTOP });
 
-  test("the Map moves by its title bar, stays in the tower view, keeps its spot and goes home on a double-click", async ({ page }) => {
+  test("the Map moves by its title bar, stays in the tower view, keeps its spot and goes home on a double-click", async ({
+    page,
+  }) => {
     await boot(page);
     const map = page.locator(MAP);
     await expect(map).toBeVisible();
@@ -115,7 +119,9 @@ test.describe("movable windows", () => {
     expect(reopened.y).toBeCloseTo(home.y, 0);
   });
 
-  test("the facility card stays where it is dragged while the camera moves, and follows its room again once closed", async ({ page }) => {
+  test("the facility card stays where it is dragged while the camera moves, and follows its room again once closed", async ({
+    page,
+  }) => {
     await boot(page);
     await page.evaluate(() => {
       const g = (window as any).game;
@@ -190,7 +196,9 @@ test.describe("movable windows on a phone", () => {
     expect(moved.y).toBeCloseTo(home.y + 120, 0);
   });
 
-  test("a touch drag on the docked facility card's title bar moves it, and it docks again once closed", async ({ page }) => {
+  test("a touch drag on the docked facility card's title bar moves it, and it docks again once closed", async ({
+    page,
+  }) => {
     await boot(page);
     const open = () =>
       page.evaluate(() => {

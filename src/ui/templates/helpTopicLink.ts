@@ -11,7 +11,8 @@ export type HelpTopicSurface = "inspector" | "stats";
  *  hover card, which re-renders on every pointer move, never rebuilds one. */
 function hrefs(surface: HelpTopicSurface): Readonly<Record<HelpTopic, string>> {
   const out = {} as Record<HelpTopic, string>;
-  for (const topic of Object.keys(HELP_TOPIC_PATH) as HelpTopic[]) out[topic] = fromGameHref(helpUrl(HELP_TOPIC_PATH[topic]), surface);
+  for (const topic of Object.keys(HELP_TOPIC_PATH) as HelpTopic[])
+    out[topic] = fromGameHref(helpUrl(HELP_TOPIC_PATH[topic]), surface);
   return out;
 }
 

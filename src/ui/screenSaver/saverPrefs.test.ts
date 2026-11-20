@@ -22,7 +22,11 @@ describe("screen saver prefs", () => {
 
   it("fall back to the defaults on unreadable or blocked storage", () => {
     expect(loadSaverPrefs(true, store("{nope"))).toEqual(defaultSaverPrefs(true));
-    const throwing = { getItem: vi.fn(() => { throw new Error("blocked"); }) };
+    const throwing = {
+      getItem: vi.fn(() => {
+        throw new Error("blocked");
+      }),
+    };
     expect(loadSaverPrefs(false, throwing)).toEqual(defaultSaverPrefs(false));
     expect(loadSaverPrefs(false, null)).toEqual(defaultSaverPrefs(false));
   });
@@ -30,8 +34,15 @@ describe("screen saver prefs", () => {
   it("save as JSON, and a full storage does not throw", () => {
     const s = { setItem: vi.fn() };
     saveSaverPrefs({ saver: "none", waitMinutes: 1, onReturn: true }, s);
-    expect(s.setItem).toHaveBeenCalledWith("vc.screensaver", JSON.stringify({ saver: "none", waitMinutes: 1, onReturn: true }));
-    const full = { setItem: vi.fn(() => { throw new Error("quota"); }) };
+    expect(s.setItem).toHaveBeenCalledWith(
+      "vc.screensaver",
+      JSON.stringify({ saver: "none", waitMinutes: 1, onReturn: true }),
+    );
+    const full = {
+      setItem: vi.fn(() => {
+        throw new Error("quota");
+      }),
+    };
     expect(() => saveSaverPrefs(defaultSaverPrefs(false), full)).not.toThrow();
   });
 });

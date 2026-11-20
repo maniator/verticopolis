@@ -37,11 +37,13 @@ describe("prLane", () => {
   });
 
   it("takes the prose lane for docs and change notes", () => {
-    expect(prLane(["docs/performance/hot-path-review.md", "_bmad-output/implementation-artifacts/backlog.md"])).toEqual({
-      code: false,
-      tests: true,
-      lane: "prose",
-    });
+    expect(prLane(["docs/performance/hot-path-review.md", "_bmad-output/implementation-artifacts/backlog.md"])).toEqual(
+      {
+        code: false,
+        tests: true,
+        lane: "prose",
+      },
+    );
     expect(prLane([".changes/some-branch.md"])).toEqual({ code: false, tests: true, lane: "prose" });
   });
 

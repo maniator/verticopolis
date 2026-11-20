@@ -116,9 +116,7 @@ function decodeSlotText(raw: string | null): SaveText | null {
 }
 
 export function autosaveKey(): string {
-  return saveStore.get(AUTO_KEY) !== null || saveStore.get(LEGACY_AUTO_KEY) === null
-    ? AUTO_KEY
-    : LEGACY_AUTO_KEY;
+  return saveStore.get(AUTO_KEY) !== null || saveStore.get(LEGACY_AUTO_KEY) === null ? AUTO_KEY : LEGACY_AUTO_KEY;
 }
 
 /** The largest timestamp JS Date can represent (ECMA-262), in ms either side
@@ -322,7 +320,8 @@ export const SaveGame = {
   /** Metadata for every slot, for the saves manager UI. A loaded or empty slot
    *  whose stored values and census reader hold reuses its last row. */
   listSlots(): SlotInfo[] {
-    const row = (slot: SlotInfo["slot"], ...keys: string[]) => rememberedSlotInfo(slot, keys, (raws) => infoFrom(slot, raws));
+    const row = (slot: SlotInfo["slot"], ...keys: string[]) =>
+      rememberedSlotInfo(slot, keys, (raws) => infoFrom(slot, raws));
     const slots: SlotInfo[] = [row("auto", AUTO_KEY, LEGACY_AUTO_KEY)];
     for (let n = 1; n <= SLOT_COUNT; n++) slots.push(row(n, SLOT_KEY(n)));
     return slots;
@@ -493,4 +492,3 @@ function writeSlot(key: string, value: string, packed?: Uint8Array): void {
 function writeAutosaveValue(value: string, packed?: Uint8Array): void {
   saveStore.set(AUTO_KEY, value, packed);
 }
-

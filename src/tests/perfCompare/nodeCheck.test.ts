@@ -14,7 +14,9 @@ describe("the glue's file URL", () => {
   it("turns a Windows drive path into a file: URL, not a scheme-looking path", () => {
     // Node reads the `c:` of a raw `C:\...` path as a URL scheme and rejects it
     // (ERR_UNSUPPORTED_ESM_URL_SCHEME), which stopped perf:compare on Windows.
-    expect(glueFileUrl("C:\\Users\\me\\vc perf\\dist\\engine", true)).toBe("file:///C:/Users/me/vc%20perf/dist/engine/verticopolis_engine.js");
+    expect(glueFileUrl("C:\\Users\\me\\vc perf\\dist\\engine", true)).toBe(
+      "file:///C:/Users/me/vc%20perf/dist/engine/verticopolis_engine.js",
+    );
     expect(glueFileUrl("c:\\repo\\dist\\engine\\", true)).toBe("file:///c:/repo/dist/engine/verticopolis_engine.js");
   });
 
@@ -30,7 +32,11 @@ describe("the glue's file URL", () => {
     // A plain Node process, as the harness runs it (vitest's own loader would
     // not tell us what Node accepts).
     const url = glueFileUrl(join(root, "engine"));
-    const out = execFileSync(process.execPath, ["--input-type=module", "-e", `console.log((await import(${JSON.stringify(url)})).answer)`], { encoding: "utf8" });
+    const out = execFileSync(
+      process.execPath,
+      ["--input-type=module", "-e", `console.log((await import(${JSON.stringify(url)})).answer)`],
+      { encoding: "utf8" },
+    );
     expect(out.trim()).toBe("42");
   });
 });

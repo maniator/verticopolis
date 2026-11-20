@@ -68,7 +68,8 @@ export async function openLinkedRow(app: GameApp, row: Pick<FileRow, "id" | "nam
   }
   if (bytes.byteLength === 0) {
     trackAppAction("folder_failed", "empty");
-    const reuse = row.type === "tower" ? " A save that didn't finish can leave one; saving under that name uses it." : "";
+    const reuse =
+      row.type === "tower" ? " A save that didn't finish can leave one; saving under that name uses it." : "";
     app.ui.sayVisibly(`"${row.name}" is an empty file, so there's no tower in it.${reuse}`);
     return true;
   }
@@ -93,7 +94,11 @@ export async function openLinkedRow(app: GameApp, row: Pick<FileRow, "id" | "nam
 
 /** Write the live tower into the folder with `write`, and make the file it
  *  wrote the live tower's file. */
-async function saveLinked(app: GameApp, why: "new" | "replace" | "current", write: (bytes: Uint8Array) => Promise<TowerFileEntry>): Promise<string> {
+async function saveLinked(
+  app: GameApp,
+  why: "new" | "replace" | "current",
+  write: (bytes: Uint8Array) => Promise<TowerFileEntry>,
+): Promise<string> {
   const bytes = exportFile(app.enginePort, app.engine.viewState(), currentStamp());
   const entry = await write(bytes);
   setCurrentLinkedFile(entry.id);
@@ -139,7 +144,9 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
       linkedFolder.allow().then(
         (access): FileNote | null => {
           trackAppAction("folder_allow", access === "granted" ? "granted" : "denied");
-          return access === "granted" ? null : { text: "The folder stays closed until your browser allows it.", kind: "bad" };
+          return access === "granted"
+            ? null
+            : { text: "The folder stays closed until your browser allows it.", kind: "bad" };
         },
         (err: unknown) => folderFailed(err),
       ),
@@ -177,7 +184,9 @@ export function linkedPlace(app: GameApp): LinkedPlaceCtx | null {
     open: (row) => void openLinkedRow(app, row),
     save: async (name, replace) => {
       try {
-        const saved = await saveLinked(app, replace ? "replace" : "new", (bytes) => linkedFolder.save(name, bytes, replace));
+        const saved = await saveLinked(app, replace ? "replace" : "new", (bytes) =>
+          linkedFolder.save(name, bytes, replace),
+        );
         app.ui.toast(`Saved "${saved}" in ${linkedFolder.state()?.name ?? "the linked folder"}.`, "good");
         return null;
       } catch (err) {
@@ -205,7 +214,9 @@ export async function saveCurrentLinked(app: GameApp): Promise<boolean> {
   try {
     // Ctrl+S is a key press, so the browser may ask for its OK here.
     if (linkedFolder.state()?.access !== "granted" && (await linkedFolder.allow()) !== "granted") {
-      app.ui.sayVisibly("Your browser didn't allow the game to save in the linked folder. Use File > Save As… to save it somewhere else.");
+      app.ui.sayVisibly(
+        "Your browser didn't allow the game to save in the linked folder. Use File > Save As… to save it somewhere else.",
+      );
       return true;
     }
     // By its name on disk: the very file the tower was opened from.

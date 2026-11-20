@@ -19,7 +19,8 @@ function refreshSwitch<T extends string>(name: string, values: readonly T[]): T 
   const value = process.env[name];
   if (value === undefined || value === "" || value === "0") return undefined;
   if (process.env.CI) throw new Error(`${name} is a local regeneration switch and never runs in CI`);
-  if (!(values as readonly string[]).includes(value)) throw new Error(`${name} must be ${values.join(" or ")}, not ${JSON.stringify(value)}`);
+  if (!(values as readonly string[]).includes(value))
+    throw new Error(`${name} must be ${values.join(" or ")}, not ${JSON.stringify(value)}`);
   return value as T;
 }
 
@@ -56,11 +57,21 @@ export function testsNotPassed(task: RunnerTask, path: readonly string[] = []): 
  * `writing`, so a misplaced call fails every run. With `writing` on, it
  * writes only when every test passed and `unfinished()` names no case.
  */
-export function finishWritingRun(what: string, writing: boolean, unfinished: () => readonly string[], write: () => void, suite: RunnerTask): void {
-  if (!("filepath" in suite)) throw new Error(`writeAfterPassingRun for the ${what} belongs at the top level of the test file`);
+export function finishWritingRun(
+  what: string,
+  writing: boolean,
+  unfinished: () => readonly string[],
+  write: () => void,
+  suite: RunnerTask,
+): void {
+  if (!("filepath" in suite))
+    throw new Error(`writeAfterPassingRun for the ${what} belongs at the top level of the test file`);
   if (!writing) return;
   const notPassed = testsNotPassed(suite);
-  if (notPassed.length > 0) throw new Error(`${what} NOT written; every test in the file has to run and pass, and these did not: ${notPassed.join("; ")}`);
+  if (notPassed.length > 0)
+    throw new Error(
+      `${what} NOT written; every test in the file has to run and pass, and these did not: ${notPassed.join("; ")}`,
+    );
   const missing = unfinished();
   if (missing.length > 0) throw new Error(`${what} NOT written; these cases did not finish: ${missing.join(", ")}`);
   write();
@@ -75,7 +86,12 @@ export function finishWritingRun(what: string, writing: boolean, unfinished: () 
  * of the file, outside any `describe`, so the gate covers the whole file; a
  * call inside a `describe` fails the run even when `writing` is off.
  */
-export function writeAfterPassingRun(what: string, writing: boolean, unfinished: () => readonly string[], write: () => void): void {
+export function writeAfterPassingRun(
+  what: string,
+  writing: boolean,
+  unfinished: () => readonly string[],
+  write: () => void,
+): void {
   // Vitest reads the first argument as fixtures and wants an object pattern
   // there; the file's suite comes second.
   // eslint-disable-next-line no-empty-pattern

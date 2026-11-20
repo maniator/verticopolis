@@ -16,7 +16,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { helpHostWorkerProblem, productionWorkerProblem } from "../src/build/previewDeploy.ts";
 
-const SW = process.argv[2] ? resolve(process.argv[2]) : resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist", "sw.js");
+const SW = process.argv[2]
+  ? resolve(process.argv[2])
+  : resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist", "sw.js");
 
 const HELP_SW = resolve(dirname(SW), "help", "sw.js");
 const read = (path: string) => (existsSync(path) ? readFileSync(path, "utf8") : null);
@@ -30,4 +32,6 @@ for (const [path, problem] of [
     process.exit(1);
   }
 }
-console.log(`check-production-worker: ${SW} is the precaching worker and ${HELP_SW} the manual host's self-removing one.`);
+console.log(
+  `check-production-worker: ${SW} is the precaching worker and ${HELP_SW} the manual host's self-removing one.`,
+);

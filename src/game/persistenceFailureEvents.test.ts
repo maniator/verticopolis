@@ -24,7 +24,13 @@ function makeLoad(port: Record<string, unknown> = {}, withNotice = true) {
   const ui = { toast: vi.fn(), sayVisibly: vi.fn(), showImportReport: vi.fn(), downloadFile: vi.fn(() => true) };
   const towerSwapped = vi.fn();
   const saveWarning = { show: vi.fn(), clear: vi.fn() };
-  const deps = { ui, towerSwapped, enginePort: () => port, getView: () => null, saveWarning: withNotice ? saveWarning : undefined } as unknown as SaveLoadDeps;
+  const deps = {
+    ui,
+    towerSwapped,
+    enginePort: () => port,
+    getView: () => null,
+    saveWarning: withNotice ? saveWarning : undefined,
+  } as unknown as SaveLoadDeps;
   return { load: new SaveLoad(deps), ui, towerSwapped, saveWarning };
 }
 
@@ -172,7 +178,10 @@ describe("a failed save reports autosave_failed", () => {
     const { load, ui } = makeLoad({}, false);
     await load.autosave();
     await load.autosave();
-    expect(ui.toast).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^Your tower isn't being saved\. This browser won't let/), "bad");
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/^Your tower isn't being saved\. This browser won't let/),
+      "bad",
+    );
   });
 
   it("keeps the failure notice for when the tab is visible again", async () => {
@@ -195,7 +204,11 @@ describe("a failed save reports autosave_failed", () => {
     load.save();
     load.save();
     expect(ui.toast).toHaveBeenCalledTimes(2);
-    expect(ui.toast).toHaveBeenNthCalledWith(2, expect.stringMatching(/^Save failed: storage is full or blocked/), "bad");
+    expect(ui.toast).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/^Save failed: storage is full or blocked/),
+      "bad",
+    );
     expect(saveWarning.show).toHaveBeenCalledTimes(1);
 
     save.mockReturnValue({ savedAt: 1, appVersion: "t" });
@@ -250,7 +263,11 @@ describe("a refused import reports import_failed with its closed code (#2075)", 
   it("reads a binary file's code too, sends a word this build does not know as `refused`, and a throw as `error`", async () => {
     const file = new Uint8Array([1]);
     const loadVctowerBytes = vi.fn(() => [0]);
-    const bytes = makeLoad({ loadVctowerBytes, lastReason: () => "damaged", lastRefusalCode: vi.fn(() => "too_large") });
+    const bytes = makeLoad({
+      loadVctowerBytes,
+      lastReason: () => "damaged",
+      lastRefusalCode: vi.fn(() => "too_large"),
+    });
     await bytes.load.importGame(file);
     expect(loadVctowerBytes).toHaveBeenCalledExactlyOnceWith(file);
     expect(trackFileFailure).toHaveBeenLastCalledWith("import_failed", "save", "too_large");
@@ -355,7 +372,11 @@ describe("an export that writes no file reports export_failed with its closed co
     expect(refused.ui.toast).toHaveBeenCalledWith("Export failed: The build name reads as before 2.0.", "bad");
 
     vi.mocked(trackFileFailure).mockClear();
-    const good = makeLoad({ setCamera: () => {}, exportVctowerBytes: () => new TextEncoder().encode("VCTOWER2\nabc"), towerName: () => "Tower" });
+    const good = makeLoad({
+      setCamera: () => {},
+      exportVctowerBytes: () => new TextEncoder().encode("VCTOWER2\nabc"),
+      towerName: () => "Tower",
+    });
     await good.load.exportGame();
     expect(trackFileFailure).not.toHaveBeenCalled();
     expect(good.ui.downloadFile).toHaveBeenCalledOnce();
@@ -363,7 +384,12 @@ describe("an export that writes no file reports export_failed with its closed co
 
   it("reports a refused .TDT export with its code, and a throwing or unloadable one as `error`", async () => {
     const tdtExport = vi.fn(() => [0]);
-    const refused = makeLoad({ setCamera: () => {}, tdtExport, lastReason: () => "Modern towers cannot be exported.", lastRefusalCode: () => "modern" });
+    const refused = makeLoad({
+      setCamera: () => {},
+      tdtExport,
+      lastReason: () => "Modern towers cannot be exported.",
+      lastRefusalCode: () => "modern",
+    });
     await refused.load.exportLegacy();
     expect(tdtExport).toHaveBeenCalledExactlyOnceWith();
     expect(trackFileFailure).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt", "modern");

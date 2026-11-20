@@ -111,7 +111,11 @@ describe("wireControllers", () => {
     const sim = { id: "sim", star: 3, population: 800 };
     const engine = { viewState: vi.fn(() => ({ view: 1 })), onContextRestored: null as unknown };
     const app = {
-      sim, enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader", unlocked: vi.fn(() => true), header: { star: 3, population: 800 } }, engine,
+      sim,
+      enginePort: { id: "engine port" },
+      portCodes: { id: "codes" },
+      reader: { id: "reader", unlocked: vi.fn(() => true), header: { star: 3, population: 800 } },
+      engine,
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
       speed: 2,
       frameErrors: [],
@@ -119,7 +123,9 @@ describe("wireControllers", () => {
       selected: { id: 7 },
       inspectAnchor: null,
       ui: {
-        toast: vi.fn(), sayVisibly: vi.fn(), precedence: { towerSwapped: vi.fn() },
+        toast: vi.fn(),
+        sayVisibly: vi.fn(),
+        precedence: { towerSwapped: vi.fn() },
         showInspector: vi.fn(),
         showBatchPricingDialog: vi.fn(),
         showElevatorScheduleDialog: vi.fn(),
@@ -160,7 +166,12 @@ describe("wireControllers", () => {
       selectedId: () => number | null;
       clearSelection: () => void;
     };
-    expect([d.enginePort(), d.portCodes(), d.reader(), d.isUnlocked("office")]).toEqual([app.enginePort, app.portCodes, app.reader, true]);
+    expect([d.enginePort(), d.portCodes(), d.reader(), d.isUnlocked("office")]).toEqual([
+      app.enginePort,
+      app.portCodes,
+      app.reader,
+      true,
+    ]);
     d.ui.toast("hi", "bad");
     expect(app.ui.toast).toHaveBeenCalledWith("hi", "bad");
     expect(d.selectedId()).toBe(7);
@@ -192,7 +203,12 @@ describe("wireControllers", () => {
       ui: Record<string, (...a: unknown[]) => unknown>;
     };
     const got = (name: string) => (d[name] as () => unknown)();
-    expect([got("engine"), got("codes"), got("reader"), got("kit")]).toEqual([app.enginePort, app.portCodes, app.reader, app.cardKit]);
+    expect([got("engine"), got("codes"), got("reader"), got("kit")]).toEqual([
+      app.enginePort,
+      app.portCodes,
+      app.reader,
+      app.cardKit,
+    ]);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
     d.ui.showBatchPricingDialog("ctx", "cb");
@@ -222,7 +238,11 @@ describe("wireControllers", () => {
     expect(d.getView()).toEqual({ view: 1 });
     expect(app.engine.viewState).toHaveBeenCalled();
     d.towerSwapped(); // breaks the report leash, follows the swap, then autosaves once as `swap` (#1631; the timer's guards, tested below)
-    expect([vi.mocked(app.ui.precedence.towerSwapped).mock.calls.length, vi.mocked(app.followSwap).mock.calls.length, vi.mocked(app.saveLoad.autosave).mock.calls]).toEqual([1, 1, [["swap"]]]);
+    expect([
+      vi.mocked(app.ui.precedence.towerSwapped).mock.calls.length,
+      vi.mocked(app.followSwap).mock.calls.length,
+      vi.mocked(app.saveLoad.autosave).mock.calls,
+    ]).toEqual([1, 1, [["swap"]]]);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
     expect(d.ui.downloadFile("f.json", "body")).toBe(false); // passed through for GH #997
@@ -235,7 +255,13 @@ describe("wireControllers", () => {
     // tower read, and reports the crash to analytics with its flattened description.
     const crashSpy = vi.spyOn(gameplaySession, "noteCrash");
     d.showCrashScreen({
-      crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false },
+      crash: {
+        kind: "webgl-context-lost",
+        repeat: false,
+        saveFlushed: true,
+        behindSplash: false,
+        recoveryFailed: false,
+      },
       error: "boom",
     });
     expect(showCrashScreen).toHaveBeenCalledWith(expect.objectContaining({ error: "boom", version: APP_VERSION }));
@@ -266,7 +292,12 @@ describe("wireControllers", () => {
     const d = mocks.deps.keyboard as Record<string, (...a: unknown[]) => unknown> & {
       ui: Record<string, (...a: unknown[]) => unknown>;
     };
-    expect([d.enginePort(), d.portCodes(), d.reader(), d.isUnlocked("office")]).toEqual([app.enginePort, app.portCodes, app.reader, true]);
+    expect([d.enginePort(), d.portCodes(), d.reader(), d.isUnlocked("office")]).toEqual([
+      app.enginePort,
+      app.portCodes,
+      app.reader,
+      true,
+    ]);
     expect(d.engine()).toBe(app.engine);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
@@ -300,7 +331,10 @@ describe("runBootFlow", () => {
       // The boot snapshot (gameplaySession.noteBoot) reads these off the live
       // sim; stub the shape so runBootFlow's snapshot call doesn't throw.
       sim: { emit: vi.fn(), mode: "classic", star: 1, population: 0, tower: { highestFloor: 1 }, gameplayEvents: {} },
-      saveLoad: { autosave: vi.fn(), newGame: vi.fn() }, events: { setBackdrop: vi.fn() }, enginePort: { logLine: vi.fn(), founder: () => false }, portCodes,
+      saveLoad: { autosave: vi.fn(), newGame: vi.fn() },
+      events: { setBackdrop: vi.fn() },
+      enginePort: { logLine: vi.fn(), founder: () => false },
+      portCodes,
       hadReadableSave: false,
       saveWasCorrupt: false,
       ...over,
@@ -428,7 +462,10 @@ describe("runBootFlow", () => {
 
     runBootFlow(app);
 
-    expect(app.enginePort.logLine).toHaveBeenCalledWith(expect.stringContaining("older saved tower"), portCodes.code("logKinds", "bad"));
+    expect(app.enginePort.logLine).toHaveBeenCalledWith(
+      expect.stringContaining("older saved tower"),
+      portCodes.code("logKinds", "bad"),
+    );
   });
 
   it("emits the fresh-start bulletin when a corrupt save had nothing behind it", () => {
@@ -436,7 +473,10 @@ describe("runBootFlow", () => {
 
     runBootFlow(app);
 
-    expect(app.enginePort.logLine).toHaveBeenCalledWith(expect.stringContaining("Starting a new tower"), portCodes.code("logKinds", "bad"));
+    expect(app.enginePort.logLine).toHaveBeenCalledWith(
+      expect.stringContaining("Starting a new tower"),
+      portCodes.code("logKinds", "bad"),
+    );
   });
 
   it("starts the autosave timer, which autosaves when no splash is up", () => {
@@ -445,7 +485,7 @@ describe("runBootFlow", () => {
     // No #splash element in the DOM, so the interval fires an autosave.
     vi.advanceTimersByTime(30000);
 
-    expect((app.saveLoad.autosave as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect(app.saveLoad.autosave as unknown as ReturnType<typeof vi.fn>).toHaveBeenCalled();
   });
 
   it("skips autosave while the splash is up", () => {
@@ -455,7 +495,7 @@ describe("runBootFlow", () => {
     runBootFlow(app);
     vi.advanceTimersByTime(30000);
 
-    expect((app.saveLoad.autosave as unknown as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect(app.saveLoad.autosave as unknown as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
   });
 });
 
@@ -468,9 +508,9 @@ describe("bootReason", () => {
   };
 
   it("prioritizes update over recovery, corrupt, and a readable save", () => {
-    expect(
-      bootReason({ justUpdated: true, justRecovered: true, hadReadableSave: true, saveWasCorrupt: true }),
-    ).toBe("update");
+    expect(bootReason({ justUpdated: true, justRecovered: true, hadReadableSave: true, saveWasCorrupt: true })).toBe(
+      "update",
+    );
   });
 
   it("reports recovery for the WebGL-loss auto-reload", () => {
@@ -485,9 +525,9 @@ describe("bootReason", () => {
     // A save-format-breaking update: the reload sets justUpdated, but the new
     // build can't read the old save, so the player got the splash + corrupt
     // message. The outcome (corrupt) wins over the trigger, mirroring resolveBootScreen.
-    expect(
-      bootReason({ justUpdated: true, justRecovered: false, hadReadableSave: false, saveWasCorrupt: true }),
-    ).toBe("corrupt");
+    expect(bootReason({ justUpdated: true, justRecovered: false, hadReadableSave: false, saveWasCorrupt: true })).toBe(
+      "corrupt",
+    );
   });
 
   it("reports continue for a readable save resumed", () => {

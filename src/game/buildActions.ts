@@ -1,4 +1,9 @@
-import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import {
+  catalogBuildKind,
+  catalogFacility,
+  catalogTileCost,
+  type Catalog,
+} from "@verticopolis/components/catalog/catalogTypes";
 import type { FacilityKind } from "@verticopolis/components/shared/types";
 import type { Picked } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
@@ -166,7 +171,11 @@ export class BuildActions {
    *  (`paintTiles`), so no step falls between its tiles. `engineRefused`
    *  marks a strip that laid nothing for the engine's own reason, which only
    *  a lot edge press has already said aloud. */
-  paintBrush(kind: BrushKind, tile: number, floor: number): { placed: number; reason?: string; engineRefused?: boolean } {
+  paintBrush(
+    kind: BrushKind,
+    tile: number,
+    floor: number,
+  ): { placed: number; reason?: string; engineRefused?: boolean } {
     const tiles = brushTiles(tile);
     this.paint = { tile, floor };
     const port = this.deps.enginePort();
@@ -189,7 +198,8 @@ export class BuildActions {
       // tile paid for its floor too (catalogTileCost).
       // A tall lobby (#308) pays the lobby price once per story.
       const rise = port.lobbyRise(floor, tile);
-      const perTile = catalogTileCost(catalog, laid, "no floor yet") + (rise - 1) * catalogTileCost(catalog, laid, "a floor tile");
+      const perTile =
+        catalogTileCost(catalog, laid, "no floor yet") + (rise - 1) * catalogTileCost(catalog, laid, "a floor tile");
       this.deps.ui.toast(
         `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,
         "info",

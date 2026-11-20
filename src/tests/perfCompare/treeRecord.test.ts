@@ -15,7 +15,12 @@ describe("treeRecord", () => {
 
   it("records the porcelain lines, a hash of the tracked changes and a hash of each untracked file", () => {
     const t = treeRecord(
-      git({ ...clean, status: " M src/a.ts\n?? src/b.ts\n", diff: "diff --git a/src/a.ts b/src/a.ts\n", "ls-files": "src/z.ts\0src/b.ts\0" }),
+      git({
+        ...clean,
+        status: " M src/a.ts\n?? src/b.ts\n",
+        diff: "diff --git a/src/a.ts b/src/a.ts\n",
+        "ls-files": "src/z.ts\0src/b.ts\0",
+      }),
       (p) => Buffer.from(`file ${p}`),
     );
     expect(t.porcelain).toEqual([" M src/a.ts", "?? src/b.ts"]);
@@ -36,23 +41,51 @@ describe("treeRecord", () => {
 
   it("keeps results folders out of every query", () => {
     const seen: string[][] = [];
-    treeRecord((args) => (seen.push(args), ""), () => null);
+    treeRecord(
+      (args) => (seen.push(args), ""),
+      () => null,
+    );
     expect(seen).toHaveLength(4);
     for (const args of seen) expect(args).toContain(":(exclude)docs/performance/results");
   });
 
   it("pins the diff text against the machine's git configuration", () => {
     const seen: string[][] = [];
-    treeRecord((args) => (seen.push(args), ""), () => null);
+    treeRecord(
+      (args) => (seen.push(args), ""),
+      () => null,
+    );
     const diff = seen.find((a) => a.includes("diff"))!;
-    for (const flag of ["--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--src-prefix=a/", "--dst-prefix=b/", "-U3", "--inter-hunk-context=0", "--diff-algorithm=myers", "--indent-heuristic", "-O/dev/null", "--ignore-submodules=none"]) expect(diff).toContain(flag);
+    for (const flag of [
+      "--binary",
+      "--full-index",
+      "--no-color",
+      "--no-ext-diff",
+      "--no-textconv",
+      "--no-renames",
+      "--src-prefix=a/",
+      "--dst-prefix=b/",
+      "-U3",
+      "--inter-hunk-context=0",
+      "--diff-algorithm=myers",
+      "--indent-heuristic",
+      "-O/dev/null",
+      "--ignore-submodules=none",
+    ])
+      expect(diff).toContain(flag);
     // The configuration comes before the subcommand, where git reads -c.
     const before = diff.slice(0, diff.indexOf("diff"));
-    for (const setting of ["diff.suppressBlankEmpty=false", "core.compression=-1", "core.quotepath=true"]) expect(before).toContain(setting);
+    for (const setting of ["diff.suppressBlankEmpty=false", "core.compression=-1", "core.quotepath=true"])
+      expect(before).toContain(setting);
   });
 
   it("says so when git cannot answer and when a file cannot be read", () => {
-    expect(treeRecord(() => null, () => null)).toEqual({ porcelain: null, diffSha256: null, untracked: [], hidden: [], complete: false });
+    expect(
+      treeRecord(
+        () => null,
+        () => null,
+      ),
+    ).toEqual({ porcelain: null, diffSha256: null, untracked: [], hidden: [], complete: false });
     const t = treeRecord(git({ ...clean, status: "?? x\n", diff: "", "ls-files": "x\0" }), () => null);
     expect(t.untracked).toEqual([{ path: "x", sha256: UNREADABLE }]);
     expect(t.complete).toBe(false);
@@ -64,31 +97,54 @@ describe("treeRecord", () => {
   });
 
   it("finds tracked files that git was told to stop looking at", () => {
-    const t = treeRecord(git({ "ls-files-v": "H ok.ts\0h assumed.ts\0S skipped.ts\0s both.ts\0", status: "", diff: "", "ls-files": "" }), () => null);
+    const t = treeRecord(
+      git({ "ls-files-v": "H ok.ts\0h assumed.ts\0S skipped.ts\0s both.ts\0", status: "", diff: "", "ls-files": "" }),
+      () => null,
+    );
     expect(t.hidden).toEqual(["assumed.ts", "both.ts", "skipped.ts"]);
     expect(t.complete).toBe(true);
   });
 });
 
 describe("treeSummary", () => {
-  const full = { porcelain: [" M a", "?? b"], diffSha256: "d1", untracked: [{ path: "b", sha256: "s1" }], complete: true };
+  const full = {
+    porcelain: [" M a", "?? b"],
+    diffSha256: "d1",
+    untracked: [{ path: "b", sha256: "s1" }],
+    complete: true,
+  };
   it("is null without a record, says clean for a clean tree and names everything for a dirty one", () => {
     expect(treeSummary(undefined)).toBeNull();
-    expect(treeSummary({ porcelain: [], diffSha256: null, untracked: [], complete: true })).toBe("clean (nothing outside docs/performance/results)");
+    expect(treeSummary({ porcelain: [], diffSha256: null, untracked: [], complete: true })).toBe(
+      "clean (nothing outside docs/performance/results)",
+    );
     // An incomplete record never reads as clean.
-    expect(treeSummary({ porcelain: [], diffSha256: null, untracked: [], complete: false })).toBe("git could not finish the working-tree record (the run is void)");
-    expect(treeSummary({ porcelain: null, diffSha256: null, untracked: [], complete: false })).toBe("git could not report the working tree (the run is void)");
+    expect(treeSummary({ porcelain: [], diffSha256: null, untracked: [], complete: false })).toBe(
+      "git could not finish the working-tree record (the run is void)",
+    );
+    expect(treeSummary({ porcelain: null, diffSha256: null, untracked: [], complete: false })).toBe(
+      "git could not report the working tree (the run is void)",
+    );
     expect(treeSummary(full)).toBe("status:  M a; ?? b; tracked changes SHA-256 d1; untracked: b s1");
-    expect(treeSummary({ porcelain: ["?? b"], diffSha256: null, untracked: [], complete: true })).toBe("status: ?? b; tracked changes SHA-256 none (no tracked changes)");
+    expect(treeSummary({ porcelain: ["?? b"], diffSha256: null, untracked: [], complete: true })).toBe(
+      "status: ?? b; tracked changes SHA-256 none (no tracked changes)",
+    );
   });
   it("does not read a failed diff or an unreadable file as nothing", () => {
-    const s = treeSummary({ porcelain: [" M a", "?? b"], diffSha256: null, untracked: [{ path: "b", sha256: UNREADABLE }], complete: false })!;
+    const s = treeSummary({
+      porcelain: [" M a", "?? b"],
+      diffSha256: null,
+      untracked: [{ path: "b", sha256: UNREADABLE }],
+      complete: false,
+    })!;
     expect(s).toContain("tracked changes SHA-256 unavailable (git could not produce the diff)");
     expect(s).toContain(`untracked: b ${UNREADABLE}`);
     expect(s).toContain("the record is incomplete (the run is void)");
   });
   it("flags a dirty run whose record shows nothing", () => {
-    expect(treeSummary({ porcelain: [], diffSha256: null, untracked: [], complete: true }, true)).toContain("flagged dirty");
+    expect(treeSummary({ porcelain: [], diffSha256: null, untracked: [], complete: true }, true)).toContain(
+      "flagged dirty",
+    );
   });
   it("names the files whose edits git hides, and does not call that clean", () => {
     const s = treeSummary({ porcelain: [], diffSha256: null, untracked: [], hidden: ["src/a.ts"], complete: true })!;

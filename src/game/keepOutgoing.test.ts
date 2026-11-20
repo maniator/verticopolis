@@ -19,7 +19,9 @@ vi.mock("../analytics", () => ({ trackAppAction: m.track }));
 vi.mock("./autosaveSchedule", () => ({ autosaveLive: () => m.live }));
 vi.mock("./portLifecycle", () => ({ saveBytes: m.saveBytes }));
 vi.mock("../storage/savePacker", () => ({ packSave: m.packSave }));
-vi.mock("../storage/saveStore", () => ({ saveStore: { get: (key: string) => (key === "verticopolis-save" ? m.stored : null) } }));
+vi.mock("../storage/saveStore", () => ({
+  saveStore: { get: (key: string) => (key === "verticopolis-save" ? m.stored : null) },
+}));
 vi.mock("../storage/SaveGame", () => ({
   autosaveKey: () => "verticopolis-save",
   SaveGame: { listSlots: () => [{ slot: "auto", exists: m.stored !== null, towerName: m.autoName, savedAt: 5 }] },
@@ -29,7 +31,14 @@ import { closeFileSpaceForTests, fileSpace } from "../storage/fileSpace";
 import { recentTowers } from "../storage/recentTowers";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
 import { setCurrentFile, setCurrentLinkedFile } from "./currentFile";
-import { captureOutgoing, dropOutgoing, keepOutgoing, keptSettled, openingFile, resetOutgoingForTests } from "./keepOutgoing";
+import {
+  captureOutgoing,
+  dropOutgoing,
+  keepOutgoing,
+  keptSettled,
+  openingFile,
+  resetOutgoingForTests,
+} from "./keepOutgoing";
 import { keepOpenedFile } from "./fileKeep";
 import { claimTower } from "./towerDocument";
 
@@ -46,7 +55,11 @@ function makeApp(name = "Harmony Tower 2.0") {
       confirmModal: vi.fn((_title: string, _body: string, _onYes: () => void, _yes?: string) => undefined),
     },
   };
-  return { app: app as never as Parameters<typeof keepOutgoing>[0] & Parameters<typeof captureOutgoing>[0], raw: app, swap: () => (generation += 1) };
+  return {
+    app: app as never as Parameters<typeof keepOutgoing>[0] & Parameters<typeof captureOutgoing>[0],
+    raw: app,
+    swap: () => (generation += 1),
+  };
 }
 
 const SAVE = Uint8Array.from([1, 2, 3]);
@@ -78,7 +91,10 @@ describe("the tower left by opening another", () => {
     setCurrentFile(own.id);
     const { app, raw, swap } = makeApp();
     captureOutgoing(app, "open");
-    expect(m.saveBytes, "no camera stamp, so a refused swap leaves the tower as it was").toHaveBeenCalledExactlyOnceWith(raw.enginePort, null, expect.anything());
+    expect(
+      m.saveBytes,
+      "no camera stamp, so a refused swap leaves the tower as it was",
+    ).toHaveBeenCalledExactlyOnceWith(raw.enginePort, null, expect.anything());
     swap();
     expect(await keepOutgoing(app)).toBe("file");
     expect(fileSpace.list()).toHaveLength(1);
@@ -86,7 +102,11 @@ describe("the tower left by opening another", () => {
     expect(m.packSave).toHaveBeenCalledExactlyOnceWith(SAVE);
     expect(m.track).toHaveBeenCalledExactlyOnceWith("tower_kept", "file");
     expect(raw.ui.toast).toHaveBeenCalledWith('Saved "Harmony" in My Towers.', "good");
-    expect(recentTowers()[0], "the kept file tops Open Recent").toMatchObject({ place: "towers", id: own.id, name: "Harmony" });
+    expect(recentTowers()[0], "the kept file tops Open Recent").toMatchObject({
+      place: "towers",
+      id: own.id,
+      name: "Harmony",
+    });
   });
 
   it("heads Open Recent above a tower opened from the device, even when its keep is written first", async () => {
@@ -113,7 +133,10 @@ describe("the tower left by opening another", () => {
     });
     slowAdd.mockRestore();
     expect(await kept).toBe("file");
-    expect(recentTowers().map((t) => t.name), "the tower left is line 1, so going back is one pick").toEqual(["Harmony", "Beta"]);
+    expect(
+      recentTowers().map((t) => t.name),
+      "the tower left is line 1, so going back is one pick",
+    ).toEqual(["Harmony", "Beta"]);
   });
 
   it("opening its own file again to go back keeps the minutes since as a new file, never over the file being read", async () => {
@@ -142,10 +165,16 @@ describe("the tower left by opening another", () => {
     const kept = fileSpace.find("Harmony Tower 2.0 (2)");
     expect(kept).toBeDefined();
     expect(await fileSpace.read(kept!.id)).toEqual(VCTOWER2);
-    expect(await fileSpace.read(fileSpace.find("Harmony Tower 2.0")!.id), "the other file is left alone").toEqual(Uint8Array.from([0]));
+    expect(await fileSpace.read(fileSpace.find("Harmony Tower 2.0")!.id), "the other file is left alone").toEqual(
+      Uint8Array.from([0]),
+    );
     expect(m.track).toHaveBeenCalledExactlyOnceWith("tower_kept", "new");
     expect(raw.ui.toast).toHaveBeenCalledWith('Kept your last tower in My Towers as "Harmony Tower 2.0 (2)".', "good");
-    expect(recentTowers()[0], "the kept file tops Open Recent").toMatchObject({ place: "towers", id: kept!.id, name: "Harmony Tower 2.0 (2)" });
+    expect(recentTowers()[0], "the kept file tops Open Recent").toMatchObject({
+      place: "towers",
+      id: kept!.id,
+      name: "Harmony Tower 2.0 (2)",
+    });
   });
 
   it("from the linked folder is written back to its own file there while the folder has its OK", async () => {
@@ -188,7 +217,9 @@ describe("the tower left by opening another", () => {
     swap();
     expect(await keepOutgoing(app)).toBe("file");
     expect(fileSpace.list()).toHaveLength(1);
-    expect(new TextDecoder().decode((await fileSpace.read(own.id))!)).toBe(`VCTOWER1\n${STORED.slice("VCZ1:".length)}\n`);
+    expect(new TextDecoder().decode((await fileSpace.read(own.id))!)).toBe(
+      `VCTOWER1\n${STORED.slice("VCZ1:".length)}\n`,
+    );
   });
 
   it("behind the title screen never writes the file this window booted with once another window put another tower in the Auto-save", async () => {
@@ -213,7 +244,10 @@ describe("the tower left by opening another", () => {
     const own = await fileSpace.save("Harmony", "tower", Uint8Array.from([0]), 10);
     setCurrentFile(own.id);
     const index = fake.lastDb!.store("meta").get("index") as { id: string; modified: number }[];
-    fake.lastDb!.store("meta").set("index", index.map((e) => ({ ...e, modified: 20 })));
+    fake.lastDb!.store("meta").set(
+      "index",
+      index.map((e) => ({ ...e, modified: 20 })),
+    );
     const { app, swap } = makeApp();
     captureOutgoing(app, "open");
     swap();
@@ -292,7 +326,11 @@ describe("the tower left by opening another", () => {
     expect(raw.ui.downloadFile, "no download without the player's click").not.toHaveBeenCalled();
     expect(m.track).toHaveBeenCalledExactlyOnceWith("tower_kept", "offered");
     const [title, body, onYes, yes] = raw.ui.confirmModal.mock.calls[0]!;
-    expect([title, body, yes]).toEqual(["Keep your last tower", 'My Towers couldn\'t keep "Harmony Tower 2.0". Download it as "Harmony Tower 2.0.vctower" so it isn\'t lost?', "Download"]);
+    expect([title, body, yes]).toEqual([
+      "Keep your last tower",
+      'My Towers couldn\'t keep "Harmony Tower 2.0". Download it as "Harmony Tower 2.0.vctower" so it isn\'t lost?',
+      "Download",
+    ]);
     onYes();
     expect(raw.ui.downloadFile).toHaveBeenCalledExactlyOnceWith("Harmony Tower 2.0.vctower", VCTOWER2);
     expect(m.track).toHaveBeenLastCalledWith("tower_kept", "download");

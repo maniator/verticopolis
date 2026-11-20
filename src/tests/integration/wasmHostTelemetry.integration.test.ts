@@ -43,13 +43,15 @@ interface Seen {
 const saveOf = (engine: WasmEngine) => JSON.parse(engine.serialize()) as SerializedGame;
 
 const isNum = (v: unknown): v is number => typeof v === "number";
-const isPairs = (v: unknown): boolean => Array.isArray(v) && v.every((p) => Array.isArray(p) && p.length === 2 && isNum(p[0]) && isNum(p[1]));
+const isPairs = (v: unknown): boolean =>
+  Array.isArray(v) && v.every((p) => Array.isArray(p) && p.length === 2 && isNum(p[0]) && isNum(p[1]));
 const isDays = (v: unknown, slot: (x: unknown) => boolean): boolean => {
   if (typeof v !== "object" || v === null) return false;
   const { weekday, weekend } = v as { weekday?: unknown; weekend?: unknown };
   return Array.isArray(weekday) && Array.isArray(weekend) && weekday.every(slot) && weekend.every(slot);
 };
-const isEntries = (v: unknown, value: (x: unknown) => boolean): boolean => Array.isArray(v) && v.every((e) => Array.isArray(e) && e.length === 2 && isNum(e[0]) && value(e[1]));
+const isEntries = (v: unknown, value: (x: unknown) => boolean): boolean =>
+  Array.isArray(v) && v.every((e) => Array.isArray(e) && e.length === 2 && isNum(e[0]) && value(e[1]));
 
 /** Whether a parsed document is the shape `seedElevatorTelemetry` takes, all
  *  the way down: `[shaft, value]` entries for the utilization, the demand
@@ -58,7 +60,11 @@ const isEntries = (v: unknown, value: (x: unknown) => boolean): boolean => Array
 function isTelemetryDocument(v: unknown): v is TelemetryDocument {
   if (typeof v !== "object" || v === null) return false;
   const d = v as Record<string, unknown>;
-  return isEntries(d.util, isNum) && isEntries(d.hourly, (x) => isDays(x, isNum)) && isEntries(d.origins, (x) => isDays(x, isPairs));
+  return (
+    isEntries(d.util, isNum) &&
+    isEntries(d.hourly, (x) => isDays(x, isNum)) &&
+    isEntries(d.origins, (x) => isDays(x, isPairs))
+  );
 }
 
 function telemetryOf(engine: WasmEngine): TelemetryDocument {
@@ -72,7 +78,8 @@ function telemetryOf(engine: WasmEngine): TelemetryDocument {
  *  not listed yet reads as having recorded nothing. */
 function ringOf(doc: TelemetryDocument, ring: Ring): Map<string, string> {
   const load = new Map<string, string>();
-  for (const [id, r] of doc.hourly) load.set(`demand of shaft ${id}`, JSON.stringify(r[ring].flatMap((v, hour) => (v === 0 ? [] : [[hour, v]]))));
+  for (const [id, r] of doc.hourly)
+    load.set(`demand of shaft ${id}`, JSON.stringify(r[ring].flatMap((v, hour) => (v === 0 ? [] : [[hour, v]]))));
   for (const [id, r] of doc.origins) {
     const origins = r[ring].flatMap((slot, i) => (slot.length === 0 ? [] : [[i, slot]]));
     load.set(`origins of shaft ${id}`, JSON.stringify(origins));
@@ -86,7 +93,13 @@ function ringOf(doc: TelemetryDocument, ring: Ring): Map<string, string> {
 const warmed = (doc: TelemetryDocument, ring: Ring) => doc.hourly.some(([, r]) => r[ring].some((v) => v > 0));
 
 /** Tick an hour at a time, checking every store after each hour. */
-function runHours(engine: WasmEngine, hours: number, week: { days: number; weekendDays: number }, seen: Seen, label: string): void {
+function runHours(
+  engine: WasmEngine,
+  hours: number,
+  week: { days: number; weekendDays: number },
+  seen: Seen,
+  label: string,
+): void {
   const dayOf = (minutes: number) => Math.floor(minutes / MINUTES_PER_DAY);
   const isWeekend = (day: number) => day % week.days >= week.days - week.weekendDays;
   for (let h = 0; h < hours; h++) {
@@ -97,11 +110,15 @@ function runHours(engine: WasmEngine, hours: number, week: { days: number; weeke
     const doc = telemetryOf(engine);
     const at = `${label} hour ${h}`;
     const shafts = new Set(save.transports.map((t) => t.id));
-    for (const [id] of [...doc.util, ...doc.hourly, ...doc.origins]) expect(shafts.has(id), `${at}: shaft ${id} is in the tower`).toBe(true);
+    for (const [id] of [...doc.util, ...doc.hourly, ...doc.origins])
+      expect(shafts.has(id), `${at}: shaft ${id} is in the tower`).toBe(true);
     // An hour inside one day records into that day's rings only.
     if (dayOf(save.minutes) === startDay && save.minutes % MINUTES_PER_DAY !== 0) {
       const other: Ring = isWeekend(startDay) ? "weekday" : "weekend";
-      expect(ringOf(doc, other), `${at}: a ${other === "weekday" ? "weekend" : "weekday"} hour leaves the ${other} rings alone`).toEqual(ringOf(before, other));
+      expect(
+        ringOf(doc, other),
+        `${at}: a ${other === "weekday" ? "weekend" : "weekday"} hour leaves the ${other} rings alone`,
+      ).toEqual(ringOf(before, other));
     }
     const hk = JSON.parse(engine.housekeepingReport() ?? "null") as { cleaned: number; leftover: number } | null;
     if (hk !== null) expect(Object.keys(hk).sort(), `${at} housekeeping`).toEqual(["cleaned", "leftover"]);
@@ -127,7 +144,8 @@ function run(fixture: string, seen: Seen): void {
     runHours(engine, 48, week, seen, fixture);
     const minutes = saveOf(engine).minutes;
     let day = Math.floor(minutes / MINUTES_PER_DAY) + 1;
-    while (day % week.days !== week.days - week.weekendDays || day * MINUTES_PER_DAY - MINUTES_PER_HOUR <= minutes) day++;
+    while (day % week.days !== week.days - week.weekendDays || day * MINUTES_PER_DAY - MINUTES_PER_HOUR <= minutes)
+      day++;
     const delta = day * MINUTES_PER_DAY - MINUTES_PER_HOUR - minutes;
     expect(delta, `${fixture} reaches the weekend ahead`).toBeGreaterThan(0);
     engine.advanceClock(delta);

@@ -142,7 +142,15 @@ describe("wireActions — the anti-dead-button contract", () => {
     const { ui } = makeUI();
     const recover = vi.fn();
     const review = vi.fn();
-    const rows = [{ id: 7, title: "Standard Elevator, floors 15–45", facts: "8 cars installed.", preview: "Using all 8 cars.", kept: false }];
+    const rows = [
+      {
+        id: 7,
+        title: "Standard Elevator, floors 15–45",
+        facts: "8 cars installed.",
+        preview: "Using all 8 cars.",
+        kept: false,
+      },
+    ];
     ui.showScheduleReview(rows, { "recover:7": recover, "keep:7": vi.fn(), "review:7": review }, "keep:7");
     expect(document.activeElement).toBe(dialog().querySelector('[data-act="keep:7"]'));
     click('[data-act="recover:7"]');
@@ -804,7 +812,9 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     // Reported back so the export flow skips its success line (GH #997).
     expect(started).toBe(false);
     const toasts = [...document.getElementById("toast-wrap")!.children];
-    expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
+    expect(
+      toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file")),
+    ).toBe(true);
   });
 
   it("Export asks first: the file is only built and downloaded after clicking Export in the confirm dialog", () => {
@@ -1029,7 +1039,6 @@ describe("import fidelity report: nothing adopted until the player opens it", ()
     expect(dialog().querySelector(".modal-notice")!.textContent).toContain("will open when you finish here");
   });
 
-
   it("does not displace a dialog that owes a restore on close", () => {
     // CAP-3's second clause, the one that matters: "the displaced dialog leaves
     // no pending handler behind". Compare pauses the tower and restores the
@@ -1147,10 +1156,7 @@ describe("export fidelity report: nothing downloads until the player confirms", 
   it("Cancel downloads nothing; content is escaped against hostile tower names", () => {
     const { ui } = makeUI();
     const onDownload = vi.fn();
-    ui.showExportReport(
-      { ...exportReport(), towerName: "<img src=x onerror=alert(1)>" },
-      { onDownload },
-    );
+    ui.showExportReport({ ...exportReport(), towerName: "<img src=x onerror=alert(1)>" }, { onDownload });
     expect(dialog().querySelector("img")).toBeNull();
     expect(dialog().textContent).toContain("<img src=x onerror=alert(1)>");
     click('[data-act="close"]');
@@ -1431,8 +1437,7 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
 
 describe("build palette — locked-tier visibility (SimTower parity)", () => {
   const palette = (): HTMLElement => document.getElementById("palette-scroll")!;
-  const item = (kind: string): HTMLElement =>
-    palette().querySelector<HTMLElement>(`.pal-item[data-kind="${kind}"]`)!;
+  const item = (kind: string): HTMLElement => palette().querySelector<HTMLElement>(`.pal-item[data-kind="${kind}"]`)!;
   // A group's visibility now lives on its section (which wraps the title + items),
   // hidden as a unit when everything beneath is locked, so no dangling header.
   const section = (group: string): HTMLElement =>
@@ -1723,7 +1728,7 @@ describe("showSettings: the Settings dialog", () => {
     // The two boolean prefs render as switches (checkbox with switch
     // semantics), each with a visible explanatory note.
     expect(dialog().querySelectorAll('input[role="switch"]')).toHaveLength(2);
-    expect(dialog().querySelectorAll('.set-note')).toHaveLength(2);
+    expect(dialog().querySelectorAll(".set-note")).toHaveLength(2);
     const acts = [...actions.querySelectorAll("[data-act]")].map((b) => b.getAttribute("data-act"));
     expect(acts).toEqual(["close"]);
   });
@@ -1847,7 +1852,12 @@ describe("showSettings: the Settings dialog", () => {
     // The engine kept bridging on (a refused toggle): the click's own uncheck
     // must not stick once the answer arrives.
     const toggle = vi.fn(async () => true);
-    const { ui } = makeUI({ getMode: () => "modern" as const, getCatalog: () => catalogFor("modern"), isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
+    const { ui } = makeUI({
+      getMode: () => "modern" as const,
+      getCatalog: () => catalogFor("modern"),
+      isAutoBridge: vi.fn(() => true),
+      onToggleAutoBridge: toggle,
+    });
     ui.showSettings();
     const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
     sw.click();
@@ -1860,7 +1870,12 @@ describe("showSettings: the Settings dialog", () => {
   it("puts the Modern bridging switch back on the live preference when the toggle fails, and reports the fault", async () => {
     const fault = new Error("engine fault");
     const toggle = vi.fn(() => Promise.reject(fault));
-    const { ui } = makeUI({ getMode: () => "modern" as const, getCatalog: () => catalogFor("modern"), isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
+    const { ui } = makeUI({
+      getMode: () => "modern" as const,
+      getCatalog: () => catalogFor("modern"),
+      isAutoBridge: vi.fn(() => true),
+      onToggleAutoBridge: toggle,
+    });
     ui.showSettings();
     const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
     const seen = await unhandled(async () => {
@@ -1992,7 +2007,11 @@ describe("showUpdatePrompt — Later / Update now, resolved once", () => {
 
   it("drops the 'unknown' sha placeholder from the build line", () => {
     const { ui } = makeUI();
-    ui.showUpdatePrompt(() => {}, () => {}, { version: "1.6.0", sha: "unknown", notes: [] });
+    ui.showUpdatePrompt(
+      () => {},
+      () => {},
+      { version: "1.6.0", sha: "unknown", notes: [] },
+    );
     expect(dialog().textContent).toContain("Build 1.6.0");
     expect(dialog().textContent).not.toContain("unknown");
   });
@@ -2113,7 +2132,16 @@ async function unhandled(run: () => Promise<void>): Promise<unknown[]> {
 }
 
 describe("showBatchPricingDialog — set-all rent/price with a reset confirm", () => {
-  const result = { matched: 5, eligible: 5, changed: 3, skippedSold: 0, skippedCustom: 2, customOverwritten: 0, clampedLow: 0, clampedHigh: 0 };
+  const result = {
+    matched: 5,
+    eligible: 5,
+    changed: 3,
+    skippedSold: 0,
+    skippedCustom: 2,
+    customOverwritten: 0,
+    clampedLow: 0,
+    clampedHigh: 0,
+  };
   function open() {
     const { ui } = makeUI();
     const band = { default: 10000, min: 5000, max: 20000, step: 1000 };
@@ -2187,7 +2215,10 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     const apply = vi.fn(() => new Promise<typeof result>((r) => (answer = r)));
     const onApplied = vi.fn();
     const band = { default: 10000, min: 5000, max: 20000, step: 1000 };
-    ui.showBatchPricingDialog({ kind: "office", kindLabel: "Office", options: { shape: "band", band } }, { preview: () => ({ ...result }), apply, onApplied });
+    ui.showBatchPricingDialog(
+      { kind: "office", kindLabel: "Office", options: { shape: "band", band } },
+      { preview: () => ({ ...result }), apply, onApplied },
+    );
     dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
     dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
     expect(dialog().open).toBe(false);
@@ -2244,7 +2275,16 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
 });
 
 describe("showBatchPricingDialog — the Classic ladder variant (rung picker + armed No Rate)", () => {
-  const result = { matched: 12, eligible: 9, changed: 9, skippedSold: 0, skippedCustom: 0, customOverwritten: 0, clampedLow: 0, clampedHigh: 0 };
+  const result = {
+    matched: 12,
+    eligible: 9,
+    changed: 9,
+    skippedSold: 0,
+    skippedCustom: 0,
+    customOverwritten: 0,
+    clampedLow: 0,
+    clampedHigh: 0,
+  };
   function openLadder() {
     const { ui } = makeUI();
     const options = priceOptionsFor(catalogFor("classic"), "office")!;
@@ -2402,7 +2442,12 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     // rows; these tests answer from their fake curves through the TypeScript
     // reference.
     const engine = rustScheduleEngine({ ...ctx, hourly });
-    return { ...ctx, autoTune: over.autoTune ?? engine.autoTune, facts: over.facts ?? engine.facts, preset: over.preset ?? engine.preset };
+    return {
+      ...ctx,
+      autoTune: over.autoTune ?? engine.autoTune,
+      facts: over.facts ?? engine.facts,
+      preset: over.preset ?? engine.preset,
+    };
   }
   /** The engine stages up-tower cars at a sky lobby, and a lobby stands only
    *  on the ground floor and every 15th: these cases run a 16-story shaft with
@@ -2443,8 +2488,9 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
 
   /** The car chip for `car` (1-based) on the grid row for `floor`. */
   const chipAt = (floor: number, car: number) => {
-    const row = Array.from(dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)"))
-      .find((r) => r.querySelector(".es-cell-floor")!.textContent!.replace(/[^0-9-]/g, "") === String(floor))!;
+    const row = Array.from(dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)")).find(
+      (r) => r.querySelector(".es-cell-floor")!.textContent!.replace(/[^0-9-]/g, "") === String(floor),
+    )!;
     return row.querySelectorAll<HTMLButtonElement>(".es-chip")[car - 1];
   };
   const okBtn = () => dialog().querySelector<HTMLButtonElement>('[data-act="apply"]')!;
@@ -2631,7 +2677,9 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
 
   it("a Modern preset rewrites both day rows and the staging", () => {
     const { apply } = open(skyLobbyShaft());
-    const feeder = Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Feeder")!;
+    const feeder = Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find(
+      (b) => b.textContent === "Feeder",
+    )!;
     feeder.click();
     okBtn().click();
     const s = apply.mock.calls[0][0];
@@ -2709,7 +2757,10 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     // which must read as one 00:00-23:00 span, not 24 comma'd stamps.
     const hourly = Array(24).fill(0.9);
     const { ui } = makeUI();
-    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1) } } }), { apply: vi.fn(async () => {}) });
+    ui.showElevatorScheduleDialog(
+      baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1) } } }),
+      { apply: vi.fn(async () => {}) },
+    );
     expect(dialog().querySelector(".es-advice")!.textContent).toBe("This shaft is short at 00:00–23:00 on weekdays.");
   });
 
@@ -2762,7 +2813,12 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     hourly[8] = 0.9; // one sampled hour: cold by any count
     const base = baseCtx({ hourly: { weekday: hourly } });
     const ready = base.autoTune({}, false);
-    const warm = { ...ready, status: "available" as const, weekday: { warm: true, sampledHours: 9, curve: Array(24).fill(0.5) }, proposal: { weekday: Array(24).fill(2), weekend: null, homeFloors: [1, 1, 1, 1], homesSeeded: true } };
+    const warm = {
+      ...ready,
+      status: "available" as const,
+      weekday: { warm: true, sampledHours: 9, curve: Array(24).fill(0.5) },
+      proposal: { weekday: Array(24).fill(2), weekend: null, homeFloors: [1, 1, 1, 1], homesSeeded: true },
+    };
     const { ui } = makeUI();
     const announce = vi.fn();
     const apply = vi.fn(async (_s: any) => {});
@@ -2780,7 +2836,9 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     const base = baseCtx({ hourly: { weekday: hourly } });
     let offered = true;
     const autoTune: ScheduleDialogCtx["autoTune"] = (draft, weekend) =>
-      offered ? base.autoTune(draft, weekend) : { ...base.autoTune(draft, weekend), status: "insufficient-data", proposal: null };
+      offered
+        ? base.autoTune(draft, weekend)
+        : { ...base.autoTune(draft, weekend), status: "insufficient-data", proposal: null };
     const { ui } = makeUI();
     const announce = vi.fn();
     const apply = vi.fn(async (_s: any) => {});
@@ -2811,7 +2869,9 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
   it("a preset keeps its hands off hand-set homes (counts only)", () => {
     const { apply } = open();
     chipAt(9, 4).click(); // hand-home car 4 at floor 9
-    const rush = Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Rush")!;
+    const rush = Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find(
+      (b) => b.textContent === "Rush",
+    )!;
     rush.click();
     okBtn().click();
     expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 3, 6, 9]); // staging untouched
@@ -2834,7 +2894,10 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     hourly[8] = 0.9;
     const { ui } = makeUI();
     ui.showElevatorScheduleDialog(
-      baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } } }),
+      baseCtx({
+        hourly: { weekday: hourly },
+        current: { activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } },
+      }),
       { apply: vi.fn(async () => {}) },
     );
     expect(dialog().querySelector(".es-legend")).not.toBeNull();
@@ -2958,7 +3021,8 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     const { apply } = open({ stops, current: { homeFloors: [5, 1, 1, 1] } });
     // Uncheck floor 5: the port mutates, the grid refreshes, car 1's home snaps off it.
     const rows = () => dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)");
-    const serve5 = Array.from(rows()).find((r) => r.querySelector(".es-cell-floor")!.textContent!.includes("5"))!
+    const serve5 = Array.from(rows())
+      .find((r) => r.querySelector(".es-cell-floor")!.textContent!.includes("5"))!
       .querySelector<HTMLInputElement>("input[type=checkbox]")!;
     serve5.checked = false;
     serve5.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3007,7 +3071,12 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
   it("on touch, the FIRST tap selects (never spans); the second extends; a third resets (F1)", () => {
     const orig = window.matchMedia;
     window.matchMedia = ((q: string) =>
-      ({ matches: q === "(pointer: coarse)", media: q, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      ({
+        matches: q === "(pointer: coarse)",
+        media: q,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
     try {
       const { apply } = open({ ux: CLASSIC_SCHEDULE_UX });
       const bars = () => dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
@@ -3087,7 +3156,9 @@ describe.skipIf(noEngine)("showElevatorScheduleDialog — the per-shaft Schedule
     expect(announce).toHaveBeenLastCalledWith("Waiting Car Response: 0. Idle cars answer the nearest call.");
     steppers[1].querySelector<HTMLButtonElement>('[aria-label="lower"]')!.click();
     expect(announce).toHaveBeenLastCalledWith("Standard Floor Departure: 46 seconds.");
-    Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Balanced")!.click();
+    Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn"))
+      .find((b) => b.textContent === "Balanced")!
+      .click();
     expect(announce).toHaveBeenLastCalledWith("Applied the Balanced schedule.");
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
     // The announce names the days actually tuned (#466): only the weekday is warm here.
@@ -3192,7 +3263,9 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
       const open = vi.spyOn(window, "open").mockReturnValue({ opener: {} } as unknown as Window);
       const { onSpeed, getSpeed } = speedAt(2);
       makeUI({ getSpeed, onSpeed });
-      document.getElementById("btn-mode")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...mod }));
+      document
+        .getElementById("btn-mode")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...mod }));
       expect(open).toHaveBeenCalledWith("/help/classic-vs-modern/?from=game&via=mode_badge", "_blank");
       expect(onSpeed).not.toHaveBeenCalled();
       open.mockRestore();
@@ -3246,7 +3319,10 @@ describe("the mode badge in the installed app", () => {
 describe("the palette and tool card follow the tower's catalog (#921)", () => {
   it("draws the tool card from getCatalog when a build tool is picked", () => {
     const base = catalogFor("classic");
-    const marked = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)) };
+    const marked = {
+      ...base,
+      facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)),
+    };
     const { ui } = makeUI({ getCatalog: () => marked });
     ui.selectTool({ type: "build", kind: "office" });
     const card = document.getElementById("tool-info")!.textContent ?? "";
@@ -3265,7 +3341,10 @@ describe("the palette and tool card follow the tower's catalog (#921)", () => {
     expect(toolInfo()).toContain("Office");
     // A WASM host points the tower at another engine's catalog.
     const base = catalogFor("classic");
-    const marked = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)) };
+    const marked = {
+      ...base,
+      facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)),
+    };
     useTowerCatalogSource(sim, () => marked);
     pump(ui, sim);
     expect(office().querySelector(".pal-name")?.textContent).toBe("Corner Suite");

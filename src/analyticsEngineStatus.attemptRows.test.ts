@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
-import { MAX_ENGINE_STATUS_ROWS, noteEngineAttempt, noteEngineEngaged, noteEngineFallback, noteEngineSettled } from "./analyticsEngineStatus";
+import {
+  MAX_ENGINE_STATUS_ROWS,
+  noteEngineAttempt,
+  noteEngineEngaged,
+  noteEngineFallback,
+  noteEngineSettled,
+} from "./analyticsEngineStatus";
 
 /** #1090's `attempt` and `engaged` rows: once each per page life, outside the
  *  cap. */
@@ -35,7 +41,15 @@ describe("the attempt and engaged rows", () => {
     noteEngineSettled(settle);
     const [first, second] = rows();
     expect(rows()).toHaveLength(2);
-    expect(first).toMatchObject({ trigger: "attempt", engine_requested: "wasm", engine: "wasm", build: "switchable", fallback_reason: "none", fallback_stage: "none", fallbacks: 0 });
+    expect(first).toMatchObject({
+      trigger: "attempt",
+      engine_requested: "wasm",
+      engine: "wasm",
+      build: "switchable",
+      fallback_reason: "none",
+      fallback_stage: "none",
+      fallbacks: 0,
+    });
     expect(first).not.toHaveProperty("engaged_by");
     expect(first.page_life).toBe(second.page_life);
   });
@@ -50,7 +64,11 @@ describe("the attempt and engaged rows", () => {
     const engaged = rows().filter((r) => r.trigger === "engaged");
     expect(engaged).toHaveLength(1);
     expect(engaged[0]).toMatchObject({ engine: "ts-fallback", engaged_by: "play" });
-    expect(rows().filter((r) => r.trigger !== "engaged").every((r) => !("engaged_by" in r))).toBe(true);
+    expect(
+      rows()
+        .filter((r) => r.trigger !== "engaged")
+        .every((r) => !("engaged_by" in r)),
+    ).toBe(true);
   });
 
   it("are never dropped by the cap", () => {

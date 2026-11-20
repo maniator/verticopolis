@@ -52,7 +52,9 @@ function payloadText(text: string): string {
   const stored = fromTowerFile(text);
   expect(stored.ok).toBe(true);
   if (!stored.ok) throw new Error("fromTowerFile refused the engine's file");
-  return new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(stored.value.slice(STORE_MAGIC.length))));
+  return new TextDecoder("utf-8", { fatal: true }).decode(
+    inflateCapped(fromBase64(stored.value.slice(STORE_MAGIC.length))),
+  );
 }
 
 /** The state hash of the tower a draft's engine holds. */
@@ -68,27 +70,30 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     expect(fixtures.length).toBeGreaterThan(0);
   });
 
-  it.each(fixtures)("%s: loaded by the web game, written by the engine, read back by every web reader", async (name) => {
-    const original = readFileSync(resolve(FIXTURES, name), "utf8");
-    // What SaveGame.export hands its writer: the loaded tower's serialization.
-    const fromWeb = await importTower(original);
-    const json = JSON.stringify(fromWeb.serialize());
-    const text = rust().encodeVctower(json, VERSION, SAVED_AT);
-    const stamped = { ...(JSON.parse(json) as Record<string, unknown>), savedAt: SAVED_AT, appVersion: VERSION };
+  it.each(fixtures)(
+    "%s: loaded by the web game, written by the engine, read back by every web reader",
+    async (name) => {
+      const original = readFileSync(resolve(FIXTURES, name), "utf8");
+      // What SaveGame.export hands its writer: the loaded tower's serialization.
+      const fromWeb = await importTower(original);
+      const json = JSON.stringify(fromWeb.serialize());
+      const text = rust().encodeVctower(json, VERSION, SAVED_AT);
+      const stamped = { ...(JSON.parse(json) as Record<string, unknown>), savedAt: SAVED_AT, appVersion: VERSION };
 
-    expect(text).toMatch(/^VCTOWER1\n[A-Za-z0-9+/]+={0,2}\n$/);
-    // The TypeScript writer's file of the same stamped save, byte for byte.
-    const web = toTowerFile(JSON.stringify(stamped));
-    expect(web.ok).toBe(true);
-    if (web.ok) expect(text).toBe(web.text);
+      expect(text).toMatch(/^VCTOWER1\n[A-Za-z0-9+/]+={0,2}\n$/);
+      // The TypeScript writer's file of the same stamped save, byte for byte.
+      const web = toTowerFile(JSON.stringify(stamped));
+      expect(web.ok).toBe(true);
+      if (web.ok) expect(text).toBe(web.text);
 
-    expect(decodeVctower(text, name)).toEqual(stamped);
-    expect(payloadText(text)).toBe(JSON.stringify(stamped));
+      expect(decodeVctower(text, name)).toEqual(stamped);
+      expect(payloadText(text)).toBe(JSON.stringify(stamped));
 
-    const fromEngine = await importTower(text);
-    expect(fromEngine.founder).toBe(fromWeb.founder);
-    expect(digest(fromEngine)).toBe(digest(fromWeb));
-  });
+      const fromEngine = await importTower(text);
+      expect(fromEngine.founder).toBe(fromWeb.founder);
+      expect(digest(fromEngine)).toBe(digest(fromWeb));
+    },
+  );
 
   // SaveGame.export stamps with the build and the clock; pin both and the
   // engine, handed the same, writes the same file (#939).
@@ -128,7 +133,14 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   // A save that already carries a stamp keeps each stamp key where it was,
   // as the property assignments in SaveGame's stamp() keep it (#939).
   it("restamps a stamped save in place, as the web writer does", () => {
-    const json = JSON.stringify({ savedAt: 1, version: 7, appVersion: "2.5.0", minutes: 0, units: [], towerName: "Sky" });
+    const json = JSON.stringify({
+      savedAt: 1,
+      version: 7,
+      appVersion: "2.5.0",
+      minutes: 0,
+      units: [],
+      towerName: "Sky",
+    });
     const web = toTowerFile(JSON.stringify({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
     expect(web.ok).toBe(true);
     if (web.ok) expect(rust().encodeVctower(json, VERSION, SAVED_AT)).toBe(web.text);

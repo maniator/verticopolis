@@ -39,7 +39,9 @@ const LOCALE_SAMPLES = [4800, 1234567.5, -1200];
 const localeText = LOCALE_SAMPLES.map((n) => n.toLocaleString()).join(" ");
 const usText = LOCALE_SAMPLES.map((n) => n.toLocaleString("en-US")).join(" ");
 if (localeText !== usText) {
-  throw new Error(`the card-text golden holds US English numbers, and this locale prints ${usText} as ${JSON.stringify(localeText)}; run with LC_ALL=en_US.UTF-8`);
+  throw new Error(
+    `the card-text golden holds US English numbers, and this locale prints ${usText} as ${JSON.stringify(localeText)}; run with LC_ALL=en_US.UTF-8`,
+  );
 }
 
 export type CardTextMode = "classic" | "modern";
@@ -84,7 +86,8 @@ export function kindsNoCaseBuilds(catalogKinds: readonly string[], goldens: read
  *  shaft lines as their plain case ("lobby distance") in the same mode, and
  *  so add no coverage. */
 export function variantsPrintingAlike(goldens: readonly CardTextGolden[]): string[] {
-  const text = (g: CardTextGolden) => JSON.stringify([g.units.map((u) => [u.kind, u.floor, u.lines]), g.transports.map((t) => [t.kind, t.lines])]);
+  const text = (g: CardTextGolden) =>
+    JSON.stringify([g.units.map((u) => [u.kind, u.floor, u.lines]), g.transports.map((t) => [t.kind, t.lines])]);
   return goldens.flatMap((v) => {
     const plain = goldens.find((g) => g.mode === v.mode && v.case.startsWith(`${g.case}, `));
     return plain && text(plain) === text(v) ? [`${v.mode}: ${v.case}`] : [];
@@ -144,15 +147,21 @@ export interface CardTextGolden {
 
 /** The file name of a case, without its extension. */
 export function cardTextSlug(mode: CardTextMode, name: string): string {
-  return `${mode}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+  return `${mode}-${name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")}`;
 }
 
-const pathOf = (mode: CardTextMode, name: string, ext: "json" | "vctower") => resolve(CARD_TEXT_DIR, `${cardTextSlug(mode, name)}.${ext}`);
+const pathOf = (mode: CardTextMode, name: string, ext: "json" | "vctower") =>
+  resolve(CARD_TEXT_DIR, `${cardTextSlug(mode, name)}.${ext}`);
 
 /** Every file the golden directory holds: a tower and its lines per case and
  *  mode. */
 export const cardTextFiles = (): string[] =>
-  CARD_TEXT_MODES.flatMap((mode) => CARD_TEXT_CASES.flatMap((name) => [`${cardTextSlug(mode, name)}.json`, `${cardTextSlug(mode, name)}.vctower`]));
+  CARD_TEXT_MODES.flatMap((mode) =>
+    CARD_TEXT_CASES.flatMap((name) => [`${cardTextSlug(mode, name)}.json`, `${cardTextSlug(mode, name)}.vctower`]),
+  );
 
 /** Both cards printing nothing would also agree, so each case must have read
  *  real lines; this checks the lines a run is about to compare or write. */
@@ -161,7 +170,8 @@ export function expectRealLines(g: CardTextGolden): void {
   // A check names each of its cases, so a renamed case fails here instead of
   // going unchecked.
   const is = (name: string): boolean => {
-    if (!CARD_TEXT_CASES.includes(name)) throw new Error(`expectRealLines checks "${name}", which is not a card-text case`);
+    if (!CARD_TEXT_CASES.includes(name))
+      throw new Error(`expectRealLines checks "${name}", which is not a card-text case`);
     return g.case === name;
   };
   const isOneOf = (names: readonly string[]): boolean => names.map(is).some(Boolean);
@@ -169,14 +179,16 @@ export function expectRealLines(g: CardTextGolden): void {
   const starting = (prefix: string): number => roomLines.filter((l) => l.startsWith(prefix)).length;
   if (!is("every transport")) expect(roomLines.length, `${label} compared no room lines`).toBeGreaterThan(0);
   if (is("lobby distance")) expect(starting("Shoppers:"), `${label}: the far shop must carry the warning`).toBe(1);
-  if (is("retail venues, rainy day")) expect(starting("Rain might"), `${label}: no venue printed the rain line`).toBeGreaterThan(0);
+  if (is("retail venues, rainy day"))
+    expect(starting("Rain might"), `${label}: no venue printed the rain line`).toBeGreaterThan(0);
   // The unhappy towers charge a top rent, so a tenant has a cause to gripe
   // about even where no worse cause (crowded elevators) comes first. The
   // unhappy service-room tower has a stairway to its rooms (built on the
   // loaded tower with the engine's `buildTransport`, #1816), so its office
   // gripes about the rent where the plain tower's unserved office prints
   // only its access line.
-  if (isOneOf(["service rooms, unhappy", "lobby distance, unhappy", "winning tower, unhappy"])) expect(starting("Main gripe:"), `${label}: no tenant printed a gripe`).toBeGreaterThan(0);
+  if (isOneOf(["service rooms, unhappy", "lobby distance, unhappy", "winning tower, unhappy"]))
+    expect(starting("Main gripe:"), `${label}: no tenant printed a gripe`).toBeGreaterThan(0);
   // The crowded lift runs close to full in Classic. Riders stay aboard to
   // their floors since 3.7.3, so its one car stops for each of them and its
   // load peaks past the engine's near-capacity line; the faster Modern car,
@@ -186,10 +198,16 @@ export function expectRealLines(g: CardTextGolden): void {
     const loads = g.transports.flatMap((t) => t.lines).filter((l) => l.startsWith("Avg load:"));
     const pct = Number(/^Avg load: (\d+)% full/.exec(loads[0] ?? "")?.[1] ?? Number.NaN);
     const least = CROWDED_LIFT_LEAST_LOAD[g.mode];
-    expect([loads.length, pct >= least], `${label}: the crowded lift reads one load, at least ${least}% full: ${JSON.stringify(loads)}`).toEqual([1, true]);
+    expect(
+      [loads.length, pct >= least],
+      `${label}: the crowded lift reads one load, at least ${least}% full: ${JSON.stringify(loads)}`,
+    ).toEqual([1, true]);
     // The card rounds the load, so a load just past the line prints as 85%.
     const near = loads[0].includes("Near capacity");
-    expect(near ? pct >= NEAR_CAPACITY_PERCENT : pct <= NEAR_CAPACITY_PERCENT, `${label}: the card words a ${pct}% load`).toBe(true);
+    expect(
+      near ? pct >= NEAR_CAPACITY_PERCENT : pct <= NEAR_CAPACITY_PERCENT,
+      `${label}: the card words a ${pct}% load`,
+    ).toBe(true);
   }
   const centers = g.units.filter((u) => u.kind === "recycling").map((u) => u.lines);
   const fillOf = (lines: readonly string[]): number =>
@@ -198,13 +216,23 @@ export function expectRealLines(g: CardTextGolden): void {
   // as [its over-capacity lines, its demand-met lines, filling].
   const expectCenters = (over: number, what: string): void => {
     const count = (lines: readonly string[], line: RegExp): number => lines.filter((l) => line.test(l)).length;
-    const seen = centers.map((lines) => [count(lines, /^Over capacity:/), count(lines, /^Capacity: .*; demand met\.$/), fillOf(lines) > 0]);
-    expect([centers.length > 0, seen], `${label}: ${what}, ${JSON.stringify(centers)}`).toEqual([true, centers.map(() => [over, 1 - over, true])]);
+    const seen = centers.map((lines) => [
+      count(lines, /^Over capacity:/),
+      count(lines, /^Capacity: .*; demand met\.$/),
+      fillOf(lines) > 0,
+    ]);
+    expect([centers.length > 0, seen], `${label}: ${what}, ${JSON.stringify(centers)}`).toEqual([
+      true,
+      centers.map(() => [over, 1 - over, true]),
+    ]);
   };
   if (is("recycling center on notice")) {
     // The order under test: the reference card puts the recycling block above the notice.
     const center = centers.find((lines) => lines.some((l) => l.startsWith("Giving notice:"))) ?? [];
-    const [block, notice] = [center.findIndex((l) => l.startsWith("Fill:")), center.findIndex((l) => l.startsWith("Giving notice:"))];
+    const [block, notice] = [
+      center.findIndex((l) => l.startsWith("Fill:")),
+      center.findIndex((l) => l.startsWith("Giving notice:")),
+    ];
     expect([block >= 0, block < notice], `${label}: ${JSON.stringify(centers)}`).toEqual([true, true]);
   }
   if (is("recycling over capacity")) expectCenters(1, "over capacity and filling");
@@ -218,7 +246,9 @@ export function expectRealLines(g: CardTextGolden): void {
     // After the morning's play each passenger elevator (standard and
     // express) prints one reading and one of them carried riders; the service
     // elevator, the stairs and the escalator print none.
-    const loads = g.transports.flatMap((t) => t.lines.flatMap((l) => /^Avg load: (\d+)%/.exec(l)?.[1] ?? []).map((n) => ({ kind: t.kind, load: Number(n) })));
+    const loads = g.transports.flatMap((t) =>
+      t.lines.flatMap((l) => /^Avg load: (\d+)%/.exec(l)?.[1] ?? []).map((n) => ({ kind: t.kind, load: Number(n) })),
+    );
     expect(
       [loads.map((l) => l.kind).sort(), loads.some((l) => l.load > 0)],
       `${label}: the elevators' load lines, ${JSON.stringify(loads)}`,

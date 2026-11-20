@@ -96,7 +96,9 @@ function manifestOf(sw: string): { revisionOf(url: string): string; entries: num
   return {
     entries,
     revisionOf: (url) => {
-      const found = new RegExp(`\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([a-f0-9]{32}(?:-i\\d+)?)"`).exec(sw);
+      const found = new RegExp(
+        `\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([a-f0-9]{32}(?:-i\\d+)?)"`,
+      ).exec(sw);
       if (!found) throw new Error(`sw.js has no revisioned precache entry for ${url}`);
       return found[1];
     },
@@ -123,23 +125,31 @@ function makeSecond(dist: string, into: string): { dir: string; packageId: strin
   writeFileSync(join(publicDir, "engine", "BUILD.json"), `${JSON.stringify(record, null, 2)}\n`);
 
   const dir = join(into, "B");
-  const built = spawnSync(process.execPath, [join(REPO, "node_modules", "vite", "bin", "vite.js"), "build", "--outDir", dir, "--emptyOutDir"], {
-    cwd: REPO,
-    encoding: "utf8",
-    timeout: 200_000,
-    env: {
-      ...process.env,
-      // The e2e builds A with the tooling handle too (specs drive `window.game`).
-      VC_TOOLING: "1",
-      VC_PUBLIC_DIR: publicDir,
+  const built = spawnSync(
+    process.execPath,
+    [join(REPO, "node_modules", "vite", "bin", "vite.js"), "build", "--outDir", dir, "--emptyOutDir"],
+    {
+      cwd: REPO,
+      encoding: "utf8",
+      timeout: 200_000,
+      env: {
+        ...process.env,
+        // The e2e builds A with the tooling handle too (specs drive `window.game`).
+        VC_TOOLING: "1",
+        VC_PUBLIC_DIR: publicDir,
+      },
     },
-  });
+  );
   if (built.error) throw built.error;
-  if (built.status !== 0) throw new Error(`the second deployment's vite build failed (${built.status ?? built.signal}):\n${(built.stderr || built.stdout || "").split("\n").slice(-30).join("\n")}`);
+  if (built.status !== 0)
+    throw new Error(
+      `the second deployment's vite build failed (${built.status ?? built.signal}):\n${(built.stderr || built.stdout || "").split("\n").slice(-30).join("\n")}`,
+    );
   // The second shell must check the second package, or the update would
   // prove nothing about the loader.
   const unsound = shellProblems(dir, true);
-  if (unsound.length > 0) throw new Error(`the second deployment's shell does not match its engine package: ${unsound.join("; ")}`);
+  if (unsound.length > 0)
+    throw new Error(`the second deployment's shell does not match its engine package: ${unsound.join("; ")}`);
   // The browser updates only when sw.js differs byte for byte; fail here, with
   // the reason, rather than at a test timeout.
   if (readFileSync(join(dist, "sw.js"), "utf8") === readFileSync(join(dir, "sw.js"), "utf8")) {
@@ -164,9 +174,12 @@ function cacheControl(path: string): string {
 }
 
 /** Start the two-deployment server on a free loopback port. */
-export async function startDeployments(distDir = fileURLToPath(new URL("../dist", import.meta.url))): Promise<Deployments> {
+export async function startDeployments(
+  distDir = fileURLToPath(new URL("../dist", import.meta.url)),
+): Promise<Deployments> {
   const dist = resolve(distDir);
-  if (!existsSync(join(dist, "sw.js"))) throw new Error("dist/ has no sw.js; run a production build first (npm run build)");
+  if (!existsSync(join(dist, "sw.js")))
+    throw new Error("dist/ has no sw.js; run a production build first (npm run build)");
   const scratch = mkdtempSync(join(tmpdir(), "vc-deployments-"));
   let second: ReturnType<typeof makeSecond>;
   try {
@@ -203,7 +216,12 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     const target = req.url ?? "/";
     // Origin-form only, one leading slash, nothing that names a drive or stream.
     const path = /^\/(?!\/)/.test(target) ? new URL(target, "http://localhost").pathname : "/\0";
-    const from = engineOverride && path.startsWith("/engine/") ? engineOverride : pageOverride && path === "/index.html" ? pageOverride : current;
+    const from =
+      engineOverride && path.startsWith("/engine/")
+        ? engineOverride
+        : pageOverride && path === "/index.html"
+          ? pageOverride
+          : current;
     const root = roots[from];
     requests.push({ path, from });
     if (networkFails === "all" || (networkFails === "engine" && path.startsWith("/engine/"))) {
@@ -227,8 +245,10 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     }
     try {
       let body = readFileSync(file);
-      if (workerReissued && from === "A" && path === "/sw.js") body = Buffer.concat([body, Buffer.from("\n// reissued\n")]);
-      if (pageRewritten && extname(file) === ".html") body = Buffer.concat([body, Buffer.from('<script async data-host-toolbar="true"></script>')]);
+      if (workerReissued && from === "A" && path === "/sw.js")
+        body = Buffer.concat([body, Buffer.from("\n// reissued\n")]);
+      if (pageRewritten && extname(file) === ".html")
+        body = Buffer.concat([body, Buffer.from('<script async data-host-toolbar="true"></script>')]);
       res.writeHead(200, {
         "content-type": TYPES[extname(file)] ?? "application/octet-stream",
         "content-length": body.length,

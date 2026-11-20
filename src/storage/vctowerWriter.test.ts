@@ -48,7 +48,7 @@ describe("the .vctower writer", () => {
     "falls back when the engine hands back no .vctower file: %j",
     async (bad) => {
       vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
-        const ownPacked = SaveGame.packSync(SMALL_TOWER_SAVE);
+      const ownPacked = SaveGame.packSync(SMALL_TOWER_SAVE);
       vi.spyOn(console, "error").mockImplementation(() => {});
       const writer = vi.fn(() => bad);
       setEngineWriter(writer);

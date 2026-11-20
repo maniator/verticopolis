@@ -1,16 +1,28 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { BROWSER_OPTION, MAX_DIAGNOSTICS, MODE_OPTION, PLATFORM_OPTION, bugReportHref, browserOption, isMobileDevice } from "./bugReport";
+import {
+  BROWSER_OPTION,
+  MAX_DIAGNOSTICS,
+  MODE_OPTION,
+  PLATFORM_OPTION,
+  bugReportHref,
+  browserOption,
+  isMobileDevice,
+} from "./bugReport";
 
 /** Real user agent strings, trimmed to the parts the picker reads. */
 const UA = {
-  chrome: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  chrome:
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
   edge: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
   firefox: "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
-  safari: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
-  iosChrome: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.0.0 Mobile/15E148 Safari/604.1",
-  android: "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+  safari:
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+  iosChrome:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.0.0 Mobile/15E148 Safari/604.1",
+  android:
+    "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
 };
 
 function fields(href: string): URLSearchParams {
@@ -51,7 +63,12 @@ describe("isMobileDevice", () => {
 });
 
 describe("bugReportHref", () => {
-  const base = { versionLine: "v3.4.0 · Rust engine 1.27.0 (1a2b3c4d5e6f)", userAgent: UA.firefox, mobile: false, mode: "modern" as const };
+  const base = {
+    versionLine: "v3.4.0 · Rust engine 1.27.0 (1a2b3c4d5e6f)",
+    userAgent: UA.firefox,
+    mobile: false,
+    mode: "modern" as const,
+  };
 
   it("opens the bug form with every known field set to one of its choices", () => {
     const q = fields(bugReportHref({ ...base, diagnostics: "App: v3.4.0\nEngine in use: Rust engine" }));
@@ -100,7 +117,7 @@ describe("bugReportHref with a real diagnostics report", () => {
   // the full browser string, the time of the report and the engine's own error
   // text, which can quote a tower name.
   const DATE = "2026-11-13T09:41:07.000Z";
-  const TOWER_QUOTE = "tower \"Naomi's Plaza\" has a bad floor";
+  const TOWER_QUOTE = 'tower "Naomi\'s Plaza" has a bad floor';
   const diagnostics = [
     "Verticopolis diagnostics",
     "The Rust engine is running and matches this build.",
@@ -110,7 +127,13 @@ describe("bugReportHref with a real diagnostics report", () => {
     "Engine in use: Rust engine",
     `Last engine error: ${TOWER_QUOTE}`,
   ].join("\n");
-  const facts = { versionLine: "v3.4.0 · Rust engine 1.27.0 (1a2b3c4d5e6f)", diagnostics, userAgent: UA.firefox, mobile: false, mode: "classic" as const };
+  const facts = {
+    versionLine: "v3.4.0 · Rust engine 1.27.0 (1a2b3c4d5e6f)",
+    diagnostics,
+    userAgent: UA.firefox,
+    mobile: false,
+    mode: "classic" as const,
+  };
 
   it("carries the whole report, browser string, time and error text included, in the diagnostics field", () => {
     const q = fields(bugReportHref(facts));
@@ -159,8 +182,15 @@ describe("bugReportHref with a real diagnostics report", () => {
 describe("the bug form's choices", () => {
   it("match the options in the issue form", () => {
     // A renamed choice in the form would silently stop prefilling that field.
-    const form = readFileSync(resolve(process.cwd(), ".github/ISSUE_TEMPLATE/bug_report.yml"), "utf8").replace(/\r\n/g, "\n");
-    for (const option of [...Object.values(BROWSER_OPTION), ...Object.values(PLATFORM_OPTION), ...Object.values(MODE_OPTION)]) {
+    const form = readFileSync(resolve(process.cwd(), ".github/ISSUE_TEMPLATE/bug_report.yml"), "utf8").replace(
+      /\r\n/g,
+      "\n",
+    );
+    for (const option of [
+      ...Object.values(BROWSER_OPTION),
+      ...Object.values(PLATFORM_OPTION),
+      ...Object.values(MODE_OPTION),
+    ]) {
       expect(form, `bug_report.yml has no "${option}" choice`).toContain(`- ${option}\n`);
     }
     for (const id of ["version", "diagnostics", "browser", "platform", "mode"]) expect(form).toContain(`id: ${id}\n`);

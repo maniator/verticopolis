@@ -258,8 +258,7 @@ function closedDimensions(props: Record<string, unknown>): Record<string, string
   for (const key of CLOSED_DIMENSIONS) {
     if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
     const value = props[key];
-    out[key] =
-      typeof value === "string" && INGEST_PLATFORM_LABELS.includes(value) ? value : INGEST_PLATFORM_FALLBACK;
+    out[key] = typeof value === "string" && INGEST_PLATFORM_LABELS.includes(value) ? value : INGEST_PLATFORM_FALLBACK;
   }
   return out;
 }
@@ -283,12 +282,8 @@ function closedDimensions(props: Record<string, unknown>): Record<string, string
  * datacenter. Disabling GeoIP drops that misleading, uniform location data and
  * keeps us IP-free, rather than forwarding the client IP to get real geography.
  */
-export function buildCaptureBody(
-  body: IngestBody & { event: string },
-  environment: string | undefined,
-): CaptureBody {
-  const session =
-    typeof body.session === "string" && body.session.length > 0 ? body.session : "anon";
+export function buildCaptureBody(body: IngestBody & { event: string }, environment: string | undefined): CaptureBody {
+  const session = typeof body.session === "string" && body.session.length > 0 ? body.session : "anon";
   const hasValidTs = typeof body.ts === "string" && Number.isFinite(Date.parse(body.ts));
   const props = isPlainObject(body.properties) ? body.properties : {};
   return {

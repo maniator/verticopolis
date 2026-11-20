@@ -22,7 +22,10 @@ async function armLobby(page: Page, picker: string, stories: number): Promise<vo
   await page.locator('.pal-item[data-kind="lobby"]').first().click();
   const button = page.locator(picker).getByRole("button", { name: `${stories} stories` });
   await button.click();
-  await page.locator(picker).locator('[aria-pressed="true"]', { hasText: `${stories} stories` }).waitFor({ timeout: 4000 });
+  await page
+    .locator(picker)
+    .locator('[aria-pressed="true"]', { hasText: `${stories} stories` })
+    .waitFor({ timeout: 4000 });
 }
 
 /** Center the camera `dx` tiles from the lot's center, on `floor`, so the
@@ -86,7 +89,12 @@ export const TALL_LOBBY_SCENES: Scene[] = [
     id: "tall-lobby-split-halls",
     outDir: "features",
     initScript: () => {
-      (window as unknown as { __vcShotTallLobby: unknown }).__vcShotTallLobby = { mode: "modern", ground: 2, sky: 3, split: 2 };
+      (window as unknown as { __vcShotTallLobby: unknown }).__vcShotTallLobby = {
+        mode: "modern",
+        ground: 2,
+        sky: 3,
+        split: 2,
+      };
     },
     build: buildTallLobbyTower,
     shots: [
@@ -111,7 +119,11 @@ export const TALL_LOBBY_SCENES: Scene[] = [
     id: "tall-lobby-flights",
     outDir: "features",
     initScript: () => {
-      (window as unknown as { __vcShotTallLobby: unknown }).__vcShotTallLobby = { mode: "classic", ground: 3, flights: true };
+      (window as unknown as { __vcShotTallLobby: unknown }).__vcShotTallLobby = {
+        mode: "classic",
+        ground: 3,
+        flights: true,
+      };
     },
     build: buildTallLobbyTower,
     shots: [

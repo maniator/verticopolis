@@ -41,27 +41,48 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
  *  short, relabeled or of the wrong shape must never read as agreement, so the
  *  command line reports it as a harness failure and not a divergence. */
 export function recordProblem(run: RunRecord, what: string): string | null {
-  if (run.details.length !== run.checkpoints.length) return `${what}: ${run.details.length} detail records for ${run.checkpoints.length} checkpoints`;
+  if (run.details.length !== run.checkpoints.length)
+    return `${what}: ${run.details.length} detail records for ${run.checkpoints.length} checkpoints`;
   for (let i = 0; i < run.checkpoints.length; i++) {
     const c: unknown = run.checkpoints[i];
     const d: unknown = run.details[i];
-    if (!isObject(c) || !["label", "state", "crowd", "events"].every((k) => typeof c[k] === "string")) return `${what}: checkpoint ${i} is not a label with state, crowd and events hashes`;
-    if (!isObject(d) || d.label !== c.label || typeof d.money !== "number" || !isObject(d.log) || !isObject(d.save) || !isObject(d.fx)) return `${what}: detail ${i} does not match checkpoint ${i} (${String(c.label)})`;
+    if (!isObject(c) || !["label", "state", "crowd", "events"].every((k) => typeof c[k] === "string"))
+      return `${what}: checkpoint ${i} is not a label with state, crowd and events hashes`;
+    if (
+      !isObject(d) ||
+      d.label !== c.label ||
+      typeof d.money !== "number" ||
+      !isObject(d.log) ||
+      !isObject(d.save) ||
+      !isObject(d.fx)
+    )
+      return `${what}: detail ${i} does not match checkpoint ${i} (${String(c.label)})`;
   }
   return null;
 }
 
 /** The first detail difference at one checkpoint, if any. */
-function detailDivergence(a: CheckpointDetail, b: CheckpointDetail): Pick<Divergence, "kind" | "field" | "other" | "rust"> | null {
+function detailDivergence(
+  a: CheckpointDetail,
+  b: CheckpointDetail,
+): Pick<Divergence, "kind" | "field" | "other" | "rust"> | null {
   if (a.money !== b.money) return { kind: "money", other: String(a.money), rust: String(b.money) };
   for (const part of ["seq", "count", "digest"] as const) {
-    if (a.log[part] !== b.log[part]) return { kind: "log", field: part, other: String(a.log[part]), rust: String(b.log[part]) };
+    if (a.log[part] !== b.log[part])
+      return { kind: "log", field: part, other: String(a.log[part]), rust: String(b.log[part]) };
   }
   for (const key of [...new Set([...Object.keys(a.save), ...Object.keys(b.save)])].sort()) {
-    if (a.save[key] !== b.save[key]) return { kind: "save", field: key, other: String(a.save[key] ?? "(absent)"), rust: String(b.save[key] ?? "(absent)") };
+    if (a.save[key] !== b.save[key])
+      return {
+        kind: "save",
+        field: key,
+        other: String(a.save[key] ?? "(absent)"),
+        rust: String(b.save[key] ?? "(absent)"),
+      };
   }
   for (const key of [...new Set([...Object.keys(a.fx), ...Object.keys(b.fx)])].sort()) {
-    if (a.fx[key] !== b.fx[key]) return { kind: "fx", field: key, other: String(a.fx[key] ?? "(absent)"), rust: String(b.fx[key] ?? "(absent)") };
+    if (a.fx[key] !== b.fx[key])
+      return { kind: "fx", field: key, other: String(a.fx[key] ?? "(absent)"), rust: String(b.fx[key] ?? "(absent)") };
   }
   return null;
 }
@@ -81,19 +102,35 @@ export function compareRuns(run: RunRecord, rust: RunRecord, leg: Leg = "WASM"):
     const detail = detailDivergence(run.details[i], rust.details[i]);
     for (const h of HASHES) {
       if (a[h] !== b[h]) {
-        return { index: i, label: a.label, kind: h, ...(detail ? { field: detail.field ?? detail.kind } : {}), other: a[h], rust: b[h] };
+        return {
+          index: i,
+          label: a.label,
+          kind: h,
+          ...(detail ? { field: detail.field ?? detail.kind } : {}),
+          other: a[h],
+          rust: b[h],
+        };
       }
     }
     if (detail) return { index: i, label: a.label, ...detail };
   }
   if (run.checkpoints.length !== rust.checkpoints.length) {
-    return { index: n, label: "(count)", kind: "count", other: String(run.checkpoints.length), rust: String(rust.checkpoints.length) };
+    return {
+      index: n,
+      label: "(count)",
+      kind: "count",
+      other: String(run.checkpoints.length),
+      rust: String(rust.checkpoints.length),
+    };
   }
   return null;
 }
 
 /** One line for the nightly's log and summary. */
 export function describeDivergence(d: Divergence, leg: Leg = "WASM"): string {
-  const where = d.kind === "count" ? "checkpoint count" : `checkpoint ${d.index} (${d.label}): ${d.kind}${d.field ? ` field ${d.field}` : ""}`;
+  const where =
+    d.kind === "count"
+      ? "checkpoint count"
+      : `checkpoint ${d.index} (${d.label}): ${d.kind}${d.field ? ` field ${d.field}` : ""}`;
   return `DIVERGED at ${where}, ${leg} ${d.other} vs Rust ${d.rust}`;
 }

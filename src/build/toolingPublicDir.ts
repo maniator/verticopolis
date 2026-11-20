@@ -6,10 +6,7 @@ import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "@verticopolis/components/host/e
 const ENGINE_FOLDER = ENGINE_DIR.replace(/\/$/, "");
 
 /** Where a tooling build or a dev serve finds its public folder. */
-export type PublicDirChoice =
-  | { kind: "player" }
-  | { kind: "tooling" }
-  | { kind: "missing-tooling"; why: string };
+export type PublicDirChoice = { kind: "player" } | { kind: "tooling" } | { kind: "missing-tooling"; why: string };
 
 /**
  * Which engine package a Vite run serves (#1057). The player package in
@@ -87,7 +84,11 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
  * under the engine folder that the package holds is answered, so a path
  * cannot climb out of `toolingPackage`.
  */
-export function toolingEngineFile(pathname: string, base: string, toolingPackage: string): { file: string; type: string } | null {
+export function toolingEngineFile(
+  pathname: string,
+  base: string,
+  toolingPackage: string,
+): { file: string; type: string } | null {
   const prefix = `${base.endsWith("/") ? base : `${base}/`}${ENGINE_DIR}`;
   if (!pathname.startsWith(prefix)) return null;
   let name: string;

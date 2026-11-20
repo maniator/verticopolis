@@ -110,10 +110,17 @@ export function buildCrashDetails(
   }
   // performance.memory is a Chrome extension; include it when the browser has
   // it (it is the strongest signal for memory-pressure crashes on Android).
-  const mem = (globalThis.performance as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } } | undefined)?.memory;
+  const mem = (
+    globalThis.performance as
+      { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } } | undefined
+  )?.memory;
   if (mem) {
     const mb = (n: number) => Math.round(n / 1e6);
-    details.memoryMB = { usedJSHeap: mb(mem.usedJSHeapSize), totalJSHeap: mb(mem.totalJSHeapSize), jsHeapLimit: mb(mem.jsHeapSizeLimit) };
+    details.memoryMB = {
+      usedJSHeap: mb(mem.usedJSHeapSize),
+      totalJSHeap: mb(mem.totalJSHeapSize),
+      jsHeapLimit: mb(mem.jsHeapSizeLimit),
+    };
   }
   return details;
 }
@@ -160,7 +167,10 @@ export async function buildCrashReportZip(
 function crashSummary(crash: CrashDescription): { title: string; lines: string[] } {
   return {
     title: "Game crashed (graphics context lost)",
-    lines: ["The game crashed: the graphics context was lost while playing.", crash.repeat ? "It crashed twice in a row." : ""],
+    lines: [
+      "The game crashed: the graphics context was lost while playing.",
+      crash.repeat ? "It crashed twice in a row." : "",
+    ],
   };
 }
 

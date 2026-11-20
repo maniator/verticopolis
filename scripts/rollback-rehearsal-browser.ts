@@ -20,7 +20,16 @@
  * `_bmad-output/planning-artifacts/release-3.0-rollback-rehearsal.md`.
  */
 import { chromium, type BrowserContext, type Page } from "playwright";
-import { AUTO_KEY, SLOT_KEYS, UNREADABLE_KEY, decodeStored, expectedRow, readSeeds, rowMatches, storedForm } from "../src/build/rollbackRehearsalStore.ts";
+import {
+  AUTO_KEY,
+  SLOT_KEYS,
+  UNREADABLE_KEY,
+  decodeStored,
+  expectedRow,
+  readSeeds,
+  rowMatches,
+  storedForm,
+} from "../src/build/rollbackRehearsalStore.ts";
 import { diffSaves, judgeDiffs, type AllowedLoss, type DiffEntry } from "../src/build/rollbackRehearsal.ts";
 import { classifyLosses, isLoss, type ChurnMap } from "../src/build/rollbackRehearsalChurn.ts";
 
@@ -28,7 +37,6 @@ const BOOT_TIMEOUT_MS = 60_000;
 /** The autosave timer ticks every 30 s from page load and skips ticks while the title screen is up, so a verify that plays allows two ticks. */
 export const AUTOSAVE_WAIT_SECONDS = 65;
 const POLL_MS = 2000;
-
 
 export interface BrowserOptions {
   origin: string;
@@ -55,7 +63,11 @@ interface BootState {
 
 async function boot(page: Page, origin: string): Promise<{ state: BootState; build: Record<string, unknown> }> {
   await page.goto(origin);
-  await page.waitForFunction(() => Boolean((window as unknown as { __vcEngineBoot?: unknown }).__vcEngineBoot), undefined, { timeout: BOOT_TIMEOUT_MS });
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __vcEngineBoot?: unknown }).__vcEngineBoot),
+    undefined,
+    { timeout: BOOT_TIMEOUT_MS },
+  );
   const state = await page.evaluate(() => (window as unknown as { __vcEngineBoot: BootState }).__vcEngineBoot);
   const build = await page.evaluate(async () => {
     try {
@@ -72,7 +84,13 @@ const SCRIPT_SRC = /<script[^>]*type="module"[^>]*src="([^"]+)"/g;
 /** The module scripts the loaded page runs against the ones the origin's own index page names (fetched outside the page, so no service worker answers). */
 async function shellCheck(page: Page, origin: string): Promise<{ same: boolean; loaded: string[]; served: string[] }> {
   const name = (src: string): string => src.split("/").pop() ?? src;
-  const loaded = (await page.evaluate(() => [...document.querySelectorAll('script[type="module"][src]')].map((s) => s.getAttribute("src") ?? ""))).map(name).sort();
+  const loaded = (
+    await page.evaluate(() =>
+      [...document.querySelectorAll('script[type="module"][src]')].map((s) => s.getAttribute("src") ?? ""),
+    )
+  )
+    .map(name)
+    .sort();
   const html = await (await fetch(origin, { cache: "no-store" })).text();
   const served = [...html.matchAll(SCRIPT_SRC)].map((m) => name(m[1] ?? "")).sort();
   return { same: loaded.length > 0 && loaded.join() === served.join(), loaded, served };
@@ -86,7 +104,9 @@ export interface SeedReport {
   stored: { label: string; key: string; name: string; bytes: number }[];
 }
 
-export async function seedProfile(opts: BrowserOptions & { savesDir: string; appVersion: string }): Promise<SeedReport> {
+export async function seedProfile(
+  opts: BrowserOptions & { savesDir: string; appVersion: string },
+): Promise<SeedReport> {
   const seeds = readSeeds(opts.savesDir);
   if (seeds.length === 0) throw new Error(`${opts.savesDir} holds no .json saves; run the engine step first`);
   const { context, page } = await open(opts);
@@ -100,7 +120,12 @@ export async function seedProfile(opts: BrowserOptions & { savesDir: string; app
     // A leftover unreadable-save record from an earlier run would make the next verify fail for the wrong reason.
     await page.evaluate((k) => localStorage.removeItem(k), UNREADABLE_KEY);
     // Let the service worker finish installing so the profile looks like a returning visitor's; never wait forever for one.
-    await page.evaluate(() => Promise.race([navigator.serviceWorker?.ready.then(() => undefined).catch(() => undefined), new Promise<void>((done) => setTimeout(done, 10_000))]));
+    await page.evaluate(() =>
+      Promise.race([
+        navigator.serviceWorker?.ready.then(() => undefined).catch(() => undefined),
+        new Promise<void>((done) => setTimeout(done, 10_000)),
+      ]),
+    );
     return {
       origin: opts.origin,
       build: first.build,
@@ -145,7 +170,15 @@ export interface VerifyReport {
 /** Paths that play always moves, so they are never a loss. */
 const PLAY_PATHS = new Set(["minutes", "savedAt", "appVersion"]);
 
-export async function verifyProfile(opts: BrowserOptions & { savesDir: string; playSeconds: number; allowed: readonly AllowedLoss[]; expectSha: string; churn?: ChurnMap | undefined }): Promise<VerifyReport> {
+export async function verifyProfile(
+  opts: BrowserOptions & {
+    savesDir: string;
+    playSeconds: number;
+    allowed: readonly AllowedLoss[];
+    expectSha: string;
+    churn?: ChurnMap | undefined;
+  },
+): Promise<VerifyReport> {
   const seeds = readSeeds(opts.savesDir);
   if (seeds.length === 0) throw new Error(`${opts.savesDir} holds no .json saves; run the engine step first`);
   const problems: string[] = [];
@@ -155,13 +188,19 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
     if (first.state.engine !== "wasm") problems.push(`the engine is ${String(first.state.engine)}, not wasm`);
     // version.json is always fetched fresh, but the shell can come from a service worker still holding the other build: compare the scripts the page loaded with the ones the origin serves now.
     const shell = await shellCheck(page, opts.origin);
-    if (!shell.same) problems.push(`the page runs ${shell.loaded.join(", ") || "no module script"} but the origin now serves ${shell.served.join(", ") || "none"}: the service worker has not moved to the served build, so this run tests the wrong build and is void`);
+    if (!shell.same)
+      problems.push(
+        `the page runs ${shell.loaded.join(", ") || "no module script"} but the origin now serves ${shell.served.join(", ") || "none"}: the service worker has not moved to the served build, so this run tests the wrong build and is void`,
+      );
     if (first.state.failure) problems.push(`the engine reported a failure: ${JSON.stringify(first.state.failure)}`);
     // A rollback run is void when the origin still serves another build (CDN or service worker not moved).
     const served = String(first.build.sha ?? "").toLowerCase();
     const wanted = opts.expectSha.toLowerCase();
     // Either may be the shorter form of the commit id.
-    if (!(served.startsWith(wanted) || (served.length >= 7 && wanted.startsWith(served)))) problems.push(`the origin serves build ${String(first.build.sha ?? "unknown")}, not the expected ${opts.expectSha}; the run is void`);
+    if (!(served.startsWith(wanted) || (served.length >= 7 && wanted.startsWith(served))))
+      problems.push(
+        `the origin serves build ${String(first.build.sha ?? "unknown")}, not the expected ${opts.expectSha}; the run is void`,
+      );
 
     const rows: VerifyRow[] = [];
     // The stamp each stored save carried when this verify began; a later stamp means the running build rewrote it.
@@ -201,11 +240,19 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
         const shown = texts.find((t) => t.includes(s.label));
         const ok = shown !== undefined && rowMatches(shown, expected);
         rows.push({ label: s.label, expected, shown: shown?.replace(/\s+/g, " "), ok });
-        if (!ok) problems.push(`${s.label}: the picker shows ${JSON.stringify(shown ?? null)}, expected ${expected.name}, ${expected.funds}, ${expected.day}`);
+        if (!ok)
+          problems.push(
+            `${s.label}: the picker shows ${JSON.stringify(shown ?? null)}, expected ${expected.name}, ${expected.funds}, ${expected.day}`,
+          );
       }
-      await page.locator('[data-picker="back"]').click().catch(() => undefined);
+      await page
+        .locator('[data-picker="back"]')
+        .click()
+        .catch(() => undefined);
     } else {
-      problems.push("the title screen has no Open Tower… (Load Tower before 4.3) button, so the stored towers could not be read from the page");
+      problems.push(
+        "the title screen has no Open Tower… (Load Tower before 4.3) button, so the stored towers could not be read from the page",
+      );
     }
 
     // A void run (the wrong build is running) must not play: the wrong build would rewrite the profile's saves.
@@ -223,7 +270,13 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
       }
     }
 
-    const stored = await page.evaluate(([keys, unreadable]) => ({ saves: Object.fromEntries((keys as readonly string[]).map((k) => [k, localStorage.getItem(k)])), kept: localStorage.getItem(unreadable as string) !== null }), [[AUTO_KEY, ...SLOT_KEYS], UNREADABLE_KEY] as const);
+    const stored = await page.evaluate(
+      ([keys, unreadable]) => ({
+        saves: Object.fromEntries((keys as readonly string[]).map((k) => [k, localStorage.getItem(k)])),
+        kept: localStorage.getItem(unreadable as string) !== null,
+      }),
+      [[AUTO_KEY, ...SLOT_KEYS], UNREADABLE_KEY] as const,
+    );
     const rewritten: VerifyReport["rewritten"] = [];
     const rewrittenLabels: string[] = [];
     const toReview: VerifyReport["toReview"] = [];
@@ -237,16 +290,38 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
       const losses = diffSaves(s.save, now).filter((d) => isLoss(d) && !PLAY_PATHS.has(d.path));
       const churnName = s.name.replace(/\.json$/, "");
       const counts = opts.churn?.[churnName];
-      if (opts.churn && !counts) problems.push(`${s.label}: the churn record has no entry for ${churnName}; run the engine step again so churn.json matches this saves folder`);
+      if (opts.churn && !counts)
+        problems.push(
+          `${s.label}: the churn record has no entry for ${churnName}; run the engine step again so churn.json matches this saves folder`,
+        );
       const { failing, review } = classifyLosses(losses, opts.churn ? (counts ?? {}) : undefined);
       if (review.length > 0) toReview.push({ label: s.label, entries: review });
       const judged = judgeDiffs(failing, opts.allowed);
-      if (judged.unexplained.length + judged.explained.length > 0) rewritten.push({ label: s.label, unexplained: judged.unexplained, explained: judged.explained });
-      for (const e of judged.unexplained) problems.push(`${s.label}: the running build dropped \`${e.path}\` (${e.count}), first at ${e.example}`);
+      if (judged.unexplained.length + judged.explained.length > 0)
+        rewritten.push({ label: s.label, unexplained: judged.unexplained, explained: judged.explained });
+      for (const e of judged.unexplained)
+        problems.push(`${s.label}: the running build dropped \`${e.path}\` (${e.count}), first at ${e.example}`);
     }
-    if (opts.playSeconds > 0 && !voidRun && !rewrittenLabels.includes("Auto-save")) problems.push("the build played but did not rewrite the autosave, so the data-loss check did not run on it; play longer or check the autosave");
-    if (stored.kept) problems.push("the page moved an autosave to the unreadable slot: the running build could not read it");
-    return { ok: problems.length === 0, origin: opts.origin, build: first.build, engine: first.state.engine, failure: first.state.failure, rows, unreadableKept: stored.kept, rewrittenLabels, rewritten, toReview, churnUsed: opts.churn !== undefined, problems };
+    if (opts.playSeconds > 0 && !voidRun && !rewrittenLabels.includes("Auto-save"))
+      problems.push(
+        "the build played but did not rewrite the autosave, so the data-loss check did not run on it; play longer or check the autosave",
+      );
+    if (stored.kept)
+      problems.push("the page moved an autosave to the unreadable slot: the running build could not read it");
+    return {
+      ok: problems.length === 0,
+      origin: opts.origin,
+      build: first.build,
+      engine: first.state.engine,
+      failure: first.state.failure,
+      rows,
+      unreadableKept: stored.kept,
+      rewrittenLabels,
+      rewritten,
+      toReview,
+      churnUsed: opts.churn !== undefined,
+      problems,
+    };
   } finally {
     await context.close();
   }

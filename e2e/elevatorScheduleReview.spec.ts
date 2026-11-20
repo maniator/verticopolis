@@ -9,13 +9,19 @@ import { expectEngineHosted } from "./helpers";
  * cars off shift. The player imports it, is told once, opens the review from Tower Statistics, sets
  * one elevator to use all its cars, and undoes that. Nothing changes until the player chooses it.
  */
-const TOWER = readFileSync(new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower-4.vctower", import.meta.url), "utf8");
+const TOWER = readFileSync(
+  new URL("../node_modules/@verticopolis/engine/conformance/fixtures/split-tower-4.vctower", import.meta.url),
+  "utf8",
+);
 const SHAFT = 1139; // a standard elevator with 8 cars and a flat schedule of 3
 const PHONE = { width: 390, height: 844 };
 
 /** The weekday hours of a shaft's schedule: the port's slots hold a row flag, then 24 hourly car counts. */
 const weekday = (page: Page, id: number) =>
-  page.evaluate((shaft) => Array.from((window as any).game.enginePort.shaftSchedule(shaft) as Float64Array).slice(1, 25), id);
+  page.evaluate(
+    (shaft) => Array.from((window as any).game.enginePort.shaftSchedule(shaft) as Float64Array).slice(1, 25),
+    id,
+  );
 
 // A 75-floor tower on a software-rendered phone-sized page draws slowly, and each click waits on frames.
 test.setTimeout(120_000);
@@ -77,9 +83,13 @@ test("an older tower's idle elevator cars are reviewed, recovered and undone on 
  * after it, Auto-tune fills the weekday to the measured load, OK saves it as one undo step, and undo
  * puts the old schedule back.
  */
-const MEASURED_WEEKDAY = [0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.4, 0.9, 1, 0.8, 0.6, 0.5, 0.5, 0.5, 0.5, 0.6, 0.8, 0.9, 0.7, 0.5, 0.3, 0.2, 0.1, 0.1];
+const MEASURED_WEEKDAY = [
+  0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.4, 0.9, 1, 0.8, 0.6, 0.5, 0.5, 0.5, 0.5, 0.6, 0.8, 0.9, 0.7, 0.5, 0.3, 0.2, 0.1, 0.1,
+];
 
-test("the Schedule dialog's Auto-tune waits for measured traffic, then saves and undoes against the real engine", async ({ page }) => {
+test("the Schedule dialog's Auto-tune waits for measured traffic, then saves and undoes against the real engine", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.waitForFunction(() => !!(window as any).game, undefined, { timeout: 30_000 });
   await page.evaluate((text) => {
@@ -93,7 +103,11 @@ test("the Schedule dialog's Auto-tune waits for measured traffic, then saves and
   const openDialog = async () => {
     await page.evaluate(() => (window as any).game.showStats());
     await page.getByRole("button", { name: /Review elevator schedules/ }).click();
-    await page.locator(".sched-review-row").first().getByRole("button", { name: /^Review schedule/ }).click();
+    await page
+      .locator(".sched-review-row")
+      .first()
+      .getByRole("button", { name: /^Review schedule/ })
+      .click();
     await expect(page.locator("#modal .es-presets")).toBeVisible();
   };
 
@@ -101,7 +115,9 @@ test("the Schedule dialog's Auto-tune waits for measured traffic, then saves and
   await openDialog();
   const tune = page.locator("#modal .es-autotune");
   await expect(tune).toBeDisabled();
-  await expect(page.locator("#modal .es-hint", { hasText: "Auto-tune needs a day or two of measured traffic first." })).toBeVisible();
+  await expect(
+    page.locator("#modal .es-hint", { hasText: "Auto-tune needs a day or two of measured traffic first." }),
+  ).toBeVisible();
   await page.locator('#modal [data-act="close"]').click();
 
   // Measure the shaft: a warm weekday curve, through the engine port.

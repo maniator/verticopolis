@@ -16,8 +16,7 @@ import { PHONE, type Scene } from "../screenshot-env.ts";
  *  the address to a missing page (under /help for the manual's variant,
  *  `?at=manual`), as a player who followed an old link sees it. */
 function stagePage(): void {
-  const missing =
-    location.search === "?at=manual" ? "/help/rooms/hotell" : "/towers/old-link";
+  const missing = location.search === "?at=manual" ? "/help/rooms/hotell" : "/towers/old-link";
   history.replaceState(null, "", missing);
   const fixed = new Date(2026, 10, 15, 9, 41).valueOf();
   const Real = Date;
@@ -30,8 +29,7 @@ function stagePage(): void {
       return fixed;
     }
   }
-  (window as unknown as { Date: DateConstructor }).Date =
-    Pinned as unknown as DateConstructor;
+  (window as unknown as { Date: DateConstructor }).Date = Pinned as unknown as DateConstructor;
 }
 
 const GAME = "404.html";

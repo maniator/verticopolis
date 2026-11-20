@@ -66,7 +66,9 @@ function nodePackageDir(tree: string): { dir: string } | { problem: string } {
     const dir = join(resolve(tree), rel);
     if ([GLUE, BINARY, MARKER].every((f) => existsSync(join(dir, f)))) return { dir };
   }
-  return { problem: `${tree} has no Node engine package (${NODE_PACKAGE_DIRS.join(" or ")}); run npm ci in that checkout` };
+  return {
+    problem: `${tree} has no Node engine package (${NODE_PACKAGE_DIRS.join(" or ")}); run npm ci in that checkout`,
+  };
 }
 
 /** The Node package of a checkout, or the reason it cannot be loaded. */
@@ -111,7 +113,12 @@ const FIXTURE_FILE = /\.(vctower|tdt)$/i;
  * hours, and is serialized by the candidate. Those are the bytes a player's
  * browser would hold after the candidate build ran.
  */
-export function candidateSaves(candidate: { binding: NodeBinding }, fixtureDirs: readonly string[], hours: number, only?: readonly string[]): FixtureSave[] {
+export function candidateSaves(
+  candidate: { binding: NodeBinding },
+  fixtureDirs: readonly string[],
+  hours: number,
+  only?: readonly string[],
+): FixtureSave[] {
   const out: FixtureSave[] = [];
   const unmatched = new Set(only ?? []);
   const seen = new Set<string>();
@@ -123,7 +130,9 @@ export function candidateSaves(candidate: { binding: NodeBinding }, fixtureDirs:
       if (seen.has(file)) throw new Error(`two fixtures are named ${file}; their saves would overwrite each other`);
       seen.add(file);
       const path = join(dir, file);
-      const engine = file.toLowerCase().endsWith(".tdt") ? importTdt(candidate.binding, readFileSync(path), file) : candidate.binding.Engine.fromVctower(readFileSync(path, "utf8"));
+      const engine = file.toLowerCase().endsWith(".tdt")
+        ? importTdt(candidate.binding, readFileSync(path), file)
+        : candidate.binding.Engine.fromVctower(readFileSync(path, "utf8"));
       try {
         for (let i = 0; i < (hours * MINUTES_PER_HOUR) / TICK_MINUTES; i++) engine.tick(TICK_MINUTES);
         out.push({ name: basename(file), text: engine.serialize() });
@@ -132,14 +141,16 @@ export function candidateSaves(candidate: { binding: NodeBinding }, fixtureDirs:
       }
     }
   }
-  if (unmatched.size > 0) throw new Error(`no fixture named ${[...unmatched].join(", ")} (in ${fixtureDirs.join(", ")})`);
+  if (unmatched.size > 0)
+    throw new Error(`no fixture named ${[...unmatched].join(", ")} (in ${fixtureDirs.join(", ")})`);
   return out;
 }
 
 /** The importer path the game takes for an original save: load into a new game, then adopt. */
 function importTdt(binding: NodeBinding, bytes: Uint8Array, filename: string): Engine {
   const engine = binding.Engine.newGame(1, "classic");
-  const refused = (what: string): Error => new Error(`${filename}: ${what}: ${engine.lastReason() ?? "no reason given"}`);
+  const refused = (what: string): Error =>
+    new Error(`${filename}: ${what}: ${engine.lastReason() ?? "no reason given"}`);
   try {
     if (engine.loadTdt(bytes, filename)[0] !== 1) throw refused("the .TDT importer refused the file");
     if (engine.adoptTdt()[0] !== 1) throw refused("the engine would not adopt the imported tower");

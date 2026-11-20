@@ -270,7 +270,8 @@ describe("a database write that fails", () => {
 describe("another tab", () => {
   it("that writes localStorage alone reaches this tab's memory for a mirrored key", async () => {
     await open();
-    const tell = (key: string, newValue: string | null) => window.dispatchEvent(new StorageEvent("storage", { key, newValue, storageArea: localStorage }));
+    const tell = (key: string, newValue: string | null) =>
+      window.dispatchEvent(new StorageEvent("storage", { key, newValue, storageArea: localStorage }));
     tell(AUTO, "t8:an older build's tab");
     expect(saveStore.get(AUTO)).toBe("t8:an older build's tab");
     tell(SLOT, "t9:not mirrored here");
@@ -415,7 +416,9 @@ describe("regressions", () => {
   it("a storage event from another storage area changes nothing", async () => {
     localStorage.setItem(AUTO, "t1:auto");
     await open();
-    window.dispatchEvent(new StorageEvent("storage", { key: AUTO, newValue: "t2:session", storageArea: sessionStorage }));
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: AUTO, newValue: "t2:session", storageArea: sessionStorage }),
+    );
     expect(saveStore.get(AUTO)).toBe("t1:auto");
   });
 

@@ -39,7 +39,8 @@ export interface RoomyShaftCopy {
 /** Elevator congestion advice: cars on a shaft with room come first, since a
  *  car is cheaper than a shaft and needs no new column (#2251). */
 function crowdedElevatorCopy(s: RoomyShaftCopy | undefined): string {
-  if (!s) return "crowded elevators. Every elevator stopping here already runs all its cars; add a parallel shaft to this block.";
+  if (!s)
+    return "crowded elevators. Every elevator stopping here already runs all its cars; add a parallel shaft to this block.";
   const floors = `${floorLabel(s.bottom)}–${floorLabel(s.top)}`;
   return `crowded elevators. The ${s.name.toLowerCase()} on floors ${floors} runs ${s.cars} of ${s.maxCars} cars; add cars to it before building a parallel shaft.`;
 }
@@ -53,7 +54,8 @@ function shareOf(coverage: number | null | undefined): string {
 export function gripeCopy(f: GripeCopyFacts): string | undefined {
   /** The cause alone in Classic; the cause and its fix in Modern. */
   const said = (cause: string, withFix: string): string => (f.advises ? withFix : cause);
-  if (f.cause === "rent") return said("the rent is above the going rate.", "the rent is above the going rate. Lower it to keep them.");
+  if (f.cause === "rent")
+    return said("the rent is above the going rate.", "the rent is above the going rate. Lower it to keep them.");
   if (f.cause === "noise") {
     if (f.adjacent && f.club) {
       return said(
@@ -74,30 +76,37 @@ export function gripeCopy(f: GripeCopyFacts): string | undefined {
   }
   if (f.cause === "congestion") {
     if (f.binding === "elevator") return said("crowded elevators.", crowdedElevatorCopy(f.roomyShaft));
-    if (f.binding === "none") return said("overcrowded vertical transport.", "overcrowded vertical transport. Add capacity to this block.");
+    if (f.binding === "none")
+      return said("overcrowded vertical transport.", "overcrowded vertical transport. Add capacity to this block.");
     if (f.binding === "walkways") {
       return f.elevatorHere
         ? said(
-          "crowded stairs and escalators, jammed by the other floors they serve.",
-          "crowded stairs and escalators. They are jammed by the other floors they serve; give those floors better elevator service, or add more stairs and escalators.",
-        )
-        : said("crowded stairs and escalators.", "crowded stairs and escalators. Add more of them, or give this floor an elevator stop.");
+            "crowded stairs and escalators, jammed by the other floors they serve.",
+            "crowded stairs and escalators. They are jammed by the other floors they serve; give those floors better elevator service, or add more stairs and escalators.",
+          )
+        : said(
+            "crowded stairs and escalators.",
+            "crowded stairs and escalators. Add more of them, or give this floor an elevator stop.",
+          );
     }
     if (f.binding === "stairs") {
       return f.elevatorHere
         ? said(
-          "crowded stairs, jammed by the other floors they serve.",
-          "crowded stairs. They are jammed by the other floors they serve; give those floors better elevator service, or add another stair column.",
-        )
+            "crowded stairs, jammed by the other floors they serve.",
+            "crowded stairs. They are jammed by the other floors they serve; give those floors better elevator service, or add another stair column.",
+          )
         : said("crowded stairs.", "crowded stairs. Add another stair column, or give this floor an elevator stop.");
     }
     if (f.binding === "escalator") {
       return f.elevatorHere
         ? said(
-          "crowded escalators, jammed by the other floors they serve.",
-          "crowded escalators. They are jammed by the other floors they serve; give those floors better elevator service, or add another escalator.",
-        )
-        : said("crowded escalators.", "crowded escalators. Add another escalator, or give this floor an elevator stop.");
+            "crowded escalators, jammed by the other floors they serve.",
+            "crowded escalators. They are jammed by the other floors they serve; give those floors better elevator service, or add another escalator.",
+          )
+        : said(
+            "crowded escalators.",
+            "crowded escalators. Add another escalator, or give this floor an elevator stop.",
+          );
     }
     return undefined;
   }
@@ -105,9 +114,9 @@ export function gripeCopy(f: GripeCopyFacts): string | undefined {
     if (f.coverage === 0) {
       return f.floorReachable
         ? said(
-          "shops and restaurants exist, but none of them are reachable from here.",
-          "shops and restaurants exist, but none of them are reachable from here. Reconnect your retail: shoppers only patronize venues they can actually reach from the lobby.",
-        )
+            "shops and restaurants exist, but none of them are reachable from here.",
+            "shops and restaurants exist, but none of them are reachable from here. Reconnect your retail: shoppers only patronize venues they can actually reach from the lobby.",
+          )
         : undefined;
     }
     return said(
@@ -132,15 +141,25 @@ export function gripeCopy(f: GripeCopyFacts): string | undefined {
   return undefined;
 }
 
-export function lobbyFixCopy(floor: number, sinking: boolean, onSlot: boolean, needsSupport: boolean, clearFirst: boolean): string {
+export function lobbyFixCopy(
+  floor: number,
+  sinking: boolean,
+  onSlot: boolean,
+  needsSupport: boolean,
+  clearFirst: boolean,
+): string {
   if (sinking) {
-    if (onSlot) return `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${floor} to anchor the block.`;
-    if (needsSupport) return `Build floors up to ${floor - 1}, then put the sky lobby on floor ${floor} to lift these tenants.`;
+    if (onSlot)
+      return `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${floor} to anchor the block.`;
+    if (needsSupport)
+      return `Build floors up to ${floor - 1}, then put the sky lobby on floor ${floor} to lift these tenants.`;
     if (clearFirst) return `Clear floor ${floor} and build the sky lobby there to lift these tenants.`;
     return `Build the sky lobby on floor ${floor} to lift these tenants.`;
   }
-  if (onSlot) return "This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.";
-  if (needsSupport) return `A sky lobby on floor ${floor} would lift it (build floors up to ${floor - 1} first; the slot story itself stays clear for the lobby).`;
+  if (onSlot)
+    return "This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.";
+  if (needsSupport)
+    return `A sky lobby on floor ${floor} would lift it (build floors up to ${floor - 1} first; the slot story itself stays clear for the lobby).`;
   if (clearFirst) return `A sky lobby on floor ${floor} would lift it (clear that floor first).`;
   return `A sky lobby on floor ${floor} would lift it.`;
 }
@@ -159,7 +178,9 @@ export function lobbyWarningCopy(f: {
 }): string {
   const distance = f.quotesDistance ? `: ${f.distance} floors` : "";
   const opening = f.sinking ? "Too far from any lobby" : "Far from the nearest lobby";
-  const effect = f.sinking ? "Satisfaction sinks until tenants give notice." : "Satisfaction is capped here, so it never tops out.";
+  const effect = f.sinking
+    ? "Satisfaction sinks until tenants give notice."
+    : "Satisfaction is capped here, so it never tops out.";
   if (!f.advises) return `${opening}${distance}. ${effect}`;
   if (f.slotFloor === undefined) {
     return f.sinking
@@ -174,23 +195,28 @@ export function lobbyWarningCopy(f: {
 export function accessCopy(state: string, advises: boolean): { text: string; bad: boolean } | undefined {
   const said = (cause: string, fix: string): string => (advises ? `${cause} ${fix}` : cause);
   switch (state) {
-    case "notConnected": return { text: "Access: not connected. No elevator or stair reaches this floor.", bad: true };
-    case "cutOff": return {
-      text: said(
-        "Access: no way to transportation from here. A gap cuts this section of the floor off from the elevators and stairs.",
-        "Bridge the gap, or add a stair or elevator that reaches this section.",
-      ),
-      bad: true,
-    };
-    case "reachable": return { text: "Access: reachable from the lobby.", bad: false };
-    case "noRoute": return {
-      text: said(
-        "Access: no route. The only way to this floor is a stairway or escalator climb longer than anyone will make, so no one travels here.",
-        "Add an elevator that reaches it.",
-      ),
-      bad: true,
-    };
-    default: return undefined;
+    case "notConnected":
+      return { text: "Access: not connected. No elevator or stair reaches this floor.", bad: true };
+    case "cutOff":
+      return {
+        text: said(
+          "Access: no way to transportation from here. A gap cuts this section of the floor off from the elevators and stairs.",
+          "Bridge the gap, or add a stair or elevator that reaches this section.",
+        ),
+        bad: true,
+      };
+    case "reachable":
+      return { text: "Access: reachable from the lobby.", bad: false };
+    case "noRoute":
+      return {
+        text: said(
+          "Access: no route. The only way to this floor is a stairway or escalator climb longer than anyone will make, so no one travels here.",
+          "Add an elevator that reaches it.",
+        ),
+        bad: true,
+      };
+    default:
+      return undefined;
   }
 }
 

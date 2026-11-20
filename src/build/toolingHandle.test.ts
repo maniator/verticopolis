@@ -16,7 +16,10 @@ describe("the tooling handle check", () => {
   });
 
   it("answers true when a bundle publishes the handle, reading only up to it", async () => {
-    const bodies: Record<string, string> = { "http://host:1/": INDEX, "http://host:1/assets/main-abc.js": "w.game=app" };
+    const bodies: Record<string, string> = {
+      "http://host:1/": INDEX,
+      "http://host:1/assets/main-abc.js": "w.game=app",
+    };
     const fetchText = vi.fn(async (url: string) => bodies[url] ?? "never read");
     expect(await distPublishesHandle("http://host:1/", fetchText)).toBe(true);
     expect(fetchText.mock.calls.map(([u]) => u)).toEqual(["http://host:1/", "http://host:1/assets/main-abc.js"]);

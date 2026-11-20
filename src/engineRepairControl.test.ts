@@ -13,7 +13,10 @@ const mismatch = {
 } as const;
 
 function setController(controller: object | null) {
-  Object.defineProperty(navigator, "serviceWorker", { value: { controller, getRegistration: async () => undefined }, configurable: true });
+  Object.defineProperty(navigator, "serviceWorker", {
+    value: { controller, getRegistration: async () => undefined },
+    configurable: true,
+  });
 }
 
 describe("Repair engine files button", () => {
@@ -29,9 +32,14 @@ describe("Repair engine files button", () => {
 
   it("is offered on a load-stage mismatch when a worker controls the page, with the repair step in the copy", () => {
     setController({});
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { ...mismatch, package: { ...mismatch.package } } as never }, true);
+    showEngineFailure(
+      { build: "wasm-only", engine: "none", failure: { ...mismatch, package: { ...mismatch.package } } as never },
+      true,
+    );
     expect(repairButton()?.textContent).toBe("Repair engine files");
-    expect(document.querySelector("#boot-fallback")?.textContent).toMatch(/press Repair engine files to download a fresh copy/);
+    expect(document.querySelector("#boot-fallback")?.textContent).toMatch(
+      /press Repair engine files to download a fresh copy/,
+    );
   });
 
   it("is not offered without a controlling worker, for a timeout or for a start-stage failure", () => {
@@ -39,16 +47,24 @@ describe("Repair engine files button", () => {
     showEngineFailure({ build: "wasm-only", engine: "none", failure: mismatch as never }, true);
     expect(repairButton()).toBeNull();
     setController({});
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-timeout", message: "m" } }, true);
+    showEngineFailure(
+      { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-timeout", message: "m" } },
+      true,
+    );
     expect(repairButton()).toBeNull();
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "start", reason: "attach-refused", message: "m" } }, true);
+    showEngineFailure(
+      { build: "wasm-only", engine: "none", failure: { stage: "start", reason: "attach-refused", message: "m" } },
+      true,
+    );
     expect(repairButton()).toBeNull();
   });
 
   it("says to connect before repairing when offline", () => {
     setController({});
     showEngineFailure({ build: "wasm-only", engine: "none", failure: mismatch as never }, false);
-    expect(document.querySelector("#boot-fallback")?.textContent).toMatch(/Connect to the internet before repairing engine files/);
+    expect(document.querySelector("#boot-fallback")?.textContent).toMatch(
+      /Connect to the internet before repairing engine files/,
+    );
   });
 });
 

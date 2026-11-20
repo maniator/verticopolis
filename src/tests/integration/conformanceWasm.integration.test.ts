@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint, type EngineStart } from "../conformance/scenario";
+import {
+  CONFORMANCE_DIR,
+  firstDivergence,
+  loadScenario,
+  runScenario,
+  type Checkpoint,
+  type EngineStart,
+} from "../conformance/scenario";
 import { hasWasmPackage, startWasmEngine, startWasmHandle, wasm, wasmEngine } from "../conformance/wasmEngine";
 import { CATALOG_VERSION, readCatalog } from "@verticopolis/components/binding/catalog";
 import { catalogLockView } from "../conformance/catalogLockView";
@@ -25,13 +32,19 @@ const LOCK = resolve(CONFORMANCE_DIR, "expected.json");
 const CATALOG_LOCK = resolve(CONFORMANCE_DIR, "catalog-digests.json");
 const CATALOG_MODES = ["classic", "modern"] as const;
 const UPDATE = process.env.VC_CONFORMANCE_UPDATE === "1";
-if (UPDATE && process.env.CI) throw new Error("VC_CONFORMANCE_UPDATE is a local regeneration switch and never runs in CI");
-if (UPDATE) throw new Error("the conformance lock lives in Verticopolis/engine; regenerate it there (VC_CONFORMANCE_UPDATE=1 in that repository)");
+if (UPDATE && process.env.CI)
+  throw new Error("VC_CONFORMANCE_UPDATE is a local regeneration switch and never runs in CI");
+if (UPDATE)
+  throw new Error(
+    "the conformance lock lives in Verticopolis/engine; regenerate it there (VC_CONFORMANCE_UPDATE=1 in that repository)",
+  );
 
 type Lock = { scenarios: Record<string, Checkpoint[]> };
 
 const lock: Lock = existsSync(LOCK) ? (JSON.parse(readFileSync(LOCK, "utf8")) as Lock) : { scenarios: {} };
-const files = readdirSync(SCENARIO_DIR).filter((f) => f.endsWith(".json")).sort();
+const files = readdirSync(SCENARIO_DIR)
+  .filter((f) => f.endsWith(".json"))
+  .sort();
 const fresh: Lock = { scenarios: {} };
 /** A scenario's pinned checkpoints: the lock's, or during an update the ones
  *  this run produced, so the checks after the scenario loop hold the new lock. */
@@ -40,13 +53,16 @@ const pinned = (id: string): Checkpoint[] | undefined => (UPDATE ? fresh.scenari
 function writeLock(l: Lock): void {
   const ids = Object.keys(l.scenarios).sort();
   const body = ids.map((id) => {
-    const rows = l.scenarios[id].map((c) => `      ${JSON.stringify({ label: c.label, state: c.state, crowd: c.crowd, events: c.events })}`).join(",\n");
+    const rows = l.scenarios[id]
+      .map((c) => `      ${JSON.stringify({ label: c.label, state: c.state, crowd: c.crowd, events: c.events })}`)
+      .join(",\n");
     return `    ${JSON.stringify(id)}: [\n${rows}\n    ]`;
   });
   writeGoldenFile(LOCK, `{\n  "scenarios": {\n${body.join(",\n")}\n  }\n}\n`);
 }
 
-if (UPDATE && !hasWasmPackage()) throw new Error("VC_CONFORMANCE_UPDATE=1 writes the lock from the Rust engine; run npm install first");
+if (UPDATE && !hasWasmPackage())
+  throw new Error("VC_CONFORMANCE_UPDATE=1 writes the lock from the Rust engine; run npm install first");
 
 // An update writes the lock only from a run in which every test in this file
 // ran and passed, so a filtered (`-t`) or failing run never leaves a partial
@@ -65,11 +81,14 @@ writeAfterPassingRun(
   "catalog lock",
   UPDATE,
   () => CATALOG_MODES.filter((mode) => !freshCatalogs.catalogs[mode]),
-  () => writeGoldenFile(CATALOG_LOCK, `${JSON.stringify({ catalogs: Object.fromEntries(CATALOG_MODES.map((m) => [m, freshCatalogs.catalogs[m]])) }, null, 2)}\n`),
+  () =>
+    writeGoldenFile(
+      CATALOG_LOCK,
+      `${JSON.stringify({ catalogs: Object.fromEntries(CATALOG_MODES.map((m) => [m, freshCatalogs.catalogs[m]])) }, null, 2)}\n`,
+    ),
 );
 
 describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding", () => {
-
   it("has a scenario for every lock entry and a unique id per file", () => {
     const ids = files.map((f) => loadScenario(resolve(SCENARIO_DIR, f)).id);
     expect(ids).toEqual(files.map((f) => f.replace(/\.json$/, "")));
@@ -107,7 +126,10 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
       const scenario = loadScenario(resolve(SCENARIO_DIR, `${id}.json`));
       const answers = scenario.commands.filter((c) => c.op === "resolveChoice").length;
       expect(answers, `${id} no longer answers a choice`).toBeGreaterThan(0);
-      expect(scenario.commands.some((c) => c.op === "reload"), `${id} reloads, which would drop the override`).toBe(false);
+      expect(
+        scenario.commands.some((c) => c.op === "reload"),
+        `${id} reloads, which would drop the override`,
+      ).toBe(false);
       let answered = 0;
       const throughPort: EngineStart = (start) => {
         const handle = startWasmHandle(start);
@@ -153,8 +175,15 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
   // for every scenario after it.
   it("refuses a scenario start it cannot honor with an error that leaves the module usable", () => {
     expect(() => startWasmEngine({ newGame: { seed: 1, mode: "arcade" as "classic" } })).toThrow(/classic or modern/);
-    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine/conformance/README.md" })).toThrow(/not a VCTOWER1 file/);
-    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven-december.vctower", mode: "arcade" as "classic" })).toThrow(/classic or modern/);
+    expect(() => startWasmEngine({ fixture: "node_modules/@verticopolis/engine/conformance/README.md" })).toThrow(
+      /not a VCTOWER1 file/,
+    );
+    expect(() =>
+      startWasmEngine({
+        fixture: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven-december.vctower",
+        mode: "arcade" as "classic",
+      }),
+    ).toThrow(/classic or modern/);
     // The module still answers after the refusals: a fresh game founds and
     // hashes the same as the lock's starter.
     const want = pinned("starter-classic")?.[0];

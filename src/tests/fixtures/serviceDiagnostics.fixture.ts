@@ -19,7 +19,12 @@ export interface FixtureTower {
   readonly clock: { minutes: number };
   readonly tower: {
     place(kind: string, floor: number, x: number): { ok: boolean; reason?: string; unitId?: number };
-    placeTransport(kind: string, x: number, bottom: number, top: number): { ok: boolean; reason?: string; transportId?: number };
+    placeTransport(
+      kind: string,
+      x: number,
+      bottom: number,
+      top: number,
+    ): { ok: boolean; reason?: string; transportId?: number };
     getUnit(id: number): unknown;
     structureKindAt(floor: number, x: number): string | undefined;
     setCars(id: number, cars: number): boolean;
@@ -86,7 +91,11 @@ export function withHotelState(save: SerializedGame, hotelId: number, state: "di
  *  takings each tier reads from. No demand is written in: the engine works it
  *  out. Commercial rooms cannot stand in the ground lobby, so an elevator
  *  serves floor 2. */
-export const retailServiceFixture: FixtureBuilder<{ readonly shop: Unit; readonly fastFood: Unit; readonly restaurant: Unit }> = (start, mode) => {
+export const retailServiceFixture: FixtureBuilder<{
+  readonly shop: Unit;
+  readonly fastFood: Unit;
+  readonly restaurant: Unit;
+}> = (start, mode) => {
   const sim = start(71, mode);
   sim.money = 1e9;
   sim.star = 5;
@@ -122,7 +131,10 @@ export const retailServiceFixture: FixtureBuilder<{ readonly shop: Unit; readonl
 /** One shop among forty occupied offices on four reachable floors: the
  *  tower's shoppers outstrip its retail space, Modern's "another venue would
  *  still sell" case. The engine works out the demand. */
-export const underServedRetailFixture: FixtureBuilder<{ readonly shop: Unit; readonly offices: readonly Unit[] }> = (start, mode) => {
+export const underServedRetailFixture: FixtureBuilder<{ readonly shop: Unit; readonly offices: readonly Unit[] }> = (
+  start,
+  mode,
+) => {
   const sim = start(75, mode);
   sim.money = 1e9;
   sim.star = 5;
@@ -151,7 +163,12 @@ export const underServedRetailFixture: FixtureBuilder<{ readonly shop: Unit; rea
 /** Shops at two heights over one lobby, plus a sky bar and an office on the
  *  far floors. Floors 2 to 8 are slabs, so a shop on floor 3 is 2 floors from
  *  the ground lobby and one on floor 7 is 6 away. */
-export const lobbyDistanceFixture: FixtureBuilder<{ readonly near: Unit; readonly far: Unit; readonly skyBar: Unit; readonly office: Unit }> = (start, mode) => {
+export const lobbyDistanceFixture: FixtureBuilder<{
+  readonly near: Unit;
+  readonly far: Unit;
+  readonly skyBar: Unit;
+  readonly office: Unit;
+}> = (start, mode) => {
   const sim = start(73, mode);
   sim.money = 1e9;
   sim.star = 5;

@@ -14,7 +14,12 @@ describe.skipIf(noEngine)("the app's history through the port", () => {
     const enginePort = newEngine(1);
     const toasts: string[] = [];
     const followed: string[] = [];
-    const hist = createAppHistory({ enginePort, ui: { toast: (m) => toasts.push(m) }, followSwap: (follow) => followed.push(follow), showSteps: () => {} });
+    const hist = createAppHistory({
+      enginePort,
+      ui: { toast: (m) => toasts.push(m) },
+      followSwap: (follow) => followed.push(follow),
+      showSteps: () => {},
+    });
     await hist.undo();
     expect(toasts).toEqual(["Nothing to undo."]);
     expect(followed, "nothing was swapped").toEqual([]);

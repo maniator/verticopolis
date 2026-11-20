@@ -16,7 +16,9 @@ type Box = { left: number; top: number; right: number; bottom: number };
 async function cardUp(page: Page, vp: { width: number; height: number }): Promise<void> {
   await page.setViewportSize(vp);
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => {
     const g = (window as any).game;
     g.onboarding.dismissSplash();
@@ -48,7 +50,9 @@ for (const vp of [
   { width: 600, height: 352 },
   { width: 520, height: 300 },
 ]) {
-  test(`with the Map open (${vp.width}x${vp.height}) the card sits beside it, readable and on screen`, async ({ page }) => {
+  test(`with the Map open (${vp.width}x${vp.height}) the card sits beside it, readable and on screen`, async ({
+    page,
+  }) => {
     await cardUp(page, vp);
     await page.click("#btn-map");
     await expect(page.locator("#overview-map")).toBeVisible();

@@ -63,7 +63,11 @@ describe("fileSpace", () => {
   });
 
   it("is not left opening when the factory throws at once (a SecurityError)", async () => {
-    const throwing = { open: () => { throw new DOMException("denied", "SecurityError"); } } as unknown as IDBFactory;
+    const throwing = {
+      open: () => {
+        throw new DOMException("denied", "SecurityError");
+      },
+    } as unknown as IDBFactory;
     expect(await fileSpace.open(throwing)).toBe(false);
     expect(fileSpace.isOpening()).toBe(false);
     expect(fileSpace.isOpen()).toBe(false);
@@ -119,7 +123,9 @@ describe("fileSpace", () => {
   it("refuses to replace when asked to keep what is there, and changes nothing", async () => {
     await open();
     const first = await fileSpace.save("Spire", "tower", bytes(1), 10);
-    await expect(fileSpace.save("spire", "tower", bytes(9, 9), 20, false)).rejects.toThrow(`A tower named "Spire" already exists.`);
+    await expect(fileSpace.save("spire", "tower", bytes(9, 9), 20, false)).rejects.toThrow(
+      `A tower named "Spire" already exists.`,
+    );
     expect(fileSpace.list()).toEqual([first]);
     expect(await fileSpace.read(first.id)).toEqual(bytes(1));
   });
@@ -231,7 +237,12 @@ describe("fileSpace", () => {
 });
 
 describe("fileSpace.addOnce", () => {
-  const file = (name: string, ...values: number[]) => ({ name, kind: "tower" as const, bytes: bytes(...values), modified: 7 });
+  const file = (name: string, ...values: number[]) => ({
+    name,
+    kind: "tower" as const,
+    bytes: bytes(...values),
+    modified: 7,
+  });
 
   it("adds the files under free names and sets the flag, once", async () => {
     await open();
@@ -239,7 +250,10 @@ describe("fileSpace.addOnce", () => {
     expect(await fileSpace.addOnce("copied", [file("Spire", 1), file("spire", 2), file("Mall", 3)])).toBe(3);
     expect(await fileSpace.addOnce("copied", [file("Again", 4)])).toBe(0);
     await reopen();
-    const names = fileSpace.list().map((e) => e.name).sort();
+    const names = fileSpace
+      .list()
+      .map((e) => e.name)
+      .sort();
     expect(names).toEqual(["Mall", "Spire", "Spire (2)", "spire (3)"]);
     expect(await fileSpace.flag("copied")).toBe(true);
     expect(await fileSpace.read(fileSpace.find("Mall")!.id)).toEqual(bytes(3));
@@ -303,7 +317,10 @@ describe("two tabs writing before they hear each other", () => {
   const names = async () => {
     const fresh = await tab();
     tabs.push(fresh);
-    return fresh.fileSpace.list().map((e) => e.name).sort();
+    return fresh.fileSpace
+      .list()
+      .map((e) => e.name)
+      .sort();
   };
 
   it("keeps both tabs' files and every body", async () => {
@@ -314,7 +331,12 @@ describe("two tabs writing before they hear each other", () => {
     expect(b.fileSpace.list()).toEqual([]);
     const fromB = await b.fileSpace.add("From B", "tower", bytes(2));
     expect(await names()).toEqual(["From A", "From B"]);
-    expect(b.fileSpace.list().map((e) => e.name).sort()).toEqual(["From A", "From B"]);
+    expect(
+      b.fileSpace
+        .list()
+        .map((e) => e.name)
+        .sort(),
+    ).toEqual(["From A", "From B"]);
     expect(await b.fileSpace.read(fromB.id)).toEqual(bytes(2));
   });
 

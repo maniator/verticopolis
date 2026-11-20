@@ -35,7 +35,15 @@ describe("Rust engine failure report without a running engine", () => {
       stage: "load",
       reason: "package-mismatch",
       message: "some private stack",
-      package: { kind: "mismatch", file: "wasm", expected: null, found: null, expectedPackage: null, servedPackage: null, controlled: false },
+      package: {
+        kind: "mismatch",
+        file: "wasm",
+        expected: null,
+        found: null,
+        expectedPackage: null,
+        servedPackage: null,
+        controlled: false,
+      },
     };
     const entries = unzipSync(engineFailureArchive(boot, null, "test-version").bytes);
     const details = JSON.parse(strFromU8(entries["engine-failure.json"]));

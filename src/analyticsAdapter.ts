@@ -91,11 +91,7 @@ export function setAnalyticsAdapter(adapter: AnalyticsAdapter): AnalyticsAdapter
   // and inject is wrapped in a best-effort catch, kill telemetry for the rest of
   // the process with nothing surfaced. Fail loudly here at swap time instead. The
   // never-throw guarantee covers event emission, not this one configuration call.
-  if (
-    !adapter ||
-    typeof adapter.send !== "function" ||
-    typeof adapter.injectPageTelemetry !== "function"
-  ) {
+  if (!adapter || typeof adapter.send !== "function" || typeof adapter.injectPageTelemetry !== "function") {
     throw new TypeError("setAnalyticsAdapter needs an adapter implementing send and injectPageTelemetry");
   }
   const previous = activeAdapter;

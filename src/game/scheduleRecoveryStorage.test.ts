@@ -128,7 +128,11 @@ describe("browserAcknowledgements", () => {
 
   it("does not rewrite the slot when nothing needs migrating, whatever the entry order", () => {
     const writes: string[] = [];
-    const raw = JSON.stringify({ "classic:1:1139:elevatorStandard:4": "kept", unknown: { note: "x" }, "classic:2:9:elevatorService:3": "told" });
+    const raw = JSON.stringify({
+      "classic:1:1139:elevatorStandard:4": "kept",
+      unknown: { note: "x" },
+      "classic:2:9:elevatorService:3": "told",
+    });
     const store = browserAcknowledgements({ getItem: () => raw, setItem: (_k, v) => void writes.push(v) });
     expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("kept");
     expect(writes).toEqual([]);
@@ -156,12 +160,17 @@ describe("browserAcknowledgements", () => {
 
   it("lets a legacy Keep beat a canonical notice that comes first in the slot", () => {
     const storage = memory();
-    storage.setItem("vc-elevator-schedule-review", JSON.stringify({ "classic:1:1139:elevatorStandard:4:2": "kept", "classic:1:1139:elevatorStandard:4": "told" }));
+    storage.setItem(
+      "vc-elevator-schedule-review",
+      JSON.stringify({ "classic:1:1139:elevatorStandard:4:2": "kept", "classic:1:1139:elevatorStandard:4": "told" }),
+    );
     expect(browserAcknowledgements(storage).get("classic:1:1139:elevatorStandard:4")).toBe("kept");
   });
 
   it("migrates a legacy slot with one write however often it is read, and keeps an own '__proto__' entry", () => {
-    const data = new Map<string, string>([["vc-elevator-schedule-review", '{"classic:1:1139:elevatorStandard:4:1":"kept","__proto__":{"a":1}}']]);
+    const data = new Map<string, string>([
+      ["vc-elevator-schedule-review", '{"classic:1:1139:elevatorStandard:4:1":"kept","__proto__":{"a":1}}'],
+    ]);
     let writes = 0;
     const store = browserAcknowledgements({
       getItem: (k) => data.get(k) ?? null,
@@ -174,12 +183,17 @@ describe("browserAcknowledgements", () => {
     store.get("x");
     store.get("classic:1:1139:elevatorStandard:4");
     expect(writes).toBe(1);
-    expect(data.get("vc-elevator-schedule-review")).toBe('{"classic:1:1139:elevatorStandard:4":"kept","__proto__":{"a":1}}');
+    expect(data.get("vc-elevator-schedule-review")).toBe(
+      '{"classic:1:1139:elevatorStandard:4":"kept","__proto__":{"a":1}}',
+    );
   });
 
   it("does not let a legacy key overwrite a canonical key holding something unreadable", () => {
     const storage = memory();
-    const stored = { "classic:1:1139:elevatorStandard:4": { note: "x" }, "classic:1:1139:elevatorStandard:4:2": "kept" };
+    const stored = {
+      "classic:1:1139:elevatorStandard:4": { note: "x" },
+      "classic:1:1139:elevatorStandard:4:2": "kept",
+    };
     storage.setItem("vc-elevator-schedule-review", JSON.stringify(stored));
     browserAcknowledgements(storage).get("anything");
     expect(JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}")).toEqual(stored);
@@ -282,7 +296,9 @@ describe("browserAcknowledgements", () => {
   });
 
   it("does not retry a refused legacy-key rewrite on every read, and tries again after a write goes through (#1601)", () => {
-    const data = new Map<string, string>([["vc-elevator-schedule-review", '{"classic:1:1139:elevatorStandard:4:1":"kept"}']]);
+    const data = new Map<string, string>([
+      ["vc-elevator-schedule-review", '{"classic:1:1139:elevatorStandard:4:1":"kept"}'],
+    ]);
     let full = true;
     let attempts = 0;
     const store = browserAcknowledgements({
@@ -300,7 +316,10 @@ describe("browserAcknowledgements", () => {
     expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("kept"); // the canonical copy is still served
     full = false;
     store.set("y", "told");
-    expect(JSON.parse(data.get("vc-elevator-schedule-review") ?? "{}")).toEqual({ "classic:1:1139:elevatorStandard:4": "kept", y: "told" });
+    expect(JSON.parse(data.get("vc-elevator-schedule-review") ?? "{}")).toEqual({
+      "classic:1:1139:elevatorStandard:4": "kept",
+      y: "told",
+    });
   });
 
   it("trims the oldest decisions past its cap", () => {

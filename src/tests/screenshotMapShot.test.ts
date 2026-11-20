@@ -38,7 +38,9 @@ afterEach(() => {
 
 describe("mapForShot", () => {
   it("fails a shot of an open Map that has not drawn its tower, cropped or not", async () => {
-    await expect(mapForShot(page, "scene/full", undefined)).rejects.toThrow("scene/full: the Map is open but has not drawn the tower yet");
+    await expect(mapForShot(page, "scene/full", undefined)).rejects.toThrow(
+      "scene/full: the Map is open but has not drawn the tower yet",
+    );
     await expect(mapForShot(page, "scene/map", "#overview-map")).rejects.toThrow("has not drawn");
   });
 
@@ -102,7 +104,9 @@ describe("mapForShot", () => {
 
   it("reads an empty crop as a full-page shot, and names a crop that is not a CSS selector", async () => {
     // A full-page shot still needs a Map that has drawn its tower.
-    await expect(mapForShot(page, "scene/blank", "")).rejects.toThrow("scene/blank: the Map is open but has not drawn the tower yet");
+    await expect(mapForShot(page, "scene/blank", "")).rejects.toThrow(
+      "scene/blank: the Map is open but has not drawn the tower yet",
+    );
     expect(open).toBe(true);
     map().dataset.mapDrawn = "true";
     await mapForShot(page, "scene/full", "");

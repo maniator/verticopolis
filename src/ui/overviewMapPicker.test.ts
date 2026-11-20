@@ -26,7 +26,9 @@ describe("the map's View dropdown", () => {
     expect(picker.root.textContent).toContain("View");
     expect(picker.select.id).toBe(MAP_PICKER_DOM.select);
     expect(picker.root.contains(picker.select)).toBe(true);
-    expect([...picker.select.options].map((o) => [o.value, o.textContent])).toEqual(MAP_VIEWS.map((v) => [v.id, v.label]));
+    expect([...picker.select.options].map((o) => [o.value, o.textContent])).toEqual(
+      MAP_VIEWS.map((v) => [v.id, v.label]),
+    );
     expect(picker.select.value).toBe("edit");
     expect(picker.selected).toBe("edit");
   });

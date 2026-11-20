@@ -86,7 +86,10 @@ export const INJECTED_CODE: ReadonlyArray<{
   // pixelarticons into its own module, so the sourcemap lists that module
   // under the components package. pixelarticons stays a dev dependency here
   // so the notices can read its license.
-  { pkg: "pixelarticons", sourcePattern: /(^|\/)node_modules\/@verticopolis\/components\/lib\/ui\/iconPaths\.generated\.js$/ },
+  {
+    pkg: "pixelarticons",
+    sourcePattern: /(^|\/)node_modules\/@verticopolis\/components\/lib\/ui\/iconPaths\.generated\.js$/,
+  },
   // workbox-build's service worker template (its AMD loader); the sourcemap
   // lists it as a temporary file outside the repository.
   // `from` names the package that resolves it, so a nested copy is the one read.
@@ -101,7 +104,9 @@ export const INJECTED_CODE: ReadonlyArray<{
 
 /** True when an `INJECTED_CODE` entry marked `outsideRepo` attributes a source id that resolves outside the repository. */
 export function isKnownOutsideRepoSource(source: string, entries: typeof INJECTED_CODE = INJECTED_CODE): boolean {
-  return entries.some((inj) => inj.outsideRepo === true && inj.sourcePattern !== undefined && inj.sourcePattern.test(source));
+  return entries.some(
+    (inj) => inj.outsideRepo === true && inj.sourcePattern !== undefined && inj.sourcePattern.test(source),
+  );
 }
 
 /**
@@ -120,7 +125,10 @@ export const WHOLE_CHUNK_MAX_BYTES = 1536;
  * code fails, so a sourcemap that lost its sources cannot hide a package.
  */
 export function isWholeInjectedChunk(code: string, marker: string): boolean {
-  const body = code.replace(/\r\n?/g, "\n").replace(/\n?\/\/# sourceMappingURL=\S*\s*$/, "").trim();
+  const body = code
+    .replace(/\r\n?/g, "\n")
+    .replace(/\n?\/\/# sourceMappingURL=\S*\s*$/, "")
+    .trim();
   if (new TextEncoder().encode(body).length > WHOLE_CHUNK_MAX_BYTES || !body.includes(marker)) return false;
   const iife = /^\((?:function\s*\(\s*\)|\(\s*\)\s*=>)\s*\{[\s\S]*\}\)\(\);?$/;
   // One function: its opening and the call that closes it each appear once.
@@ -141,7 +149,11 @@ export function isWholeInjectedChunk(code: string, marker: string): boolean {
  */
 export function isPackagePath(id: string, extension?: RegExp): boolean {
   const path = id.replace(/\?.*$/s, "");
-  return /(^|[\\/])node_modules[\\/]/.test(path) && !FIRST_PARTY.test(path) && (extension === undefined || extension.test(path));
+  return (
+    /(^|[\\/])node_modules[\\/]/.test(path) &&
+    !FIRST_PARTY.test(path) &&
+    (extension === undefined || extension.test(path))
+  );
 }
 
 /** The project's own packages, as the last `node_modules` segment names them. */
@@ -159,7 +171,8 @@ const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "optionalDependenc
  * any depth of the tree, including ones package.json does not name.
  */
 export function lockfileLinkProblems(lockfile: unknown, name = "package-lock.json"): string[] {
-  const packages = typeof lockfile === "object" && lockfile !== null ? (lockfile as { packages?: unknown }).packages : undefined;
+  const packages =
+    typeof lockfile === "object" && lockfile !== null ? (lockfile as { packages?: unknown }).packages : undefined;
   if (typeof packages !== "object" || packages === null) return [];
   return Object.entries(packages as Record<string, unknown>)
     .filter(([, entry]) => typeof entry === "object" && entry !== null && (entry as { link?: unknown }).link === true)
@@ -194,7 +207,8 @@ export function linkedDependencyProblems(manifest: Record<string, unknown>): str
       continue;
     }
     for (const [name, spec] of Object.entries(deps)) {
-      if (typeof spec === "string" && isLocalSpec(spec)) problems.push(`package.json ${field} links ${name} (${spec.trim()})`);
+      if (typeof spec === "string" && isLocalSpec(spec))
+        problems.push(`package.json ${field} links ${name} (${spec.trim()})`);
     }
   }
   // npm overrides and yarn resolutions can point at a local package too, at any depth.
@@ -208,7 +222,8 @@ export function linkedDependencyProblems(manifest: Record<string, unknown>): str
   walk("overrides", manifest.overrides, "");
   walk("resolutions", manifest.resolutions, "");
   const pnpm = manifest.pnpm;
-  if (typeof pnpm === "object" && pnpm !== null) walk("pnpm.overrides", (pnpm as Record<string, unknown>).overrides, "");
+  if (typeof pnpm === "object" && pnpm !== null)
+    walk("pnpm.overrides", (pnpm as Record<string, unknown>).overrides, "");
   return problems;
 }
 
@@ -333,7 +348,7 @@ export function declaredLicense(manifest: { license?: unknown; licenses?: unknow
   const one = (v: unknown): string | null => {
     if (typeof v === "string") return v.trim() || null;
     if (v && typeof v === "object" && typeof (v as { type?: unknown }).type === "string") {
-      return ((v as { type: string }).type).trim() || null;
+      return (v as { type: string }).type.trim() || null;
     }
     return null;
   };
@@ -398,7 +413,13 @@ export function isAllowedLicense(expression: string): boolean {
 }
 
 /** A problem that keeps a package out of the notices; the build fails on any of these. */
-export function noticeProblem(pkg: { name?: string; version?: string; license?: string | null; licenseText?: string; hasLicenseFile?: boolean }): string | null {
+export function noticeProblem(pkg: {
+  name?: string;
+  version?: string;
+  license?: string | null;
+  licenseText?: string;
+  hasLicenseFile?: boolean;
+}): string | null {
   if (!pkg.name) return "a bundled package's manifest has no name";
   if (!pkg.version) return `${pkg.name}: its manifest has no version`;
   if (!pkg.license) return `${pkg.name}@${pkg.version}: its manifest declares no license`;
@@ -462,7 +483,10 @@ function byParts(pa: string[], pb: string[]): number {
 export function renderNotices(packages: readonly NoticePackage[]): string {
   const seen = new Set<string>();
   const unique = [...packages]
-    .sort((a, b) => byCodePoint(a.name, b.name) || byVersion(a.version, b.version) || byCodePoint(a.kind ?? "npm", b.kind ?? "npm"))
+    .sort(
+      (a, b) =>
+        byCodePoint(a.name, b.name) || byVersion(a.version, b.version) || byCodePoint(a.kind ?? "npm", b.kind ?? "npm"),
+    )
     .filter((p) => {
       const key = `${p.kind ?? "npm"}:${p.name}@${p.version}`;
       if (seen.has(key)) return false;
@@ -482,7 +506,15 @@ export function renderNotices(packages: readonly NoticePackage[]): string {
     "",
   ].join("\n");
   const blocks = unique.map((p) =>
-    [rule, `${p.name}@${p.version}${kindLabel(p)}`, `License: ${p.license}`, rule, "", p.licenseText.replace(/\r\n?/g, "\n").trimEnd(), ""].join("\n"),
+    [
+      rule,
+      `${p.name}@${p.version}${kindLabel(p)}`,
+      `License: ${p.license}`,
+      rule,
+      "",
+      p.licenseText.replace(/\r\n?/g, "\n").trimEnd(),
+      "",
+    ].join("\n"),
   );
   return `${header}\n${blocks.join("\n")}`;
 }

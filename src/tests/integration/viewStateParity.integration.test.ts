@@ -56,26 +56,28 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
     sim = draftTower();
     adopted = [];
     importReports = [];
-    saveLoad = new SaveLoad(withPorts({
-      getSim: () => sim,
-      getView: () => ({ ...camera }),
-      adoptSim: (s) => {
-        // The app follows the adopted tower, as GameApp.adoptSim does.
-        adopted.push(s);
-        sim = s;
-      },
-      ui: {
-        toast: () => {},
-        sayVisibly: vi.fn(),
-        downloadFile: () => true,
-        showImportReport: (_report, cb) => importReports.push({ open: cb.onOpen }),
-        showExportReport: () => {},
-      },
-      showCrashScreen: () => {},
-      showRecoveryWait: () => () => {},
-      attemptGraphicsRecovery: () => {},
-      armOnboarding: () => {},
-    }));
+    saveLoad = new SaveLoad(
+      withPorts({
+        getSim: () => sim,
+        getView: () => ({ ...camera }),
+        adoptSim: (s) => {
+          // The app follows the adopted tower, as GameApp.adoptSim does.
+          adopted.push(s);
+          sim = s;
+        },
+        ui: {
+          toast: () => {},
+          sayVisibly: vi.fn(),
+          downloadFile: () => true,
+          showImportReport: (_report, cb) => importReports.push({ open: cb.onOpen }),
+          showExportReport: () => {},
+        },
+        showCrashScreen: () => {},
+        showRecoveryWait: () => () => {},
+        attemptGraphicsRecovery: () => {},
+        armOnboarding: () => {},
+      }),
+    );
   });
 
   it("save() stamps the view; the reloaded autosave carries it", () => {
@@ -86,16 +88,24 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
   it("a null camera (headless) stamps nothing and never erases a view the sim already carries", () => {
     // e.g. brought over by a TDT import: the engine holds the camera
     (sim.port as unknown as EnginePort).setCamera(7, 8, NaN);
-    saveLoad = new SaveLoad(withPorts({
-      getSim: () => sim,
-      getView: () => null,
-      adoptSim: () => {},
-      ui: { toast: () => {}, sayVisibly: () => {}, downloadFile: () => true, showImportReport: () => {}, showExportReport: () => {} },
-      showCrashScreen: () => {},
-      showRecoveryWait: () => () => {},
-      attemptGraphicsRecovery: () => {},
-      armOnboarding: () => {},
-    }));
+    saveLoad = new SaveLoad(
+      withPorts({
+        getSim: () => sim,
+        getView: () => null,
+        adoptSim: () => {},
+        ui: {
+          toast: () => {},
+          sayVisibly: () => {},
+          downloadFile: () => true,
+          showImportReport: () => {},
+          showExportReport: () => {},
+        },
+        showCrashScreen: () => {},
+        showRecoveryWait: () => () => {},
+        attemptGraphicsRecovery: () => {},
+        armOnboarding: () => {},
+      }),
+    );
     saveLoad.save(true);
     expect(viewOf(sim)).toEqual({ tile: 7, floor: 8 });
     expect(viewOf(loadAuto())).toEqual({ tile: 7, floor: 8 });
@@ -108,42 +118,47 @@ describe.skipIf(noEngine)("SaveLoad stamps the live camera onto the CURRENT towe
 
   it("exportGame() stamps the view into the .vctower payload", async () => {
     let file: Uint8Array = new Uint8Array();
-    saveLoad = new SaveLoad(withPorts({
-      getSim: () => sim,
-      getView: () => ({ ...camera }),
-      adoptSim: () => {},
-      ui: {
-        toast: () => {},
-        sayVisibly: vi.fn(),
-        downloadFile: (_name, contents) => {
-          file = contents as Uint8Array;
-          return true;
+    saveLoad = new SaveLoad(
+      withPorts({
+        getSim: () => sim,
+        getView: () => ({ ...camera }),
+        adoptSim: () => {},
+        ui: {
+          toast: () => {},
+          sayVisibly: vi.fn(),
+          downloadFile: (_name, contents) => {
+            file = contents as Uint8Array;
+            return true;
+          },
+          showImportReport: () => {},
+          showExportReport: () => {},
         },
-        showImportReport: () => {},
-        showExportReport: () => {},
-      },
-      showCrashScreen: () => {},
-      showRecoveryWait: () => () => {},
-      attemptGraphicsRecovery: () => {},
-      armOnboarding: () => {},
-    }));
+        showCrashScreen: () => {},
+        showRecoveryWait: () => () => {},
+        attemptGraphicsRecovery: () => {},
+        armOnboarding: () => {},
+      }),
+    );
     await saveLoad.exportGame();
     expect(decodeVctower(file).view).toEqual(camera);
   });
 
-  it.skipIf(!hasWasmPackage())("importLegacy: the imported sim keeps the TDT file's view, never the live camera's; the pre-adopt flush keeps the live one", async () => {
-    const words = WORDS_200_20;
-    const buf = buildTdt({ ...sampleTowerSpec(), viewX: words.x, viewY: words.y });
-    await saveLoad.importLegacy(buf.buffer as ArrayBuffer, "MOVED.TDT");
-    importReports[0].open();
-    // The adopted tower carries the FILE's view (zoomless, fractional: the
-    // words quantize to 8px/36px). My Towers keeps the 1994 file's own bytes.
-    expect(viewOf(adopted[0])!.zoom).toBeUndefined();
-    expect(viewOf(adopted[0])!.tile).toBeCloseTo(200, 1);
-    expect(viewOf(adopted[0])!.floor).toBeCloseTo(20, 1);
-    // The previous tower's autosave flush carries the live camera.
-    expect(viewOf(loadAuto())).toEqual(camera);
-  });
+  it.skipIf(!hasWasmPackage())(
+    "importLegacy: the imported sim keeps the TDT file's view, never the live camera's; the pre-adopt flush keeps the live one",
+    async () => {
+      const words = WORDS_200_20;
+      const buf = buildTdt({ ...sampleTowerSpec(), viewX: words.x, viewY: words.y });
+      await saveLoad.importLegacy(buf.buffer as ArrayBuffer, "MOVED.TDT");
+      importReports[0].open();
+      // The adopted tower carries the FILE's view (zoomless, fractional: the
+      // words quantize to 8px/36px). My Towers keeps the 1994 file's own bytes.
+      expect(viewOf(adopted[0])!.zoom).toBeUndefined();
+      expect(viewOf(adopted[0])!.tile).toBeCloseTo(200, 1);
+      expect(viewOf(adopted[0])!.floor).toBeCloseTo(20, 1);
+      // The previous tower's autosave flush carries the live camera.
+      expect(viewOf(loadAuto())).toEqual(camera);
+    },
+  );
 });
 
 describe("TowerEngine camera restore (prototype on a fake: no canvas)", () => {

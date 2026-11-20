@@ -28,23 +28,37 @@ import { transportEditorTemplate, unitEditorTemplate } from "./editor";
  * `editorPatch.test.ts`; the UI wiring in the integration spec.
  */
 
-
 /** The 07:00 the cards read by default: every venue is open. */
 const MORNING = 7;
 
 /** A unit card of `kind` in `mode`, occupied and served on floor 2. */
-const unit = (kind: FacilityKind, over: Partial<UnitDetail> = {}, mode: GameMode = "classic") => unitDetail(mode, kind, over);
+const unit = (kind: FacilityKind, over: Partial<UnitDetail> = {}, mode: GameMode = "classic") =>
+  unitDetail(mode, kind, over);
 
 /** The mobile fold-in's lines for a commuter unit: the engine's access line. */
 const ACCESS_LINES: TemplateResult[] = [html`<div>Access: reachable from the lobby.</div>`];
 
-function unitEditor(u: UnitDetail, opts: { mode?: GameMode; mobile?: boolean; hour?: number; lines?: TemplateResult[]; calendar?: CalendarKind } = {}): TemplateResult {
+function unitEditor(
+  u: UnitDetail,
+  opts: { mode?: GameMode; mobile?: boolean; hour?: number; lines?: TemplateResult[]; calendar?: CalendarKind } = {},
+): TemplateResult {
   const mobile = opts.mobile ?? false;
-  return unitEditorTemplate(u, catalogFor(opts.mode ?? "classic"), opts.hour ?? MORNING, mobile, mobile ? (opts.lines ?? ACCESS_LINES) : [], opts.calendar);
+  return unitEditorTemplate(
+    u,
+    catalogFor(opts.mode ?? "classic"),
+    opts.hour ?? MORNING,
+    mobile,
+    mobile ? (opts.lines ?? ACCESS_LINES) : [],
+    opts.calendar,
+  );
 }
 
 function transportEditor(t: TransportDetail, mobile = false): TemplateResult {
-  return transportEditorTemplate(t, catalogFor("classic"), mobile ? transportLoadLines(t.utilization ?? undefined, t.nearCapacity, false) : []);
+  return transportEditorTemplate(
+    t,
+    catalogFor("classic"),
+    mobile ? transportLoadLines(t.utilization ?? undefined, t.nearCapacity, false) : [],
+  );
 }
 
 const maxCars = (kind: FacilityKind) => catalogFacility(catalogFor("classic"), kind).maxCars!;
@@ -81,7 +95,9 @@ describe("transport editor template structure", () => {
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!.disabled).toBe(true);
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="addcar"]')!.disabled).toBe(false);
     // addcar disables at the catalog's car limit
-    frag = renderToFragment(transportEditor(transportDetail("elevatorStandard", 2, { cars: maxCars("elevatorStandard") })));
+    frag = renderToFragment(
+      transportEditor(transportDetail("elevatorStandard", 2, { cars: maxCars("elevatorStandard") })),
+    );
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!.disabled).toBe(false);
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="addcar"]')!.disabled).toBe(true);
   });
@@ -156,7 +172,9 @@ describe("unit editor row and action branches", () => {
     expect(uFrag.querySelector('[data-edit="rentUp"]')).not.toBeNull();
     expect(uFrag.querySelector("#ed-rung")).toBeNull(); // no rung picker in Modern
     expect(uFrag.querySelector('[data-edit="batchKind"]')).not.toBeNull();
-    const sFrag = renderToFragment(unitEditor(unit("condo", { everOccupied: true, residents: 4 }, "modern"), { mode: "modern" }));
+    const sFrag = renderToFragment(
+      unitEditor(unit("condo", { everOccupied: true, residents: 4 }, "modern"), { mode: "modern" }),
+    );
     expect(sFrag.querySelector('[data-edit="rentUp"]')).toBeNull();
     expect(sFrag.querySelector("#ed-rung")).toBeNull(); // Modern keeps the hidden-row behavior
     expect(sFrag.querySelector('[data-edit="batchKind"]')).toBeNull();
@@ -179,12 +197,18 @@ describe("unit editor row and action branches", () => {
       renderToFragment(unitEditor(u, { mode, calendar })).querySelector('[data-field="rent"]')!.textContent;
 
     it("Modern on the short 1994 calendar: an office shows what lands each 3-day quarter and the rate it is scaled from", () => {
-      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "canon")).toBe("$333 (the $10,000 rate scaled to a 3-day quarter)");
+      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "canon")).toBe(
+        "$333 (the $10,000 rate scaled to a 3-day quarter)",
+      );
     });
 
     it("Modern on the real-world calendar: an office shows what lands each 30-day month (#2255)", () => {
-      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "realWorld")).toBe("$3,333 (the $10,000 rate scaled to a 30-day month)");
-      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern")).toBe("$3,333 (the $10,000 rate scaled to a 30-day month)");
+      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern", "realWorld")).toBe(
+        "$3,333 (the $10,000 rate scaled to a 30-day month)",
+      );
+      expect(rentCell(unit("office", { price: 10_000 }, "modern"), "modern")).toBe(
+        "$3,333 (the $10,000 rate scaled to a 30-day month)",
+      );
     });
 
     it("an office's rent is labeled by when it lands: monthly on Modern's real-world calendar, quarterly otherwise (#2255)", () => {
@@ -201,7 +225,9 @@ describe("unit editor row and action branches", () => {
     });
 
     it("Modern on the short calendar: a rental's monthly rent is scaled to the 3-day month", () => {
-      expect(rentCell(unit("rentalStudio", { price: 2_500 }, "modern"), "modern", "canon")).toBe("$250 (the $2,500 rate scaled to a 3-day month)");
+      expect(rentCell(unit("rentalStudio", { price: 2_500 }, "modern"), "modern", "canon")).toBe(
+        "$250 (the $2,500 rate scaled to a 3-day month)",
+      );
     });
 
     it("Modern on the short calendar: a hotel's nightly rate and a condo's price are not scaled", () => {
@@ -231,10 +257,13 @@ describe("unit editor row and action branches", () => {
     expect(op.querySelector('[data-field="filmDays"]')!.textContent).toBe("9");
     expect(op.querySelector('[data-edit="filmPolicy"]')!.textContent).toBe("Auto-rebook: Blockbuster ▸");
     for (const film of economy.films) {
-      expect(op.querySelector(`[data-edit="${film.key}Film"]`)!.textContent).toBe(`${film.label} ($${groupDigits(film.price)})`);
+      expect(op.querySelector(`[data-edit="${film.key}Film"]`)!.textContent).toBe(
+        `${film.label} ($${groupDigits(film.price)})`,
+      );
     }
     expect(economy.films.map((f) => f.label)).toEqual(["Revival", "Feature", "Blockbuster"]);
-    const rebooks = (filmPolicy: UnitDetail["filmPolicy"]) => card({ filmPolicy, filmTier: "new" }).querySelector('[data-edit="filmPolicy"]')!.textContent;
+    const rebooks = (filmPolicy: UnitDetail["filmPolicy"]) =>
+      card({ filmPolicy, filmTier: "new" }).querySelector('[data-edit="filmPolicy"]')!.textContent;
     expect([null, "auto", "feature", "revival", "off"].map((p) => rebooks(p as UnitDetail["filmPolicy"]))).toEqual([
       "Auto-rebook: Feature ▸",
       "Auto-rebook: Feature ▸",
@@ -251,7 +280,8 @@ describe("unit editor row and action branches", () => {
     const modern = { mode: "modern" as const };
     const economy = catalogFor("modern").economy;
     const screen2 = { filmPolicy: "revival", filmDays: 1, filmTier: "classic" } as const;
-    const card = (over: Partial<UnitDetail>) => renderToFragment(unitEditor(unit("cinema", { screen2, ...over }, "modern"), modern));
+    const card = (over: Partial<UnitDetail>) =>
+      renderToFragment(unitEditor(unit("cinema", { screen2, ...over }, "modern"), modern));
     const op = card({ filmPolicy: null, filmTier: "blockbuster", filmDays: 9 });
     expect(op.querySelector('[data-field="showing"]')!.textContent).toBe("Blockbuster, 9 days");
     expect(op.querySelector('[data-field="showing2"]')!.textContent).toBe("Revival, 1 day");
@@ -263,7 +293,10 @@ describe("unit editor row and action branches", () => {
       expect(op.querySelector(`[data-edit="${film.key}Film"]`)!.textContent).toBe(label);
       expect(op.querySelector(`[data-edit="${film.key}Film2"]`)!.textContent).toBe(label);
     }
-    expect([...op.querySelectorAll(".ed-screen")].map((e) => e.textContent)).toEqual(["Book a film on screen 1", "Book a film on screen 2"]);
+    expect([...op.querySelectorAll(".ed-screen")].map((e) => e.textContent)).toEqual([
+      "Book a film on screen 1",
+      "Book a film on screen 2",
+    ]);
     // One ticket price for the whole theater.
     expect(op.querySelectorAll('[data-edit="ticketPrice"]')).toHaveLength(1);
     // A closed theater books nothing on either screen and keeps each choice.
@@ -276,7 +309,9 @@ describe("unit editor row and action branches", () => {
   it("modern cinema: names the ticket price it charges, Normal when it has none (#1950)", () => {
     const modern = { mode: "modern" as const };
     const price = (ticketPrice: UnitDetail["ticketPrice"]) =>
-      renderToFragment(unitEditor(unit("cinema", { ticketPrice }, "modern"), modern)).querySelector('[data-edit="ticketPrice"]')!.textContent;
+      renderToFragment(unitEditor(unit("cinema", { ticketPrice }, "modern"), modern)).querySelector(
+        '[data-edit="ticketPrice"]',
+      )!.textContent;
     expect([null, "low", "normal", "high", "premium"].map((p) => price(p as UnitDetail["ticketPrice"]))).toEqual([
       "Ticket price: Normal ▸",
       "Ticket price: Low ▸",
@@ -289,7 +324,8 @@ describe("unit editor row and action branches", () => {
 
   it("classic cinema: shows the film and its days, and offers a new film or a classic at the catalog's prices", () => {
     const economy = catalogFor("classic").economy;
-    const film = (classic: boolean) => renderToFragment(unitEditor(unit("cinema", { filmDays: 4, filmTier: classic ? "classic" : "new" })));
+    const film = (classic: boolean) =>
+      renderToFragment(unitEditor(unit("cinema", { filmDays: 4, filmTier: classic ? "classic" : "new" })));
     const fresh = film(false);
     expect(fresh.querySelector('[data-field="showing"]')!.textContent).toBe("New film");
     expect(fresh.querySelector('[data-field="filmDays"]')!.textContent).toBe("4");
@@ -308,9 +344,10 @@ describe("unit editor row and action branches", () => {
 
 describe("transport editor row and action branches", () => {
   it("standard elevator: a skipped floor reads plainly (never borrowing the express copy)", () => {
-    expect(renderToFragment(transportEditor(transportDetail("elevatorStandard", 4))).querySelector('[data-field="stops"]')!.textContent).toBe(
-      "all floors",
-    );
+    expect(
+      renderToFragment(transportEditor(transportDetail("elevatorStandard", 4))).querySelector('[data-field="stops"]')!
+        .textContent,
+    ).toBe("all floors");
     const skipping = transportDetail("elevatorStandard", 4, { stops: stopRows(1, 4, [3]) });
     const stops = renderToFragment(transportEditor(skipping)).querySelector('[data-field="stops"]')!.textContent!;
     expect(stops).toBe("skips 1 floor");
@@ -339,23 +376,32 @@ describe("transport editor row and action branches", () => {
     // No utilization recorded yet: transportDiagnostics is empty, so the mobile
     // editor renders no empty .ed-diagnostics box (parity with the old empty
     // div's `:empty { display:none }`, now expressed as no box at all).
-    expect(renderToFragment(transportEditor(transportDetail("elevatorStandard", 4), true)).querySelector(".ed-diagnostics")).toBeNull();
+    expect(
+      renderToFragment(transportEditor(transportDetail("elevatorStandard", 4), true)).querySelector(".ed-diagnostics"),
+    ).toBeNull();
   });
 
   it("express elevator surfaces a preserved skipped lobby honestly", () => {
-    expect(renderToFragment(transportEditor(transportDetail("elevatorExpress", 3))).querySelector('[data-field="stops"]')!.textContent).toBe(
-      "lobbies and sky lobbies",
-    );
+    expect(
+      renderToFragment(transportEditor(transportDetail("elevatorExpress", 3))).querySelector('[data-field="stops"]')!
+        .textContent,
+    ).toBe("lobbies and sky lobbies");
     // A legacy/forged save can carry a deliberately skipped lobby; the Stops
     // readout surfaces the count instead of overstating the policy.
-    const frag = renderToFragment(transportEditor(transportDetail("elevatorExpress", 3, { stops: stopRows(1, 3, [1]) })));
+    const frag = renderToFragment(
+      transportEditor(transportDetail("elevatorExpress", 3, { stops: stopRows(1, 3, [1]) })),
+    );
     expect(frag.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and sky lobbies (1 skipped)");
   });
 
   it("express elevator into the basements names them and counts a basement stop turned off", () => {
-    const frag = renderToFragment(transportEditor(transportDetail("elevatorExpress", 3, { bottom: -1, stops: stopRows(-1, 3, [0]) })));
+    const frag = renderToFragment(
+      transportEditor(transportDetail("elevatorExpress", 3, { bottom: -1, stops: stopRows(-1, 3, [0]) })),
+    );
     expect(frag.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and basements (1 skipped)");
-    const all = renderToFragment(transportEditor(transportDetail("elevatorExpress", 3, { bottom: -1, stops: stopRows(-1, 3) })));
+    const all = renderToFragment(
+      transportEditor(transportDetail("elevatorExpress", 3, { bottom: -1, stops: stopRows(-1, 3) })),
+    );
     expect(all.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and basements");
   });
 
@@ -404,7 +450,10 @@ describe("the Classic rung picker row (ux-pricing-split-editor §1)", () => {
     expect(chip).not.toBeNull();
     expect(chip.getAttribute("aria-hidden")).toBe("true"); // color never carries the state alone
     expect(chip.dataset.rung).toBe("2");
-    expect(renderToFragment(unitEditor(unit("office", { rent: 15_000 }))).querySelector<HTMLElement>(".rung-chip")!.dataset.rung).toBe("3");
+    expect(
+      renderToFragment(unitEditor(unit("office", { rent: 15_000 }))).querySelector<HTMLElement>(".rung-chip")!.dataset
+        .rung,
+    ).toBe("3");
     const off = renderToFragment(unitEditor(unit("office", { rent: 15_000, noRate: true })));
     expect(off.querySelector<HTMLElement>(".rung-chip")!.dataset.rung).toBe("none");
     expect(off.querySelector<HTMLSelectElement>("#ed-rung")!.dataset.current).toBe("noRate");
@@ -440,17 +489,23 @@ describe("the editor access row's third state (#370)", () => {
   });
 
   it("served and reachable reads Yes in the good color; unserved reads No", () => {
-    const yes = renderToFragment(unitEditor(unit("office", { served: true, reachable: true }))).querySelector('[data-field="served"]')!;
+    const yes = renderToFragment(unitEditor(unit("office", { served: true, reachable: true }))).querySelector(
+      '[data-field="served"]',
+    )!;
     expect(yes.textContent).toBe("Yes");
     expect(yes.innerHTML).toContain("var(--good)");
-    const no = renderToFragment(unitEditor(unit("office", { served: false, reachable: false }))).querySelector('[data-field="served"]')!;
+    const no = renderToFragment(unitEditor(unit("office", { served: false, reachable: false }))).querySelector(
+      '[data-field="served"]',
+    )!;
     expect(no.textContent).toBe("No");
     expect(no.innerHTML).toContain("var(--bad)");
   });
 
   it("a zero-population service kind keeps plain Yes/No (the reachability line is about passenger trips)", () => {
     // The reachability verdict must be ignored for service kinds.
-    const cell = renderToFragment(unitEditor(unit("security", { served: true, reachable: false }))).querySelector('[data-field="served"]')!;
+    const cell = renderToFragment(unitEditor(unit("security", { served: true, reachable: false }))).querySelector(
+      '[data-field="served"]',
+    )!;
     expect(cell.textContent).toBe("Yes");
   });
 });

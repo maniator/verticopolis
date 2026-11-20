@@ -32,7 +32,12 @@ export function versionName(name: string, at: number): string {
 }
 
 /** Open version `v` of the tower named `name` as a new file, through `openFile`. */
-export async function openVersion(app: Pick<GameApp, "ui">, name: string, v: TowerVersion, openFile: (id: string) => Promise<unknown>): Promise<FileNote | null> {
+export async function openVersion(
+  app: Pick<GameApp, "ui">,
+  name: string,
+  v: TowerVersion,
+  openFile: (id: string) => Promise<unknown>,
+): Promise<FileNote | null> {
   try {
     const bytes = await fileSpace.readVersion(v.key);
     if (!bytes) return { text: "That version is gone. Newer versions may have replaced it.", kind: "bad" };
@@ -48,7 +53,12 @@ export async function openVersion(app: Pick<GameApp, "ui">, name: string, v: Tow
 
 /** Show My Towers file `id`'s Previous Versions window. `back` puts the
  *  window it was opened from back when it closes without opening one. */
-export async function showVersions(app: Pick<GameApp, "ui">, id: string, openFile: (id: string) => Promise<unknown>, back?: () => void): Promise<void> {
+export async function showVersions(
+  app: Pick<GameApp, "ui">,
+  id: string,
+  openFile: (id: string) => Promise<unknown>,
+  back?: () => void,
+): Promise<void> {
   const f = fileSpace.get(id);
   if (!f) return;
   let versions: TowerVersion[] = [];

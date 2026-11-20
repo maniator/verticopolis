@@ -74,7 +74,15 @@ export const OPEN_RECENT_SCENES: Scene[] = [
             localStorage.setItem("verticopolis-linked-folder-link", "screenshot-link");
             localStorage.setItem(
               "vc.recentTowers",
-              JSON.stringify([{ place: "folder", id: "Riverside Plaza.vctower", name: "Riverside Plaza.vctower", kind: "tower", link: "screenshot-link" }]),
+              JSON.stringify([
+                {
+                  place: "folder",
+                  id: "Riverside Plaza.vctower",
+                  name: "Riverside Plaza.vctower",
+                  kind: "tower",
+                  link: "screenshot-link",
+                },
+              ]),
             );
           });
           await page.evaluate(pgSaveAll, ["Weekend Build", "Harbour Point", "Penthouse Plan", "Sky Hotel"]);

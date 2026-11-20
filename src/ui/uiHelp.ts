@@ -121,13 +121,20 @@ interface HelpDialogOpts {
  * starts after, so a render that throws never leaves the tower paused with no
  * dialog to close. Returns the box and its `finish` (close and end the pause).
  */
-function openHelpDialog(ui: UI, result: TemplateResult, opts: HelpDialogOpts = {}): { box: HTMLElement; finish: () => void } {
+function openHelpDialog(
+  ui: UI,
+  result: TemplateResult,
+  opts: HelpDialogOpts = {},
+): { box: HTMLElement; finish: () => void } {
   const pause = helpPause(ui);
   const dialog = ui.el.modal as HTMLDialogElement;
   const replacing = dialog.open;
   let box!: HTMLElement;
   pause.swap(() => {
-    box = ui.openModalTemplate(result, { displaceable: opts.displaceable ?? true, onDisplaced: () => pause.displaced() });
+    box = ui.openModalTemplate(result, {
+      displaceable: opts.displaceable ?? true,
+      onDisplaced: () => pause.displaced(),
+    });
   });
   addStatusLine(box);
   // A dialog that was already open is not shown again, so the browser never
@@ -273,7 +280,13 @@ export function wireHelpBar(ui: UI): void {
     hud: () => {
       const text = (el: HTMLElement) => (el.textContent ?? "").trim();
       const el = barUi!.el;
-      return { date: text(el.date), time: text(el.time), money: text(el.money), population: text(el.pop), stars: text(el.star) };
+      return {
+        date: text(el.date),
+        time: text(el.time),
+        money: text(el.money),
+        population: text(el.pop),
+        stars: text(el.star),
+      };
     },
   });
 }
@@ -310,7 +323,14 @@ export function showAbout(ui: UI): void {
   let finishAbout = () => {};
   const { box, finish } = openHelpDialog(
     ui,
-    aboutTemplate(onSplash, appVersion(), { onReplay: () => replay(ui, finishAbout) }, engineSuffix(), diagnostics, reportHref(ui, onSplash, diagnostics)),
+    aboutTemplate(
+      onSplash,
+      appVersion(),
+      { onReplay: () => replay(ui, finishAbout) },
+      engineSuffix(),
+      diagnostics,
+      reportHref(ui, onSplash, diagnostics),
+    ),
     { actions: { "copy-diagnostics": () => copyDiagnostics(box, diagnostics) } },
   );
   finishAbout = finish;
@@ -337,7 +357,9 @@ function wireReportLink(ui: UI, box: HTMLElement): void {
   link?.addEventListener("click", (e) => {
     if (!navigator.onLine) {
       e.preventDefault();
-      if (status) status.textContent = "Reporting a problem needs an internet connection. Copy diagnostics now and report it once you are back online.";
+      if (status)
+        status.textContent =
+          "Reporting a problem needs an internet connection. Copy diagnostics now and report it once you are back online.";
       return;
     }
     leaveForTab(ui, e);
@@ -354,7 +376,8 @@ function wirePrivacyLink(ui: UI, box: HTMLElement): void {
   link?.addEventListener("click", (e) => {
     if (!navigator.onLine) {
       e.preventDefault();
-      if (status) status.textContent = `The privacy page needs an internet connection. It is at ${HELP_ADDRESS}/privacy.`;
+      if (status)
+        status.textContent = `The privacy page needs an internet connection. It is at ${HELP_ADDRESS}/privacy.`;
       return;
     }
     leaveForTab(ui, e);
@@ -393,7 +416,8 @@ export function showModeHelp(ui: UI, e?: MouseEvent): void {
     showCompare(ui);
     return;
   }
-  if (openPageInTab(ui, "/help/classic-vs-modern/", "mode_badge", () => showCompare(ui), e)) trackAppAction("compare_open");
+  if (openPageInTab(ui, "/help/classic-vs-modern/", "mode_badge", () => showCompare(ui), e))
+    trackAppAction("compare_open");
 }
 
 /** Close the dialog and end the pause, THEN replay, so Getting Started never

@@ -17,7 +17,11 @@ const RULE = MODERN.rules.skyBridge!;
 function palette(mode: "classic" | "modern") {
   const el = document.createElement("div");
   const selectTool = vi.fn();
-  const ui = { el: { palette: el, paletteTabs: null }, selectTool, cb: { getCatalog: () => catalogFor(mode) } } as unknown as UI;
+  const ui = {
+    el: { palette: el, paletteTabs: null },
+    selectTool,
+    cb: { getCatalog: () => catalogFor(mode) },
+  } as unknown as UI;
   buildPalette(ui);
   return { el, selectTool, button: el.querySelector<HTMLElement>('.pal-item[data-tool="skyBridge"]') };
 }

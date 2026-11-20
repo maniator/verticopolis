@@ -13,7 +13,7 @@ export const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
  *  long advice stretch reads as one span, not a two-line comma flood (§11). */
 export function fmtHours(hs: readonly number[]): string {
   const parts: string[] = [];
-  for (let i = 0; i < hs.length; ) {
+  for (let i = 0; i < hs.length;) {
     let j = i;
     while (j + 1 < hs.length && hs[j + 1] === hs[j] + 1) j++;
     parts.push(j > i ? `${hh(hs[i])}–${hh(hs[j])}` : hh(hs[i]));

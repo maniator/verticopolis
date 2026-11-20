@@ -97,7 +97,9 @@ export const PRICING_SCENES: Scene[] = [
             g.refreshEditor();
           });
           await page.waitForTimeout(150);
-          await page.evaluate(() => (document.querySelector('#editor [data-edit="batchKind"]') as HTMLElement | null)?.click());
+          await page.evaluate(() =>
+            (document.querySelector('#editor [data-edit="batchKind"]') as HTMLElement | null)?.click(),
+          );
           // The Modern dialog is the number-band variant. Type a price so the
           // dialog reads in use (custom value + live preview line); the
           // Classic sibling has no number input and instead shows the rung

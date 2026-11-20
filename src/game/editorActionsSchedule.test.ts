@@ -1,13 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
 import { trackAppAction } from "../analytics";
-import {
-  lift,
-  rec,
-  SCHEDULE,
-  setup,
-  type Answers,
-} from "./editorActions.fixture";
+import { lift, rec, SCHEDULE, setup, type Answers } from "./editorActions.fixture";
 
 vi.mock("../analytics", async (importActual) => ({
   ...(await importActual<typeof import("../analytics")>()),
@@ -58,17 +52,14 @@ describe("EditorActions: schedule dialog", () => {
       null,
     );
     s.actions.openSchedule(lift.id);
-    const [ctx, cb] = s.deps.ui.showElevatorScheduleDialog.mock
-      .calls[0] as unknown as [Ctx, Cb];
+    const [ctx, cb] = s.deps.ui.showElevatorScheduleDialog.mock.calls[0] as unknown as [Ctx, Cb];
     return { ...s, ctx, cb };
   }
 
   it("opens for a named shaft with its live facts and the engine's schedule", () => {
     const { ctx, reader, kit } = opened();
     expect(reader.update).toHaveBeenCalledOnce();
-    expect(ctx.title).toBe(
-      `Schedule: Standard Elevator (floors ${lift.bottom}-${lift.top})`,
-    );
+    expect(ctx.title).toBe(`Schedule: Standard Elevator (floors ${lift.bottom}-${lift.top})`);
     expect(ctx).toMatchObject({
       isExpress: false,
       cars: lift.cars,
@@ -91,8 +82,7 @@ describe("EditorActions: schedule dialog", () => {
     const stairs = setup({}, { type: "transport", id: lift.id });
     stairs.cards.shaft.mockReturnValue({ ...lift, kind: "stairs" });
     stairs.actions.openSchedule();
-    for (const s of [none, unit, stairs])
-      expect(s.deps.ui.showElevatorScheduleDialog).not.toHaveBeenCalled();
+    for (const s of [none, unit, stairs]) expect(s.deps.ui.showElevatorScheduleDialog).not.toHaveBeenCalled();
   });
 
   it("each stop edit is its own undo step against the live shaft", async () => {
@@ -103,17 +93,13 @@ describe("EditorActions: schedule dialog", () => {
     expect(port.expressStops).toHaveBeenCalledExactlyOnceWith(lift.id);
     await ctx.stops.allStops();
     expect(port.dropStops).toHaveBeenCalledExactlyOnceWith(lift.id);
-    expect(deps.captureUndo.mock.calls).toEqual([
-      ["Elevator stops"],
-      ["Elevator stops"],
-      ["Elevator stops"],
-    ]);
+    expect(deps.captureUndo.mock.calls).toEqual([["Elevator stops"], ["Elevator stops"], ["Elevator stops"]]);
     expect(deps.commitUndo).toHaveBeenCalledTimes(3);
     expect(cards.forget).toHaveBeenCalledTimes(3);
-    expect(
-      deps.audio.sfx.mock.calls,
-      "the serve toggle is silent, the bulk actions click",
-    ).toEqual([["click"], ["click"]]);
+    expect(deps.audio.sfx.mock.calls, "the serve toggle is silent, the bulk actions click").toEqual([
+      ["click"],
+      ["click"],
+    ]);
   });
 
   it("a stop edit on a shaft that is gone sends nothing", async () => {
@@ -128,22 +114,11 @@ describe("EditorActions: schedule dialog", () => {
     const { ctx, port } = opened();
     const draft = { cars: [] };
     expect(ctx.autoTune(draft, true)).toBe("tuned");
-    expect(port.autoTuneProposal).toHaveBeenCalledExactlyOnceWith(
-      lift.id,
-      scheduleSlots(draft as never),
-      true,
-    );
+    expect(port.autoTuneProposal).toHaveBeenCalledExactlyOnceWith(lift.id, scheduleSlots(draft as never), true);
     expect(ctx.facts(draft, false)).toBe("facts");
-    expect(port.scheduleFacts).toHaveBeenCalledExactlyOnceWith(
-      lift.id,
-      scheduleSlots(draft as never),
-      false,
-    );
+    expect(port.scheduleFacts).toHaveBeenCalledExactlyOnceWith(lift.id, scheduleSlots(draft as never), false);
     expect(ctx.preset("rush")).toBe("preset");
-    expect(port.schedulePreset).toHaveBeenCalledExactlyOnceWith(
-      lift.id,
-      "rush",
-    );
+    expect(port.schedulePreset).toHaveBeenCalledExactlyOnceWith(lift.id, "rush");
   });
 
   it("forwards the dialog's announcements", () => {
@@ -156,17 +131,10 @@ describe("EditorActions: schedule dialog", () => {
     const { cb, port, deps } = opened();
     const schedule = { cars: [] };
     await cb.apply(schedule);
-    expect(port.scheduleShaft).toHaveBeenCalledExactlyOnceWith(
-      lift.id,
-      scheduleSlots(schedule as never),
-    );
-    expect(deps.captureUndo).toHaveBeenCalledExactlyOnceWith(
-      "Set elevator schedule",
-    );
+    expect(port.scheduleShaft).toHaveBeenCalledExactlyOnceWith(lift.id, scheduleSlots(schedule as never));
+    expect(deps.captureUndo).toHaveBeenCalledExactlyOnceWith("Set elevator schedule");
     expect(deps.commitUndo).toHaveBeenCalledOnce();
-    expect(deps.announce).toHaveBeenCalledExactlyOnceWith(
-      "Elevator schedule saved.",
-    );
+    expect(deps.announce).toHaveBeenCalledExactlyOnceWith("Elevator schedule saved.");
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
   });
 
@@ -196,19 +164,13 @@ describe("EditorActions: schedule dialog", () => {
   it("OK on a refused schedule says why; on a shaft that is gone it writes nothing", async () => {
     const refused = opened({ scheduleShaft: () => rec("buildAt", false) });
     await refused.cb.apply({ cars: [] });
-    expect(refused.deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "The engine said no.",
-      "bad",
-    );
+    expect(refused.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("The engine said no.", "bad");
     expect(refused.deps.announce).not.toHaveBeenCalled();
     const gone = opened();
     gone.cards.shaft.mockReturnValue(undefined);
     await gone.cb.apply({ cars: [] });
     expect(gone.port.scheduleShaft).not.toHaveBeenCalled();
-    expect(gone.deps.ui.toast).toHaveBeenCalledExactlyOnceWith(
-      "That elevator is gone.",
-      "bad",
-    );
+    expect(gone.deps.ui.toast).toHaveBeenCalledExactlyOnceWith("That elevator is gone.", "bad");
   });
 });
 
@@ -217,15 +179,10 @@ describe("EditorActions: extend drag", () => {
 
   /** A drag whose steps answer `steps`, each with the `lastReason` at the
    *  same index (none when it is missing). */
-  function dragging(
-    steps: Float64Array[],
-    generation = 3,
-    reasons: (string | undefined)[] = [],
-  ) {
+  function dragging(steps: Float64Array[], generation = 3, reasons: (string | undefined)[] = []) {
     const extendShaft = vi.fn();
     for (const s of steps) extendShaft.mockReturnValueOnce(s);
-    const lastReason = () =>
-      reasons[extendShaft.mock.calls.length - 1] ?? undefined;
+    const lastReason = () => reasons[extendShaft.mock.calls.length - 1] ?? undefined;
     return setup(
       {
         generation: () => generation,
@@ -248,22 +205,11 @@ describe("EditorActions: extend drag", () => {
     expect(port.startExtend).toHaveBeenCalledExactlyOnceWith(lift.id);
     expect(deps.captureUndo).toHaveBeenCalledExactlyOnceWith("Extend");
     expect(port.extendShaft).toHaveBeenNthCalledWith(2, lift.id, true, 5);
-    expect(
-      deps.audio.sfx.mock.calls,
-      "a grown floor builds; a shrink clicks",
-    ).toEqual([["build"], ["click"]]);
-    expect(
-      cards.shaft,
-      "the drag reads the card once, at its start",
-    ).toHaveBeenCalledOnce();
-    expect(actions.endExtend(), "the release closes the drag's gesture").toBe(
-      true,
-    );
+    expect(deps.audio.sfx.mock.calls, "a grown floor builds; a shrink clicks").toEqual([["build"], ["click"]]);
+    expect(cards.shaft, "the drag reads the card once, at its start").toHaveBeenCalledOnce();
+    expect(actions.endExtend(), "the release closes the drag's gesture").toBe(true);
     expect(port.stopExtend).toHaveBeenCalledOnce();
-    expect(
-      deps.ui.toast,
-      "a drag that went where aimed says nothing",
-    ).not.toHaveBeenCalled();
+    expect(deps.ui.toast, "a drag that went where aimed says nothing").not.toHaveBeenCalled();
   });
 
   it("a step that moved nothing or was refused is silent while the drag moves", () => {
@@ -280,10 +226,7 @@ describe("EditorActions: extend drag", () => {
   it("the release says once why the drag stopped short of a lobby (#1847)", () => {
     const why = "Build the lobby on floor 1 first, then extend through it.";
     const { actions, deps } = dragging(
-      [
-        rec("extendShaft", true, { bottom: -5, top: 0, added: 3 }),
-        rec("extendShaft", false, { bottom: -5, top: 0 }),
-      ],
+      [rec("extendShaft", true, { bottom: -5, top: 0, added: 3 }), rec("extendShaft", false, { bottom: -5, top: 0 })],
       3,
       [why, why],
     );
@@ -298,10 +241,7 @@ describe("EditorActions: extend drag", () => {
 
   it("a later step that went where it was aimed drops the held reason", () => {
     const { actions, deps } = dragging(
-      [
-        rec("extendShaft", false, { bottom: 1, top: 5 }),
-        rec("extendShaft", true, { bottom: 1, top: 4 }),
-      ],
+      [rec("extendShaft", false, { bottom: 1, top: 5 }), rec("extendShaft", true, { bottom: 1, top: 4 })],
       3,
       ["Transport shafts cannot overlap."],
     );
@@ -336,8 +276,7 @@ describe("EditorActions: extend drag", () => {
         generation: () => generation,
         startExtend: () => rec("buildAt", true),
         stopExtend: () => rec("buildAt", true),
-        extendShaft: () =>
-          rec("extendShaft", true, { bottom: 1, top: 6, added: 1 }),
+        extendShaft: () => rec("extendShaft", true, { bottom: 1, top: 6, added: 1 }),
       },
       onLift,
     );
@@ -346,10 +285,7 @@ describe("EditorActions: extend drag", () => {
     s.actions.extendSelectedTo("up", 7);
     expect(s.port.extendShaft).toHaveBeenCalledOnce();
     expect(s.actions.endExtend()).toBe(false);
-    expect(
-      s.actions.endExtend(),
-      "with no drag held the release just closes",
-    ).toBe(true);
+    expect(s.actions.endExtend(), "with no drag held the release just closes").toBe(true);
   });
 
   it("does not drag a unit, a stairway, or nothing", () => {
@@ -358,7 +294,6 @@ describe("EditorActions: extend drag", () => {
     const stairs = setup({ generation: () => 3 }, onLift);
     stairs.cards.shaft.mockReturnValue({ ...lift, kind: "stairs" });
     stairs.actions.extendSelectedTo("up", 6);
-    for (const s of [unit, stairs])
-      expect(s.deps.captureUndo).not.toHaveBeenCalled();
+    for (const s of [unit, stairs]) expect(s.deps.captureUndo).not.toHaveBeenCalled();
   });
 });

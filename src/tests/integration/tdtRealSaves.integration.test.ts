@@ -112,16 +112,18 @@ describeWithCodec("real 1997 saves keep their shop, restaurant and fast-food sty
   }
 });
 
-
 describeWithCodec("imported TDT basement express stop persistence", () => {
   it("marks real TDT basement express stops and keeps them on ordinary .vctower reload", () => {
     const source = load("TOWER7.TDT").save;
     const fromGame = imported("TOWER7.TDT");
-    const shafts = source.transports.filter((t) => t.kind === "elevatorExpress" && t.bottom < 0 && Array.isArray(t.skipFloors));
+    const shafts = source.transports.filter(
+      (t) => t.kind === "elevatorExpress" && t.bottom < 0 && Array.isArray(t.skipFloors),
+    );
     expect(shafts.length).toBeGreaterThan(0);
     for (const fromFile of shafts) {
-      const actual = fromGame.transports.find((t) =>
-        t.kind === fromFile.kind && t.x === fromFile.x && t.bottom === fromFile.bottom && t.top === fromFile.top);
+      const actual = fromGame.transports.find(
+        (t) => t.kind === fromFile.kind && t.x === fromFile.x && t.bottom === fromFile.bottom && t.top === fromFile.top,
+      );
       expect(actual?.preserveBasementStops).toBe(true);
       for (let floor = fromFile.bottom + 1; floor <= 0; floor++) {
         expect(actual?.skipFloors?.includes(floor)).toBe(fromFile.skipFloors!.includes(floor));
@@ -137,8 +139,7 @@ describeWithCodec("imported TDT basement express stop persistence", () => {
 
   it("preserves zero/mixed skips twice, and an older save loads with its basement stops on", () => {
     const source = load("TOWER7.TDT").save;
-    const index = source.transports.findIndex((t) =>
-      t.kind === "elevatorExpress" && t.bottom <= -2 && t.top > 4);
+    const index = source.transports.findIndex((t) => t.kind === "elevatorExpress" && t.bottom <= -2 && t.top > 4);
     expect(index).toBeGreaterThanOrEqual(0);
     const original = source.transports[index];
     const baseline = original.bottom + 1;

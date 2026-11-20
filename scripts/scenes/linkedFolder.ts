@@ -24,9 +24,7 @@ async function pgStageFolder(canLink: boolean): Promise<void> {
   await w.game.saveFile("Harbour Point");
   await w.game.saveFile("Sky Hotel");
   const root = await navigator.storage.getDirectory();
-  await root
-    .removeEntry("Verticopolis Towers", { recursive: true })
-    .catch(() => {});
+  await root.removeEntry("Verticopolis Towers", { recursive: true }).catch(() => {});
   const folder = await root.getDirectoryHandle("Verticopolis Towers", {
     create: true,
   });
@@ -39,9 +37,7 @@ async function pgStageFolder(canLink: boolean): Promise<void> {
   ];
   const age = new Map(files.map(([name, , minutes]) => [name, minutes]));
   for (const [name, size] of files) {
-    const out = await (
-      await folder.getFileHandle(name, { create: true })
-    ).createWritable();
+    const out = await (await folder.getFileHandle(name, { create: true })).createWritable();
     await out.write(new Uint8Array(size));
     await out.close();
   }
@@ -76,25 +72,19 @@ function pgNeedOkAgain(): void {
 }
 
 async function closeWindow(page: Page): Promise<void> {
-  await page.evaluate(() =>
-    (window as unknown as { game: any }).game.ui.closeModal?.(),
-  );
+  await page.evaluate(() => (window as unknown as { game: any }).game.ui.closeModal?.());
 }
 
 /** Open File > Open… (`open`) or File > Save As… (`saveAs`) from the menu. */
 async function openWindow(page: Page, which: "open" | "saveAs"): Promise<void> {
   await closeWindow(page);
-  await page.evaluate(
-    (id) => document.getElementById(id)?.click(),
-    which === "open" ? "mb-import" : "mb-export",
-  );
+  await page.evaluate((id) => document.getElementById(id)?.click(), which === "open" ? "mb-import" : "mb-export");
   await page.waitForSelector("#modal .fd", { timeout: 4000 });
 }
 
 async function lookMenu(page: Page): Promise<void> {
   // The menu may still be open from the shot before.
-  if ((await page.locator("#modal .fd-look-pop").count()) === 0)
-    await page.locator("#modal .fd-look").click();
+  if ((await page.locator("#modal .fd-look-pop").count()) === 0) await page.locator("#modal .fd-look").click();
   await page.waitForSelector("#modal .fd-look-pop", { timeout: 2000 });
 }
 
@@ -149,9 +139,7 @@ export const LINKED_FOLDER_SCENES: Scene[] = [
         name: "linked-folder-open",
         setup: async (page) => {
           await openWindow(page, "open");
-          await page
-            .locator("#modal .fd-row", { hasText: "Penthouse Plan" })
-            .click();
+          await page.locator("#modal .fd-row", { hasText: "Penthouse Plan" }).click();
         },
       }),
       still({
@@ -159,9 +147,7 @@ export const LINKED_FOLDER_SCENES: Scene[] = [
         name: "linked-folder-row-menu",
         setup: async (page) => {
           await openWindow(page, "open");
-          await page
-            .locator("#modal .fd-row", { hasText: "Riverside Plaza" })
-            .click({ button: "right" });
+          await page.locator("#modal .fd-row", { hasText: "Riverside Plaza" }).click({ button: "right" });
           await page.waitForSelector("#modal .fd-menu", { timeout: 2000 });
         },
       }),
@@ -224,9 +210,7 @@ export const LINKED_FOLDER_SCENES: Scene[] = [
           name: "linked-folder-open-mobile",
           setup: async (page) => {
             await linkFolder(page);
-            await page
-              .locator("#modal .fd-row", { hasText: "Penthouse Plan" })
-              .click();
+            await page.locator("#modal .fd-row", { hasText: "Penthouse Plan" }).click();
           },
         },
         false,

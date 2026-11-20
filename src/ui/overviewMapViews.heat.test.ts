@@ -20,7 +20,10 @@ const cell = (floor: number, severity: number): HeatCellView => ({ floor, minX: 
 function onView(view: MapViewId) {
   const clock = { minutes: 7 * 60, gesture: 0 };
   const engine = {
-    cells: { congestion: [cell(1, 0), cell(2, 0.5), cell(3, 0.9)], occupancy: [cell(2, 0)] } as Record<string, HeatCellView[]>,
+    cells: { congestion: [cell(1, 0), cell(2, 0.5), cell(3, 0.9)], occupancy: [cell(2, 0)] } as Record<
+      string,
+      HeatCellView[]
+    >,
     tower: 1,
     meal: 1,
   };
@@ -48,7 +51,8 @@ function fakeCtx(): MapPaintContext & { fills: number[] } {
   return { fills, fillStyle: "", fillRect: () => fills.push(1), clearRect: () => {} };
 }
 const plain: PatternSource = { get: (fill) => fill };
-const legendOf = (view: MapViewId) => document.querySelector(`.overview-map-legend[data-view="${view}"]`) as HTMLElement;
+const legendOf = (view: MapViewId) =>
+  document.querySelector(`.overview-map-legend[data-view="${view}"]`) as HTMLElement;
 
 afterEach(() => disposeRigs());
 

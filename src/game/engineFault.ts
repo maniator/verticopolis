@@ -16,7 +16,10 @@ export type TrapDuring = "tick" | "save" | "census";
 
 /** The reliability code for a trap in each place (`fallback_reason`), so a
  *  trap in the save writer or the census is not counted as a tick's. */
-export const TRAP_REASON = { tick: "trap-tick", save: "trap-save", census: "trap-census" } as const satisfies Record<TrapDuring, FallbackReason>;
+export const TRAP_REASON = { tick: "trap-tick", save: "trap-save", census: "trap-census" } as const satisfies Record<
+  TrapDuring,
+  FallbackReason
+>;
 
 let onTrap: ((error: unknown, during: TrapDuring) => void) | null = null;
 let trapped = false;

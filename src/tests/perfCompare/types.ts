@@ -49,7 +49,19 @@ export interface StepSummary {
   stepMaxMs: number;
   /** From a separate wrapped pass (hosted WASM only); the timings above
    *  come from an unwrapped pass. */
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number; byExport: Record<string, { calls: number; ms: number }>; parseMs: number; parseCalls: number } | null;
+  attribution: {
+    engineTickMs: number;
+    engineExportMs: number;
+    hostJsMs: number;
+    wrappedTotalMs: number;
+    merges: number;
+    engineTicks: number;
+    exportCalls: number;
+    exportsWrapped: number;
+    byExport: Record<string, { calls: number; ms: number }>;
+    parseMs: number;
+    parseCalls: number;
+  } | null;
   engineActive: EngineName;
   hostErrorsAdded: string[];
   /** The loop began from a full GC (gc() was there). */
@@ -177,7 +189,13 @@ export interface ProcessRun {
   /** Uncaught page errors and console errors, kept for the record. */
   pageErrors: string[];
   browserVersion: string | null;
-  page: { crossOriginIsolated: boolean; timerResolutionMs: number; userAgent: string; viewport: { width: number; height: number; dpr: number }; webgl: { renderer: string; vendor: string } | null } | null;
+  page: {
+    crossOriginIsolated: boolean;
+    timerResolutionMs: number;
+    userAgent: string;
+    viewport: { width: number; height: number; dpr: number };
+    webgl: { renderer: string; vendor: string } | null;
+  } | null;
   /** The WebGL renderer read again from a new context once the frames were done. A GPU process that died in between shows as a different string or none (validate.ts). Absent in results written before this check. */
   rendererEnd?: string | null;
   /** The same read after the throttled cold start, kept apart so it cannot hide a change after the frames; absent for a run without a cold start. */
@@ -258,7 +276,18 @@ export interface Comparison {
   ratio: number;
   ciLow: number | null;
   ciHigh: number | null;
-  verdict: "wasm faster" | "wasm slower" | "wasm smaller" | "wasm larger" | "wasm lower" | "wasm higher" | "wasm fewer" | "wasm more" | "equivalent" | "inconclusive" | "A/A";
+  verdict:
+    | "wasm faster"
+    | "wasm slower"
+    | "wasm smaller"
+    | "wasm larger"
+    | "wasm lower"
+    | "wasm higher"
+    | "wasm fewer"
+    | "wasm more"
+    | "equivalent"
+    | "inconclusive"
+    | "A/A";
   n: { ts: number; wasm: number; pairs: number };
 }
 
@@ -276,8 +305,26 @@ export interface CompareResults {
   environment: Environment;
   /** The pinned pre-cutover build the TypeScript arm ran (baseline.ts), or null for an A/A pass of WASM. Absent in results written before the pin. */
   tsBaseline?: { commit: string; appVersion: string } | null;
-  browser: { version: string | null; headless: boolean; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; rendererExceptionCommit?: string | null; gpuVerified?: boolean };
-  scenarios: { name: string; description: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
+  browser: {
+    version: string | null;
+    headless: boolean;
+    executable: string | null;
+    channel?: string | null;
+    args?: string[];
+    rendererException?: string | null;
+    rendererExceptionSha256?: string | null;
+    rendererExceptionCommit?: string | null;
+    gpuVerified?: boolean;
+  };
+  scenarios: {
+    name: string;
+    description: string;
+    sha256: string;
+    population: number;
+    units: number;
+    transports: number;
+    saveBytes: number;
+  }[];
   nodeChecks: NodeCheck[];
   /** Hourly save churn on the WASM engine in Node, per scenario. */
   churn?: ChurnReport[];

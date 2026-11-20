@@ -64,7 +64,11 @@ describe("the Tools window's fold button", () => {
 
   it("starts folded when the player last folded it", () => {
     const win = toolsWindow();
-    const button = wirePaletteCollapse(win, memoryStore({ [PALETTE_COLLAPSED_STORAGE_KEY]: PALETTE_COLLAPSED_VALUE.collapsed }), () => {})!;
+    const button = wirePaletteCollapse(
+      win,
+      memoryStore({ [PALETTE_COLLAPSED_STORAGE_KEY]: PALETTE_COLLAPSED_VALUE.collapsed }),
+      () => {},
+    )!;
     expect(folded(win)).toBe(true);
     expect(button.getAttribute("aria-expanded")).toBe("false");
   });
@@ -72,13 +76,22 @@ describe("the Tools window's fold button", () => {
   it("reads storage that throws, holds something else, or is missing as open", () => {
     expect(storedPaletteCollapsed(null)).toBe(false);
     expect(storedPaletteCollapsed(memoryStore({ [PALETTE_COLLAPSED_STORAGE_KEY]: "yes" }))).toBe(false);
-    const throwing = { getItem: () => { throw new Error("blocked"); } };
+    const throwing = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+    };
     expect(storedPaletteCollapsed(throwing)).toBe(false);
   });
 
   it("still folds when a write throws", () => {
     const win = toolsWindow();
-    const store = { getItem: () => null, setItem: () => { throw new Error("quota"); } };
+    const store = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
     const button = wirePaletteCollapse(win, store, () => {})!;
     button.click();
     expect(folded(win)).toBe(true);
@@ -94,7 +107,10 @@ describe("the Tools window's fold button", () => {
 describe("openFoldedPaletteAround", () => {
   /** A page whose viewport is (`desktop`) or is not on the desktop layout. */
   const viewport = (desktop: boolean) =>
-    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({ matches: query === PALETTE_FIT_MQ && desktop })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({ matches: query === PALETTE_FIT_MQ && desktop })),
+    );
 
   afterEach(() => {
     vi.unstubAllGlobals();

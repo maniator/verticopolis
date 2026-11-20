@@ -164,7 +164,7 @@ describe("preserve mode, every combination", () => {
     // a character as U+FFFD. A preserved value only reaches the encoding branch
     // when it is NOT VCZ1-prefixed, which for the unreadable backup is exactly
     // the arbitrary-bytes case the mode exists for.
-    const raw = 'garbage\uD800bytes';
+    const raw = "garbage\uD800bytes";
     expect(toTowerFile(raw, true)).toEqual({ ok: false, reason: "unreadable" });
     expect(toTowerFile(raw, false)).toEqual({ ok: false, reason: "unreadable" });
   });

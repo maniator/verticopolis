@@ -26,7 +26,9 @@
 export function pgClearTransients(keepDialogs: boolean): void {
   document.getElementById("toast-wrap")?.replaceChildren();
   if (!keepDialogs) {
-    document.querySelectorAll<HTMLElement>("#modal [data-act='close'], #modal [data-act='decline']").forEach((b) => b.click());
+    document
+      .querySelectorAll<HTMLElement>("#modal [data-act='close'], #modal [data-act='decline']")
+      .forEach((b) => b.click());
     document.querySelectorAll("dialog[open]").forEach((d) => (d as HTMLDialogElement).close?.());
     document.querySelector(".modal-backdrop")?.remove();
   }
@@ -49,7 +51,8 @@ export function pgMaskVersion(): void {
     // masked with the version, so the engine leg of the drift check compares
     // the game's pixels and an engine change does not churn them.
     for (const n of el.parentElement?.childNodes ?? []) {
-      if (n.nodeType === Node.TEXT_NODE && / · (Rust|TypeScript) engine/.test(n.textContent ?? "")) n.textContent = n.textContent!.replace(/ · (Rust|TypeScript) engine.*$/, "");
+      if (n.nodeType === Node.TEXT_NODE && / · (Rust|TypeScript) engine/.test(n.textContent ?? ""))
+        n.textContent = n.textContent!.replace(/ · (Rust|TypeScript) engine.*$/, "");
     }
   });
   // About this game's engine diagnostics carry the capture time, the commit,
@@ -306,7 +309,9 @@ export function pgDismissSplash(): void {
     /* ignore */
   }
   const w = window as unknown as { game?: any };
-  document.querySelector("#splash [data-splash='continue'], #splash [data-splash='new']")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  document
+    .querySelector("#splash [data-splash='continue'], #splash [data-splash='new']")
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   // Remove only the first-run chrome; every other app element stays.
   for (const id of ["splash", "onboard"]) document.getElementById(id)?.remove();
   document.querySelectorAll("dialog[open]").forEach((d) => (d as HTMLDialogElement).close?.());
@@ -322,7 +327,7 @@ export function pgDismissSplash(): void {
  *  to advance so rooms sit flush without overlap regardless of the width table. */
 export function pgFillRow(kind: string, floor: number, x0: number, x1: number, state: string): void {
   const s = (window as unknown as { game: any }).game.sim;
-  for (let x = x0; x + 1 <= x1; ) {
+  for (let x = x0; x + 1 <= x1;) {
     const r = s.tower.place(kind, floor, x);
     if (r.ok) {
       const u = s.tower.getUnit(r.unitId);

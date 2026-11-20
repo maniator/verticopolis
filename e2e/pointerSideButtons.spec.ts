@@ -57,12 +57,26 @@ class Mouse {
 
   /** Press `button` while the buttons in `held` (a `buttons` mask) are down. */
   press(button: MouseButton, held: number): Promise<unknown> {
-    return this.cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: this.x, y: this.y, button, buttons: held, clickCount: 1 });
+    return this.cdp.send("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x: this.x,
+      y: this.y,
+      button,
+      buttons: held,
+      clickCount: 1,
+    });
   }
 
   /** Release `button`, leaving the buttons in `held` down. */
   release(button: MouseButton, held: number): Promise<unknown> {
-    return this.cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: this.x, y: this.y, button, buttons: held, clickCount: 1 });
+    return this.cdp.send("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x: this.x,
+      y: this.y,
+      button,
+      buttons: held,
+      clickCount: 1,
+    });
   }
 
   /** Move to (x, y) in a few steps with the buttons in `held` down. */

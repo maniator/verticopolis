@@ -33,7 +33,10 @@ test.afterEach(() => {
 
 const repairButton = (page: Page) => page.locator('#engine-failure [data-act="repair-engine"]');
 const status = (page: Page) => page.locator("#engine-failure .engine-failure-repair-status");
-const refused = (page: Page) => page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, { timeout: 60_000 });
+const refused = (page: Page) =>
+  page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, {
+    timeout: 60_000,
+  });
 const bootFailure = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null);
 
 /** The first build installed and controlling this page, on the engine. */
@@ -82,7 +85,9 @@ test("a repair leaves a save that was made online, and the repaired engine loads
 
     const loaded = await page.evaluate(async (id) => {
       await (window as any).game.openFile(id);
-      return (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === 160);
+      return (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some(
+        (u) => u.kind === "lobby" && u.x === 160,
+      );
     }, built.id);
     expect(loaded, "the save made before the repair loads on the repaired engine").toBe(true);
     expect(await lobbyAt(page, 160)).toBe(true);
@@ -91,7 +96,9 @@ test("a repair leaves a save that was made online, and the repaired engine loads
   }
 });
 
-test("with the engine network cut at the server, a repair changes nothing and the next repair works", async ({ browser }) => {
+test("with the engine network cut at the server, a repair changes nothing and the next repair works", async ({
+  browser,
+}) => {
   const context = await newContext(browser, deployments);
   try {
     const page = await context.newPage();
@@ -121,7 +128,9 @@ test("with the engine network cut at the server, a repair changes nothing and th
   }
 });
 
-test("a stop screen takes a waiting build at once, and the damaged entry leaves with the old keys", async ({ browser }) => {
+test("a stop screen takes a waiting build at once, and the damaged entry leaves with the old keys", async ({
+  browser,
+}) => {
   // A page stopped on a damaged engine has no tower to save, so it activates a
   // waiting build as soon as one is there (bootstrap.ts, registerPWA with an
   // activate-at-once handler). That is the way out of a package no Repair can
@@ -164,7 +173,9 @@ test("a stop screen takes a waiting build at once, and the damaged entry leaves 
       await page.reload();
       await hostedGame(page);
       expect(await bootFailure(page), "no fallback on the offline start").toBeNull();
-      const record = await page.evaluate(async () => (await (await fetch("/engine/BUILD.json", { cache: "no-store" })).json()).package as string);
+      const record = await page.evaluate(
+        async () => (await (await fetch("/engine/BUILD.json", { cache: "no-store" })).json()).package as string,
+      );
       expect(record).toBe(deployments.packageId.B);
       await expectEngineIs(deployments, page, "B");
     });

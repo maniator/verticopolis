@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { wireEngine } from "./engineWiring";
 import { code, record } from "../tests/portKit/mockPort";
-import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
+import {
+  placeSimpleBuild,
+  isTransportTool,
+  isPaintTool,
+  updateBuildPreview,
+  touchBuildLiftFloors,
+} from "./buildPreview";
 import { runFrame } from "./frameLoop";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 import { flush, makeApp } from "./engineWiring.fixture";
@@ -279,8 +285,11 @@ describe("secondary + extend", () => {
   });
 
   it("onExtendEnd leaves the open gesture alone when something ended the drag first", () => {
-    const app = makeApp(); wireEngine(app); vi.mocked(app.editor.endExtend).mockReturnValue(false);
-    app.engine.onExtendEnd!(); expect(app.commitUndo).not.toHaveBeenCalled();
+    const app = makeApp();
+    wireEngine(app);
+    vi.mocked(app.editor.endExtend).mockReturnValue(false);
+    app.engine.onExtendEnd!();
+    expect(app.commitUndo).not.toHaveBeenCalled();
   });
 });
 describe("onUpdate", () => {

@@ -25,10 +25,18 @@ const compat = (over: Partial<CompatRecord> = {}): CompatRecord => ({
   identitySchema: 1,
   ...over,
 });
-const facts = (label: string, appVersion: string, over: Partial<CompatRecord> = {}): BuildFacts => ({ label, appVersion, compat: compat(over) });
+const facts = (label: string, appVersion: string, over: Partial<CompatRecord> = {}): BuildFacts => ({
+  label,
+  appVersion,
+  compat: compat(over),
+});
 
 /** An engine double: loads JSON, optionally rewrites it on the way out, and counts the minutes played. */
-function fakePackage(label: string, rewrite: (save: Record<string, unknown>) => Record<string, unknown> = (s) => s, refuse?: string): EnginePackage {
+function fakePackage(
+  label: string,
+  rewrite: (save: Record<string, unknown>) => Record<string, unknown> = (s) => s,
+  refuse?: string,
+): EnginePackage {
   return {
     label,
     fromSave(text: string): EngineHandle {
@@ -46,9 +54,19 @@ function fakePackage(label: string, rewrite: (save: Record<string, unknown>) => 
 }
 
 /** The final step of a case. */
-const last = <T,>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
+const last = <T>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 
-const TOWER = JSON.stringify({ version: 7, minutes: 100, money: 5000, towerName: "Test", units: [{ id: 1, kind: "office", x: 3 }, { id: 2, kind: "condo", x: 9, rent: 120 }], extra: { booked: [4, 5] } });
+const TOWER = JSON.stringify({
+  version: 7,
+  minutes: 100,
+  money: 5000,
+  towerName: "Test",
+  units: [
+    { id: 1, kind: "office", x: 3 },
+    { id: 2, kind: "condo", x: 9, rent: 120 },
+  ],
+  extra: { booked: [4, 5] },
+});
 
 describe("diffSaves", () => {
   it("finds nothing between equal saves, ignoring key order", () => {
@@ -56,7 +74,14 @@ describe("diffSaves", () => {
   });
 
   it("names dropped, added and changed paths with indices folded", () => {
-    const before = { money: 1, units: [{ id: 1, rent: 5 }, { id: 2, rent: 6 }], booked: [1] };
+    const before = {
+      money: 1,
+      units: [
+        { id: 1, rent: 5 },
+        { id: 2, rent: 6 },
+      ],
+      booked: [1],
+    };
     const after = { money: 2, units: [{ id: 1 }, { id: 2 }], fresh: true };
     const found = diffSaves(before, after);
     const by = (kind: string, path: string) => found.find((e) => e.kind === kind && e.path === path);
@@ -67,7 +92,9 @@ describe("diffSaves", () => {
   });
 
   it("reports a list of another length once, at the list's path", () => {
-    expect(diffSaves({ units: [1, 2, 3] }, { units: [1, 2] })).toEqual([{ kind: "changed", path: "units[] length", count: 1, example: "units: 3 -> 2", removed: 1 }]);
+    expect(diffSaves({ units: [1, 2, 3] }, { units: [1, 2] })).toEqual([
+      { kind: "changed", path: "units[] length", count: 1, example: "units: 3 -> 2", removed: 1 },
+    ]);
   });
 
   it("treats a type change as a change", () => {
@@ -83,7 +110,9 @@ describe("diffSaves", () => {
 });
 
 describe("judgeDiffs", () => {
-  const allowed: AllowedLoss[] = [{ id: "EX-1", kind: "dropped", path: "extra.booked", reason: "an older build ignores the list" }];
+  const allowed: AllowedLoss[] = [
+    { id: "EX-1", kind: "dropped", path: "extra.booked", reason: "an older build ignores the list" },
+  ];
 
   it("accepts only the named kind and path, and never fails on an addition", () => {
     const entries = diffSaves({ extra: { booked: [1] }, money: 1 }, { extra: {}, money: 2, more: 1 });
@@ -131,8 +160,13 @@ describe("preflight", () => {
   });
 
   it("fails swapped arguments and notes a differing layout", () => {
-    expect(fails(facts("prev", "3.0.0"), facts("cand", "2.77.4", { crateVersion: "1.4.0" })).map((f) => f.message)[0]).toMatch(/may be swapped/);
-    const notes = preflight(facts("prev", "2.77.4", { crateVersion: "1.5.1", catalogVersion: 4 }), facts("cand", "2.78.0")).map((f) => f.message);
+    expect(
+      fails(facts("prev", "3.0.0"), facts("cand", "2.77.4", { crateVersion: "1.4.0" })).map((f) => f.message)[0],
+    ).toMatch(/may be swapped/);
+    const notes = preflight(
+      facts("prev", "2.77.4", { crateVersion: "1.5.1", catalogVersion: 4 }),
+      facts("cand", "2.78.0"),
+    ).map((f) => f.message);
     expect(notes.some((m) => /catalog version differs/.test(m))).toBe(true);
   });
 });
@@ -143,20 +177,33 @@ describe("rehearseCase", () => {
   it("passes when the previous build keeps every field", () => {
     const r = rehearseCase("tower", TOWER, fakePackage("prev"), fakePackage("cand"), opts);
     expect(r.ok).toBe(true);
-    expect(r.steps.map((s) => s.step)).toEqual(["candidate-read", "previous-load", "previous-read", "previous-play", "roll-forward"]);
+    expect(r.steps.map((s) => s.step)).toEqual([
+      "candidate-read",
+      "previous-load",
+      "previous-read",
+      "previous-play",
+      "roll-forward",
+    ]);
   });
 
   it("fails on a field the previous build drops, and passes once the loss is accepted", () => {
     const dropsBooked = fakePackage("prev", (s) => ({ ...s, extra: {} }));
     const bad = rehearseCase("tower", TOWER, dropsBooked, fakePackage("cand"), opts);
     expect(bad.ok).toBe(false);
-    expect(bad.steps.find((s) => s.step === "previous-read")?.judgement?.unexplained[0]).toMatchObject({ kind: "dropped", path: "extra.booked" });
+    expect(bad.steps.find((s) => s.step === "previous-read")?.judgement?.unexplained[0]).toMatchObject({
+      kind: "dropped",
+      path: "extra.booked",
+    });
 
     const allowed: AllowedLoss[] = [{ id: "EX-9", kind: "dropped", path: "extra.booked", reason: "test" }];
     const good = rehearseCase("tower", TOWER, dropsBooked, fakePackage("cand"), { hours: 1, allowed });
     expect(good.ok).toBe(true);
     expect(staleAllowances(allowed, [good])).toEqual([]);
-    expect(staleAllowances(allowed, [rehearseCase("tower", TOWER, fakePackage("prev"), fakePackage("cand"), { hours: 1, allowed })])).toEqual(allowed);
+    expect(
+      staleAllowances(allowed, [
+        rehearseCase("tower", TOWER, fakePackage("prev"), fakePackage("cand"), { hours: 1, allowed }),
+      ]),
+    ).toEqual(allowed);
   });
 
   it("fails on a value the previous build changes while only reading", () => {
@@ -174,9 +221,19 @@ describe("rehearseCase", () => {
   });
 
   it("fails when the previous build refuses the save", () => {
-    const r = rehearseCase("tower", TOWER, fakePackage("prev", undefined, "version 9 is unknown"), fakePackage("cand"), opts);
+    const r = rehearseCase(
+      "tower",
+      TOWER,
+      fakePackage("prev", undefined, "version 9 is unknown"),
+      fakePackage("cand"),
+      opts,
+    );
     expect(r.ok).toBe(false);
-    expect(last(r.steps)).toEqual({ step: "previous-load", ok: false, error: "prev refused the save: version 9 is unknown" });
+    expect(last(r.steps)).toEqual({
+      step: "previous-load",
+      ok: false,
+      error: "prev refused the save: version 9 is unknown",
+    });
   });
 
   it("fails when the previous build traps while playing", () => {
@@ -192,7 +249,11 @@ describe("rehearseCase", () => {
     };
     const r = rehearseCase("tower", TOWER, traps, fakePackage("cand"), opts);
     expect(r.ok).toBe(false);
-    expect(last(r.steps)).toMatchObject({ step: "previous-play", ok: false, error: "prev failed while playing: unreachable" });
+    expect(last(r.steps)).toMatchObject({
+      step: "previous-play",
+      ok: false,
+      error: "prev failed while playing: unreachable",
+    });
   });
 
   it("fails the case, not the run, when serialize traps", () => {
@@ -208,7 +269,11 @@ describe("rehearseCase", () => {
     };
     const r = rehearseCase("tower", TOWER, traps, fakePackage("cand"), opts);
     expect(r.ok).toBe(false);
-    expect(last(r.steps)).toMatchObject({ step: "previous-read", ok: false, error: "prev failed while serializing: memory access out of bounds" });
+    expect(last(r.steps)).toMatchObject({
+      step: "previous-read",
+      ok: false,
+      error: "prev failed while serializing: memory access out of bounds",
+    });
   });
 
   it("fails when the candidate cannot read what the previous build wrote", () => {
@@ -226,7 +291,13 @@ describe("rehearseCase", () => {
   });
 
   it("fails when the candidate drops a field the previous build wrote", () => {
-    const r = rehearseCase("tower", TOWER, fakePackage("prev"), fakePackage("cand", (s) => ({ ...s, towerName: undefined })), opts);
+    const r = rehearseCase(
+      "tower",
+      TOWER,
+      fakePackage("prev"),
+      fakePackage("cand", (s) => ({ ...s, towerName: undefined })),
+      opts,
+    );
     expect(last(r.steps)?.judgement?.unexplained[0]).toMatchObject({ kind: "dropped", path: "towerName" });
   });
 
@@ -279,7 +350,9 @@ describe("buildReport and renderReport", () => {
     const allowed: AllowedLoss[] = [{ id: "EX-9", kind: "dropped", path: "extra.booked", reason: "test reason" }];
     const dropsBooked = fakePackage("prev", (s) => ({ ...s, extra: {}, money: 1 }));
     const failing = rehearseCase("a|b", TOWER, dropsBooked, fakePackage("cand"), { hours: 1, allowed });
-    const text = renderReport(buildReport(prev, cand, 1, [failing], [...allowed, { id: "EX-8", kind: "dropped", path: "gone", reason: "r" }]));
+    const text = renderReport(
+      buildReport(prev, cand, 1, [failing], [...allowed, { id: "EX-8", kind: "dropped", path: "gone", reason: "r" }]),
+    );
     expect(text).toContain("FAIL");
     expect(text).toContain("a\\|b");
     expect(text).toContain("UNEXPLAINED changed `money`");

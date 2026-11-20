@@ -3,7 +3,9 @@ import { arrivalLine } from "./arrivalLine";
 
 /** A stand-in for the reader: only the room and structure counts and the name matter. */
 const sim = (towerName: string, built: boolean) =>
-  ({ rooms: built ? [{}] : [], structure: built ? [{}] : [], tower: { towerName } }) as unknown as Parameters<typeof arrivalLine>[0];
+  ({ rooms: built ? [{}] : [], structure: built ? [{}] : [], tower: { towerName } }) as unknown as Parameters<
+    typeof arrivalLine
+  >[0];
 
 describe("arrivalLine", () => {
   it("names a loaded tower, welcomes back a reloaded one, and opens a new empty lot", () => {

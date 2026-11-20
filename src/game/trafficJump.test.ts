@@ -9,7 +9,12 @@ vi.mock("../analytics", () => ({ trackAppAction: track }));
 const spot = vi.hoisted(() => vi.fn());
 vi.mock("@verticopolis/components/render/excalibur/trafficSpotlight", async (real) => {
   const mod = await real<typeof import("@verticopolis/components/render/excalibur/trafficSpotlight")>();
-  return { ...mod, spotlightTraffic: vi.fn((...a: Parameters<typeof mod.spotlightTraffic>) => (spot(...a), mod.spotlightTraffic(...a))) };
+  return {
+    ...mod,
+    spotlightTraffic: vi.fn(
+      (...a: Parameters<typeof mod.spotlightTraffic>) => (spot(...a), mod.spotlightTraffic(...a)),
+    ),
+  };
 });
 
 /**
@@ -21,7 +26,8 @@ vi.mock("@verticopolis/components/render/excalibur/trafficSpotlight", async (rea
  * with the answers: it goes to the worst line, and marks that one line only.
  */
 
-const elevator = (id: number, x: number) => ({ id, kind: "elevatorStandard", x, width: 4, bottom: -6, top: 30 }) as unknown as TransportView;
+const elevator = (id: number, x: number) =>
+  ({ id, kind: "elevatorStandard", x, width: 4, bottom: -6, top: 30 }) as unknown as TransportView;
 const ELEVATORS = [elevator(7, 40), elevator(9, 60)];
 const SHAFTS = new Map(ELEVATORS.map((t) => [t.id, t]));
 
@@ -38,7 +44,10 @@ function fakeApp(tier: number, rows: Row[], stretches: Record<string, [number, n
   const queueView = vi.fn(() => ({ landings, boarded: new Map() }));
   const applyView = vi.fn();
   const engine = {
-    sim: { tower: { getTransport: (id: number) => SHAFTS.get(id), transports: ELEVATORS }, crowd: { people: [], queueView } },
+    sim: {
+      tower: { getTransport: (id: number) => SHAFTS.get(id), transports: ELEVATORS },
+      crowd: { people: [], queueView },
+    },
     viewWidth: 1280,
     applyView,
   };
@@ -56,10 +65,14 @@ beforeEach(() => {
 describe("jumpToTraffic", () => {
   it("goes to the worst line and marks that landing only, not the floor or the other shafts", () => {
     // 288 fed up at B4 for elevator 9; a short line at 25F for elevator 7.
-    const f = fakeApp(3, [
-      [7, 25, 6, 2],
-      [9, -4, 288, 2],
-    ], { "9:-4": [64, 70.2], "7:25": [44, 45] });
+    const f = fakeApp(
+      3,
+      [
+        [7, 25, 6, 2],
+        [9, -4, 288, 2],
+      ],
+      { "9:-4": [64, 70.2], "7:25": [44, 45] },
+    );
     expect(jumpToTraffic(f.app)).toBe(true);
     // The engine's stretch of that one line is asked for, not the floor's.
     expect(f.queueLine).toHaveBeenCalledWith(9, -4);

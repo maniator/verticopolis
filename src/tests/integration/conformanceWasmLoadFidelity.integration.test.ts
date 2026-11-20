@@ -106,7 +106,8 @@ describe.runIf(run)("a save at random state 0 reloads at state 0 (#856)", () => 
 describe.runIf(run)("top-level values that are no save (#858, #1418)", () => {
   it("refuses a null save, and every other top-level value with no clock or rooms (#1418)", () => {
     expect(() => rust().Engine.fromSave("null")).toThrow(/null/);
-    for (const text of ["{}", "5", "[]", '"abc"', '""', "true"]) expect(() => rust().Engine.fromSave(text), text).toThrow(/not a saved tower/);
+    for (const text of ["{}", "5", "[]", '"abc"', '""', "true"])
+      expect(() => rust().Engine.fromSave(text), text).toThrow(/not a saved tower/);
   });
 });
 

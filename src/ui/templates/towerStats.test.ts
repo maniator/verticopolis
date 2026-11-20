@@ -35,8 +35,14 @@ describe("towerStatsTemplate values", () => {
     const ks = [...frag.querySelectorAll(".k")].map((el) => el.textContent);
     const vs = [...frag.querySelectorAll(".v")].map((el) => el.textContent);
     expect(ks).toEqual([
-      "Floors", "Offices", "Condos sold", "Hotel (in use)",
-      "Rooms to clean", "Shops / Food", "Transports", "Vacancies",
+      "Floors",
+      "Offices",
+      "Condos sold",
+      "Hotel (in use)",
+      "Rooms to clean",
+      "Shops / Food",
+      "Transports",
+      "Vacancies",
     ]);
     expect(vs).toEqual(["42 / B3", "17/20", "5/8", "2/6", "0", "4 / 3", "9", "11"]);
   });

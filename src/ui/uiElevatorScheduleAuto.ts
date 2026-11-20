@@ -29,7 +29,9 @@ export function fillFromProposal(
     weekend: p.weekend ? [...p.weekend] : [...(schedule.activeCars?.weekend ?? fullRow())],
   };
   if (takeHomes) schedule.homeFloors = [...p.homeFloors];
-  return [res.weekday.warm ? "weekday" : null, res.weekend.warm ? "weekend" : null].filter((d): d is string => d !== null);
+  return [res.weekday.warm ? "weekday" : null, res.weekend.warm ? "weekend" : null].filter(
+    (d): d is string => d !== null,
+  );
 }
 
 /** The announcement for a fill: name the days actually tuned, since on a

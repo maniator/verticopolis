@@ -143,7 +143,10 @@ describe.skipIf(noEngine)("updateBuildPreview on the engine's quotes", () => {
     expect(own).toBe(snapX(CAT, "office", tile));
     useTowerCatalogSource(app.enginePort, (mode) => {
       const base = catalogFor(mode);
-      return { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2 } : f)) };
+      return {
+        ...base,
+        facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2 } : f)),
+      };
     });
     updateBuildPreview(app, tile, 2);
     expect((raw.engine.preview as { x: number }).x).toBe(own - 2);
@@ -164,7 +167,12 @@ describe.skipIf(noEngine)("updateBuildPreview on the engine's quotes", () => {
     const { app, raw } = makeApp(engine, buildTool("elevatorStandard"));
     const x = snapX(CAT, "elevatorStandard", 14);
     updateBuildPreview(app, 14, 2);
-    expect(raw.engine.preview).toEqual({ kind: "elevatorStandard", floor: 2, x, valid: app.reader.unlocked("elevatorStandard") });
+    expect(raw.engine.preview).toEqual({
+      kind: "elevatorStandard",
+      floor: 2,
+      x,
+      valid: app.reader.unlocked("elevatorStandard"),
+    });
     expect(raw.engine.transportPreview).toBeNull();
   });
 

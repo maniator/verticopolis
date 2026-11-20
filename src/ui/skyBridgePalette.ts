@@ -52,7 +52,12 @@ export function skyBridgeUnlocked(rule: CatalogSkyBridge | null, star: number): 
 
 /** The lock scan's part for the button: hide it below the rule's star, dim it
  *  while one tile is past the funds. Returns whether it was shown or hidden. */
-export function scanSkyBridgeButton(palette: HTMLElement, rule: CatalogSkyBridge | null, star: number, money: number): boolean {
+export function scanSkyBridgeButton(
+  palette: HTMLElement,
+  rule: CatalogSkyBridge | null,
+  star: number,
+  money: number,
+): boolean {
   const item = palette.querySelector<HTMLElement>(`.pal-item[data-tool="${SKY_BRIDGE_TOOL}"]`);
   if (!item || !rule) return false;
   const locked = !skyBridgeUnlocked(rule, star);
@@ -65,6 +70,8 @@ export function scanSkyBridgeButton(palette: HTMLElement, rule: CatalogSkyBridge
 /** The tool's card: what a click does, the price of a tile and the longest
  *  bridge. The ghost tags the whole bridge's price before the click. */
 export function skyBridgeToolInfo(rule: CatalogSkyBridge | null): TemplateResult {
-  const price = rule ? html`<div>Cost: $${groupDigits(rule.tileCost)} per tile, up to ${rule.maxSpan} tiles</div>` : nothing;
+  const price = rule
+    ? html`<div>Cost: $${groupDigits(rule.tileCost)} per tile, up to ${rule.maxSpan} tiles</div>`
+    : nothing;
   return html`<div class="ti-name">Sky Bridge</div>${price}<p style="margin-top:6px;color:var(--muted)">${SKY_BRIDGE_DESCRIPTION} The ghost shows the whole bridge and its price before you click.</p>`;
 }

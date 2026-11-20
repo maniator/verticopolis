@@ -9,7 +9,10 @@ describe("the save packer's worker", () => {
     const bytes = new TextEncoder().encode('{"money":9}');
     await answer({ postMessage }, { id: 3, bytes });
     expect(postMessage).toHaveBeenCalledTimes(1);
-    const [reply, transfer] = postMessage.mock.calls[0] as [{ id: number; packed: Uint8Array; base64: string }, Transferable[]];
+    const [reply, transfer] = postMessage.mock.calls[0] as [
+      { id: number; packed: Uint8Array; base64: string },
+      Transferable[],
+    ];
     expect(reply.id).toBe(3);
     expect(new TextDecoder().decode(inflateSync(reply.packed))).toBe('{"money":9}');
     expect(fromBase64(reply.base64)).toEqual(reply.packed);
@@ -22,7 +25,10 @@ describe("the save packer's worker", () => {
       const postMessage = vi.fn();
       const bytes = new TextEncoder().encode("{}");
       await answer({ postMessage }, { id: 4, bytes });
-      const [reply, transfer] = postMessage.mock.calls[0] as [{ id: number; error: string; bytes: Uint8Array }, Transferable[]];
+      const [reply, transfer] = postMessage.mock.calls[0] as [
+        { id: number; error: string; bytes: Uint8Array },
+        Transferable[],
+      ];
       expect(reply.id).toBe(4);
       expect(reply.error).toMatch(/CompressionStream/);
       expect(reply.bytes).toBe(bytes);

@@ -142,7 +142,11 @@ describe("Space builds on release, never as the pan key", () => {
     makeApp();
     const palette = document.createElement("div");
     const selectTool = vi.fn();
-    const ui = { el: { palette, paletteTabs: document.createElement("div") }, selectTool, cb: { getCatalog: () => catalogFor("classic") } } as unknown as UI;
+    const ui = {
+      el: { palette, paletteTabs: document.createElement("div") },
+      selectTool,
+      cb: { getCatalog: () => catalogFor("classic") },
+    } as unknown as UI;
     buildPalette(ui);
     document.body.appendChild(palette);
     const lobby = palette.querySelector<HTMLElement>('.pal-item[data-kind="lobby"]')!;
@@ -234,7 +238,12 @@ describe("Space builds on release, never as the pan key", () => {
     const editable = document.createElement("div");
     editable.contentEditable = "true";
     editable.tabIndex = 0;
-    for (const field of [document.createElement("input"), document.createElement("textarea"), document.createElement("select"), editable]) {
+    for (const field of [
+      document.createElement("input"),
+      document.createElement("textarea"),
+      document.createElement("select"),
+      editable,
+    ]) {
       document.body.appendChild(field);
       field.focus();
       expect(panRelease().defaultPrevented, `a focused ${field.tagName} types or opens with Space`).toBe(false);
@@ -355,7 +364,11 @@ describe("Space builds on release, never as the pan key", () => {
     const app = makeApp();
     const palette = document.createElement("div");
     const selectTool = vi.fn();
-    const ui = { el: { palette, paletteTabs: document.createElement("div") }, selectTool, cb: { getCatalog: () => catalogFor("classic") } } as unknown as UI;
+    const ui = {
+      el: { palette, paletteTabs: document.createElement("div") },
+      selectTool,
+      cb: { getCatalog: () => catalogFor("classic") },
+    } as unknown as UI;
     buildPalette(ui);
     document.body.appendChild(palette);
     const button = document.createElement("button");

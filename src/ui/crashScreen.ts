@@ -125,7 +125,8 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
       // is preserving evidence. The neutral wording covers both halves of the
       // pipeline (zip build and the download).
       console.error("[crash-report] packing or saving failed:", err);
-      status.textContent = "The crash report couldn't be saved. You can still reload; your tower's save state is described above.";
+      status.textContent =
+        "The crash report couldn't be saved. You can still reload; your tower's save state is described above.";
       downloadBtn.disabled = false;
     });
   });

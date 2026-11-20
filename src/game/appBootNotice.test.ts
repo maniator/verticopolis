@@ -7,7 +7,9 @@ describe("unreadableSaveNotice", () => {
   const flags = { hadReadableSave: false, saveWasNewer: false, unreadableKept: false };
 
   it("says an older tower loaded when a healthy legacy save was behind the unreadable one", () => {
-    expect(unreadableSaveNotice({ ...flags, hadReadableSave: true })).toMatch(/couldn't be read, so an older saved tower was loaded/);
+    expect(unreadableSaveNotice({ ...flags, hadReadableSave: true })).toMatch(
+      /couldn't be read, so an older saved tower was loaded/,
+    );
   });
 
   it("adds the update hint when that unreadable autosave was a newer version's and is kept aside", () => {
@@ -23,7 +25,9 @@ describe("unreadableSaveNotice", () => {
   });
 
   it("tells a newer-version save to update the game, and says whether it is kept", () => {
-    expect(unreadableSaveNotice({ ...flags, saveWasNewer: true, unreadableKept: true })).toMatch(/Update the game to open it\. It is kept aside/);
+    expect(unreadableSaveNotice({ ...flags, saveWasNewer: true, unreadableKept: true })).toMatch(
+      /Update the game to open it\. It is kept aside/,
+    );
     expect(unreadableSaveNotice({ ...flags, saveWasNewer: true })).toMatch(/do not start or load another tower first/);
   });
 

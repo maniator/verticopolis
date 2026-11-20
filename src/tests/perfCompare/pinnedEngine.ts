@@ -5,7 +5,11 @@ import { join } from "node:path";
  *  records, the engine the game pins, or null when it is not installed. */
 export function pinnedEngineSources(repo: string): string | null {
   try {
-    const sources = (JSON.parse(readFileSync(join(repo, "node_modules/@verticopolis/engine/web/BUILD.json"), "utf8")) as { sources?: unknown }).sources;
+    const sources = (
+      JSON.parse(readFileSync(join(repo, "node_modules/@verticopolis/engine/web/BUILD.json"), "utf8")) as {
+        sources?: unknown;
+      }
+    ).sources;
     return typeof sources === "string" ? sources : null;
   } catch {
     return null;

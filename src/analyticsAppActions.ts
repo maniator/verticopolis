@@ -18,14 +18,24 @@ export type AppActionName =
   // My Towers, the Open and Save As windows (owner, 2026-11-15). Codes and
   // counts only, never a file's name; each `detail` is in the data map's
   // "My Towers" section (docs/analytics-data-map.md).
-  | "files_open" | "file_open" | "file_save" | "file_add" | "file_dropped"
-  | "file_rename" | "file_copy" | "file_delete" | "file_failed"
-  | "files_copied" | "files_waited" | "file_ask"
+  | "files_open"
+  | "file_open"
+  | "file_save"
+  | "file_add"
+  | "file_dropped"
+  | "file_rename"
+  | "file_copy"
+  | "file_delete"
+  | "file_failed"
+  | "files_copied"
+  | "files_waited"
+  | "file_ask"
   // The tower left behind by a swap, kept in My Towers (owner, 2026-11-16).
   | "tower_kept"
   // A tower given its own file, or its file caught up at boot (#2380), and
   // the Previous versions… window and its opens.
-  | "tower_file" | "file_versions"
+  | "tower_file"
+  | "file_versions"
   // The Open and Save As windows' right-click menu opened: a right-click
   // (`pointer`), a finger held on a row (`hold`), or a key (`key`).
   | "file_menu"
@@ -34,8 +44,14 @@ export type AppActionName =
   | "recent_missing"
   // The folder linked on the player's computer (owner, 2026-11-15), in the
   // data map's "Linked folder" section. Codes only, never a name.
-  | "folder_link" | "folder_allow" | "folder_unlink" | "folder_open"
-  | "folder_save" | "folder_copy" | "folder_failed" | "folder_mirror"
+  | "folder_link"
+  | "folder_allow"
+  | "folder_unlink"
+  | "folder_open"
+  | "folder_save"
+  | "folder_copy"
+  | "folder_failed"
+  | "folder_mirror"
   | "export_save"
   | "import_save"
   | "export_tdt"

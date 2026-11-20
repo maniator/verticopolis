@@ -88,7 +88,10 @@ export function must(s: Subject, call: (port: EnginePort) => PortRecord, label: 
 /** The gameplay events since the last drain, oldest first. */
 export function drain(port: EnginePort): { name: string; payload: unknown }[] {
   const [, count] = port.drainEvents();
-  return Array.from({ length: count }, (_, i) => JSON.parse(port.eventText(i) ?? "null") as { name: string; payload: unknown });
+  return Array.from(
+    { length: count },
+    (_, i) => JSON.parse(port.eventText(i) ?? "null") as { name: string; payload: unknown },
+  );
 }
 
 /** The parts of a save the contracts read back. */
@@ -101,7 +104,18 @@ export interface SavedTower {
   founder?: boolean;
   towerName?: string;
   view?: { tile: number; floor: number; zoom?: number };
-  units: { id: number; kind: string; floor: number; x: number; rent?: number; label?: string; noRate?: boolean; filmPolicy?: string; ticketPrice?: string; screen2?: Record<string, unknown> }[];
+  units: {
+    id: number;
+    kind: string;
+    floor: number;
+    x: number;
+    rent?: number;
+    label?: string;
+    noRate?: boolean;
+    filmPolicy?: string;
+    ticketPrice?: string;
+    screen2?: Record<string, unknown>;
+  }[];
   transports: { id: number; skipFloors?: number[]; schedule?: Record<string, unknown> }[];
   log?: { text: string; kind: string }[];
 }
@@ -126,7 +140,10 @@ export function lobbyCenter(s: Subject): number {
   const left = lobby[0];
   const right = lobby[lobby.length - 1] + 1;
   const mid = Math.floor((left + right) / 2);
-  expect([left <= mid - 4, right >= mid + 16, right - left === lobby.length], `the starter lobby spans ${left} to ${right} in one run`).toEqual([true, true, true]);
+  expect(
+    [left <= mid - 4, right >= mid + 16, right - left === lobby.length],
+    `the starter lobby spans ${left} to ${right} in one run`,
+  ).toEqual([true, true, true]);
   return mid;
 }
 
@@ -150,7 +167,14 @@ export interface Furnished {
 export function furnish(s: Subject): Furnished {
   const mid = lobbyCenter(s);
   const tiles = Float64Array.from({ length: 11 }, (_, i) => mid + 5 + i);
-  for (const floor of [2, 3]) expect(slot("paintTiles", must(s, (p) => p.paintTiles(kind("floor"), floor, tiles), `floor ${floor}`), "placed")).toBe(11);
+  for (const floor of [2, 3])
+    expect(
+      slot(
+        "paintTiles",
+        must(s, (p) => p.paintTiles(kind("floor"), floor, tiles), `floor ${floor}`),
+        "placed",
+      ),
+    ).toBe(11);
   must(s, (p) => p.buildAt(kind("office"), 2, mid - 4), "office");
   must(s, (p) => p.buildAt(kind("fastFood"), 3, mid - 4), "fast food");
   must(s, (p) => p.buildShaft(kind("elevatorStandard"), mid + 12, 1, 3), "shaft");
@@ -176,4 +200,3 @@ export function expectUnmoved(s: Subject, call: (port: EnginePort) => PortRecord
   expect(drain(s.port), label).toEqual([]);
   return rec;
 }
-

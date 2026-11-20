@@ -21,23 +21,63 @@ import type { WasmEngine } from "@verticopolis/components/binding/binding";
  */
 
 /** Strings that are not catalog keys, including names an object lookup would find on its prototype. */
-const UNKNOWN_KINDS = ["", "ofice", "OFFICE", " office", "office ", "__proto__", "constructor", "toString", "hasOwnProperty", "0"];
+const UNKNOWN_KINDS = [
+  "",
+  "ofice",
+  "OFFICE",
+  " office",
+  "office ",
+  "__proto__",
+  "constructor",
+  "toString",
+  "hasOwnProperty",
+  "0",
+];
 const UNKNOWN = { ok: false, reason: "Unknown facility." };
 const NOT_VALID = { ok: false, reason: "That request is not valid." };
 /** The kinds a rent batch prices (office, condo, hotel rooms, the leased venues, rentals). */
-const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite", "fitnessClub", "clinic", "rentalStudio", "rentalApartment"];
+const PRICED_KINDS = [
+  "office",
+  "condo",
+  "hotelSingle",
+  "hotelDouble",
+  "hotelSuite",
+  "fitnessClub",
+  "clinic",
+  "rentalStudio",
+  "rentalApartment",
+];
 
 type Start = { label: string; seed?: number; fixture?: string; mode: GameMode };
 const STARTS: Start[] = [
   { label: "new Classic game", seed: 7, mode: "classic" },
   { label: "new Modern game", seed: 7, mode: "modern" },
-  { label: "towerone_6 in Classic", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone_6.vctower", mode: "classic" },
-  { label: "sixseven-december in Modern", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven-december.vctower", mode: "modern" },
-  { label: "towerone-star4 in Modern", fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone-star4.vctower", mode: "modern" },
+  {
+    label: "towerone_6 in Classic",
+    fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone_6.vctower",
+    mode: "classic",
+  },
+  {
+    label: "sixseven-december in Modern",
+    fixture: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven-december.vctower",
+    mode: "modern",
+  },
+  {
+    label: "towerone-star4 in Modern",
+    fixture: "node_modules/@verticopolis/engine/conformance/fixtures/towerone-star4.vctower",
+    mode: "modern",
+  },
 ];
 
 type SaveUnit = { id: number; kind: string; state?: string; rent?: number; noRate?: boolean; everOccupied?: boolean };
-type Save = { money: number; star: number; units: SaveUnit[]; transports: { id: number }[]; exterminationDueDay?: number; exterminationRoomIds?: number[] };
+type Save = {
+  money: number;
+  star: number;
+  units: SaveUnit[];
+  transports: { id: number }[];
+  exterminationDueDay?: number;
+  exterminationRoomIds?: number[];
+};
 
 function open(start: Start): WasmEngine {
   const { Engine } = wasm();
@@ -113,14 +153,38 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers through the WAS
 
     book("books three rooms and carries cost and rooms", "modern", 3, 1e9, { ok: true, cost: fee(3), rooms: 3 });
     book("a second call is pending", "modern", 3, 1e9, { ok: false, reason: "pending" }, 2);
-    book("refuses short of funds with the price and the rooms", "modern", 3, fee(3) - 1, { ok: false, reason: "funds", cost: fee(3), rooms: 3 });
+    book("refuses short of funds with the price and the rooms", "modern", 3, fee(3) - 1, {
+      ok: false,
+      reason: "funds",
+      cost: fee(3),
+      rooms: 3,
+    });
     book("books at exactly the price", "modern", 3, fee(3), { ok: true, cost: fee(3), rooms: 3 });
     book("refuses when no room is infested", "modern", 0, 1e9, { ok: false, reason: "none" });
     book("is unavailable in Classic", "classic", 1, 1e9, { ok: false, reason: "unavailable" });
   });
 
   describe("previewRentBatch", () => {
-    const TARGETS: unknown[] = ["default", "noRate", 0, 1, 50, 200, 800, 5_000, 1e9, -5, 12.5, Number.NaN, Number.POSITIVE_INFINITY, "cheap", null, undefined, {}, true];
+    const TARGETS: unknown[] = [
+      "default",
+      "noRate",
+      0,
+      1,
+      50,
+      200,
+      800,
+      5_000,
+      1e9,
+      -5,
+      12.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      "cheap",
+      null,
+      undefined,
+      {},
+      true,
+    ];
     const target = (t: unknown): string => JSON.stringify(t) ?? "null";
 
     for (const start of STARTS) {
@@ -148,7 +212,8 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers through the WAS
                   if (applied === undefined) continue;
                   reported++;
                   // An apply that reports a change wrote it.
-                  if ((JSON.parse(applied) as { changed: number }).changed > 0) expect(fresh.serialize(), label).not.toBe(text);
+                  if ((JSON.parse(applied) as { changed: number }).changed > 0)
+                    expect(fresh.serialize(), label).not.toBe(text);
                 } finally {
                   fresh.free();
                 }
@@ -177,14 +242,18 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers through the WAS
       const { engine } = reload(built, (save) => {
         save.units.filter((u) => u.kind === "office")[1]!.rent = 1_234;
       });
-      const raw = engine as unknown as { previewRentBatch(kind: unknown, target: string, only: unknown): string | undefined };
+      const raw = engine as unknown as {
+        previewRentBatch(kind: unknown, target: string, only: unknown): string | undefined;
+      };
       try {
         const onlyDefault = raw.previewRentBatch("office", "5000", true);
         const every = raw.previewRentBatch("office", "5000", false);
         // The custom-priced office makes the two flags differ, so a misread flag shows.
         expect(onlyDefault).not.toEqual(every);
-        for (const only of ["yes", "0", 0.5, 2 ** 32, {}, []]) expect(raw.previewRentBatch("office", "5000", only), `only=${String(only)}`).toEqual(onlyDefault);
-        for (const only of ["", 0, null, undefined]) expect(raw.previewRentBatch("office", "5000", only), `only=${String(only)}`).toEqual(every);
+        for (const only of ["yes", "0", 0.5, 2 ** 32, {}, []])
+          expect(raw.previewRentBatch("office", "5000", only), `only=${String(only)}`).toEqual(onlyDefault);
+        for (const only of ["", 0, null, undefined])
+          expect(raw.previewRentBatch("office", "5000", only), `only=${String(only)}`).toEqual(every);
         for (const kind of [null, undefined, 5, {}, [], Symbol("k")]) {
           expect(raw.previewRentBatch(kind, '"default"', false)).toBeUndefined();
           expect(JSON.parse(engine.validateTransport(kind as never, 150, 1, 3))).toEqual(UNKNOWN);
@@ -210,7 +279,9 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers through the WAS
             expect(JSON.parse(engine.build(kind, 2, 150)), `build ${label}`).toEqual(UNKNOWN);
             expect(JSON.parse(engine.canBuild(kind, 2, 150)), `canBuild ${label}`).toEqual({ ...UNKNOWN, cost: 0 });
             expect(JSON.parse(engine.buildTransport(kind, 150, 1, 3)), `buildTransport ${label}`).toEqual(UNKNOWN);
-            expect(JSON.parse(engine.validateTransport(kind, 150, 1, 3)), `validateTransport ${label}`).toEqual(UNKNOWN);
+            expect(JSON.parse(engine.validateTransport(kind, 150, 1, 3)), `validateTransport ${label}`).toEqual(
+              UNKNOWN,
+            );
             expect(engine.placeTransportDryRun(kind, 150, 1, 3), `placeTransportDryRun ${label}`).toBe(false);
             expect(parse(engine.applyRentBatch(kind, '"default"', false)), `applyRentBatch ${label}`).toBeNull();
             expect(parse(engine.previewRentBatch(kind, '"default"', false)), `previewRentBatch ${label}`).toBeNull();
@@ -264,11 +335,15 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers through the WAS
             for (const x of XS) {
               for (const bottom of FLOORS) {
                 for (const top of FLOORS) {
-                  const got = JSON.parse(engine.validateTransport(kind, x, bottom, top)) as { ok: boolean; reason?: string };
+                  const got = JSON.parse(engine.validateTransport(kind, x, bottom, top)) as {
+                    ok: boolean;
+                    reason?: string;
+                  };
                   const dry = engine.placeTransportDryRun(kind, x, bottom, top);
                   const at = `${kind} x${x} ${bottom}..${top}`;
                   // The dry run agrees with the validation, and only a transport kind is ever accepted.
-                  if (dry !== got.ok || (got.ok && !(transports as readonly string[]).includes(kind))) diffs.push(`${at}: ${JSON.stringify(got)}/${dry}`);
+                  if (dry !== got.ok || (got.ok && !(transports as readonly string[]).includes(kind)))
+                    diffs.push(`${at}: ${JSON.stringify(got)}/${dry}`);
                   if (!got.ok) {
                     refused++;
                     continue;
@@ -279,7 +354,8 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers through the WAS
                   built.add(kind);
                   const copy = Engine.fromSave(before);
                   try {
-                    if (!(JSON.parse(copy.buildTransport(kind, x, bottom, top)) as { ok: boolean }).ok) diffs.push(`${at}: accepted but not built`);
+                    if (!(JSON.parse(copy.buildTransport(kind, x, bottom, top)) as { ok: boolean }).ok)
+                      diffs.push(`${at}: accepted but not built`);
                   } finally {
                     copy.free();
                   }
@@ -300,9 +376,27 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers through the WAS
       it(`${start.label}: a coordinate that is not a whole number is refused`, () => {
         const engine = open(start);
         try {
-          const bad: unknown[] = [0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 2 ** 53, -(2 ** 53), "3", null, undefined, true, 1n, {}, []];
+          const bad: unknown[] = [
+            0.5,
+            Number.NaN,
+            Number.POSITIVE_INFINITY,
+            Number.NEGATIVE_INFINITY,
+            2 ** 53,
+            -(2 ** 53),
+            "3",
+            null,
+            undefined,
+            true,
+            1n,
+            {},
+            [],
+          ];
           for (const v of bad) {
-            for (const args of [[v, 1, 3], [150, v, 3], [150, 1, v]]) {
+            for (const args of [
+              [v, 1, 3],
+              [150, v, 3],
+              [150, 1, v],
+            ]) {
               const label = `${String(v)} in ${args.map(String).join(",")}`;
               const [x, b, t] = args as [number, number, number];
               expect(JSON.parse(engine.validateTransport("elevatorStandard", x, b, t)), label).toEqual(NOT_VALID);
@@ -312,9 +406,17 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers through the WAS
           // The last safe integer is a whole number: the engine reads it and the
           // tower, not the number rule, refuses the shaft off the lot.
           const edge = 2 ** 53 - 1;
-          for (const args of [[edge, 1, 3], [-edge, 1, 3], [150, -edge, 3], [150, 1, edge]]) {
+          for (const args of [
+            [edge, 1, 3],
+            [-edge, 1, 3],
+            [150, -edge, 3],
+            [150, 1, edge],
+          ]) {
             const [x, b, t] = args as [number, number, number];
-            const got = JSON.parse(engine.validateTransport("elevatorStandard", x, b, t)) as { ok: boolean; reason?: string };
+            const got = JSON.parse(engine.validateTransport("elevatorStandard", x, b, t)) as {
+              ok: boolean;
+              reason?: string;
+            };
             expect(got.ok).toBe(false);
             expect(got.reason, args.join(",")).not.toBe(NOT_VALID.reason);
           }

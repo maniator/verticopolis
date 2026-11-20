@@ -10,20 +10,52 @@ function metric(mode: ModeName, name: string, base: number, over: Partial<Metric
   // A little spread across repetitions, the same in both runs, so the paired
   // ratios are exact while the values are not constant.
   const values = reps.map((i) => base * (1 + i / 200));
-  return { group: "hosted", scenario: "large", throttle: "1", metric: name, unit: "ms", better: "lower", mode, values, reps, summary: null, ...over };
+  return {
+    group: "hosted",
+    scenario: "large",
+    throttle: "1",
+    metric: name,
+    unit: "ms",
+    better: "lower",
+    mode,
+    values,
+    reps,
+    summary: null,
+    ...over,
+  };
 }
 
 /** A run: controls at their base value, the worker's rows scaled by `worker`. */
 function input(commit: string, mergeBase: string | null, worker: number, control = 1): CrossInput {
   const metrics: Metric[] = [];
   for (const mode of ["ts", "wasm", "wasm-frame"] as const) {
-    metrics.push(metric(mode, "wall time, 720 steps", 1000 * control), metric(mode, "main-thread time, 720 steps", 800 * control));
+    metrics.push(
+      metric(mode, "wall time, 720 steps", 1000 * control),
+      metric(mode, "main-thread time, 720 steps", 800 * control),
+    );
   }
-  metrics.push(metric("wasm-worker", "wall time, 720 steps", 1000 * worker), metric("wasm-worker", "main-thread time, 720 steps", 800 * worker));
-  metrics.push(metric("wasm-worker", "full-save merges (frames)", 4, { group: "traffic", values: reps.map(() => 4 * worker) }));
+  metrics.push(
+    metric("wasm-worker", "wall time, 720 steps", 1000 * worker),
+    metric("wasm-worker", "main-thread time, 720 steps", 800 * worker),
+  );
+  metrics.push(
+    metric("wasm-worker", "full-save merges (frames)", 4, { group: "traffic", values: reps.map(() => 4 * worker) }),
+  );
   return {
     config: { reps: REPS, quick: false, scenarios: ["large"] } as unknown as CrossInput["config"],
-    environment: { commit, dirty: false, mergeBase, cpuModel: "Ryzen", logicalCpus: 12, totalMemoryBytes: 32, os: "win", kernel: "26200", arch: "x64", node: "22", playwright: "1.5" } as unknown as CrossInput["environment"],
+    environment: {
+      commit,
+      dirty: false,
+      mergeBase,
+      cpuModel: "Ryzen",
+      logicalCpus: 12,
+      totalMemoryBytes: 32,
+      os: "win",
+      kernel: "26200",
+      arch: "x64",
+      node: "22",
+      playwright: "1.5",
+    } as unknown as CrossInput["environment"],
     browser: { version: "149", executable: "chrome.exe" },
     scenarios: [{ name: "large", sha256: "abc", population: 1, units: 1, transports: 1, saveBytes: 1 }],
     metrics,
@@ -80,7 +112,9 @@ describe("perf:worker cross-run comparison", () => {
     const a = after(1);
     const row = b.metrics.find((m) => m.mode === "wasm-worker" && m.metric.startsWith("full-save"))!;
     row.values[3] = 0;
-    a.metrics.find((m) => m.mode === "wasm-worker" && m.metric.startsWith("full-save"))!.reps = reps.map((i) => i + (i === 9 ? 5 : 0));
+    a.metrics.find((m) => m.mode === "wasm-worker" && m.metric.startsWith("full-save"))!.reps = reps.map(
+      (i) => i + (i === 9 ? 5 : 0),
+    );
     const r = crossRun(b, a);
     const out = r.rows.find((x) => x.metric.startsWith("full-save"))!;
     expect(out.zeroReference).toBe(1);
@@ -95,24 +129,73 @@ describe("perf:worker cross-run comparison", () => {
       return crossErrors(base, a, REPS);
     };
     expect(crossErrors(base, after(1), REPS)).toEqual([]);
-    expect(mutate((a) => { a.environment.dirty = true; })).toEqual(["the after run was on a dirty tree"]);
-    expect(mutate((a) => { a.validation.ok = false; })).toEqual(["the after run failed its own validation"]);
-    expect(mutate((a) => { a.config.quick = true; })[0]).toBe("the after run is a --quick smoke run");
-    expect(mutate((a) => { a.config.reps = 5; })).toEqual(expect.arrayContaining(["the after run has 5 repetitions; 10 are needed", "the two runs used different configurations"]));
-    expect(mutate((a) => { a.scenarios[0].sha256 = "other"; })).toEqual(["the two runs measured different towers"]);
-    expect(mutate((a) => { a.browser.version = "150"; })).toEqual(["the two runs differ in browser, machine or toolchain"]);
-    expect(mutate((a) => { a.environment.cpuModel = "other"; })).toEqual(["the two runs differ in browser, machine or toolchain"]);
-    expect(mutate((a) => { a.environment.commit = "aaa"; })).toEqual(expect.arrayContaining(["both runs are the same commit"]));
-    expect(mutate((a) => { a.environment.mergeBase = "elsewhere"; })[0]).toContain("is not the before run's commit");
-    expect(mutate((a) => { a.environment.mergeBase = null; })[0]).toContain("unknown");
-    expect(crossRun(base, Object.assign(after(1), { validation: { ok: false, errors: [], warnings: [] } })).rows).toEqual([]);
+    expect(
+      mutate((a) => {
+        a.environment.dirty = true;
+      }),
+    ).toEqual(["the after run was on a dirty tree"]);
+    expect(
+      mutate((a) => {
+        a.validation.ok = false;
+      }),
+    ).toEqual(["the after run failed its own validation"]);
+    expect(
+      mutate((a) => {
+        a.config.quick = true;
+      })[0],
+    ).toBe("the after run is a --quick smoke run");
+    expect(
+      mutate((a) => {
+        a.config.reps = 5;
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        "the after run has 5 repetitions; 10 are needed",
+        "the two runs used different configurations",
+      ]),
+    );
+    expect(
+      mutate((a) => {
+        a.scenarios[0].sha256 = "other";
+      }),
+    ).toEqual(["the two runs measured different towers"]);
+    expect(
+      mutate((a) => {
+        a.browser.version = "150";
+      }),
+    ).toEqual(["the two runs differ in browser, machine or toolchain"]);
+    expect(
+      mutate((a) => {
+        a.environment.cpuModel = "other";
+      }),
+    ).toEqual(["the two runs differ in browser, machine or toolchain"]);
+    expect(
+      mutate((a) => {
+        a.environment.commit = "aaa";
+      }),
+    ).toEqual(expect.arrayContaining(["both runs are the same commit"]));
+    expect(
+      mutate((a) => {
+        a.environment.mergeBase = "elsewhere";
+      })[0],
+    ).toContain("is not the before run's commit");
+    expect(
+      mutate((a) => {
+        a.environment.mergeBase = null;
+      })[0],
+    ).toContain("unknown");
+    expect(
+      crossRun(base, Object.assign(after(1), { validation: { ok: false, errors: [], warnings: [] } })).rows,
+    ).toEqual([]);
   });
 
   it("writes the verdict, the void and the refusal into the report", () => {
     const b = before();
     const ok = after(0.5);
     expect(crossMarkdown(b, ok, crossRun(b, ok))).toContain("Every control row is equivalent within the band.");
-    expect(crossMarkdown(b, ok, crossRun(b, ok))).toContain("| large | 1 | wall time, 720 steps | wasm-worker | subject | 0.500 |");
+    expect(crossMarkdown(b, ok, crossRun(b, ok))).toContain(
+      "| large | 1 | wall time, 720 steps | wasm-worker | subject | 0.500 |",
+    );
     const moved = after(0.5, 1.12);
     expect(crossMarkdown(b, moved, crossRun(b, moved))).toContain("**Void (a control moved):**");
     const dirty = after(1);

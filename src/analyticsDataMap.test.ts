@@ -4,11 +4,23 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { ENGAGED_BY } from "./analyticsEngagement";
 import { TRAP_KINDS } from "@verticopolis/components/host/hostFault";
-import { ENGINE_STATUS_REASONS, ENGINE_BUILDS, ENGINE_KINDS, ENGINE_STATUS_FIELDS, ENGINE_STATUS_TRIGGERS, MAX_ENGINE_STATUS_ROWS } from "./analyticsEngineStatus";
+import {
+  ENGINE_STATUS_REASONS,
+  ENGINE_BUILDS,
+  ENGINE_KINDS,
+  ENGINE_STATUS_FIELDS,
+  ENGINE_STATUS_TRIGGERS,
+  MAX_ENGINE_STATUS_ROWS,
+} from "./analyticsEngineStatus";
 import { FALLBACK_STAGES } from "@verticopolis/components/host/engineBoot";
 import { MAX_BODY_BYTES, RATE_LIMIT_MAX } from "./analyticsIngest";
 import type { EngineChoice } from "@verticopolis/components/host/engineChoice";
-import { TDT_IMPORT_ANOMALIES, TDT_TRANSPORT_ANOMALIES, tdtImportReadProps, type TowerFileProps } from "./analyticsFiles";
+import {
+  TDT_IMPORT_ANOMALIES,
+  TDT_TRANSPORT_ANOMALIES,
+  tdtImportReadProps,
+  type TowerFileProps,
+} from "./analyticsFiles";
 import type { ImportReportFacts } from "@verticopolis/components/port/tdtReportFacts";
 
 /** Every engine a page life can ask for. Typed against `EngineChoice` both
@@ -151,14 +163,17 @@ describe("analytics data map", () => {
 
   it("reads the tdt_import_read keys from the builder, every anomaly included", () => {
     const keys = tdtImportReadKeys();
-    for (const name of [...TDT_IMPORT_ANOMALIES, ...TDT_TRANSPORT_ANOMALIES, "anomalies", "hasRoster", "notes"]) expect(keys).toContain(name);
+    for (const name of [...TDT_IMPORT_ANOMALIES, ...TDT_TRANSPORT_ANOMALIES, "anomalies", "hasRoster", "notes"])
+      expect(keys).toContain(name);
     expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("states the limits the code sets", () => {
     expect(engineSection()).toContain(`Past ${MAX_ENGINE_STATUS_ROWS} such rows`);
     expect(MAX_BODY_BYTES).toBe(8 * 1024);
-    expect(section("Posture")).toContain(`The relay caps bodies at 8 KiB and each IP at ${RATE_LIMIT_MAX} posts a minute.`);
+    expect(section("Posture")).toContain(
+      `The relay caps bodies at 8 KiB and each IP at ${RATE_LIMIT_MAX} posts a minute.`,
+    );
   });
 
   it("states retention and the deletion path", () => {

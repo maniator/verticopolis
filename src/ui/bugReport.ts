@@ -80,6 +80,10 @@ export function bugReportHref(facts: BugReportFacts): string {
     mode: facts.mode ? MODE_OPTION[facts.mode] : MODE_OPTION.unsure,
   });
   const diagnostics = facts.diagnostics?.trim();
-  if (diagnostics) params.set("diagnostics", diagnostics.length > MAX_DIAGNOSTICS ? `${diagnostics.slice(0, MAX_DIAGNOSTICS)}\n…` : diagnostics);
+  if (diagnostics)
+    params.set(
+      "diagnostics",
+      diagnostics.length > MAX_DIAGNOSTICS ? `${diagnostics.slice(0, MAX_DIAGNOSTICS)}\n…` : diagnostics,
+    );
   return `${NEW_ISSUE}?${params.toString()}`;
 }

@@ -21,7 +21,9 @@ interface BootState {
 const bootState = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot as BootState | undefined);
 
 async function hostedGame(page: Page): Promise<void> {
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => document.getElementById("splash")?.remove());
 }
 
@@ -37,7 +39,8 @@ async function trapNextStep(page: Page): Promise<void> {
       value: (...args: unknown[]) => {
         real(...args);
         for (const key of Object.getOwnPropertyNames(proto)) {
-          if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
+          if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function")
+            continue;
           Object.defineProperty(engine, key, {
             value: () => {
               throw new Error("recursive use of an object detected which would lead to unsafe aliasing in rust");
@@ -71,7 +74,9 @@ test.describe("starts on the WASM engine", () => {
     // The two ways the old engine switch took a choice of the TypeScript engine.
     await page.addInitScript(() => localStorage.setItem("vc.engine", "ts"));
     await page.goto("/?engine=ts");
-    await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
+    await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, {
+      timeout: 30_000,
+    });
     expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "wasm", failure: null });
     await expect(page.locator(".splash-version")).toContainText("Rust engine");
     await page.evaluate(() => document.getElementById("splash")?.remove());
@@ -166,7 +171,10 @@ test.describe("never falls back to the TypeScript engine", () => {
     await expect(page.locator("#boot-fallback button:not([data-act])")).toHaveText("Reload");
     const state = await bootState(page);
     expect(state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage } });
-    expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({ game: false, host: false });
+    expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({
+      game: false,
+      host: false,
+    });
     return (await failure.textContent()) ?? "";
   }
 
@@ -178,7 +186,10 @@ test.describe("never falls back to the TypeScript engine", () => {
     expect(text).toContain("Reload the page to try again");
     // Help cannot open here, so the stop screen carries Copy diagnostics (#963).
     await page.evaluate(() => {
-      Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => ((window as any).__copied = t) }, configurable: true });
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: async (t: string) => ((window as any).__copied = t) },
+        configurable: true,
+      });
     });
     await page.locator('#boot-fallback button[data-act="copy-diagnostics"]').click();
     await expect(page.locator(".engine-failure-copy-status")).toHaveText("Copied.");
@@ -190,7 +201,11 @@ test.describe("never falls back to the TypeScript engine", () => {
 
   test("a corrupted engine binary stops boot", async ({ page }) => {
     await page.route("**/engine/verticopolis_engine_bg.wasm", (r) =>
-      r.fulfill({ status: 200, contentType: "application/wasm", body: Buffer.from("\0asm\x01\0\0\0not a module at all") }),
+      r.fulfill({
+        status: 200,
+        contentType: "application/wasm",
+        body: Buffer.from("\0asm\x01\0\0\0not a module at all"),
+      }),
     );
     await page.goto("/");
     await expectStopped(page, "load");
@@ -201,12 +216,18 @@ test.describe("never falls back to the TypeScript engine", () => {
     // mismatched build would. The shell was built for other bytes, so the
     // package check refuses it before anything is imported.
     await page.route("**/engine/verticopolis_engine.js", (r) =>
-      r.fulfill({ status: 200, contentType: "text/javascript", body: "export default async function init() {}\nexport class Engine {}\n" }),
+      r.fulfill({
+        status: 200,
+        contentType: "text/javascript",
+        body: "export default async function init() {}\nexport class Engine {}\n",
+      }),
     );
     await page.goto("/");
     const text = await expectStopped(page, "load");
     expect(text).toContain("The engine files do not match this version of the game. The engine was not started.");
-    expect(await bootState(page)).toMatchObject({ failure: { reason: "package-mismatch", package: { kind: "mismatch", file: "glue" } } });
+    expect(await bootState(page)).toMatchObject({
+      failure: { reason: "package-mismatch", package: { kind: "mismatch", file: "glue" } },
+    });
   });
 
   test("an engine that loads but cannot host the first tower stops the game at start", async ({ page }) => {
@@ -215,12 +236,17 @@ test.describe("never falls back to the TypeScript engine", () => {
     // but no catalog, which boot reads before it builds an engine. The
     // byte check would refuse such a file, so it is swapped in after the
     // check, in the Blob the loader imports.
-    const methods = [...INSTANCE_METHODS, ...TOOLING_METHODS].map((m) => `Engine.prototype.${m} = function () { throw new Error("stub"); };`).join("\n");
+    const methods = [...INSTANCE_METHODS, ...TOOLING_METHODS]
+      .map((m) => `Engine.prototype.${m} = function () { throw new Error("stub"); };`)
+      .join("\n");
     const statics = STATIC_METHODS.map((m) => `Engine.${m} = function () { throw new Error("stub"); };`).join("\n");
     const glue = `export default async function init() {}\nexport function encodeVctower() { return ""; }\nexport class Engine {}\n${methods}\n${statics}\n`;
     await page.addInitScript((stub) => {
       const create = URL.createObjectURL.bind(URL);
-      URL.createObjectURL = (obj: Blob | MediaSource) => (obj instanceof Blob && obj.type === "text/javascript" ? create(new Blob([stub], { type: "text/javascript" })) : create(obj));
+      URL.createObjectURL = (obj: Blob | MediaSource) =>
+        obj instanceof Blob && obj.type === "text/javascript"
+          ? create(new Blob([stub], { type: "text/javascript" }))
+          : create(obj);
     }, glue);
     await page.goto("/");
     const failure = page.locator("#engine-failure");
@@ -229,10 +255,15 @@ test.describe("never falls back to the TypeScript engine", () => {
     await expect(failure).toContainText("could not start");
     expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "start" } });
     // The engine is refused before it builds a tower, so no game runs.
-    expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({ game: false, host: false });
+    expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({
+      game: false,
+      host: false,
+    });
   });
 
-  test("an engine that traps mid-game reloads once, then stops the game instead of running it on TypeScript (#874, #1422)", async ({ page }) => {
+  test("an engine that traps mid-game reloads once, then stops the game instead of running it on TypeScript (#874, #1422)", async ({
+    page,
+  }) => {
     const errors = pageErrors(page);
     await page.goto("/");
     await hostedGame(page);
@@ -296,7 +327,8 @@ test.describe("never falls back to the TypeScript engine", () => {
       Object.defineProperty(engine, "saveBytes", {
         value: () => {
           for (const key of Object.getOwnPropertyNames(proto)) {
-            if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
+            if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function")
+              continue;
             Object.defineProperty(engine, key, {
               value: () => {
                 throw new Error("recursive use of an object detected which would lead to unsafe aliasing in rust");
@@ -318,7 +350,9 @@ test.describe("never falls back to the TypeScript engine", () => {
     expect(await page.evaluate(() => localStorage.getItem("verticopolis-save"))).toBe(saved.text);
     await page.waitForEvent("load", { timeout: 30_000 });
     await hostedGame(page);
-    await page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, saved.minutes, { timeout: 10_000 });
+    await page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, saved.minutes, {
+      timeout: 10_000,
+    });
     expect(await page.evaluate(() => localStorage.getItem("verticopolis-save"))).toBe(saved.text);
   });
 
@@ -331,14 +365,19 @@ test.describe("never falls back to the TypeScript engine", () => {
     await page.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 30_000 });
     const urls = await page.evaluate(async () => {
       const out: string[] = [];
-      for (const name of await caches.keys()) for (const req of await (await caches.open(name)).keys()) if (req.url.includes("verticopolis_engine_bg.wasm")) out.push(req.url);
+      for (const name of await caches.keys())
+        for (const req of await (await caches.open(name)).keys())
+          if (req.url.includes("verticopolis_engine_bg.wasm")) out.push(req.url);
       return out;
     });
     expect(urls.length, "the binary is in the precache").toBeGreaterThan(0);
     for (const url of urls) expect(await edit(url)).toBe(true);
   }
 
-  test("an installed game whose cached engine binary is gone stops offline, never on TypeScript", async ({ page, context }) => {
+  test("an installed game whose cached engine binary is gone stops offline, never on TypeScript", async ({
+    page,
+    context,
+  }) => {
     await installThen(page, (url) =>
       page.evaluate(async (u) => {
         let gone = false;
@@ -357,14 +396,22 @@ test.describe("never falls back to the TypeScript engine", () => {
     expect(text).toContain("You appear to be offline");
   });
 
-  test("an installed game whose cached engine binary is corrupted stops offline, never on TypeScript", async ({ page, context }) => {
+  test("an installed game whose cached engine binary is corrupted stops offline, never on TypeScript", async ({
+    page,
+    context,
+  }) => {
     await installThen(page, (url) =>
       page.evaluate(async (u) => {
         let put = false;
         for (const name of await caches.keys()) {
           const cache = await caches.open(name);
           if (!(await cache.match(u))) continue;
-          await cache.put(u, new Response(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 2, 3]), { headers: { "content-type": "application/wasm" } }));
+          await cache.put(
+            u,
+            new Response(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 2, 3]), {
+              headers: { "content-type": "application/wasm" },
+            }),
+          );
           put = true;
         }
         return put;

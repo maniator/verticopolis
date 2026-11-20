@@ -17,7 +17,8 @@ describe.skipIf(noEngine)("SaveGame", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   /** Rename the tower through the engine's own setter. */
-  const nameTower = (sim: Draft, name: string): void => (sim.port as unknown as { setTowerName(name: string): void }).setTowerName(name);
+  const nameTower = (sim: Draft, name: string): void =>
+    (sim.port as unknown as { setTowerName(name: string): void }).setTowerName(name);
 
   /** A played tower on the Rust engine: the seeded lobby, floor 2 over part
    *  of it, an elevator, an office and five hours of play. */
@@ -532,7 +533,9 @@ describe.skipIf(noEngine)("SaveGame", () => {
 
   it("rejects a raw-JSON tower export — only .vctower containers import now", async () => {
     const sim = sampleGame();
-    await expect(readImport(JSON.stringify(sim.serialize(), null, 2))).rejects.toThrow(/not a verticopolis tower file/i);
+    await expect(readImport(JSON.stringify(sim.serialize(), null, 2))).rejects.toThrow(
+      /not a verticopolis tower file/i,
+    );
   });
 
   it("rejects malformed imports", async () => {

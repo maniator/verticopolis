@@ -65,9 +65,7 @@ function tableRows(): { line: string; cells: string[] }[] {
 describe("backlog issue mirror", () => {
   it("every data row splits into exactly the table's columns (escaped pipes only in Notes)", () => {
     const bad = tableRows().filter((r) => r.cells.length !== PARTS);
-    expect(
-      bad.map((r) => `${r.cells[2] ?? "?"} (${r.cells.length - 2} cells): ${r.line.slice(0, 80)}`),
-    ).toEqual([]);
+    expect(bad.map((r) => `${r.cells[2] ?? "?"} (${r.cells.length - 2} cells): ${r.line.slice(0, 80)}`)).toEqual([]);
   });
 
   it("every status is a known token (unknown statuses must not fail open)", () => {

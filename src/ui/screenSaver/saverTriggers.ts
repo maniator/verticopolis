@@ -41,7 +41,10 @@ const PRESENCE = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"
 /** Watch for the idle wait and the way back to the tab. Returns a function
  *  that stops watching, and one that marks the player as just here (call it
  *  when the saver ends or the choices change). */
-export function watchForSaver(ports: SaverTriggerPorts, win: Window = window): { stop: () => void; touched: () => void } {
+export function watchForSaver(
+  ports: SaverTriggerPorts,
+  win: Window = window,
+): { stop: () => void; touched: () => void } {
   const doc = win.document;
   const now = () => win.performance.now();
   let lastInput = now();
@@ -60,7 +63,8 @@ export function watchForSaver(ports: SaverTriggerPorts, win: Window = window): {
   const check = () => {
     timer = 0;
     if (!on()) return;
-    if (doc.visibilityState !== "hidden" && now() - lastInput >= waitMs() && ports.paused() && ports.canShow()) ports.start("idle");
+    if (doc.visibilityState !== "hidden" && now() - lastInput >= waitMs() && ports.paused() && ports.canShow())
+      ports.start("idle");
     arm();
   };
   function arm(): void {

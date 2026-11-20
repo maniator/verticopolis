@@ -46,18 +46,30 @@ function importIsTypeOnly(clause: ts.ImportClause | undefined): boolean {
   if (!clause) return false; // `import "../engine/x"` runs the module
   if (clause.isTypeOnly) return true;
   const named = clause.namedBindings;
-  return !clause.name && named !== undefined && ts.isNamedImports(named) && named.elements.length > 0 && named.elements.every((e) => e.isTypeOnly);
+  return (
+    !clause.name &&
+    named !== undefined &&
+    ts.isNamedImports(named) &&
+    named.elements.length > 0 &&
+    named.elements.every((e) => e.isTypeOnly)
+  );
 }
 
 /** True when a re-export brings in types only. */
 function exportIsTypeOnly(node: ts.ExportDeclaration): boolean {
   if (node.isTypeOnly) return true;
   const clause = node.exportClause;
-  return clause !== undefined && ts.isNamedExports(clause) && clause.elements.length > 0 && clause.elements.every((e) => e.isTypeOnly);
+  return (
+    clause !== undefined &&
+    ts.isNamedExports(clause) &&
+    clause.elements.length > 0 &&
+    clause.elements.every((e) => e.isTypeOnly)
+  );
 }
 
 /** `import.meta` in `import.meta.url` or `import.meta.glob`. */
-const isImportMeta = (node: ts.Node): boolean => ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword;
+const isImportMeta = (node: ts.Node): boolean =>
+  ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword;
 
 /** True for `{ eager: true }`, the glob option that bundles every match into
  *  the importer's chunk. */
@@ -65,7 +77,10 @@ function isEager(options: ts.Expression | undefined): boolean {
   return (
     options !== undefined &&
     ts.isObjectLiteralExpression(options) &&
-    options.properties.some((p) => ts.isPropertyAssignment(p) && p.name.getText() === "eager" && p.initializer.kind === ts.SyntaxKind.TrueKeyword)
+    options.properties.some(
+      (p) =>
+        ts.isPropertyAssignment(p) && p.name.getText() === "eager" && p.initializer.kind === ts.SyntaxKind.TrueKeyword,
+    )
   );
 }
 
@@ -76,7 +91,11 @@ const viteQuery = (spec: string): string => /\?([^#]*)/.exec(spec)?.[1] ?? "";
  *  specifier as written (a URL's relative path given its `./`). A caller that
  *  has already parsed the file passes its `source` (parsed with parent nodes)
  *  so the file is parsed once. */
-export function scanRuntimeImports(rel: string, text: string, source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true)): ImportScan {
+export function scanRuntimeImports(
+  rel: string,
+  text: string,
+  source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true),
+): ImportScan {
   const imports: RuntimeImport[] = [];
   const unreadable: string[] = [];
   const lineOf = (node: ts.Node): string => `${rel}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}`;
@@ -111,14 +130,20 @@ export function scanRuntimeImports(rel: string, text: string, source = ts.create
       if (!node.isTypeOnly) note(node.moduleReference.expression, "static", node);
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       note(node.arguments[0], "dynamic", node);
-    } else if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "glob" && isImportMeta(node.expression.expression)) {
+    } else if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "glob" &&
+      isImportMeta(node.expression.expression)
+    ) {
       const [patterns, options] = node.arguments;
       noteGlob(patterns, isEager(options) ? "static" : "glob", node);
     } else if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "URL") {
       const [spec, base] = node.arguments ?? [];
       if (base !== undefined && ts.isPropertyAccessExpression(base) && isImportMeta(base.expression)) {
         // `new URL("x.ts", import.meta.url)` is relative to the file, `./` or not.
-        const relative = spec !== undefined && ts.isStringLiteralLike(spec) && !/^([a-z][a-z0-9+.-]*:|\.|\/)/i.test(spec.text);
+        const relative =
+          spec !== undefined && ts.isStringLiteralLike(spec) && !/^([a-z][a-z0-9+.-]*:|\.|\/)/i.test(spec.text);
         if (relative) imports.push({ spec: `./${spec.text}`, kind: "url" });
         else note(spec, "url", node);
       }
@@ -178,11 +203,18 @@ export function globRegex(glob: string): RegExp {
       else if (ch === "?") out += "[^/]";
       else if (ch === "{" && pattern.indexOf("}", i) > i) {
         const end = pattern.indexOf("}", i);
-        out += `(?:${pattern.slice(i + 1, end).split(",").map(body).join("|")})`;
+        out += `(?:${pattern
+          .slice(i + 1, end)
+          .split(",")
+          .map(body)
+          .join("|")})`;
         i = end;
       } else if (ch === "[" && pattern.indexOf("]", i) > i + 1) {
         const end = pattern.indexOf("]", i);
-        out += `[${pattern.slice(i + 1, end).replace(/^!/, "^").replace(/\\/g, "\\\\")}]`;
+        out += `[${pattern
+          .slice(i + 1, end)
+          .replace(/^!/, "^")
+          .replace(/\\/g, "\\\\")}]`;
         i = end;
       } else out += escape(ch);
     }

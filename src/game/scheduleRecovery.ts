@@ -22,7 +22,11 @@ import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTyp
 const SCHEDULE_HOURS = 24;
 
 /** The kinds that are elevators; a test pins this to the engine's `isElevatorKind`. */
-const ELEVATOR_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["elevatorStandard", "elevatorService", "elevatorExpress"]);
+const ELEVATOR_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>([
+  "elevatorStandard",
+  "elevatorService",
+  "elevatorExpress",
+]);
 export const isElevator = (kind: FacilityKind): boolean => ELEVATOR_KINDS.has(kind);
 
 /** What the review needs of a shaft: the card's facts, nothing from the engine's records. */
@@ -55,7 +59,10 @@ function rowsOf(schedule: ElevatorSchedule, cars: number): number[][] {
 }
 
 /** The elevators a schedule leaves short, in the order given. `scheduleOf` is the port's `currentSchedule`. */
-export function shortFleets(shafts: readonly ShaftFacts[], scheduleOf: (id: number) => ElevatorSchedule | undefined): ShortFleet[] {
+export function shortFleets(
+  shafts: readonly ShaftFacts[],
+  scheduleOf: (id: number) => ElevatorSchedule | undefined,
+): ShortFleet[] {
   const found: ShortFleet[] = [];
   for (const shaft of shafts) {
     if (!isElevator(shaft.kind)) continue;
@@ -137,7 +144,8 @@ const isDecision = (value: unknown): value is Decision => value === "kept" || va
 
 /** The player's choice to keep a schedule outranks the one-time notice flag, so when two answers meet for one shaft
  *  (a legacy key and its canonical form, or a notice written after a Keep) the kept one stays. */
-const strongerDecision = (a: Decision | undefined, b: Decision): Decision => (a === "kept" || b === "kept" ? "kept" : b);
+const strongerDecision = (a: Decision | undefined, b: Decision): Decision =>
+  a === "kept" || b === "kept" ? "kept" : b;
 
 /** Rewrites the known legacy shaft keys to their canonical form, at the position of the first entry for that shaft.
  *  Every other entry stays where and as it is: this slot is the game's own, but a newer build or another tab may
@@ -150,7 +158,12 @@ function canonicalize(entries: Record<string, unknown>): Record<string, unknown>
     if (!isDecision(value)) return null;
     const canonical = canonicalKey(key);
     if (canonical === null) return null;
-    if (canonical !== key && Object.prototype.hasOwnProperty.call(entries, canonical) && !isDecision(entries[canonical])) return null;
+    if (
+      canonical !== key &&
+      Object.prototype.hasOwnProperty.call(entries, canonical) &&
+      !isDecision(entries[canonical])
+    )
+      return null;
     return canonical;
   };
   const merged = new Map<string, Decision>();
@@ -176,7 +189,9 @@ function canonicalize(entries: Record<string, unknown>): Record<string, unknown>
  *  An answer storage would not take is held in memory instead, so within this session Keep still sticks and the
  *  one-time notice does not come back. Once storage takes a write again, every answer held in memory goes in with it,
  *  so a reload after storage recovers still remembers them. */
-export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setItem"> | undefined = safeStorage()): Acknowledgements {
+export function browserAcknowledgements(
+  storage: Pick<Storage, "getItem" | "setItem"> | undefined = safeStorage(),
+): Acknowledgements {
   const unsaved = new Map<string, Decision>();
   // True once a legacy-key rewrite was refused: reads stop retrying it until a write goes through.
   let migrationRefused = false;
@@ -203,7 +218,9 @@ export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setI
     const kept = stored[canonical];
     const fromStorage = isDecision(kept) ? kept : undefined;
     const fromMemory = unsaved.get(canonical);
-    return fromMemory !== undefined && fromStorage !== undefined ? strongerDecision(fromMemory, fromStorage) : (fromMemory ?? fromStorage);
+    return fromMemory !== undefined && fromStorage !== undefined
+      ? strongerDecision(fromMemory, fromStorage)
+      : (fromMemory ?? fromStorage);
   };
   return {
     get: (key) => {

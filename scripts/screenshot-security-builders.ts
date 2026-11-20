@@ -41,7 +41,12 @@ export function buildSecurityTower(): void {
   const split = opts.split === true;
   const left = split ? cx - 33 : cx - 20;
   const right = split ? cx + 32 : cx + 19;
-  const towers: [number, number][] = split ? [[left, cx - 10], [cx + 9, right]] : [[left, right]];
+  const towers: [number, number][] = split
+    ? [
+        [left, cx - 10],
+        [cx + 9, right],
+      ]
+    : [[left, right]];
   if (split) (window as unknown as { __vcShotSecuritySplit?: unknown }).__vcShotSecuritySplit = towers;
   // The founding lot differs by mode, so lay the ground row outward from the
   // center in both: every later tile connects by touching the first.
@@ -73,7 +78,8 @@ export function buildSecurityTower(): void {
       let x = f === 6 && lo === left ? lo + 6 + secWidth : lo + 6;
       while (x + 1 <= end) x += room(f === 2 ? "fastFood" : "office", f, x, f === 2 ? 0 : 6);
       if (gap) {
-        if (hi + 1 - x < secWidth) throw new Error(`floor 11 left ${hi + 1 - x} free tiles, short of a Security office`);
+        if (hi + 1 - x < secWidth)
+          throw new Error(`floor 11 left ${hi + 1 - x} free tiles, short of a Security office`);
         (window as unknown as { __vcShotSecurityGapAt?: number }).__vcShotSecurityGapAt = x;
       }
     }

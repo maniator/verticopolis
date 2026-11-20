@@ -51,7 +51,9 @@ function harness(answer = Float64Array.of(1, 0), reason?: string) {
     ui: {
       toast: vi.fn(),
       sayVisibly: vi.fn(),
-      showScheduleReview: vi.fn((_rows: unknown, _handlers?: unknown, _focus?: string): HTMLElement => document.createElement("div")),
+      showScheduleReview: vi.fn((_rows: unknown, _handlers?: unknown, _focus?: string): HTMLElement =>
+        document.createElement("div"),
+      ),
     },
     audio: { sfx: vi.fn() },
     captureUndo: vi.fn(),
@@ -119,10 +121,16 @@ describe("ScheduleReview", () => {
   it("counts for the Tower Statistics entry only the flat short schedules not kept", () => {
     const { review, schedules } = harness();
     schedules.set(11, FLAT); // stairs: never an elevator finding
-    expect(review.undecided().map((f) => f.shaft.id), "the staggered shaft 9 is left out").toEqual([7]);
+    expect(
+      review.undecided().map((f) => f.shaft.id),
+      "the staggered shaft 9 is left out",
+    ).toEqual([7]);
     review.keep(7);
     expect(review.undecided()).toEqual([]);
-    expect(review.findings().map((f) => f.shaft.id), "both still listed in the dialog").toEqual([7, 9]);
+    expect(
+      review.findings().map((f) => f.shaft.id),
+      "both still listed in the dialog",
+    ).toEqual([7, 9]);
   });
 
   it("redraws an open review when an Undo or Redo changes the tower under it, keeping the focused button", () => {
@@ -196,8 +204,12 @@ describe("ScheduleReview", () => {
     expect(engine.scheduleShaft).toHaveBeenCalledExactlyOnceWith(7, scheduleSlots(all));
     expect(deps.captureUndo).toHaveBeenCalledExactlyOnceWith("Use all elevator cars");
     expect(deps.commitUndo).toHaveBeenCalledOnce();
-    expect(deps.captureUndo.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(engine.scheduleShaft).mock.invocationCallOrder[0]!);
-    expect(vi.mocked(engine.scheduleShaft).mock.invocationCallOrder[0]).toBeLessThan(deps.commitUndo.mock.invocationCallOrder[0]!);
+    expect(deps.captureUndo.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(engine.scheduleShaft).mock.invocationCallOrder[0]!,
+    );
+    expect(vi.mocked(engine.scheduleShaft).mock.invocationCallOrder[0]).toBeLessThan(
+      deps.commitUndo.mock.invocationCallOrder[0]!,
+    );
     expect(kit.cards.forget).toHaveBeenCalledOnce();
     expect(deps.audio.sfx).toHaveBeenCalledExactlyOnceWith("build");
     expect(deps.announce).toHaveBeenCalledExactlyOnceWith("Elevator floors 1 to 9 now uses all 4 cars.");
@@ -212,7 +224,9 @@ describe("ScheduleReview", () => {
     expect(deps.refreshEditor).not.toHaveBeenCalled();
     expect(lastDialog()[2]).toBe(recoverAct(7));
     expect(deps.ui.sayVisibly).toHaveBeenCalledExactlyOnceWith("Not enough money.", "bad");
-    expect(deps.ui.showScheduleReview.mock.invocationCallOrder[0]).toBeLessThan(deps.ui.sayVisibly.mock.invocationCallOrder[0]!);
+    expect(deps.ui.showScheduleReview.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.ui.sayVisibly.mock.invocationCallOrder[0]!,
+    );
   });
 
   it("sends nothing to the engine for an elevator that no longer needs it", () => {
@@ -227,7 +241,9 @@ describe("ScheduleReview", () => {
     const { review, deps, decisions, lastDialog } = harness();
     review.keep(7);
     expect(decisions.get("classic:42:7:elevatorStandard:10")).toBe("kept");
-    expect(deps.announce).toHaveBeenCalledExactlyOnceWith("Kept the schedule of the elevator on floors 1 to 9 as it is.");
+    expect(deps.announce).toHaveBeenCalledExactlyOnceWith(
+      "Kept the schedule of the elevator on floors 1 to 9 as it is.",
+    );
     const [rows, handlers, focus] = lastDialog();
     expect(rows[0]!.kept).toBe(true);
     expect(handlers[keepAct(7)]).toBeUndefined();

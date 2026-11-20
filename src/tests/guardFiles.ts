@@ -13,9 +13,7 @@ import { dirname, relative, resolve } from "node:path";
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Generated output under the scanned roots, by repo-relative path. */
-export const SKIPPED_PATHS: ReadonlySet<string> = new Set([
-  "src/public/engine",
-]);
+export const SKIPPED_PATHS: ReadonlySet<string> = new Set(["src/public/engine"]);
 
 const SKIPPED_NAMES: ReadonlySet<string> = new Set(["node_modules", "dist", ".git"]);
 

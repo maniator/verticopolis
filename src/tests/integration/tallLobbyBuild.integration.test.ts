@@ -63,12 +63,21 @@ function previewOf(t: Tower, kind: string, tile: number, floor: number, amount: 
   } as unknown as GameApp;
   t.setMoney(amount);
   updateBuildPreview(app, tile, floor);
-  return engine as { preview: { valid: boolean; stories?: number } | null; transportPreview: { bottom: number; top: number; valid: boolean } | null };
+  return engine as {
+    preview: { valid: boolean; stories?: number } | null;
+    transportPreview: { bottom: number; top: number; valid: boolean } | null;
+  };
 }
 
 /** The Lobby brush preview at `(tile, floor)` with `amount` to spend and the
  *  card's picked `height`. */
-function preview(t: Tower, tile: number, floor: number, amount: number, height: number): { valid: boolean; stories?: number } {
+function preview(
+  t: Tower,
+  tile: number,
+  floor: number,
+  amount: number,
+  height: number,
+): { valid: boolean; stories?: number } {
   return previewOf(t, "lobby", tile, floor, amount, height).preview as { valid: boolean; stories?: number };
 }
 
@@ -131,14 +140,17 @@ describe.skipIf(!hasWasmPackage())("tall lobbies on the Rust engine (#308)", () 
     const at = 174;
     t.setMoney(1e9);
     expect(buildActions(t, 1).paintBrush("lobby", at, 1).placed).toBeGreaterThan(0);
-    for (let floor = 2; floor < sky; floor++) expect(buildActions(t, 1).paintBrush("floor", at, floor).placed, `floor ${floor}`).toBeGreaterThan(0);
+    for (let floor = 2; floor < sky; floor++)
+      expect(buildActions(t, 1).paintBrush("floor", at, floor).placed, `floor ${floor}`).toBeGreaterThan(0);
     expect(preview(t, at, sky, 1e9, 3).valid).toBe(false);
     const toasts: [string, string | undefined][] = [];
     const money = t.engine.money();
     // The phone's tap stamps the brush through seedPaint, which has no hover
     // ghost to carry the reason, so it must say it.
     buildActions(t, 3, (text, tone) => void toasts.push([text, tone])).seedPaint("lobby", at, sky);
-    expect(toasts).toEqual([[expect.stringMatching(/^In Classic, only the ground lobby can be taller than one story\. Pick 1 story/), "bad"]]);
+    expect(toasts).toEqual([
+      [expect.stringMatching(/^In Classic, only the ground lobby can be taller than one story\. Pick 1 story/), "bad"],
+    ]);
     expect(t.engine.money()).toBe(money);
     t.reader.update();
     expect(brushTiles(at).some((x) => t.reader.tower.structureKindAt(sky, x) === "lobby")).toBe(false);
@@ -232,7 +244,9 @@ describe.skipIf(!hasWasmPackage())("tall lobbies on the Rust engine (#308)", () 
       expect(ghost).toMatchObject({ bottom: sky, top: sky + 2, valid: true });
       expect(buildActions(t, 1).tryBuildTransport("stairs", 114, sky, sky + 1).ok).toBe(true);
       t.reader.update();
-      expect(t.reader.tower.transports.filter((x) => x.kind === "stairs").map((x) => [x.bottom, x.top])).toEqual([[sky, sky + 2]]);
+      expect(t.reader.tower.transports.filter((x) => x.kind === "stairs").map((x) => [x.bottom, x.top])).toEqual([
+        [sky, sky + 2],
+      ]);
     });
   });
 
@@ -260,7 +274,10 @@ describe.skipIf(!hasWasmPackage())("tall lobbies on the Rust engine (#308)", () 
       expect(buildActions(t, 1).tryBuildTransport("stairs", at - 10, 1, 2).ok, `${height}`).toBe(true);
       t.reader.update();
       const built = t.reader.tower.transports.filter((x) => x.kind === "stairs");
-      expect(built.map((x) => [x.bottom, x.top]), `${height}`).toEqual([[1, over]]);
+      expect(
+        built.map((x) => [x.bottom, x.top]),
+        `${height}`,
+      ).toEqual([[1, over]]);
     }
   });
 });

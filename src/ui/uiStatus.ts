@@ -169,7 +169,10 @@ export function update(ui: UI, src: HudSource): void {
     // matches what the palette shows. (Fires once: the tool is Inspect afterward.)
     // Gated with the scan: the tool can only BECOME locked when the star drops
     // (a key change) or a new catalog withholds its kind (which clears the key).
-    const toolLocked = ui.tool.type === "skyBridge" ? !skyBridgeUnlocked(bridge, star) : ui.tool.type === "build" && !unlocked(catalog, ui.tool.kind, star);
+    const toolLocked =
+      ui.tool.type === "skyBridge"
+        ? !skyBridgeUnlocked(bridge, star)
+        : ui.tool.type === "build" && !unlocked(catalog, ui.tool.kind, star);
     if (toolLocked) {
       ui.selectTool({ type: "inspect" });
     }

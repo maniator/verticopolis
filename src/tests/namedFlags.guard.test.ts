@@ -60,18 +60,45 @@ function hits(dir: string, exts: string[]): string[] {
 describe("named flags guard", () => {
   it("every allowed file still exists and has exactly its listed shift sites", () => {
     for (const [rel, { sites }] of Object.entries(ALLOWED)) {
-      const abs = sourceFiles(rel.split("/").slice(0, -1).join("/"), [rel.split("/").pop()!]).find((f) => repoRel(f) === rel);
+      const abs = sourceFiles(rel.split("/").slice(0, -1).join("/"), [rel.split("/").pop()!]).find(
+        (f) => repoRel(f) === rel,
+      );
       expect(abs, `${rel} is listed in ALLOWED but not found; drop it`).toBeDefined();
       const found = siteLines(readFileSync(abs!, "utf8"));
-      expect(found.length, `${rel} has ${found.length} shift site(s), the list says ${sites}. A new site needs its reason written down; a removed one lowers the count:\n${found.join("\n")}`).toBe(sites);
+      expect(
+        found.length,
+        `${rel} has ${found.length} shift site(s), the list says ${sites}. A new site needs its reason written down; a removed one lowers the count:\n${found.join("\n")}`,
+      ).toBe(sites);
     }
   });
 
   it("catches every spelling of a literal one shifted or two raised to an index", () => {
-    for (const code of ["1 << i", "1u32 << i", "1u8<<i", "1i32 << i", "1i64 << n", "1_u8 << k", "1_u64 << k", "1usize << k", "(1 as u64) << k", "( 1 as i128 ) << k", "1n << BigInt(k)", "2 ** i"]) {
+    for (const code of [
+      "1 << i",
+      "1u32 << i",
+      "1u8<<i",
+      "1i32 << i",
+      "1i64 << n",
+      "1_u8 << k",
+      "1_u64 << k",
+      "1usize << k",
+      "(1 as u64) << k",
+      "( 1 as i128 ) << k",
+      "1n << BigInt(k)",
+      "2 ** i",
+    ]) {
       expect(SHIFT_OR_POW.test(code), code).toBe(true);
     }
-    for (const code of ["value << 3", "x << 1", "11 << 2", "0x1 << 2", "12u32 << 2", "(2 as u64) << k", "2 ** 8", "a < b << c"]) {
+    for (const code of [
+      "value << 3",
+      "x << 1",
+      "11 << 2",
+      "0x1 << 2",
+      "12u32 << 2",
+      "(2 as u64) << k",
+      "2 ** 8",
+      "a < b << c",
+    ]) {
       expect(SHIFT_OR_POW.test(code), code).toBe(false);
     }
   });

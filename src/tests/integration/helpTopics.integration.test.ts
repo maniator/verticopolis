@@ -46,7 +46,6 @@ function showCard(): HTMLElement {
   return card;
 }
 
-
 const pressF1 = (opts: KeyboardEventInit = {}) => {
   const e = new KeyboardEvent("keydown", { key: "F1", cancelable: true, ...opts });
   window.dispatchEvent(e);
@@ -72,7 +71,10 @@ describe("the problem lines' Help links", () => {
     link.dispatchEvent(press);
     expect(press.defaultPrevented).toBe(true);
     expect(open).toHaveBeenCalledTimes(1);
-    expect(open).toHaveBeenCalledWith("/help/tower/ratings/?from=game&via=inspector#what-wears-a-rating-down", "_blank");
+    expect(open).toHaveBeenCalledWith(
+      "/help/tower/ratings/?from=game&via=inspector#what-wears-a-rating-down",
+      "_blank",
+    );
     expect(sent.trackAppAction).toHaveBeenCalledWith("help_topic_open", "inspector_noise");
     expect(speed.now()).toBe(0);
     leaveAndReturn();
@@ -140,7 +142,9 @@ describe("the problem lines' Help links", () => {
   it("marks a room card that holds a Help link, so the desktop card names F1", () => {
     const { ui } = makeUI();
     const card = document.getElementById("inspector")!;
-    ui.showInspector(html`<h4 class="win-title">Office</h4><div>Main gripe: noise.${helpTopicLink("noise", "inspector")}</div>`);
+    ui.showInspector(
+      html`<h4 class="win-title">Office</h4><div>Main gripe: noise.${helpTopicLink("noise", "inspector")}</div>`,
+    );
     expect(card.classList.contains("has-help")).toBe(true);
     ui.showInspector(html`<h4 class="win-title">Office</h4><div>Access: reachable from the lobby.</div>`);
     expect(card.classList.contains("has-help")).toBe(false);

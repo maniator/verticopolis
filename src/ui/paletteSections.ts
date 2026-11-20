@@ -85,7 +85,9 @@ export function wireSectionFolds(root: HTMLElement, storage: Store | null, onTog
     onToggle();
   };
   const headerAt = (target: EventTarget | null) =>
-    target instanceof HTMLElement ? target.closest<HTMLElement>(".pal-group > .pal-group-title[data-group]:not(.pal-sub)") : null;
+    target instanceof HTMLElement
+      ? target.closest<HTMLElement>(".pal-group > .pal-group-title[data-group]:not(.pal-sub)")
+      : null;
   root.addEventListener("click", (e) => {
     const header = headerAt(e.target);
     if (header) toggle(header);

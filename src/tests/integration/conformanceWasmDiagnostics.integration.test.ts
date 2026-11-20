@@ -28,7 +28,9 @@ import type { WasmEngine } from "@verticopolis/components/binding/binding";
  */
 
 const SCENARIO_DIR = resolve(CONFORMANCE_DIR, "scenarios");
-const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "expected.json"), "utf8")) as { scenarios: Record<string, Checkpoint[]> };
+const lock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "expected.json"), "utf8")) as {
+  scenarios: Record<string, Checkpoint[]>;
+};
 const files = readdirSync(SCENARIO_DIR)
   .filter((f) => f.endsWith(".json"))
   .sort();
@@ -67,7 +69,8 @@ function wasmWithFacts(handle: WasmEngine, reads: DiagnosticFacts[][]): Scenario
           const text = handle.diagnosticFacts(u.id);
           if (text === undefined) throw new Error(`diagnosticFacts(${u.id}) answered nothing for a unit`);
           const facts = JSON.parse(text) as DiagnosticFacts;
-          if (facts.id !== u.id || facts.kind !== u.kind) throw new Error(`diagnosticFacts(${u.id}) answered about ${facts.kind} ${facts.id}, not ${u.kind} ${u.id}`);
+          if (facts.id !== u.id || facts.kind !== u.kind)
+            throw new Error(`diagnosticFacts(${u.id}) answered about ${facts.kind} ${facts.id}, not ${u.kind} ${u.id}`);
           return facts;
         }),
       );
@@ -85,11 +88,27 @@ function wasmWithFacts(handle: WasmEngine, reads: DiagnosticFacts[][]): Scenario
  *  engine change that stops reaching one fails the last test, so a section
  *  cannot drop out of the run unseen. */
 const CORPUS_SECTIONS = [
-  "access:cutOff", "access:notConnected", "access:reachable", "farWalk",
-  "gripe:access", "gripe:lobbyFar", "gripe:noTransport", "gripe:noise", "gripe:rent", "gripe:transportFar",
-  "lobby:slot:support", "noRate:occupied",
-  "notice:access", "notice:noTransport", "notice:noise", "notice:relocation", "notice:rent", "notice:transportFar",
-  "wontLease:noise", "wontLease:rent", "wontLease:transportFar",
+  "access:cutOff",
+  "access:notConnected",
+  "access:reachable",
+  "farWalk",
+  "gripe:access",
+  "gripe:lobbyFar",
+  "gripe:noTransport",
+  "gripe:noise",
+  "gripe:rent",
+  "gripe:transportFar",
+  "lobby:slot:support",
+  "noRate:occupied",
+  "notice:access",
+  "notice:noTransport",
+  "notice:noise",
+  "notice:relocation",
+  "notice:rent",
+  "notice:transportFar",
+  "wontLease:noise",
+  "wontLease:rent",
+  "wontLease:transportFar",
 ];
 
 /** Which sections the corpus exercised, so a gap in the run shows,
@@ -101,7 +120,12 @@ function tally(f: DiagnosticFacts): void {
   if (f.access) bump(`access:${f.access}`);
   if (f.noRate) bump(`noRate:${f.noRate}`);
   if (f.farWalk) bump("farWalk");
-  if (f.lobby) bump(f.lobby.slot ? `lobby:slot${f.lobby.slot.needsSupport ? ":support" : ""}${f.lobby.slot.clearFirst ? ":clear" : ""}` : "lobby:noSlot");
+  if (f.lobby)
+    bump(
+      f.lobby.slot
+        ? `lobby:slot${f.lobby.slot.needsSupport ? ":support" : ""}${f.lobby.slot.clearFirst ? ":clear" : ""}`
+        : "lobby:noSlot",
+    );
   if (f.gripe) bump(`gripe:${f.gripe.cause}${f.gripe.binding ? `:${f.gripe.binding}` : ""}`);
   if (f.wontLease) bump(`wontLease:${f.wontLease.gripe?.cause ?? "none"}`);
   if (f.notice) bump(`notice:${f.notice.reason}`);
@@ -114,7 +138,12 @@ describe.skipIf(!hasWasmPackage())("diagnostics facts through the WASM binding",
       const pinned = lock.scenarios[scenario.id];
       if (!pinned) throw new Error(`${scenario.id} is not in the lock; regenerate it with the Rust run first`);
       const reads: DiagnosticFacts[][] = [];
-      expect(firstDivergence(runScenario(scenario, (start) => wasmWithFacts(startWasmHandle(start), reads)), pinned)).toBeNull();
+      expect(
+        firstDivergence(
+          runScenario(scenario, (start) => wasmWithFacts(startWasmHandle(start), reads)),
+          pinned,
+        ),
+      ).toBeNull();
       expect(reads.length, `${scenario.id}: one read per checkpoint`).toBe(pinned.length);
       reads.forEach((read) => read.forEach(tally));
       compared += 1;
@@ -131,6 +160,7 @@ describe.skipIf(!hasWasmPackage())("diagnostics facts through the WASM binding",
   });
 
   afterAll(() => {
-    if (seen.size > 0) console.info(`diagnostics facts read, by section: ${JSON.stringify(Object.fromEntries([...seen].sort()))}`);
+    if (seen.size > 0)
+      console.info(`diagnostics facts read, by section: ${JSON.stringify(Object.fromEntries([...seen].sort()))}`);
   });
 });

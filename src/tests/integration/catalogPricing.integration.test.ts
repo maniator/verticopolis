@@ -20,13 +20,16 @@ describe.skipIf(noEngine)("a fresh build's price on the engine (#921)", () => {
       draft.money = 1e12;
       draft.star = 6;
       const x0 = Math.floor(LOT_WIDTH / 2) - 20;
-      const eligible = catalogOn(draft.port, mode).facilities.filter((f) => f.available && f.rent && !f.transport && !f.basement);
+      const eligible = catalogOn(draft.port, mode).facilities.filter(
+        (f) => f.available && f.rent && !f.transport && !f.basement,
+      );
       expect(eligible.length, `${mode}: the sweep covers priced kinds`).toBeGreaterThan(3);
       const built: { id: number; kind: FacilityKind }[] = [];
       for (let x = x0; x < x0 + 80; x++) layTile(draft, "lobby", 1, x);
       let floor = 2;
       for (const f of eligible) {
-        for (let story = floor; story < floor + f.floors; story++) for (let x = x0; x < x0 + 80; x++) layTile(draft, "floor", story, x);
+        for (let story = floor; story < floor + f.floors; story++)
+          for (let x = x0; x < x0 + 80; x++) layTile(draft, "floor", story, x);
         const res = draft.tower.place(f.key, floor, x0 + 2);
         // Every priced kind must build, or the sweep would quietly check fewer.
         expect(res.ok, `${mode} ${f.key}: ${res.reason ?? ""}`).toBe(true);
@@ -37,7 +40,11 @@ describe.skipIf(noEngine)("a fresh build's price on the engine (#921)", () => {
       const catalog = catalogOn(engine, mode);
       const cards = new Cards(engine, newViewReader(engine));
       for (const { id, kind } of built) {
-        const stored = look(engine).tower.units.find((u) => u.id === id) as unknown as { kind: FacilityKind; rent?: number; noRate?: boolean };
+        const stored = look(engine).tower.units.find((u) => u.id === id) as unknown as {
+          kind: FacilityKind;
+          rent?: number;
+          noRate?: boolean;
+        };
         expect(cards.unit(id)!.price, `${mode} ${kind}`).toBe(unitPrice(catalog, stored));
         expect(cards.unit(id)!.price, `${mode} ${kind} charges something`).toBeGreaterThan(0);
       }

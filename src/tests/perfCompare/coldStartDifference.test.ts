@@ -21,7 +21,11 @@ describe("coldStartDifferenceLines", () => {
     // Differences 0 to 9 at 1x: median 4.5, interval x(2) to x(9) = 1 to 8; the gate's value is the 8.
     const metrics = [
       row("ts", "1", Array(10).fill(1000)),
-      row("wasm", "1", Array.from({ length: 10 }, (_, i) => 1000 + i)),
+      row(
+        "wasm",
+        "1",
+        Array.from({ length: 10 }, (_, i) => 1000 + i),
+      ),
       row("ts", "4", Array(10).fill(3000)),
       row("wasm", "4", Array(10).fill(2990)),
     ];

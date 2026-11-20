@@ -42,7 +42,11 @@ const { width, height } = SKYLINE_WINDOW_SIZE;
 const rect = ([x, y]: readonly [number, number]) => `<rect x="${x}" y="${y}" width="${width}" height="${height}" />`;
 const windowLines: string[] = [];
 for (let i = 0; i < SKYLINE_WINDOWS.length; i += 2) {
-  windowLines.push(`    ${SKYLINE_WINDOWS.slice(i, i + 2).map(rect).join("")}`);
+  windowLines.push(
+    `    ${SKYLINE_WINDOWS.slice(i, i + 2)
+      .map(rect)
+      .join("")}`,
+  );
 }
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${SKYLINE_VIEWBOX}">
@@ -60,4 +64,6 @@ ${windowLines.join("\n")}
 `;
 
 writeFileSync(OUT, svg);
-console.log(`gen-splash-skyline: wrote ${SKYLINE_BUILDINGS.length} buildings and ${SKYLINE_WINDOWS.length} windows to src/public/splash-skyline.svg`);
+console.log(
+  `gen-splash-skyline: wrote ${SKYLINE_BUILDINGS.length} buildings and ${SKYLINE_WINDOWS.length} windows to src/public/splash-skyline.svg`,
+);

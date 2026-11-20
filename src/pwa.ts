@@ -18,7 +18,14 @@
  * UI, or reloads on a timer.
  */
 import { registerSW } from "virtual:pwa-register";
-import { parseUpdateInfo, isDifferentBuild, notesSinceRunning, readNotesSeen, withUpdateKind, type UpdateInfo } from "./pwaUpdateInfo";
+import {
+  parseUpdateInfo,
+  isDifferentBuild,
+  notesSinceRunning,
+  readNotesSeen,
+  withUpdateKind,
+  type UpdateInfo,
+} from "./pwaUpdateInfo";
 import { PREVIEW_DEPLOY } from "./deployTarget";
 import { WORKBOX_CACHE_PREFIX } from "./workboxCaches";
 
@@ -150,7 +157,11 @@ async function reloadFromNetwork(registration: ServiceWorkerRegistration): Promi
     // Workbox names its precache after the registration's scope; only this
     // app's precache goes.
     const names = await caches.keys();
-    await Promise.all(names.filter((name) => name.startsWith("workbox-precache") && name.endsWith(registration.scope)).map((name) => caches.delete(name)));
+    await Promise.all(
+      names
+        .filter((name) => name.startsWith("workbox-precache") && name.endsWith(registration.scope))
+        .map((name) => caches.delete(name)),
+    );
   } catch {
     // Cache Storage can be missing or locked; the unregister alone still lets
     // the reload reach the network.
@@ -219,7 +230,10 @@ export function registerPWA(handlers: PwaHandlers): void {
     // rebuild (an internal change with no version bump, new sha) shows none,
     // only the build-id line.
     const shown = info ? notesSinceRunning(info, __APP_VERSION__, readNotesSeen()) : info;
-    handlers.onUpdateAvailable(activate, withUpdateKind(shown, typeof __BUILD_FINGERPRINT__ !== "undefined" ? __BUILD_FINGERPRINT__ : undefined));
+    handlers.onUpdateAvailable(
+      activate,
+      withUpdateKind(shown, typeof __BUILD_FINGERPRINT__ !== "undefined" ? __BUILD_FINGERPRINT__ : undefined),
+    );
   };
 
   const updateSW = registerSW({

@@ -30,22 +30,40 @@ function viewPort() {
     unitLabel: () => undefined,
     unitSubtype: () => undefined,
     unitMetaChanged: () => Float64Array.of(0, 0),
-    viewStructure: () => structure({ header: { revision: 1, highestFloor: 1, lowestFloor: 1 }, rooms: [{ id: 10, kind: "office", floor: 1, x: 12, width: 9 }] }),
-    viewFrame: (full: boolean) => frame({ header: { frameSeq: 1, full: full ? 1 : 0, rooms: 1, towerRevision: 1, metaRevision: 0 }, units: [{ slot: 0, state: code("unitStates", "occupied") }] }),
+    viewStructure: () =>
+      structure({
+        header: { revision: 1, highestFloor: 1, lowestFloor: 1 },
+        rooms: [{ id: 10, kind: "office", floor: 1, x: 12, width: 9 }],
+      }),
+    viewFrame: (full: boolean) =>
+      frame({
+        header: { frameSeq: 1, full: full ? 1 : 0, rooms: 1, towerRevision: 1, metaRevision: 0 },
+        units: [{ slot: 0, state: code("unitStates", "occupied") }],
+      }),
   });
 }
 
 describe("quoteBuild", () => {
   it("passes the kind's code and the spot, and reads the cost and the ok flag", () => {
-    const port = mockPort({ quoteBuild: () => record("quoteBuild", { ok: 1, cost: 5_000 }), lastReason: () => REFUSAL });
+    const port = mockPort({
+      quoteBuild: () => record("quoteBuild", { ok: 1, cost: 5_000 }),
+      lastReason: () => REFUSAL,
+    });
     expect(quoteBuild(port, new PortCodes(port), "floor", 2, 12)).toEqual({ ok: true, cost: 5_000, reason: undefined });
     expect(port.quoteBuild).toHaveBeenCalledExactlyOnceWith(code("kinds", "floor"), 2, 12);
     expect(port.lastReason, "an accepted quote reads no reason").not.toHaveBeenCalled();
   });
 
   it("carries the engine's own refusal text with the cost it quoted", () => {
-    const port = mockPort({ quoteBuild: () => record("quoteBuild", { ok: 0, cost: 40_000 }), lastReason: () => REFUSAL });
-    expect(quoteBuild(port, new PortCodes(port), "office", 9, 12)).toEqual({ ok: false, cost: 40_000, reason: REFUSAL });
+    const port = mockPort({
+      quoteBuild: () => record("quoteBuild", { ok: 0, cost: 40_000 }),
+      lastReason: () => REFUSAL,
+    });
+    expect(quoteBuild(port, new PortCodes(port), "office", 9, 12)).toEqual({
+      ok: false,
+      cost: 40_000,
+      reason: REFUSAL,
+    });
     expect(port.lastReason).toHaveBeenCalledOnce();
   });
 });
@@ -85,7 +103,9 @@ describe("catalogOf", () => {
     const office = catalogFacility(base, "office");
     const hosted = {
       ...base,
-      facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2, cost: f.cost + 1000 } : f)),
+      facilities: base.facilities.map((f) =>
+        f.key === "office" ? { ...f, width: f.width + 2, cost: f.cost + 1000 } : f,
+      ),
     };
     useTowerCatalogSource(enginePort, () => hosted);
     const read = catalogFacility(catalogOf({ enginePort, reader }), "office");
@@ -116,7 +136,8 @@ describe("newRenderSim", () => {
       return { ...c, facilities: c.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 7 } : f)) };
     };
     useTowerCatalogSource(engine, marked);
-    const hall = (sim: object) => towerCatalog(sim as { mode: "classic" | "modern" }).facilities.find((f) => f.key === "weddingHall")?.floors;
+    const hall = (sim: object) =>
+      towerCatalog(sim as { mode: "classic" | "modern" }).facilities.find((f) => f.key === "weddingHall")?.floors;
     expect(hall(newRenderSim(engine, reader))).toBe(7);
     // A render sim built bare reads the fallback, not the engine's source.
     expect(hall(new PortRenderSim(engine, reader))).toBe(catalogFacility(catalogFor("classic"), "weddingHall").floors);

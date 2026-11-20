@@ -22,7 +22,8 @@ async function pgMakeVersions(): Promise<void> {
   const w = window as unknown as { game: any };
   const g = w.game;
   const pinned = Date.now();
-  const at = (minutesAgo: number) => Object.defineProperty(Date, "now", { configurable: true, value: () => pinned - minutesAgo * 60_000 });
+  const at = (minutesAgo: number) =>
+    Object.defineProperty(Date, "now", { configurable: true, value: () => pinned - minutesAgo * 60_000 });
   const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
   try {
     at(1_500);

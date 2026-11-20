@@ -21,7 +21,9 @@ function firePrep(leg: Leg, seed: number, n = 1) {
     return offices.map((u) => u.id);
   });
   expect(ids).toHaveLength(n);
-  expect(sim.state.tower.transports.some((t) => t.kind === "elevatorStandard" && t.bottom <= 1 && t.top >= 2)).toBe(true);
+  expect(sim.state.tower.transports.some((t) => t.kind === "elevatorStandard" && t.bottom <= 1 && t.top >= 2)).toBe(
+    true,
+  );
   /** The office `i`, as the engine holds it now. */
   const office = (i: number) => sim.state.tower.units.find((u) => u.id === ids[i])!;
   /** Set the first office ablaze, whatever else the tower holds by then. */

@@ -35,7 +35,10 @@ test("a fast load never shows the line", async ({ page }) => {
     const w = window as any;
     w.__loadingLines = 0;
     new MutationObserver((records) => {
-      for (const r of records) for (const n of r.addedNodes) if (n instanceof Element && (n.classList.contains("boot-loading") || n.querySelector(".boot-loading"))) w.__loadingLines++;
+      for (const r of records)
+        for (const n of r.addedNodes)
+          if (n instanceof Element && (n.classList.contains("boot-loading") || n.querySelector(".boot-loading")))
+            w.__loadingLines++;
     }).observe(document, { childList: true, subtree: true });
     // When the engine boot settles: boot publishes its state once the load is over.
     let state: unknown;
@@ -50,9 +53,15 @@ test("a fast load never shows the line", async ({ page }) => {
   });
   await page.reload();
   await hostedGame(page);
-  const { lines, settled } = await page.evaluate(() => ({ lines: (window as any).__loadingLines as number, settled: (window as any).__bootSettledAt as number }));
+  const { lines, settled } = await page.evaluate(() => ({
+    lines: (window as any).__loadingLines as number,
+    settled: (window as any).__bootSettledAt as number,
+  }));
   // The line is right to show on a machine too slow to settle inside the
   // delay; only a load that beat it is held to the claim.
-  test.skip(!(settled < ENGINE_LOADING_DELAY_MS), `the engine took ${Math.round(settled)} ms to settle, past the ${ENGINE_LOADING_DELAY_MS} ms delay`);
+  test.skip(
+    !(settled < ENGINE_LOADING_DELAY_MS),
+    `the engine took ${Math.round(settled)} ms to settle, past the ${ENGINE_LOADING_DELAY_MS} ms delay`,
+  );
   expect(lines).toBe(0);
 });

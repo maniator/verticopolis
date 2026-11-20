@@ -18,7 +18,9 @@ import { test, expect, type Page } from "@playwright/test";
 test.setTimeout(90_000);
 test.use({ storageState: { cookies: [], origins: [] }, serviceWorkers: "block" });
 
-const OLD: Record<string, string> = JSON.parse(readFileSync(new URL("./fixtures/storage-4.2.json", import.meta.url), "utf8"));
+const OLD: Record<string, string> = JSON.parse(
+  readFileSync(new URL("./fixtures/storage-4.2.json", import.meta.url), "utf8"),
+);
 const SLOT_KEYS = ["simtower-clone-slot-1", "simtower-clone-slot-2"];
 /** The Open window's rows, newest first: the Auto-save's own file, then slot
  *  2 (unnamed, under its tower's name, saved after slot 1). */
@@ -37,7 +39,9 @@ async function seed(page: Page): Promise<void> {
 /** Load the game and wait for the title screen on the Rust engine. */
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+    timeout: 30_000,
+  });
   await expect(page.locator('[data-splash="continue"]'), "the title screen offers Continue").toBeVisible();
 }
 
@@ -55,10 +59,13 @@ test("4.2's Auto-save and save slots show in the Open window as files, and the o
   await openWindow(page);
   await expect.poll(() => rowNames(page)).toEqual(LISTED);
   await expect(page.locator(".fd-row", { hasText: "Auto-save" }), "no Auto-save row").toHaveCount(0);
-  await expect(page.locator(".fd-usage"), "the header counts the Auto-save's file with the copied slots").toHaveText(/^3 towers, /);
-  expect(await page.evaluate((keys) => keys.map((k) => localStorage.getItem(k)), [...SLOT_KEYS, AUTO_KEY]), "the old keys are kept for a rollback").toEqual(
-    [...SLOT_KEYS, AUTO_KEY].map((k) => OLD[k]),
+  await expect(page.locator(".fd-usage"), "the header counts the Auto-save's file with the copied slots").toHaveText(
+    /^3 towers, /,
   );
+  expect(
+    await page.evaluate((keys) => keys.map((k) => localStorage.getItem(k)), [...SLOT_KEYS, AUTO_KEY]),
+    "the old keys are kept for a rollback",
+  ).toEqual([...SLOT_KEYS, AUTO_KEY].map((k) => OLD[k]));
 
   // The copy runs once: after a reload the list is the same, with no second copies.
   await page.reload();
@@ -69,7 +76,9 @@ test("4.2's Auto-save and save slots show in the Open window as files, and the o
   // A copied slot opens as a tower.
   await page.locator(".fd-row", { hasText: "My Old Slot One" }).dblclick();
   await expect(page.locator(".fd")).toBeHidden();
-  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, { timeout: 10_000 });
+  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+    timeout: 10_000,
+  });
 });
 
 test("File > Open… shows the window while My Towers is still opening, and fills it in", async ({ page }) => {

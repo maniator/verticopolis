@@ -8,7 +8,15 @@ import { decodeVctower } from "../../storage/vctowerContainer";
  *  special-purpose towers after them. A run with no
  *  `--scenarios` takes the first three kinds only (`DEFAULT_SCENARIOS`); the
  *  bracket towers, the many-unit tower (issue #1270) and the hotel-heavy tower (#1279) are named on purpose. */
-export const SCENARIO_NAMES = ["small", "bracket-a", "bracket-b", "medium", "large", "many-unit", "hotel-heavy"] as const;
+export const SCENARIO_NAMES = [
+  "small",
+  "bracket-a",
+  "bracket-b",
+  "medium",
+  "large",
+  "many-unit",
+  "hotel-heavy",
+] as const;
 export type ScenarioName = (typeof SCENARIO_NAMES)[number];
 export const DEFAULT_SCENARIOS: readonly ScenarioName[] = ["small", "medium", "large"];
 
@@ -49,7 +57,10 @@ export interface PinnedTower {
 
 /** The pinned towers' records, read once. */
 export function pinnedTowers(): Record<ScenarioName, PinnedTower> {
-  return JSON.parse(readFileSync(resolve(import.meta.dirname, "towers/manifest.json"), "utf8")) as Record<ScenarioName, PinnedTower>;
+  return JSON.parse(readFileSync(resolve(import.meta.dirname, "towers/manifest.json"), "utf8")) as Record<
+    ScenarioName,
+    PinnedTower
+  >;
 }
 
 /**
@@ -61,13 +72,32 @@ export function pinnedTowers(): Record<ScenarioName, PinnedTower> {
  * stops the run here instead of quietly measuring another tower.
  */
 const TOWERS: Record<ScenarioName, { file: string; description: string }> = {
-  small: { file: "src/tests/perfCompare/towers/small.vctower", description: "synthetic 15-floor tower (towers/small.vctower)" },
-  "bracket-a": { file: "src/tests/perfCompare/towers/bracket-a.vctower", description: "bracket tower: 26 floors, about 1,150 people (towers/bracket-a.vctower)" },
-  "bracket-b": { file: "src/tests/perfCompare/towers/bracket-b.vctower", description: "bracket tower: 48 floors, about 1,800 people (towers/bracket-b.vctower)" },
-  medium: { file: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven_2.vctower", description: "player fixture conformance/fixtures/sixseven_2.vctower" },
+  small: {
+    file: "src/tests/perfCompare/towers/small.vctower",
+    description: "synthetic 15-floor tower (towers/small.vctower)",
+  },
+  "bracket-a": {
+    file: "src/tests/perfCompare/towers/bracket-a.vctower",
+    description: "bracket tower: 26 floors, about 1,150 people (towers/bracket-a.vctower)",
+  },
+  "bracket-b": {
+    file: "src/tests/perfCompare/towers/bracket-b.vctower",
+    description: "bracket tower: 48 floors, about 1,800 people (towers/bracket-b.vctower)",
+  },
+  medium: {
+    file: "node_modules/@verticopolis/engine/conformance/fixtures/sixseven_2.vctower",
+    description: "player fixture conformance/fixtures/sixseven_2.vctower",
+  },
   large: { file: "src/tests/perfCompare/towers/large.vctower", description: "Tier-1 win tower (towers/large.vctower)" },
-  "many-unit": { file: "src/tests/perfCompare/towers/many-unit.vctower", description: "many units, few people: the large tower's shell with about 500 people (towers/many-unit.vctower)" },
-  "hotel-heavy": { file: "src/tests/perfCompare/towers/hotel-heavy.vctower", description: "Modern hotel tower: 852 rooms, 24 housekeeping units, a split staff network and a wing no crew can route to (towers/hotel-heavy.vctower)" },
+  "many-unit": {
+    file: "src/tests/perfCompare/towers/many-unit.vctower",
+    description: "many units, few people: the large tower's shell with about 500 people (towers/many-unit.vctower)",
+  },
+  "hotel-heavy": {
+    file: "src/tests/perfCompare/towers/hotel-heavy.vctower",
+    description:
+      "Modern hotel tower: 852 rooms, 24 housekeeping units, a split staff network and a wing no crew can route to (towers/hotel-heavy.vctower)",
+  },
 };
 
 /** One tower, checked against its record. */
@@ -76,8 +106,17 @@ export function loadScenario(name: ScenarioName, pinned: PinnedTower | undefined
   if (pinned === undefined) throw new Error(`${name}: towers/manifest.json has no record for ${file}`);
   const save = JSON.stringify(loadFixtureSave(file));
   const sha256 = createHash("sha256").update(save, "utf8").digest("hex");
-  if (sha256 !== pinned.sha256) throw new Error(`${name}: ${file} hashes to ${sha256}, but towers/manifest.json records ${pinned.sha256}`);
-  return { name, description, save, sha256, population: pinned.population, units: pinned.units, transports: pinned.transports };
+  if (sha256 !== pinned.sha256)
+    throw new Error(`${name}: ${file} hashes to ${sha256}, but towers/manifest.json records ${pinned.sha256}`);
+  return {
+    name,
+    description,
+    save,
+    sha256,
+    population: pinned.population,
+    units: pinned.units,
+    transports: pinned.transports,
+  };
 }
 
 /** The names that are not a tower the harnesses can run. */

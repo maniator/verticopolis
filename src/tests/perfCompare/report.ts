@@ -27,19 +27,67 @@ export function toCsv(header: string[], rows: unknown[][]): string {
  *  slots, so a file read apart from results.json still says what it is. A
  *  network-limited run adds a column after it that holds the folder's marker (`net-10x40`) on the rows
  *  it shaped (`limitedRow`) and leaves the others blank. */
-function csvOf(header: string[], rows: unknown[][], aa: EngineName | null, network: NetworkLimit | null, limited: (row: unknown[]) => boolean): string {
+function csvOf(
+  header: string[],
+  rows: unknown[][],
+  aa: EngineName | null,
+  network: NetworkLimit | null,
+  limited: (row: unknown[]) => boolean,
+): string {
   const cols = [...(aa ? ["aa"] : []), ...(network ? ["network"] : [])];
   if (!cols.length) return toCsv(header, rows);
-  return toCsv([...header, ...cols], rows.map((r) => [...r, ...(aa ? [aa] : []), ...(network ? [limited(r) ? networkMarker(network) : ""] : [])]));
+  return toCsv(
+    [...header, ...cols],
+    rows.map((r) => [...r, ...(aa ? [aa] : []), ...(network ? [limited(r) ? networkMarker(network) : ""] : [])]),
+  );
 }
 
 /** The first four columns of every CSV are group, scenario, throttle and metric, so one test of the row says whether the limit shaped it. */
-const rowLimited = (r: unknown[]): boolean => limitedRow({ group: String(r[0]), scenario: String(r[1]), metric: String(r[3]) });
+const rowLimited = (r: unknown[]): boolean =>
+  limitedRow({ group: String(r[0]), scenario: String(r[1]), metric: String(r[3]) });
 
-export function summaryCsv(rows: readonly MetricRow[], aa: EngineName | null, network: NetworkLimit | null = null): string {
+export function summaryCsv(
+  rows: readonly MetricRow[],
+  aa: EngineName | null,
+  network: NetworkLimit | null = null,
+): string {
   return csvOf(
-    ["group", "scenario", "throttle", "metric", "unit", "engine", "n", "median", "median_ci_low", "median_ci_high", "p95", "mean", "sd", "cv", "min", "max"],
-    rows.map((r) => [r.group, r.scenario, r.throttle, r.metric, r.unit, r.engine, r.values.length, r.summary?.median, r.summary?.medianCiLow, r.summary?.medianCiHigh, r.summary?.p95, r.summary?.mean, r.summary?.sd, r.summary?.cv, r.summary?.min, r.summary?.max]),
+    [
+      "group",
+      "scenario",
+      "throttle",
+      "metric",
+      "unit",
+      "engine",
+      "n",
+      "median",
+      "median_ci_low",
+      "median_ci_high",
+      "p95",
+      "mean",
+      "sd",
+      "cv",
+      "min",
+      "max",
+    ],
+    rows.map((r) => [
+      r.group,
+      r.scenario,
+      r.throttle,
+      r.metric,
+      r.unit,
+      r.engine,
+      r.values.length,
+      r.summary?.median,
+      r.summary?.medianCiLow,
+      r.summary?.medianCiHigh,
+      r.summary?.p95,
+      r.summary?.mean,
+      r.summary?.sd,
+      r.summary?.cv,
+      r.summary?.min,
+      r.summary?.max,
+    ]),
     aa,
     network,
     rowLimited,
@@ -48,14 +96,55 @@ export function summaryCsv(rows: readonly MetricRow[], aa: EngineName | null, ne
 
 export function rawCsv(rows: readonly MetricRow[], aa: EngineName | null, network: NetworkLimit | null = null): string {
   const out: unknown[][] = [];
-  for (const r of rows) r.values.forEach((v, i) => out.push([r.group, r.scenario, r.throttle, r.metric, r.unit, r.engine, r.reps[i], v]));
-  return csvOf(["group", "scenario", "throttle", "metric", "unit", "engine", "rep", "value"], out, aa, network, rowLimited);
+  for (const r of rows)
+    r.values.forEach((v, i) => out.push([r.group, r.scenario, r.throttle, r.metric, r.unit, r.engine, r.reps[i], v]));
+  return csvOf(
+    ["group", "scenario", "throttle", "metric", "unit", "engine", "rep", "value"],
+    out,
+    aa,
+    network,
+    rowLimited,
+  );
 }
 
-export function comparisonsCsv(rows: readonly Comparison[], aa: EngineName | null, network: NetworkLimit | null = null): string {
+export function comparisonsCsv(
+  rows: readonly Comparison[],
+  aa: EngineName | null,
+  network: NetworkLimit | null = null,
+): string {
   return csvOf(
-    ["group", "scenario", "throttle", "metric", "unit", "ts_median", "wasm_median", "wasm_over_ts_paired", "ci_low", "ci_high", "verdict", "n_ts", "n_wasm", "n_pairs"],
-    rows.map((c) => [c.group, c.scenario, c.throttle, c.metric, c.unit, c.tsMedian, c.wasmMedian, c.ratio, c.ciLow, c.ciHigh, c.verdict, c.n.ts, c.n.wasm, c.n.pairs]),
+    [
+      "group",
+      "scenario",
+      "throttle",
+      "metric",
+      "unit",
+      "ts_median",
+      "wasm_median",
+      "wasm_over_ts_paired",
+      "ci_low",
+      "ci_high",
+      "verdict",
+      "n_ts",
+      "n_wasm",
+      "n_pairs",
+    ],
+    rows.map((c) => [
+      c.group,
+      c.scenario,
+      c.throttle,
+      c.metric,
+      c.unit,
+      c.tsMedian,
+      c.wasmMedian,
+      c.ratio,
+      c.ciLow,
+      c.ciHigh,
+      c.verdict,
+      c.n.ts,
+      c.n.wasm,
+      c.n.pairs,
+    ]),
     aa,
     network,
     rowLimited,
@@ -96,7 +185,11 @@ function table(header: string[], rows: string[][]): string {
  * end is the value `perf:calibrate` reads against ε for a pass
  * (`coldStartDifference`); both come from `pairedDifference`.
  */
-export function coldStartDifferenceLines(metrics: readonly MetricRow[], aa: EngineName | null, network: NetworkLimit | null = null): string[] {
+export function coldStartDifferenceLines(
+  metrics: readonly MetricRow[],
+  aa: EngineName | null,
+  network: NetworkLimit | null = null,
+): string[] {
   const rows = metrics.filter((m) => m.group === "startup" && m.metric === "cold game ready");
   const throttles = [...new Set(rows.map((m) => m.throttle))];
   const lines = throttles.flatMap((t) => {
@@ -104,34 +197,70 @@ export function coldStartDifferenceLines(metrics: readonly MetricRow[], aa: Engi
     const ts = rows.find((m) => m.throttle === t && m.engine === "ts");
     const d = wasm && ts ? pairedDifference(wasm, ts) : null;
     if (!d) return [];
-    const ci = d.ciLow !== null && d.ciHigh !== null ? `${fmt(d.ciLow, "ms")} to ${fmt(d.ciHigh, "ms")}` : "no interval";
-    return [[`${t}x`, fmt(d.median, "ms"), ci, d.n < MIN_REPS ? `${d.n} (below the gate's minimum of ${MIN_REPS})` : String(d.n)]];
+    const ci =
+      d.ciLow !== null && d.ciHigh !== null ? `${fmt(d.ciLow, "ms")} to ${fmt(d.ciHigh, "ms")}` : "no interval";
+    return [
+      [
+        `${t}x`,
+        fmt(d.median, "ms"),
+        ci,
+        d.n < MIN_REPS ? `${d.n} (below the gate's minimum of ${MIN_REPS})` : String(d.n),
+      ],
+    ];
   });
   if (!lines.length) return [];
   const sign = aa ? "slot wasm minus slot ts" : "WASM minus TypeScript";
-  return ["", `Cold start to ready, paired difference (${sign}; above zero is worse${network ? `; behind a network limit: ${describeNetwork(network)}` : ""}):`, "", table(["CPU", "Median", "95% CI of median", "Pairs"], lines)];
+  return [
+    "",
+    `Cold start to ready, paired difference (${sign}; above zero is worse${network ? `; behind a network limit: ${describeNetwork(network)}` : ""}):`,
+    "",
+    table(["CPU", "Median", "95% CI of median", "Pairs"], lines),
+  ];
 }
 
 /** A metric name, marked when a network limit shaped its row. */
-const tagged = (m: { group: string; scenario: string; metric: string }, network: NetworkLimit | null): string => (network && limitedRow(m) ? `${m.metric} [network-limited]` : m.metric);
+const tagged = (m: { group: string; scenario: string; metric: string }, network: NetworkLimit | null): string =>
+  network && limitedRow(m) ? `${m.metric} [network-limited]` : m.metric;
 
 /** The startup rows printed with the same paired statistic as M5 but outside
  *  any gate (#1254; the list is metrics.ts's `REPORTED_DIFFERENCES`). */
-export function reportedDifferenceLines(metrics: readonly MetricRow[], aa: EngineName | null, network: NetworkLimit | null = null): string[] {
+export function reportedDifferenceLines(
+  metrics: readonly MetricRow[],
+  aa: EngineName | null,
+  network: NetworkLimit | null = null,
+): string[] {
   const rows = metrics.filter((m) => m.group === "startup" && REPORTED_DIFFERENCES.includes(m.metric));
   const keys = [...new Map(rows.map((m) => [`${m.metric}|${m.scenario}|${m.throttle}`, m])).values()];
   const lines = keys.flatMap((k) => {
-    const pick = (engine: EngineName) => rows.find((m) => m.metric === k.metric && m.scenario === k.scenario && m.throttle === k.throttle && m.engine === engine);
+    const pick = (engine: EngineName) =>
+      rows.find(
+        (m) => m.metric === k.metric && m.scenario === k.scenario && m.throttle === k.throttle && m.engine === engine,
+      );
     const wasm = pick("wasm");
     const ts = pick("ts");
     const d = wasm && ts ? pairedDifference(wasm, ts) : null;
     if (!d) return [];
-    const ci = d.ciLow !== null && d.ciHigh !== null ? `${fmt(d.ciLow, "ms")} to ${fmt(d.ciHigh, "ms")}` : "no interval";
-    return [[tagged(k, network), k.scenario, `${k.throttle}x`, fmt(d.median, "ms"), ci, d.n < MIN_REPS ? `${d.n} (below the gate's minimum of ${MIN_REPS})` : String(d.n)]];
+    const ci =
+      d.ciLow !== null && d.ciHigh !== null ? `${fmt(d.ciLow, "ms")} to ${fmt(d.ciHigh, "ms")}` : "no interval";
+    return [
+      [
+        tagged(k, network),
+        k.scenario,
+        `${k.throttle}x`,
+        fmt(d.median, "ms"),
+        ci,
+        d.n < MIN_REPS ? `${d.n} (below the gate's minimum of ${MIN_REPS})` : String(d.n),
+      ],
+    ];
   });
   if (!lines.length) return [];
   const sign = aa ? "slot wasm minus slot ts" : "WASM minus TypeScript";
-  return ["", `Reported, not gates (#1254): the same paired difference for the moment the engine loaded (on WASM, the end of the package load), the warm start, the span from the engine loaded to ready, and the cold start with each scenario's save in the autosave slot. Compare a saved-tower row only across engines: it runs after the repetition's other measurements, in a warmer browser process than M5's cold start (${sign}; above zero is worse):`, "", table(["Metric", "Scenario", "CPU", "Median", "95% CI of median", "Pairs"], lines)];
+  return [
+    "",
+    `Reported, not gates (#1254): the same paired difference for the moment the engine loaded (on WASM, the end of the package load), the warm start, the span from the engine loaded to ready, and the cold start with each scenario's save in the autosave slot. Compare a saved-tower row only across engines: it runs after the repetition's other measurements, in a warmer browser process than M5's cold start (${sign}; above zero is worse):`,
+    "",
+    table(["Metric", "Scenario", "CPU", "Median", "95% CI of median", "Pairs"], lines),
+  ];
 }
 
 export function markdownReport(res: CompareResults): string {
@@ -147,11 +276,21 @@ export function markdownReport(res: CompareResults): string {
     `> **Snapshot, not a live figure.** Measured ${res.startedAt ?? "?"} to ${res.generatedAt} on commit \`${e.commit}\`${e.dirty ? " (dirty tree)" : ""} (app ${e.appVersion}${res.tsBaseline ? `; ${aa ? "both slots" : "the TypeScript arm"} ran the pinned pre-cutover build ${res.tsBaseline.commit.slice(0, 8)}, app ${res.tsBaseline.appVersion}` : ""}), with public main at \`${e.mainCommit ?? "unknown"}\`${e.mainFetched === false ? " as last fetched (the fetch before the run failed)" : ""}.${preThree(e.appVersion) ? " A pre-3.0 baseline of an engine still being cut over (#945), not release performance." : ""} The live number comes from ${aa ? `\`npm run perf:calibrate\` over fresh A/A folders, made by re-running \`npm run perf:compare${rerunFlags}\`` : `re-running \`npm run perf:compare${rerunFlags}\``} (src/tests/perfCompare, its tests beside it); this file never refreshes.`,
     "",
   );
-  if (net) out.push(`> **Network-limited run (\`--network\`).** ${limitedStarts(res.config.throttles).replace(/^the/, "The")} ran behind ${describeNetwork(net)}; rows marked [network-limited] and the \`network\` column of the CSV files show which. This is not a protocol run, and its folder name says so. It is a diagnostic: its startup rows do not count toward M5.`, "");
+  if (net)
+    out.push(
+      `> **Network-limited run (\`--network\`).** ${limitedStarts(res.config.throttles).replace(/^the/, "The")} ran behind ${describeNetwork(net)}; rows marked [network-limited] and the \`network\` column of the CSV files show which. This is not a protocol run, and its folder name says so. It is a diagnostic: its startup rows do not count toward M5.`,
+      "",
+    );
   if (aa) {
-    out.push(`> **A/A pass.** Both slots ran the ${aa === "wasm" ? "WASM" : "TypeScript"} engine. The "ts" and "wasm" labels below name the two slots, and every ratio is slot "wasm" over slot "ts". This folder is one input to \`npm run perf:calibrate\` (docs/performance/benchmark-protocol.md, section 6.1), which derives the candidate tolerances from many passes per engine. No tolerance is read off one folder, and there is no verdict: the intervals are the data. Rows the ${aa === "wasm" ? "TypeScript" : "WASM"} engine alone produces, and the cold WASM load steps, are left out.`, "");
+    out.push(
+      `> **A/A pass.** Both slots ran the ${aa === "wasm" ? "WASM" : "TypeScript"} engine. The "ts" and "wasm" labels below name the two slots, and every ratio is slot "wasm" over slot "ts". This folder is one input to \`npm run perf:calibrate\` (docs/performance/benchmark-protocol.md, section 6.1), which derives the candidate tolerances from many passes per engine. No tolerance is read off one folder, and there is no verdict: the intervals are the data. Rows the ${aa === "wasm" ? "TypeScript" : "WASM"} engine alone produces, and the cold WASM load steps, are left out.`,
+      "",
+    );
   }
-  out.push(`Generated by \`npm run perf:compare${rerunFlags}\` (${res.issue}). Machine-written; ${aa ? "A/A folders are not comparison results, and the engine analysis" : "the analysis"} is in \`docs/performance/ts-vs-wasm.md\`.`, "");
+  out.push(
+    `Generated by \`npm run perf:compare${rerunFlags}\` (${res.issue}). Machine-written; ${aa ? "A/A folders are not comparison results, and the engine analysis" : "the analysis"} is in \`docs/performance/ts-vs-wasm.md\`.`,
+    "",
+  );
   for (const banner of rendererBanners(res.browser, res.config.quick)) out.push(banner, "");
   out.push(`**Validation: ${res.validation.ok ? "passed" : "FAILED"}.**`, "");
   for (const err of res.validation.errors) out.push(`- error: ${err}`);
@@ -163,18 +302,41 @@ export function markdownReport(res: CompareResults): string {
       [
         ["Commit", `${e.commit}${e.dirty ? " (dirty tree)" : ""} on ${e.branch}`],
         ...(treeSummary(e.tree, e.dirty) ? [["Working tree", treeSummary(e.tree, e.dirty)!]] : []),
-        ["Public main (origin/main as last fetched)", e.mainCommit ? `${e.mainCommit} (merge base ${e.mergeBase ?? "unknown"}; ${e.behindMain === 0 ? "this tree contains it" : `${e.behindMain ?? "?"} commit(s) of it missing here`})` : "unknown"],
+        [
+          "Public main (origin/main as last fetched)",
+          e.mainCommit
+            ? `${e.mainCommit} (merge base ${e.mergeBase ?? "unknown"}; ${e.behindMain === 0 ? "this tree contains it" : `${e.behindMain ?? "?"} commit(s) of it missing here`})`
+            : "unknown",
+        ],
         ["App version", e.appVersion],
-        ...(res.tsBaseline ? [["TypeScript baseline", `${res.tsBaseline.commit} (app ${res.tsBaseline.appVersion}, pinned pre-cutover build)`]] : []),
+        ...(res.tsBaseline
+          ? [
+              [
+                "TypeScript baseline",
+                `${res.tsBaseline.commit} (app ${res.tsBaseline.appVersion}, pinned pre-cutover build)`,
+              ],
+            ]
+          : []),
         ["OS", `${e.os} (kernel ${e.kernel}, ${e.arch})`],
         ["CPU", `${e.cpuModel}, ${e.logicalCpus} logical CPUs`],
         ["Memory", fmt(e.totalMemoryBytes, "bytes")],
-        ["Browser", `${browserName(res.browser.channel, res.browser.executable)} ${res.browser.version ?? "unknown"} (headless${res.browser.channel ? `, channel ${res.browser.channel}` : ""}${res.browser.executable ? `, ${res.browser.executable}` : ""}${res.browser.args?.length ? `, extra switches ${res.browser.args.join(" ")}` : ""})`],
+        [
+          "Browser",
+          `${browserName(res.browser.channel, res.browser.executable)} ${res.browser.version ?? "unknown"} (headless${res.browser.channel ? `, channel ${res.browser.channel}` : ""}${res.browser.executable ? `, ${res.browser.executable}` : ""}${res.browser.args?.length ? `, extra switches ${res.browser.args.join(" ")}` : ""})`,
+        ],
         ["Node", e.node],
         ["Rust", e.rust ?? "not installed"],
         ["Playwright", e.playwright ?? "unknown"],
-        ["Engine package bytes (SHA-256)", Object.entries(e.enginePackage ?? {}).map(([f, h]) => `${f} ${h.slice(0, 16)}`).join(", ") || "missing"],
-        ["Engine package hash", `${e.engineBuildHash ?? "missing"}${e.engineSourceHash && e.engineBuildHash !== e.engineSourceHash ? ` (sources: ${e.engineSourceHash}, MISMATCH)` : ""}`],
+        [
+          "Engine package bytes (SHA-256)",
+          Object.entries(e.enginePackage ?? {})
+            .map(([f, h]) => `${f} ${h.slice(0, 16)}`)
+            .join(", ") || "missing",
+        ],
+        [
+          "Engine package hash",
+          `${e.engineBuildHash ?? "missing"}${e.engineSourceHash && e.engineBuildHash !== e.engineSourceHash ? ` (sources: ${e.engineSourceHash}, MISMATCH)` : ""}`,
+        ],
         ["WebGL renderer", rendererSummary(res.runs)],
         ["Cross-origin isolated", String(res.runs.find((r) => r.page)?.page?.crossOriginIsolated ?? "unknown")],
         ["Timer resolution", fmt(res.runs.find((r) => r.page)?.page?.timerResolutionMs, "ms")],
@@ -183,17 +345,59 @@ export function markdownReport(res: CompareResults): string {
   );
   const c = res.config;
   out.push("", "## Configuration", "");
-  out.push(`${c.reps} repetitions per ${aa ? "slot" : "engine"}, each in a fresh browser process, ${aa ? "slot" : "engine"} order alternating. Simulation: ${c.steps} steps of ${c.dt} in-game minutes (${(c.steps * c.dt) / 60} in-game hours) after ${c.warmSteps} warmup steps on a throwaway instance. Frames: ${c.frameWindowMs} ms window after ${c.frameWarmMs} ms warmup at speed index ${c.speed}. CPU throttles: ${c.throttles.join("x, ")}x. Viewport ${c.viewport.width}x${c.viewport.height} at DPR 1.${c.quick ? " Quick mode (smoke test)." : ""}`, "");
-  if (c.network) out.push(`Network limit (\`--network\`): ${describeNetwork(c.network)} on ${limitedStarts(c.throttles)}. The saved-tower starts, the simulation, frame and memory passes and every other measurement ran with no network limit. A limited run answers a different question from the protocol runs and is not pooled with them (\`perf:calibrate\` leaves it out).`, "");
-  out.push(table(["Scenario", "Source", "Population", "Units", "Transports", "Save", "Save SHA-256"], res.scenarios.map((s) => [s.name, s.description, String(s.population), String(s.units), String(s.transports), fmt(s.saveBytes, "bytes"), `\`${s.sha256.slice(0, 16)}\``])));
+  out.push(
+    `${c.reps} repetitions per ${aa ? "slot" : "engine"}, each in a fresh browser process, ${aa ? "slot" : "engine"} order alternating. Simulation: ${c.steps} steps of ${c.dt} in-game minutes (${(c.steps * c.dt) / 60} in-game hours) after ${c.warmSteps} warmup steps on a throwaway instance. Frames: ${c.frameWindowMs} ms window after ${c.frameWarmMs} ms warmup at speed index ${c.speed}. CPU throttles: ${c.throttles.join("x, ")}x. Viewport ${c.viewport.width}x${c.viewport.height} at DPR 1.${c.quick ? " Quick mode (smoke test)." : ""}`,
+    "",
+  );
+  if (c.network)
+    out.push(
+      `Network limit (\`--network\`): ${describeNetwork(c.network)} on ${limitedStarts(c.throttles)}. The saved-tower starts, the simulation, frame and memory passes and every other measurement ran with no network limit. A limited run answers a different question from the protocol runs and is not pooled with them (\`perf:calibrate\` leaves it out).`,
+      "",
+    );
+  out.push(
+    table(
+      ["Scenario", "Source", "Population", "Units", "Transports", "Save", "Save SHA-256"],
+      res.scenarios.map((s) => [
+        s.name,
+        s.description,
+        String(s.population),
+        String(s.units),
+        String(s.transports),
+        fmt(s.saveBytes, "bytes"),
+        `\`${s.sha256.slice(0, 16)}\``,
+      ]),
+    ),
+  );
   out.push("", "## Outcome checks (Node, conformance digests)", "");
-  out.push(table(["Scenario", "Steps", "Start state", "End state", "End crowd"], res.nodeChecks.map((n) => [n.scenario, String(n.steps), `\`${n.start.state}\``, `\`${n.end.state}\``, `\`${n.end.crowd}\``])));
+  out.push(
+    table(
+      ["Scenario", "Steps", "Start state", "End state", "End crowd"],
+      res.nodeChecks.map((n) => [
+        n.scenario,
+        String(n.steps),
+        `\`${n.start.state}\``,
+        `\`${n.end.state}\``,
+        `\`${n.end.crowd}\``,
+      ]),
+    ),
+  );
   if (res.churn?.length) {
     out.push("", "## Hourly save churn (WASM engine, Node)", "");
-    out.push("The share of the serialized save that changes from one in-game hour to the next, counted in units (each element of a top-level array, each property of a top-level object; src/tests/perfCompare/churn.ts). It sizes what a \"changed since last sent\" contract would send each hour. The character counts are the units' JSON text only, without keys and punctuation between units, and a unit that disappears counts as changed. Sections lists the five largest by size: their share of the save, then their own median hourly churn.", "");
+    out.push(
+      'The share of the serialized save that changes from one in-game hour to the next, counted in units (each element of a top-level array, each property of a top-level object; src/tests/perfCompare/churn.ts). It sizes what a "changed since last sent" contract would send each hour. The character counts are the units\' JSON text only, without keys and punctuation between units, and a unit that disappears counts as changed. Sections lists the five largest by size: their share of the save, then their own median hourly churn.',
+      "",
+    );
     out.push(
       table(
-        ["Scenario", "Unit text (characters)", "Hours", "Median", "p95", "Max", "Largest sections (share of save / own churn)"],
+        [
+          "Scenario",
+          "Unit text (characters)",
+          "Hours",
+          "Median",
+          "p95",
+          "Max",
+          "Largest sections (share of save / own churn)",
+        ],
         res.churn.map((c) => [
           c.scenario,
           String(c.saveChars),
@@ -212,7 +416,14 @@ export function markdownReport(res: CompareResults): string {
   }
   const groups: [string, CompareResults["comparisons"][number]["group"]][] = [
     ["Startup (CPU column: 1x, or the throttled cold start)", "startup"],
-    ...(aa ? [] : [["WASM load steps (TypeScript page, never compiled before)", "wasm-load"] as [string, CompareResults["comparisons"][number]["group"]]]),
+    ...(aa
+      ? []
+      : [
+          ["WASM load steps (TypeScript page, never compiled before)", "wasm-load"] as [
+            string,
+            CompareResults["comparisons"][number]["group"],
+          ],
+        ]),
     ["Simulation only, engine as the app hosts it", "sim-hosted"],
     ["Simulation only, bare engine", "sim-raw"],
     ["Gameplay frames, audio off (never started)", "frames"],
@@ -223,37 +434,127 @@ export function markdownReport(res: CompareResults): string {
   for (const [title, g] of groups) {
     out.push("", `## ${title}`, "");
     const comps = res.comparisons.filter((x) => x.group === g);
-    const single = res.metrics.filter((m) => m.group === g && !comps.some((x) => x.scenario === m.scenario && x.throttle === m.throttle && x.metric === m.metric));
+    const single = res.metrics.filter(
+      (m) =>
+        m.group === g &&
+        !comps.some((x) => x.scenario === m.scenario && x.throttle === m.throttle && x.metric === m.metric),
+    );
     if (comps.length) {
-      const head = aa ? ['slot "ts" median', 'slot "wasm" median', 'slot wasm / slot ts, paired (95% CI)'] : ["TypeScript median", "WASM median", "WASM / TS, paired (95% CI)"];
-      out.push(table(["Scenario", "CPU", "Metric", ...head, ...(aa ? [] : ["Verdict"]), "n (ts/wasm/pairs)"], comps.map((x) => [x.scenario, `${x.throttle}x`, tagged(x, net), fmt(x.tsMedian, x.unit), fmt(x.wasmMedian, x.unit), ratioText(x), ...(aa ? [] : [x.verdict]), `${x.n.ts}/${x.n.wasm}/${x.n.pairs}`])));
+      const head = aa
+        ? ['slot "ts" median', 'slot "wasm" median', "slot wasm / slot ts, paired (95% CI)"]
+        : ["TypeScript median", "WASM median", "WASM / TS, paired (95% CI)"];
+      out.push(
+        table(
+          ["Scenario", "CPU", "Metric", ...head, ...(aa ? [] : ["Verdict"]), "n (ts/wasm/pairs)"],
+          comps.map((x) => [
+            x.scenario,
+            `${x.throttle}x`,
+            tagged(x, net),
+            fmt(x.tsMedian, x.unit),
+            fmt(x.wasmMedian, x.unit),
+            ratioText(x),
+            ...(aa ? [] : [x.verdict]),
+            `${x.n.ts}/${x.n.wasm}/${x.n.pairs}`,
+          ]),
+        ),
+      );
     }
-    if (g === "startup") out.push(...coldStartDifferenceLines(res.metrics, aa, net), ...reportedDifferenceLines(res.metrics, aa, net));
+    if (g === "startup")
+      out.push(...coldStartDifferenceLines(res.metrics, aa, net), ...reportedDifferenceLines(res.metrics, aa, net));
     if (single.length) {
       out.push("");
-      out.push(table(["Scenario", "CPU", "Metric", aa ? "Slot" : "Engine", "Median", "95% CI of median", "p95", "CV", "n"], single.map((m) => [m.scenario, `${m.throttle}x`, tagged(m, net), m.engine, fmt(m.summary?.median, m.unit), m.summary?.medianCiLow != null ? `${fmt(m.summary.medianCiLow, m.unit)} to ${fmt(m.summary.medianCiHigh, m.unit)}` : "n/a", fmt(m.summary?.p95, m.unit), m.summary ? `${(m.summary.cv * 100).toFixed(1)}%` : "n/a", String(m.values.length)])));
+      out.push(
+        table(
+          ["Scenario", "CPU", "Metric", aa ? "Slot" : "Engine", "Median", "95% CI of median", "p95", "CV", "n"],
+          single.map((m) => [
+            m.scenario,
+            `${m.throttle}x`,
+            tagged(m, net),
+            m.engine,
+            fmt(m.summary?.median, m.unit),
+            m.summary?.medianCiLow != null
+              ? `${fmt(m.summary.medianCiLow, m.unit)} to ${fmt(m.summary.medianCiHigh, m.unit)}`
+              : "n/a",
+            fmt(m.summary?.p95, m.unit),
+            m.summary ? `${(m.summary.cv * 100).toFixed(1)}%` : "n/a",
+            String(m.values.length),
+          ]),
+        ),
+      );
       const reasons = [...new Set(single.flatMap((m) => (m.noVerdict ? [m.noVerdict] : [])))];
-      for (const r of reasons) out.push("", `No engine comparison for ${[...new Set(single.filter((m) => m.noVerdict === r).map((m) => m.metric))].join(", ")}: ${r}.`);
+      for (const r of reasons)
+        out.push(
+          "",
+          `No engine comparison for ${[...new Set(single.filter((m) => m.noVerdict === r).map((m) => m.metric))].join(", ")}: ${r}.`,
+        );
     }
   }
   if (res.bundle) {
     out.push("", "## Production build sizes", "");
-    out.push(table(["Category", "Files", "Raw", "gzip -9", "Brotli 11"], Object.entries(res.bundle.byCategory).sort((a, b) => b[1].raw - a[1].raw).map(([k, v]) => [k, String(v.files), fmt(v.raw, "bytes"), fmt(v.gzip, "bytes"), fmt(v.brotli, "bytes")])));
+    out.push(
+      table(
+        ["Category", "Files", "Raw", "gzip -9", "Brotli 11"],
+        Object.entries(res.bundle.byCategory)
+          .sort((a, b) => b[1].raw - a[1].raw)
+          .map(([k, v]) => [k, String(v.files), fmt(v.raw, "bytes"), fmt(v.gzip, "bytes"), fmt(v.brotli, "bytes")]),
+      ),
+    );
     const t = res.bundle.totals;
-    out.push("", table(["Total", "Raw", "gzip -9", "Brotli 11"], [
-      ["Game files (no source maps, help/gallery pages or dual-run worker)", fmt(t.game.raw, "bytes"), fmt(t.game.gzip, "bytes"), fmt(t.game.brotli, "bytes")],
-      ["Game files without the WASM engine", fmt(t.gameWithoutWasm.raw, "bytes"), fmt(t.gameWithoutWasm.gzip, "bytes"), fmt(t.gameWithoutWasm.brotli, "bytes")],
-      ["WASM engine files alone (binary, glue, BUILD.json)", fmt(t.wasmOnly.raw, "bytes"), fmt(t.wasmOnly.gzip, "bytes"), fmt(t.wasmOnly.brotli, "bytes")],
-      ["Everything in dist/", fmt(t.everything.raw, "bytes"), fmt(t.everything.gzip, "bytes"), fmt(t.everything.brotli, "bytes")],
-    ]));
+    out.push(
+      "",
+      table(
+        ["Total", "Raw", "gzip -9", "Brotli 11"],
+        [
+          [
+            "Game files (no source maps, help/gallery pages or dual-run worker)",
+            fmt(t.game.raw, "bytes"),
+            fmt(t.game.gzip, "bytes"),
+            fmt(t.game.brotli, "bytes"),
+          ],
+          [
+            "Game files without the WASM engine",
+            fmt(t.gameWithoutWasm.raw, "bytes"),
+            fmt(t.gameWithoutWasm.gzip, "bytes"),
+            fmt(t.gameWithoutWasm.brotli, "bytes"),
+          ],
+          [
+            "WASM engine files alone (binary, glue, BUILD.json)",
+            fmt(t.wasmOnly.raw, "bytes"),
+            fmt(t.wasmOnly.gzip, "bytes"),
+            fmt(t.wasmOnly.brotli, "bytes"),
+          ],
+          [
+            "Everything in dist/",
+            fmt(t.everything.raw, "bytes"),
+            fmt(t.everything.gzip, "bytes"),
+            fmt(t.everything.brotli, "bytes"),
+          ],
+        ],
+      ),
+    );
     if (res.toolingBundleTotals) {
       const d = res.toolingBundleTotals.game.brotli - t.game.brotli;
-      out.push("", `The timed runs of the current build used the VC_TOOLING=1 build of the same sources; its game files are ${fmt(res.toolingBundleTotals.game.brotli, "bytes")} Brotli (${d >= 0 ? "+" : ""}${fmt(d, "bytes")} against the production build above).`);
+      out.push(
+        "",
+        `The timed runs of the current build used the VC_TOOLING=1 build of the same sources; its game files are ${fmt(res.toolingBundleTotals.game.brotli, "bytes")} Brotli (${d >= 0 ? "+" : ""}${fmt(d, "bytes")} against the production build above).`,
+      );
     }
-    out.push("", `Precache: ${res.bundle.precache.entries} entries, ${fmt(res.bundle.precache.raw, "bytes")} raw, ${fmt(res.bundle.precache.brotli, "bytes")} Brotli.`);
+    out.push(
+      "",
+      `Precache: ${res.bundle.precache.entries} entries, ${fmt(res.bundle.precache.raw, "bytes")} raw, ${fmt(res.bundle.precache.brotli, "bytes")} Brotli.`,
+    );
     if (res.bundle.wasm) {
-      out.push("", `WASM sections of \`${res.bundle.wasm.path}\` (${fmt(res.bundle.wasm.raw, "bytes")}; custom sections ${fmt(res.bundle.wasm.customBytes, "bytes")}):`, "");
-      out.push(table(["Section", "Bytes"], res.bundle.wasm.sections.map((s) => [s.name, fmt(s.bytes, "bytes")])));
+      out.push(
+        "",
+        `WASM sections of \`${res.bundle.wasm.path}\` (${fmt(res.bundle.wasm.raw, "bytes")}; custom sections ${fmt(res.bundle.wasm.customBytes, "bytes")}):`,
+        "",
+      );
+      out.push(
+        table(
+          ["Section", "Bytes"],
+          res.bundle.wasm.sections.map((s) => [s.name, fmt(s.bytes, "bytes")]),
+        ),
+      );
     }
   }
   const offlineOf = (r: CompareResults["runs"][number]): string => {
@@ -264,9 +565,31 @@ export function markdownReport(res: CompareResults): string {
     return `${who}: ${f.offlineEngineActive ?? "did not boot"}`;
   };
   const offline = res.runs.filter((r) => r.firstVisitWithServiceWorker).map(offlineOf);
-  out.push("", "## Offline reload after a first visit", "", "Which engine the page booted on when reloaded with the network cut, per process:", "", offline.join("; ") || "not measured");
+  out.push(
+    "",
+    "## Offline reload after a first visit",
+    "",
+    "Which engine the page booted on when reloaded with the network cut, per process:",
+    "",
+    offline.join("; ") || "not measured",
+  );
   out.push("", "## Process runs", "");
-  out.push(table(["Rep", aa ? "Slot" : "Engine", "Order", "OK", "Error", "Page errors", "Audio"], res.runs.map((r) => [String(r.rep), aa ? `${r.engine} (ran ${r.ranEngine ?? r.engine})` : r.engine, String(r.order), r.ok ? "yes" : "NO", r.error ?? "", String(r.pageErrors.length), r.audio ? `${r.audio.started ? "started" : "not started"} (${r.audio.contexts.join(", ") || "no context"})` : "n/a"])));
+  out.push(
+    table(
+      ["Rep", aa ? "Slot" : "Engine", "Order", "OK", "Error", "Page errors", "Audio"],
+      res.runs.map((r) => [
+        String(r.rep),
+        aa ? `${r.engine} (ran ${r.ranEngine ?? r.engine})` : r.engine,
+        String(r.order),
+        r.ok ? "yes" : "NO",
+        r.error ?? "",
+        String(r.pageErrors.length),
+        r.audio
+          ? `${r.audio.started ? "started" : "not started"} (${r.audio.contexts.join(", ") || "no context"})`
+          : "n/a",
+      ]),
+    ),
+  );
   out.push("", "## Limitations", "");
   for (const l of res.limitations) out.push(`- ${l}`);
   return out.join("\n") + "\n";

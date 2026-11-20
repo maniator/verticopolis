@@ -81,7 +81,15 @@ export function showVersionsDialog(ui: Pick<UI, "openModalTemplate" | "closeModa
 
   function draw(): void {
     if (!box.isConnected) return;
-    render(versionsTemplate(ctx, state, { select: (key) => ((state.selected = key), draw()), open, cancel: dismiss, picked }), host);
+    render(
+      versionsTemplate(ctx, state, {
+        select: (key) => ((state.selected = key), draw()),
+        open,
+        cancel: dismiss,
+        picked,
+      }),
+      host,
+    );
   }
   draw();
   host.querySelector<HTMLElement>(".pv-row.selected")?.focus();
@@ -120,9 +128,11 @@ function versionsTemplate(
     <p class="pv-intro">Earlier versions of "${ctx.name}". Open one to make it a new tower file beside this one; the tower itself doesn't change.</p>
     <div class="fd-list well">
       <div class="fd-rows pv-rows" role="listbox" aria-label="Previous versions of ${ctx.name}">
-        ${rows.length > 0
-          ? rows
-          : html`<div class="fd-empty">No earlier versions yet. The game keeps one every 10 minutes while you play, and the last one you saved with File > Save.</div>`}
+        ${
+          rows.length > 0
+            ? rows
+            : html`<div class="fd-empty">No earlier versions yet. The game keeps one every 10 minutes while you play, and the last one you saved with File > Save.</div>`
+        }
       </div>
     </div>
     ${state.line ? html`<p class=${`fd-line fd-line-${state.line.kind}`} role="alert">${state.line.text}</p>` : nothing}

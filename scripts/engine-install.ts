@@ -26,11 +26,14 @@ try {
   console.warn("engine-install: @verticopolis/engine is not installed; src/public/engine is left as it is");
   process.exit(0);
 }
-if (!existsSync(join(from, "BUILD.json"))) throw new Error(`engine-install: ${from} has no BUILD.json; reinstall @verticopolis/engine`);
+if (!existsSync(join(from, "BUILD.json")))
+  throw new Error(`engine-install: ${from} has no BUILD.json; reinstall @verticopolis/engine`);
 
 const to = join(repo, "src/public/engine");
 rmSync(to, { recursive: true, force: true });
 // The type declarations stay in the package: the page serves only the files
 // the engine's record describes.
 cpSync(from, to, { recursive: true, filter: (src) => !src.endsWith(".d.ts") });
-console.log(`engine-install: src/public/engine now holds ${require("@verticopolis/engine/package.json").version as string}`);
+console.log(
+  `engine-install: src/public/engine now holds ${require("@verticopolis/engine/package.json").version as string}`,
+);

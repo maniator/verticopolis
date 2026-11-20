@@ -120,7 +120,10 @@
           .clone()
           .text()
           .then(function (html) {
-            if (!allAskedFor(assetsNamed(html, input.url))) throw new TypeError("The page names files this worker does not precache, so it is from another build (#1949).");
+            if (!allAskedFor(assetsNamed(html, input.url)))
+              throw new TypeError(
+                "The page names files this worker does not precache, so it is from another build (#1949).",
+              );
             return response;
           });
       });

@@ -26,7 +26,9 @@ export function showSettings(ui: UI): void {
   // The passers-by switch shows only where the catalog lets the mode draw
   // decorative passers-by (Modern); a Classic tower has none to switch (#2091).
   const passersBy = catalog.rules.decorativePassersBy;
-  const box = ui.openModalTemplate(settingsTemplate(version, bridgingToggleable, engineSuffix(), passersBy), { displaceable: true });
+  const box = ui.openModalTemplate(settingsTemplate(version, bridgingToggleable, engineSuffix(), passersBy), {
+    displaceable: true,
+  });
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.

@@ -63,7 +63,11 @@ export function mapStartsOpen(storage: ReadStore | null | undefined, layout: Map
 
 /** Store an explicit open or close for a layout class. Returns whether the
  *  write landed; a failed write changes nothing on screen. */
-export function rememberMapOpen(storage: WriteStore | null | undefined, layout: MapLayoutClass, open: boolean): boolean {
+export function rememberMapOpen(
+  storage: WriteStore | null | undefined,
+  layout: MapLayoutClass,
+  open: boolean,
+): boolean {
   if (!storage) return false;
   try {
     storage.setItem(MAP_OPEN_STORAGE_KEY[layout], open ? MAP_OPEN_VALUE.open : MAP_OPEN_VALUE.closed);

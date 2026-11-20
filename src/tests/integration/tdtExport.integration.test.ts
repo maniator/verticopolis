@@ -238,9 +238,7 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     shorter.transports.push({ ...shaft([]), top: 12 });
     const taller = sampleSave();
     taller.transports.push({ ...shaft([12, 13, 14, 15, 16, 17, 18, 19, 20, 21]), top: 22 });
-    expect(buildTDT(taller).bytes.length - buildTDT(shorter).bytes.length).toBe(
-      10 * TDT_ELEVATOR_PER_FLOOR_SIZE,
-    );
+    expect(buildTDT(taller).bytes.length - buildTDT(shorter).bytes.length).toBe(10 * TDT_ELEVATOR_PER_FLOOR_SIZE);
     // And the stop settings themselves still round-trip (the bitmap is written
     // whatever the payload size is).
     const back = parseTDT(buildTDT(skipsFive).bytes.buffer as ArrayBuffer, "S.TDT").save;
@@ -274,12 +272,30 @@ describeWithCodec("buildTDT: export → import round trip", () => {
       units.push(unit({ id: 10 + i, kind: "floor", floor: 2 + i, x: 100, width: 9 }));
     }
     const save: SerializedGame = {
-      version: SAVE_VERSION, seed: 1, money: 1_000_000, star: 1, minutes: 600, mode: "classic",
-      units, nextId: 100, towerName: "GOLD", builtWeddingHall: false, evaluatedTower: false,
+      version: SAVE_VERSION,
+      seed: 1,
+      money: 1_000_000,
+      star: 1,
+      minutes: 600,
+      mode: "classic",
+      units,
+      nextId: 100,
+      towerName: "GOLD",
+      builtWeddingHall: false,
+      evaluatedTower: false,
       transports: [
         {
-          id: 50, kind: "elevatorStandard", x: 90, width: 4, bottom: 1, top: 8, cars: 2,
-          carPositions: [1, 1], carDir: [0, 0], load: 0, skipFloors: [3, 4],
+          id: 50,
+          kind: "elevatorStandard",
+          x: 90,
+          width: 4,
+          bottom: 1,
+          top: 8,
+          cars: 2,
+          carPositions: [1, 1],
+          carDir: [0, 0],
+          load: 0,
+          skipFloors: [3, 4],
         },
       ],
     };
@@ -648,12 +664,15 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     // (type 0), not lobby. This pins that the type-24 above is sky-story-specific
     // (the isLobbyFloor gate), not "all paving is a lobby".
     const NOTSKY = SKY + 1; // one story above a sky lobby -> not a lobby floor
-    const plainNonSky: SerializedGame = { ...towerWith("floor"), units: [
-      unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
-      unit({ id: 2, kind: "floor", floor: NOTSKY, x: 40, width: 1 }),
-      unit({ id: 3, kind: "floor", floor: NOTSKY, x: 41, width: 1 }),
-      unit({ id: 4, kind: "floor", floor: NOTSKY, x: 42, width: 1 }),
-    ] };
+    const plainNonSky: SerializedGame = {
+      ...towerWith("floor"),
+      units: [
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "floor", floor: NOTSKY, x: 40, width: 1 }),
+        unit({ id: 3, kind: "floor", floor: NOTSKY, x: 41, width: 1 }),
+        unit({ id: 4, kind: "floor", floor: NOTSKY, x: 42, width: 1 }),
+      ],
+    };
     const nonSkyRecs = readFloorRecords(buildTDT(plainNonSky).bytes, NOTSKY + TDT_FLOOR_OFFSET);
     expect(nonSkyRecs.length).toBeGreaterThan(0);
     expect(nonSkyRecs.every((r) => r.type === 0)).toBe(true);
@@ -702,8 +721,7 @@ describeWithCodec("buildTDT: export → import round trip", () => {
 
 describeWithCodec("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
   /** Little-endian i32 read at a header byte offset. */
-  const i32 = (b: Uint8Array, off: number) =>
-    (b[off] | (b[off + 1] << 8) | (b[off + 2] << 16) | (b[off + 3] << 24)) | 0;
+  const i32 = (b: Uint8Array, off: number) => b[off] | (b[off + 1] << 8) | (b[off + 2] << 16) | (b[off + 3] << 24) | 0;
 
   /** A minimal Classic save carrying `units`. */
   const tower = (units: Unit[], extra: Partial<SerializedGame> = {}): SerializedGame => ({
@@ -723,9 +741,7 @@ describeWithCodec("buildTDT: No-Rate rent class + lastQuarterMoney header", () =
   });
 
   it("a No-Rate office exports rent-class byte 4", () => {
-    const { bytes } = buildTDT(
-      tower([unit({ id: 1, kind: "office", floor: 5, x: 100, width: 9, noRate: true })]),
-    );
+    const { bytes } = buildTDT(tower([unit({ id: 1, kind: "office", floor: 5, x: 100, width: 9, noRate: true })]));
     const tdt = wireModel(bytes);
     const tenant = tdt.floors.flatMap((f) => f.tenants).find((t) => Math.abs(t.type) === 7);
     expect(tenant?.rentRate).toBe(4);
@@ -734,9 +750,7 @@ describeWithCodec("buildTDT: No-Rate rent class + lastQuarterMoney header", () =
   it("a non-priced kind (no rent band) exports rent-class byte 4, matching real saves", () => {
     // fast food / security / housekeeping charge no tenant rent; the 1994 game
     // stores them as class 4 (No Rate). Confirmed in my_tower/mo real saves.
-    const { bytes } = buildTDT(
-      tower([unit({ id: 1, kind: "fastFood", floor: 5, x: 100, width: 16 })]),
-    );
+    const { bytes } = buildTDT(tower([unit({ id: 1, kind: "fastFood", floor: 5, x: 100, width: 16 })]));
     const tdt = wireModel(bytes);
     const tenant = tdt.floors.flatMap((f) => f.tenants).find((t) => Math.abs(t.type) === 12);
     expect(tenant?.rentRate).toBe(4);
@@ -850,11 +864,9 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
       expect(paved.has(x)).toBe(true);
     }
     const back = parseTDT(bytes.buffer as ArrayBuffer, "S.TDT");
-    expect(
-      back.save.units.some(
-        (u) => u.kind === "office" && u.x === office.x && u.floor === office.floor,
-      ),
-    ).toBe(false);
+    expect(back.save.units.some((u) => u.kind === "office" && u.x === office.x && u.floor === office.floor)).toBe(
+      false,
+    );
   });
 
   it("a floor whose ONLY room burned still exports, paved end to end", () => {
@@ -885,9 +897,7 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
     const save = sampleSave();
     const floor = 8;
     save.units = save.units.filter((u) => u.floor !== floor);
-    save.units.push(
-      unit({ id: 9_401, kind: "office", floor, x: LOT_WIDTH - 4, width: 9, state: "gutted" }),
-    );
+    save.units.push(unit({ id: 9_401, kind: "office", floor, x: LOT_WIDTH - 4, width: 9, state: "gutted" }));
     const { bytes } = buildTDT(save);
     const spans = recordSpans(bytes, floor + TDT_FLOOR_OFFSET);
     // The row must actually EXIST (an empty walk would satisfy every bound
@@ -971,8 +981,16 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
     // Express records are sized the way the game sizes them (doc §8), so no
     // express stays behind and the modal says nothing about them.
     const mk = (x: number): Transport => ({
-      id: 800 + x, kind: "elevatorExpress" as FacilityKind, x, width: 8, bottom: 1, top: 30,
-      cars: 2, carPositions: [1, 1], carDir: [0, 0], load: 0,
+      id: 800 + x,
+      kind: "elevatorExpress" as FacilityKind,
+      x,
+      width: 8,
+      bottom: 1,
+      top: 30,
+      cars: 2,
+      carPositions: [1, 1],
+      carDir: [0, 0],
+      load: 0,
     });
     const base = buildTDT(sampleSave()).report;
     const three = sampleSave();
@@ -989,8 +1007,16 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
     // silently re-breaks every exported tower that has an express.
     const save = sampleSave();
     const mk = (kind: FacilityKind, x: number, bottom: number, top: number): Transport => ({
-      id: 300 + x, kind, x, width: kind === "elevatorExpress" ? 8 : 4, bottom, top,
-      cars: 2, carPositions: [bottom, bottom], carDir: [0, 0], load: 0,
+      id: 300 + x,
+      kind,
+      x,
+      width: kind === "elevatorExpress" ? 8 : 4,
+      bottom,
+      top,
+      cars: 2,
+      carPositions: [bottom, bottom],
+      carDir: [0, 0],
+      load: 0,
     });
     save.transports.push(mk("elevatorExpress", 60, 1, 30));
     save.transports.push(mk("elevatorStandard", 80, 1, 12));
@@ -1012,13 +1038,29 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
     const save = sampleSave();
     save.transports = [];
     save.transports.push({
-      id: 400, kind: "elevatorExpress" as FacilityKind, x: 40, width: 8, bottom: 1, top: 30,
-      cars: 2, carPositions: [1, 1], carDir: [0, 0], load: 0,
+      id: 400,
+      kind: "elevatorExpress" as FacilityKind,
+      x: 40,
+      width: 8,
+      bottom: 1,
+      top: 30,
+      cars: 2,
+      carPositions: [1, 1],
+      carDir: [0, 0],
+      load: 0,
     });
     for (let i = 0; i < 30; i++) {
       save.transports.push({
-        id: 500 + i, kind: "elevatorStandard" as FacilityKind, x: 60 + i * 5, width: 4, bottom: 1, top: 12,
-        cars: 1, carPositions: [1], carDir: [0], load: 0,
+        id: 500 + i,
+        kind: "elevatorStandard" as FacilityKind,
+        x: 60 + i * 5,
+        width: 4,
+        bottom: 1,
+        top: 12,
+        cars: 1,
+        carPositions: [1],
+        carDir: [0],
+        load: 0,
       });
     }
     const decoded = wireModel(buildTDT(save).bytes).elevators!;
@@ -1059,9 +1101,7 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
     expect(halls).toHaveLength(1);
     expect(halls[0].floor).toBe(100);
     // Nothing overlaps: the importer dropped zero rooms.
-    expect(parseTDT(bytes.buffer as ArrayBuffer, "S.TDT").report.couldNotBring.join(" ")).not.toMatch(
-      /overlapped/,
-    );
+    expect(parseTDT(bytes.buffer as ArrayBuffer, "S.TDT").report.couldNotBring.join(" ")).not.toMatch(/overlapped/);
   });
 
   it("a floor with more rooms than the format holds is refused, not written broken", () => {
@@ -1437,8 +1477,7 @@ describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving rec
 // never run; and the saved view opens on the ground, not the sky.
 describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedule, camera)", () => {
   const u16 = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8);
-  const u32 = (b: Uint8Array, o: number) =>
-    (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
+  const u32 = (b: Uint8Array, o: number) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
   // The u32 people count sits immediately after the 120-record floor map.
   const peopleOffset = (b: Uint8Array): number => {
     let o = 0x230;
@@ -1449,7 +1488,8 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
   // (#2044): the census plus at least 256 free records, rounded up to whole
   // blocks of 256 the way the game's own saves are.
   const PEOPLE_POOL_BLOCK = 256;
-  const peoplePool = (census: number) => Math.ceil((census + PEOPLE_POOL_BLOCK) / PEOPLE_POOL_BLOCK) * PEOPLE_POOL_BLOCK;
+  const peoplePool = (census: number) =>
+    Math.ceil((census + PEOPLE_POOL_BLOCK) / PEOPLE_POOL_BLOCK) * PEOPLE_POOL_BLOCK;
   // The finance block's population total, for a tower with no built shafts:
   // past the people, the retail table, the empty elevator slots and the
   // statistic words, at byte 40 of the block (tdt-byte-map.md section 7).
@@ -1457,8 +1497,12 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
   const financeTotal = (b: Uint8Array): number => {
     const off = peopleOffset(b);
     const finance =
-      off + 4 + u32(b, off) * TDT_PERSON_RECORD_SIZE + TDT_RETAIL_SLOTS * TDT_RETAIL_RECORD_SIZE +
-      TDT_ELEVATOR_SLOTS * TDT_ELEVATOR_HEADER_SIZE + TDT_STATS_SIZE;
+      off +
+      4 +
+      u32(b, off) * TDT_PERSON_RECORD_SIZE +
+      TDT_RETAIL_SLOTS * TDT_RETAIL_RECORD_SIZE +
+      TDT_ELEVATOR_SLOTS * TDT_ELEVATOR_HEADER_SIZE +
+      TDT_STATS_SIZE;
     return u32(b, finance + FINANCE_TOTAL_AT);
   };
   // The census a tower writes, checked two ways: the finance block counts it
@@ -1468,13 +1512,31 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
     expect(u32(b, peopleOffset(b))).toBe(peoplePool(census));
   };
   const shaft = (over: Partial<Transport> = {}): Transport => ({
-    id: 10, kind: "elevatorStandard", x: 20, width: 8, bottom: 1, top: 9,
-    cars: 1, carPositions: [1], carDir: [0], load: 0, ...over,
+    id: 10,
+    kind: "elevatorStandard",
+    x: 20,
+    width: 8,
+    bottom: 1,
+    top: 9,
+    cars: 1,
+    carPositions: [1],
+    carDir: [0],
+    load: 0,
+    ...over,
   });
   const tower = (units: Unit[], transports: Transport[] = []): SerializedGame => ({
-    version: SAVE_VERSION, seed: 1, money: 2_000_000, star: 2, minutes: 7 * 60,
-    mode: "classic", units, transports, nextId: units.length + 1,
-    towerName: "Load", builtWeddingHall: false, evaluatedTower: false,
+    version: SAVE_VERSION,
+    seed: 1,
+    money: 2_000_000,
+    star: 2,
+    minutes: 7 * 60,
+    mode: "classic",
+    units,
+    transports,
+    nextId: units.length + 1,
+    towerName: "Load",
+    builtWeddingHall: false,
+    evaluatedTower: false,
   });
 
   it("an empty tower still writes a spare block of people records to build with", () => {
@@ -1592,7 +1654,11 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
     for (let r = 0; r < 16; r++) {
       expect(Array.from(records.subarray(r * 12, r * 12 + 12))).toEqual([0xfe, 0xfe, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     }
-    const rest = [...tail.subarray(0, stalls), ...tail.subarray(stalls + 512 * 6, table), ...tail.subarray(table + 16 * 12)];
+    const rest = [
+      ...tail.subarray(0, stalls),
+      ...tail.subarray(stalls + 512 * 6, table),
+      ...tail.subarray(table + 16 * 12),
+    ];
     expect(rest.every((x) => x === 0xff)).toBe(true);
   });
 
@@ -1612,9 +1678,7 @@ describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedu
   });
 
   it("a built shaft carries the default schedule block (not zeros) so its cars run", () => {
-    const { bytes } = buildTDT(
-      tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })], [shaft()]),
-    );
+    const { bytes } = buildTDT(tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })], [shaft()]));
     let o = peopleOffset(bytes);
     o += 4 + u32(bytes, o) * TDT_PERSON_RECORD_SIZE; // skip people block
     o += 512 * 18; // skip retail table -> elevator table, first slot is the shaft

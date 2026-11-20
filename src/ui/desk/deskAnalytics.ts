@@ -44,7 +44,9 @@ export type DeskTrayIcon = "display" | "sound";
 
 /** The analytics name of a window id, or the title screen's window. */
 function windowName(id: string): string {
-  return Object.prototype.hasOwnProperty.call(DESK_WINDOW_NAME, id) ? DESK_WINDOW_NAME[id as DeskWindowId] : DESK_TITLE_WINDOW;
+  return Object.prototype.hasOwnProperty.call(DESK_WINDOW_NAME, id)
+    ? DESK_WINDOW_NAME[id as DeskWindowId]
+    : DESK_TITLE_WINDOW;
 }
 
 /** A taskbar window button pressed: `desk_task`, `<window>_<result>`. */

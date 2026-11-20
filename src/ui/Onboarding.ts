@@ -75,7 +75,8 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     id: "floor",
     title: "Add a floor",
     sub: "Every room needs a floor under it. Lay one just above your lobby.",
-    hintDesktop: "Pick Floor in the palette, then drag across the row above your lobby. (To pan, hold Shift or Space and drag.)",
+    hintDesktop:
+      "Pick Floor in the palette, then drag across the row above your lobby. (To pan, hold Shift or Space and drag.)",
     hintMobile: "Tap Floor, then tap the row just above your lobby to lay floor tiles.",
     pulse: '.pal-item[data-kind="floor"]',
     done: (bits) => (bits & ONBOARDING_FLAG.floor) !== 0,
@@ -258,7 +259,10 @@ export class OnboardingController {
     // Read offerability ONCE at mount (CAP-5: not gated on a live event, so no
     // reveal race), and only when a handler is present.
     const installOffered = (o.installOffered?.() ?? false) && !!o.onInstall;
-    litRender(splashTemplate(o.hasSave, premise, o.muted?.() ?? false, installOffered, o.founder?.() ?? false, handlers), el);
+    litRender(
+      splashTemplate(o.hasSave, premise, o.muted?.() ?? false, installOffered, o.founder?.() ?? false, handlers),
+      el,
+    );
     document.body.appendChild(el);
     // Marks the title screen as mounted for CSS that must react to it: the
     // toast rail lifts above the splash only while this class is set, so a

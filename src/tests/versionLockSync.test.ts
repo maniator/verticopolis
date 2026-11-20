@@ -31,7 +31,7 @@ describe("package.json / package-lock.json version sync", () => {
     expect(lock.version).toBe(pkg.version);
   });
 
-  it("the lockfile's root package entry (\"\") version matches package.json", () => {
+  it('the lockfile\'s root package entry ("") version matches package.json', () => {
     expect(lock.packages?.[""]?.version).toBe(pkg.version);
   });
 });

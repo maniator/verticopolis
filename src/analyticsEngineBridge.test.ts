@@ -33,18 +33,26 @@ function sent(): [string, unknown][] {
 }
 
 function propsFor(name: string): unknown[] {
-  return sent().filter(([n]) => n === name).map(([, p]) => p);
+  return sent()
+    .filter(([n]) => n === name)
+    .map(([, p]) => p);
 }
 
 /** The first-tower funnel's tower fields (#2392): tower `n` of this page life. */
 const tw = (n: number) => ({ tower_n: n, page_life: expect.any(String) });
 
 const founded = (mode = "classic") => ({ name: "tower_founded", payload: { mode } });
-const placed = (kind: string, floor: number, count = 1) => ({ name: "facility_placed", payload: { kind, floor, count } });
+const placed = (kind: string, floor: number, count = 1) => ({
+  name: "facility_placed",
+  payload: { kind, floor, count },
+});
 const star = (s: number) => ({ name: "star_reached", payload: { star: s } });
 const milestone = (id: string) => ({ name: "milestone_reached", payload: { id } });
 const removed = (kind: string, method: string) => ({ name: "facility_removed", payload: { kind, method } });
-const resolved = (kind: string, decision: string, source: string) => ({ name: "emergency_resolved", payload: { kind, decision, source } });
+const resolved = (kind: string, decision: string, source: string) => ({
+  name: "emergency_resolved",
+  payload: { kind, decision, source },
+});
 
 /** A drain source over a fixed queue. */
 function source(queue: unknown[], opts: { backdrop?: boolean; dropped?: number } = {}): GameplayEventSource {
@@ -139,7 +147,10 @@ describe("analytics engine bridge", () => {
 
   it("reports every rung of a multi-rung jump", () => {
     forwardGameplayEvents([star(3), star(4)]);
-    expect(propsFor("star_reached")).toEqual([{ star: 3, ...tw(1) }, { star: 4, ...tw(1) }]);
+    expect(propsFor("star_reached")).toEqual([
+      { star: 3, ...tw(1) },
+      { star: 4, ...tw(1) },
+    ]);
   });
 
   it("sums placements, so a brush's per-tile events count the tiles it laid", () => {
@@ -149,7 +160,10 @@ describe("analytics engine bridge", () => {
     gameplaySession.end(false);
     expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
     expect(propsFor("session_peak_floors")).toEqual([{ floors: 5 }]);
-    expect(propsFor("tool_session_uses")).toEqual([{ tool: "floor", uses: 3 }, { tool: "office", uses: 1 }]);
+    expect(propsFor("tool_session_uses")).toEqual([
+      { tool: "floor", uses: 3 },
+      { tool: "office", uses: 1 },
+    ]);
   });
 
   it("re-opens the funnel only at a founding, across a batch that spans two towers", () => {
@@ -188,7 +202,11 @@ describe("analytics engine bridge", () => {
     // A held-back founding leaves the funnel closed: no first_build is ever
     // sent without its new_game_started ahead of it.
     expect(propsFor("first_build")).toHaveLength(BRIDGE_SEND_LIMIT);
-    expect(sent().slice(0, 4).map(([n]) => n)).toEqual(["new_game_started", "first_build", "new_game_started", "first_build"]);
+    expect(
+      sent()
+        .slice(0, 4)
+        .map(([n]) => n),
+    ).toEqual(["new_game_started", "first_build", "new_game_started", "first_build"]);
     expect(engineBridgeStats().rateLimited).toBe(5);
     // Every build still counted.
     gameplaySession.end(false);
@@ -264,7 +282,11 @@ describe("analytics engine bridge", () => {
   it("never throws into the frame loop, whatever the drain answers", () => {
     const answers: unknown[] = [null, undefined, "[]", 7, { name: "star_reached" }];
     for (const answer of answers) {
-      const src = { drainGameplayEvents: () => answer, gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } };
+      const src = {
+        drainGameplayEvents: () => answer,
+        gameplayEventsDropped: 0,
+        gameplayEvents: { discardOnHandOff: false },
+      };
       expect(() => drainEngineEvents(src as unknown as GameplayEventSource)).not.toThrow();
     }
     expect(engineBridgeStats().drainFailures).toBe(answers.length);
@@ -296,8 +318,16 @@ describe("analytics engine bridge", () => {
 
   it("asks the source to let go of held events at the session's own flushes, and only there (#874)", () => {
     const calls: unknown[] = [];
-    bindEngineBridge(() => ({ drainGameplayEvents: (opts?: unknown) => (calls.push(opts), []), gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } }));
-    drainEngineEvents({ drainGameplayEvents: (opts?: unknown) => (calls.push(opts), []), gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } });
+    bindEngineBridge(() => ({
+      drainGameplayEvents: (opts?: unknown) => (calls.push(opts), []),
+      gameplayEventsDropped: 0,
+      gameplayEvents: { discardOnHandOff: false },
+    }));
+    drainEngineEvents({
+      drainGameplayEvents: (opts?: unknown) => (calls.push(opts), []),
+      gameplayEventsDropped: 0,
+      gameplayEvents: { discardOnHandOff: false },
+    });
     gameplaySession.end(); // a hide: the report folds the engine's last events
     gameplaySession.startEpoch(); // a window closing: dropped unsent
     expect(calls).toEqual([undefined, { release: true }, { release: true }]);
@@ -306,7 +336,11 @@ describe("analytics engine bridge", () => {
   it("folds the outgoing tower's held events before a swap (#2392)", () => {
     const calls: unknown[] = [];
     const queue: unknown[] = [star(2)];
-    bindEngineBridge(() => ({ drainGameplayEvents: (opts?: unknown) => (calls.push(opts), queue.splice(0) as never), gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } }));
+    bindEngineBridge(() => ({
+      drainGameplayEvents: (opts?: unknown) => (calls.push(opts), queue.splice(0) as never),
+      gameplayEventsDropped: 0,
+      gameplayEvents: { discardOnHandOff: false },
+    }));
     flushBeforeTowerSwap();
     expect(calls).toEqual([{ release: true }]);
     expect(sent()).toEqual([["star_reached", { star: 2, ...tw(1) }]]);
@@ -353,7 +387,13 @@ describe("analytics engine bridge", () => {
     const files = readdirSync(src, { recursive: true, encoding: "utf8" })
       .map((f) => f.replace(/\\/g, "/")) // Windows joins with backslashes
       .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".d.ts"))
-      .filter((f) => f !== "analyticsEngineBridge.ts" && f !== "engineBinding/binding.ts" && f !== "analyticsEngagement.ts" && f !== "tests/goldens/portEditCases.ts");
+      .filter(
+        (f) =>
+          f !== "analyticsEngineBridge.ts" &&
+          f !== "engineBinding/binding.ts" &&
+          f !== "analyticsEngagement.ts" &&
+          f !== "tests/goldens/portEditCases.ts",
+      );
     expect(files).toContain("game/buildActions.ts");
     const senders = files.filter((f) => /["'`]demolish["'`]\s*[,)};]/.test(readFileSync(resolve(src, f), "utf8")));
     expect(senders).toEqual([]);

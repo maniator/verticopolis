@@ -26,7 +26,15 @@ const extra = process.argv.slice(2);
 
 // tools/agent-env/setup.sh installs the package here (the same name rule).
 const installDir = join(homedir(), ".cache", "vc-agent", MCP_PACKAGE.replace(/[@/]/g, "_"));
-const installedCli = join(installDir, "node_modules", "chrome-devtools-mcp", "build", "src", "bin", "chrome-devtools-mcp.js");
+const installedCli = join(
+  installDir,
+  "node_modules",
+  "chrome-devtools-mcp",
+  "build",
+  "src",
+  "bin",
+  "chrome-devtools-mcp.js",
+);
 
 const env = { ...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: "1", CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS: "1" };
 // One client per server (stdio), so page tools need no pageId.

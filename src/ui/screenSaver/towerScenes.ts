@@ -12,9 +12,20 @@ export interface TowerSnapshot {
   /** Floor and lobby runs: the tower's outline. `width` is in tiles. */
   readonly structure: ReadonlyArray<{ readonly floor: number; readonly x: number; readonly width: number }>;
   /** Rooms, with the window color their kind lights and whether anyone is in. */
-  readonly rooms: ReadonlyArray<{ readonly floor: number; readonly x: number; readonly width: number; readonly color: string; readonly lit: boolean }>;
+  readonly rooms: ReadonlyArray<{
+    readonly floor: number;
+    readonly x: number;
+    readonly width: number;
+    readonly color: string;
+    readonly lit: boolean;
+  }>;
   /** Elevator shafts, each with the floors it spans. */
-  readonly shafts: ReadonlyArray<{ readonly x: number; readonly width: number; readonly bottom: number; readonly top: number }>;
+  readonly shafts: ReadonlyArray<{
+    readonly x: number;
+    readonly width: number;
+    readonly bottom: number;
+    readonly top: number;
+  }>;
 }
 
 /** A room's place and light on the scene's canvas. */
@@ -59,7 +70,8 @@ function layout(t: TowerSnapshot, w: number, h: number) {
     ground,
     rowH,
     px: (x: number) => left + Math.floor((x - minX) * scale),
-    span: (x: number, width: number) => Math.max(1, Math.floor((x - minX + width) * scale) - Math.floor((x - minX) * scale)),
+    span: (x: number, width: number) =>
+      Math.max(1, Math.floor((x - minX + width) * scale) - Math.floor((x - minX) * scale)),
     py: (floor: number) => ground - (floor - low + 1) * rowH,
   };
 }
@@ -78,14 +90,27 @@ export function madeUpTower(rng: Rng): TowerSnapshot {
       else r -= intIn(rng, 3, 8);
     }
     structure.push({ floor: f, x: l, width: r - l });
-    for (let x = l; x < r; ) {
+    for (let x = l; x < r;) {
       const width = Math.min(r - x, intIn(rng, 3, 9));
-      rooms.push({ floor: f, x, width, color: f === 0 ? WINDOW.lobby : oneOf(rng, WINDOW_MIX), lit: f === 0 || rng() < 0.55 });
+      rooms.push({
+        floor: f,
+        x,
+        width,
+        color: f === 0 ? WINDOW.lobby : oneOf(rng, WINDOW_MIX),
+        lit: f === 0 || rng() < 0.55,
+      });
       x += width + 1;
     }
   }
   const mid = Math.floor(r / 2);
-  return { structure, rooms, shafts: [{ x: mid - 12, width: 4, bottom: 0, top: floors - 1 }, { x: mid + 10, width: 4, bottom: 0, top: Math.floor(floors * 0.6) }] };
+  return {
+    structure,
+    rooms,
+    shafts: [
+      { x: mid - 12, width: 4, bottom: 0, top: floors - 1 },
+      { x: mid + 10, width: 4, bottom: 0, top: Math.floor(floors * 0.6) },
+    ],
+  };
 }
 
 /** Night Shift: the tower at night, windows switching on and off, a car
@@ -102,13 +127,33 @@ export function nightShift(
   const t = tower && tower.rooms.length > 0 ? tower : madeUpTower(rng);
   const at = layout(t, w, h);
   const paneH = at.rowH > 1 ? at.rowH - 1 : 1;
-  const panes: Pane[] = t.rooms.map((r) => ({ x: at.px(r.x), y: at.py(r.floor), w: at.span(r.x, r.width), h: paneH, color: r.color, lit: r.lit }));
+  const panes: Pane[] = t.rooms.map((r) => ({
+    x: at.px(r.x),
+    y: at.py(r.floor),
+    w: at.span(r.x, r.width),
+    h: paneH,
+    color: r.color,
+    lit: r.lit,
+  }));
   const lifts: Lift[] = t.shafts.map((s) => {
     const bottom = at.py(s.bottom);
     const top = at.py(s.top);
-    return { x: at.px(s.x), w: Math.max(1, at.span(s.x, s.width)), bottom, top, pos: bottom, target: top + Math.floor(rng() * (bottom - top + 1)), wait: rng() * 2 };
+    return {
+      x: at.px(s.x),
+      w: Math.max(1, at.span(s.x, s.width)),
+      bottom,
+      top,
+      pos: bottom,
+      target: top + Math.floor(rng() * (bottom - top + 1)),
+      wait: rng() * 2,
+    };
   });
-  const stars = Array.from({ length: Math.floor((w * h) / 90) }, () => ({ x: intIn(rng, 0, w - 1), y: intIn(rng, 0, Math.floor(h * 0.75)), phase: rng() * 6.28, rate: 0.3 + rng() * 0.6 }));
+  const stars = Array.from({ length: Math.floor((w * h) / 90) }, () => ({
+    x: intIn(rng, 0, w - 1),
+    y: intIn(rng, 0, Math.floor(h * 0.75)),
+    phase: rng() * 6.28,
+    rate: 0.3 + rng() * 0.6,
+  }));
   const layer = makeLayer();
   if (layer) {
     // A new canvas starts at 300 by 150; the layer is the scene's size.

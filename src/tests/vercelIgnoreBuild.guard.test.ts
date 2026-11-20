@@ -125,7 +125,13 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       const run = spawnSync("git", args, {
         cwd,
         encoding: "utf8",
-        env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com" },
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: "t",
+          GIT_AUTHOR_EMAIL: "t@example.com",
+          GIT_COMMITTER_NAME: "t",
+          GIT_COMMITTER_EMAIL: "t@example.com",
+        },
       });
       expect(run.status, run.stderr).toBe(0);
       return run.stdout.trim();
@@ -134,7 +140,12 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
     /** A repo whose first commit holds `before`, and a second that applies
      *  `after` (a null value deletes the file). Returns the script's exit
      *  code, with the first commit as Vercel's previous deploy. */
-    function exitCode(before: Record<string, string>, after: Record<string, string | null>, previous: "sha" | "none" = "sha", vercelEnv = ""): number | null {
+    function exitCode(
+      before: Record<string, string>,
+      after: Record<string, string | null>,
+      previous: "sha" | "none" = "sha",
+      vercelEnv = "",
+    ): number | null {
       const root = mkdtempSync(join(tmpdir(), "vc-ignore-build-"));
       roots.push(root);
       git(root, "init", "-q");
@@ -162,7 +173,9 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
     const base = { "src/a.ts": "a", "docs/a.md": "a", "README.md": "a", "package.json": pkg("2.0.0") };
 
     it("skips (0) when only skipped paths changed", () => {
-      expect(exitCode(base, { "docs/a.md": "b", "README.md": "b", ".github/workflows/x.yml": "b", "src/a.test.ts": "b" })).toBe(0);
+      expect(
+        exitCode(base, { "docs/a.md": "b", "README.md": "b", ".github/workflows/x.yml": "b", "src/a.test.ts": "b" }),
+      ).toBe(0);
     });
 
     it("builds (1) when a built path changed, alone or among skipped ones", () => {
@@ -181,25 +194,65 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
     });
 
     describe("the production hold for pending change notes", () => {
-      const note = (app: string, eol = "\n") => ["---", `app: ${app} # a comment`, "---", "## Player", "- A line."].join(eol) + eol;
+      const note = (app: string, eol = "\n") =>
+        ["---", `app: ${app} # a comment`, "---", "## Player", "- A line."].join(eol) + eol;
 
       it("holds production while a note asks for an app release", () => {
         expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor") }, "sha", "production")).toBe(0);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("major", "\r\n") }, "sha", "production")).toBe(0);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/a.md": note("none"), ".changes/b.md": note("patch") }, "sha", "production")).toBe(0);
+        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("major", "\r\n") }, "sha", "production")).toBe(
+          0,
+        );
+        expect(
+          exitCode(
+            base,
+            { "src/a.ts": "b", ".changes/a.md": note("none"), ".changes/b.md": note("patch") },
+            "sha",
+            "production",
+          ),
+        ).toBe(0);
         // An indented level parses, so it holds too.
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none").replace("app: none", "  app: minor") }, "sha", "production")).toBe(0);
+        expect(
+          exitCode(
+            base,
+            { "src/a.ts": "b", ".changes/x.md": note("none").replace("app: none", "  app: minor") },
+            "sha",
+            "production",
+          ),
+        ).toBe(0);
         // A note from before the split says crate: none, which holds nothing.
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": "---\napp: none\ncrate: none\n---\n", ...bump("2.1.0") }, "sha", "production")).toBe(1);
+        expect(
+          exitCode(
+            base,
+            { "src/a.ts": "b", ".changes/x.md": "---\napp: none\ncrate: none\n---\n", ...bump("2.1.0") },
+            "sha",
+            "production",
+          ),
+        ).toBe(1);
       });
 
       it("builds a preview with pending notes, and production when every note is none", () => {
         expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor") }, "sha", "preview")).toBe(1);
         expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("minor") })).toBe(1);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none"), ...bump("2.1.0") }, "sha", "production")).toBe(1);
+        expect(
+          exitCode(base, { "src/a.ts": "b", ".changes/x.md": note("none"), ...bump("2.1.0") }, "sha", "production"),
+        ).toBe(1);
         // The folder's README is not a note, and a level outside the front matter does not count.
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/README.md": note("minor"), ...bump("2.1.0") }, "sha", "production")).toBe(1);
-        expect(exitCode(base, { "src/a.ts": "b", ".changes/x.md": `${note("none")}app: minor\n`, ...bump("2.1.0") }, "sha", "production")).toBe(1);
+        expect(
+          exitCode(
+            base,
+            { "src/a.ts": "b", ".changes/README.md": note("minor"), ...bump("2.1.0") },
+            "sha",
+            "production",
+          ),
+        ).toBe(1);
+        expect(
+          exitCode(
+            base,
+            { "src/a.ts": "b", ".changes/x.md": `${note("none")}app: minor\n`, ...bump("2.1.0") },
+            "sha",
+            "production",
+          ),
+        ).toBe(1);
       });
 
       it("builds the release merge that deletes the notes", () => {
@@ -213,7 +266,14 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         expect(exitCode(base, { "src/a.ts": "b" }, "sha", "production")).toBe(0);
         expect(exitCode(base, { "src/a.ts": "b", "package.json": pkg("2.0.0", "1") }, "sha", "production")).toBe(0);
         // A release that consumed only none notes moved nothing, so it deploys nothing.
-        expect(exitCode({ ...base, ".changes/x.md": "---\napp: none\n---\n" }, { ".changes/x.md": null }, "sha", "production")).toBe(0);
+        expect(
+          exitCode(
+            { ...base, ".changes/x.md": "---\napp: none\n---\n" },
+            { ".changes/x.md": null },
+            "sha",
+            "production",
+          ),
+        ).toBe(0);
       });
 
       it("builds production when the app version changes", () => {
@@ -230,7 +290,12 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
           git(root, "add", "-A");
           git(root, "commit", "-q", "-m", "c");
         }
-        const env = { ...process.env, VERCEL_ENV: "production", VERCEL_GIT_PROVIDER: "", VERCEL_GIT_PREVIOUS_SHA: "0123456789012345678901234567890123456789" };
+        const env = {
+          ...process.env,
+          VERCEL_ENV: "production",
+          VERCEL_GIT_PROVIDER: "",
+          VERCEL_GIT_PREVIOUS_SHA: "0123456789012345678901234567890123456789",
+        };
         expect(spawnSync("bash", [SCRIPT], { cwd: root, env, encoding: "utf8" }).status).toBe(0);
       });
 
@@ -253,7 +318,11 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         git(root, "add", "-A");
         git(root, "commit", "-q", "-m", "c");
       }
-      const env = { ...process.env, VERCEL_GIT_PROVIDER: "", VERCEL_GIT_PREVIOUS_SHA: "0123456789012345678901234567890123456789" };
+      const env = {
+        ...process.env,
+        VERCEL_GIT_PROVIDER: "",
+        VERCEL_GIT_PREVIOUS_SHA: "0123456789012345678901234567890123456789",
+      };
       expect(spawnSync("bash", [SCRIPT], { cwd: root, env, encoding: "utf8" }).status).toBe(1);
     });
 
@@ -263,7 +332,10 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
      *  of the new tip, so the old tip is missing from it. The script's GitHub
      *  URL is pointed at the local repo through git's url.insteadOf. Runs the
      *  script with the old tip (or `previous`) as the previous deploy. */
-    function forcePushed(rewritten: Record<string, string>, previous?: string | ((oldTip: string) => string)): { status: number | null; stdout: string } {
+    function forcePushed(
+      rewritten: Record<string, string>,
+      previous?: string | ((oldTip: string) => string),
+    ): { status: number | null; stdout: string } {
       const github = mkdtempSync(join(tmpdir(), "vc-ignore-build-gh-"));
       const clone = mkdtempSync(join(tmpdir(), "vc-ignore-build-clone-"));
       roots.push(github, clone);
@@ -332,7 +404,11 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       writeFileSync(join(root, "README.md"), "a");
       git(root, "add", "-A");
       git(root, "commit", "-q", "-m", "only");
-      const run = spawnSync("bash", [SCRIPT], { cwd: root, env: { ...process.env, VERCEL_GIT_PREVIOUS_SHA: "" }, encoding: "utf8" });
+      const run = spawnSync("bash", [SCRIPT], {
+        cwd: root,
+        env: { ...process.env, VERCEL_GIT_PREVIOUS_SHA: "" },
+        encoding: "utf8",
+      });
       expect(run.status).toBe(1);
     });
   });
@@ -354,7 +430,15 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
     function resolveSpec(fromRel: string, spec: string): string | null {
       const bare = spec.replace(/[?#].*$/, "");
       const target = posix.normalize(posix.join(posix.dirname(fromRel), bare));
-      for (const candidate of [target, `${target}.ts`, `${target}.tsx`, `${target}.mts`, `${target}.mjs`, `${target}/index.ts`, target.replace(/\.js$/, ".ts")]) {
+      for (const candidate of [
+        target,
+        `${target}.ts`,
+        `${target}.tsx`,
+        `${target}.mts`,
+        `${target}.mjs`,
+        `${target}/index.ts`,
+        target.replace(/\.js$/, ".ts"),
+      ]) {
         const abs = resolve(repoRoot, candidate);
         if (existsSync(abs) && !readdirOrNull(abs)) return candidate;
       }

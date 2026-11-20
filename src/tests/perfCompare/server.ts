@@ -50,7 +50,9 @@ const TYPES: Record<string, string> = {
 
 /** Whether a file of this extension is served compressed. */
 export function compressible(ext: string): boolean {
-  return [".html", ".js", ".mjs", ".css", ".json", ".webmanifest", ".wasm", ".svg", ".txt", ".map", ".ico"].includes(ext);
+  return [".html", ".js", ".mjs", ".css", ".json", ".webmanifest", ".wasm", ".svg", ".txt", ".map", ".ico"].includes(
+    ext,
+  );
 }
 
 /** The Cache-Control a path gets, per vercel.json. */
@@ -104,7 +106,8 @@ export async function startServer(root: string, port = 0, overlay?: Overlay): Pr
   // check below holds whatever the caller passed.
   const base = resolve(root);
   const over = overlay ? { prefix: overlay.prefix.replace(/\/+$/, ""), base: resolve(overlay.dir) } : null;
-  if (over && !/^(\/[^/]+)+$/.test(over.prefix)) throw new Error(`the overlay prefix "${overlay?.prefix}" must be a path such as /engine`);
+  if (over && !/^(\/[^/]+)+$/.test(over.prefix))
+    throw new Error(`the overlay prefix "${overlay?.prefix}" must be a path such as /engine`);
   if (over && !existsSync(over.base)) throw new Error(`the overlay folder ${over.base} does not exist`);
   if (over && !statSync(over.base).isDirectory()) throw new Error(`the overlay folder ${over.base} is not a folder`);
   const cache = new Map<string, Entry>();
@@ -115,7 +118,9 @@ export async function startServer(root: string, port = 0, overlay?: Overlay): Pr
       const raw = readFileSync(file);
       e = { raw, etag: `"${createHash("sha1").update(raw).digest("hex")}"` };
       if (compressible(extname(file))) {
-        e.br = brotliCompressSync(raw, { params: { [constants.BROTLI_PARAM_QUALITY]: 11, [constants.BROTLI_PARAM_SIZE_HINT]: raw.length } });
+        e.br = brotliCompressSync(raw, {
+          params: { [constants.BROTLI_PARAM_QUALITY]: 11, [constants.BROTLI_PARAM_SIZE_HINT]: raw.length },
+        });
         e.gzip = gzipSync(raw, { level: 9 });
       }
       cache.set(file, e);
@@ -135,7 +140,11 @@ export async function startServer(root: string, port = 0, overlay?: Overlay): Pr
   if (over) warm(over.base);
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
-    const isolation = { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp", "Cross-Origin-Resource-Policy": "same-origin" };
+    const isolation = {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Resource-Policy": "same-origin",
+    };
     let path: string;
     try {
       path = decodeURIComponent(url.pathname);

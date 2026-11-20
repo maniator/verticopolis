@@ -40,7 +40,10 @@ const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace
 
 /** The skyline at the card's right, on the ground line. */
 function backdrop() {
-  const skyline = tower(870, 120, 250, GROUND, "#241a4a") + tower(1110, 120, 230, GROUND, "#241a4a") + tower(990, 170, 340, GROUND, TOWER);
+  const skyline =
+    tower(870, 120, 250, GROUND, "#241a4a") +
+    tower(1110, 120, 230, GROUND, "#241a4a") +
+    tower(990, 170, 340, GROUND, TOWER);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
     <defs>
       <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">

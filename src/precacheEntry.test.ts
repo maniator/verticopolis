@@ -6,7 +6,9 @@ const DIST = resolve("/build/dist");
 
 describe("precacheFile", () => {
   it("maps a manifest URL to its file under dist/, dropping the query and decoding it", () => {
-    expect(precacheFile(DIST, "engine/verticopolis_engine_bg.wasm?__WB_REVISION__=abc")).toBe(resolve(DIST, "engine/verticopolis_engine_bg.wasm"));
+    expect(precacheFile(DIST, "engine/verticopolis_engine_bg.wasm?__WB_REVISION__=abc")).toBe(
+      resolve(DIST, "engine/verticopolis_engine_bg.wasm"),
+    );
     expect(precacheFile(DIST, "assets/a%20b.js#x")).toBe(resolve(DIST, "assets/a b.js"));
     expect(precacheFile(DIST, "./index.html")).toBe(resolve(DIST, "index.html"));
     // A file name may start with dots; only a whole ".." segment climbs.

@@ -53,7 +53,13 @@ function runBytes(cmd: string, args: string[], cwd: string, raw: boolean): Buffe
     // SSH prompt.)
     // GIT_DIFF_OPTS changes the diff text, so the record's hash never sees it.
     const { GIT_DIFF_OPTS: _ignored, ...inherited } = process.env;
-    const out = execFileSync(cmd, args, { cwd, stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, maxBuffer: raw ? 256 * 2 ** 20 : undefined, env: { ...inherited, GIT_TERMINAL_PROMPT: "0" } });
+    const out = execFileSync(cmd, args, {
+      cwd,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 30_000,
+      maxBuffer: raw ? 256 * 2 ** 20 : undefined,
+      env: { ...inherited, GIT_TERMINAL_PROMPT: "0" },
+    });
     return raw ? out : Buffer.from(out.toString("utf8").trim());
   } catch {
     return null;
@@ -117,7 +123,8 @@ export function packageState(distDir: string): PackageState {
     return { files, buildHash: null, buildProblem: "has a BUILD.json that is not JSON" };
   }
   const sources = (parsed as { sources?: unknown } | null)?.sources;
-  if (typeof sources !== "string" || !sources) return { files, buildHash: null, buildProblem: "has a BUILD.json with no sources hash" };
+  if (typeof sources !== "string" || !sources)
+    return { files, buildHash: null, buildProblem: "has a BUILD.json with no sources hash" };
   return { files, buildHash: sources, buildProblem: null };
 }
 
@@ -145,7 +152,11 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
   // Untracked files count too: a new source file changes the build.
   // Committed-or-not results folders are output, not source, so they never
   // make a tree dirty.
-  const status = run("git", ["status", "--porcelain", "--untracked-files=normal", "--", ".", ":(exclude)docs/performance/results"], repo);
+  const status = run(
+    "git",
+    ["status", "--porcelain", "--untracked-files=normal", "--", ".", ":(exclude)docs/performance/results"],
+    repo,
+  );
   // Best effort: bring origin/main up to date, then compare with it (as
   // last fetched, when the fetch cannot reach the remote).
   const fetched = run("git", ["fetch", "-q", "origin", "main"], repo) !== null;
@@ -154,11 +165,18 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
   const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string };
   let playwright: string | null = null;
   try {
-    playwright = (JSON.parse(readFileSync(join(repo, "node_modules", "playwright-core", "package.json"), "utf8")) as { version: string }).version;
+    playwright = (
+      JSON.parse(readFileSync(join(repo, "node_modules", "playwright-core", "package.json"), "utf8")) as {
+        version: string;
+      }
+    ).version;
   } catch {
     playwright = null;
   }
-  const tree = treeRecord((args) => runBytes("git", args, repo, true), (p) => readUntracked(join(repo, p)));
+  const tree = treeRecord(
+    (args) => runBytes("git", args, repo, true),
+    (p) => readUntracked(join(repo, p)),
+  );
   // A status that could not be read counts as dirty: unknown is not clean. So
   // does a tracked file git was told to ignore changes in, and the flag with
   // nothing in the record to explain it makes the record incomplete.
@@ -240,6 +258,13 @@ export function processTreePss(rootPid: number, only: RegExp = /./): { bytes: nu
 /** The tree a build comes from: HEAD and whether anything outside the
  *  results folders differs from it. */
 export function buildTree(repo: string): { commit: string; dirty: boolean } {
-  const status = run("git", ["status", "--porcelain", "--untracked-files=normal", "--", ".", ":(exclude)docs/performance/results"], repo);
-  return { commit: run("git", ["rev-parse", "HEAD"], repo) ?? "unknown", dirty: status === null ? true : status.length > 0 };
+  const status = run(
+    "git",
+    ["status", "--porcelain", "--untracked-files=normal", "--", ".", ":(exclude)docs/performance/results"],
+    repo,
+  );
+  return {
+    commit: run("git", ["rev-parse", "HEAD"], repo) ?? "unknown",
+    dirty: status === null ? true : status.length > 0,
+  };
 }

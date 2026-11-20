@@ -1,4 +1,9 @@
-import { repairEnginePackage, repairMessage, updateRegistration, type RepairResult } from "@verticopolis/components/host/engineRepair";
+import {
+  repairEnginePackage,
+  repairMessage,
+  updateRegistration,
+  type RepairResult,
+} from "@verticopolis/components/host/engineRepair";
 
 /**
  * The stop screen's Repair engine files button (#985, design 5.4): runs the
@@ -6,7 +11,10 @@ import { repairEnginePackage, repairMessage, updateRegistration, type RepairResu
  * button available for another try. It never reloads the page or activates a
  * worker; the player presses Reload.
  */
-export async function runEngineRepair(e: Event, repair: () => Promise<RepairResult> = () => repairEnginePackage({ update: updateRegistration })): Promise<void> {
+export async function runEngineRepair(
+  e: Event,
+  repair: () => Promise<RepairResult> = () => repairEnginePackage({ update: updateRegistration }),
+): Promise<void> {
   const button = e.currentTarget as HTMLButtonElement;
   const status = button.parentElement?.querySelector<HTMLElement>(".engine-failure-repair-status");
   if (button.getAttribute("aria-disabled") === "true") return;

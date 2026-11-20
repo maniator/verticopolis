@@ -15,7 +15,9 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 /** Boot the game and found a Modern tower at five stars, so every tool shows. */
 async function fullModernPalette(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: { sim?: unknown } }).game?.sim), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: { sim?: unknown } }).game?.sim), undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
     const g = (window as any).game;
@@ -109,7 +111,9 @@ test("a tall desktop keeps the normal rows, and a shorter window refits as it re
 test("a new Classic tower at one star keeps the normal single column", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: { sim?: unknown } }).game?.sim), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: { sim?: unknown } }).game?.sim), undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => document.getElementById("splash")?.remove());
   await expect(page.locator('#palette .pal-item[data-kind="office"]')).toBeVisible();
   const state = await paletteState(page);
@@ -130,7 +134,9 @@ for (const vp of [
   });
 }
 
-test("the fold button folds the desktop Tools window into a strip, remembers it, and opens it again", async ({ page }) => {
+test("the fold button folds the desktop Tools window into a strip, remembers it, and opens it again", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await fullModernPalette(page);
   const button = page.locator("#btn-palette-collapse");
@@ -146,7 +152,9 @@ test("the fold button folds the desktop Tools window into a strip, remembers it,
   expect(stageFolded).toBeGreaterThan(stageBefore + 250);
   // Folded stays folded on the next visit.
   await page.reload();
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: { sim?: unknown } }).game?.sim), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: { sim?: unknown } }).game?.sim), undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => document.getElementById("splash")?.remove());
   await expect(page.locator("#btn-palette-collapse")).toHaveAttribute("aria-expanded", "false");
   await page.locator("#btn-palette-collapse").click();
@@ -160,15 +168,23 @@ test("a phone has no fold button, and a stored fold leaves its tools showing", a
   await page.addInitScript(() => localStorage.setItem("vc-tools-collapsed-desktop", "collapsed"));
   await fullModernPalette(page);
   await expect(page.locator("#btn-palette-collapse")).toBeHidden();
-  await expect(page.locator('#palette .pal-item[data-kind="inspect"], #palette .pal-item[data-tool="inspect"]').first()).toBeVisible();
+  await expect(
+    page.locator('#palette .pal-item[data-kind="inspect"], #palette .pal-item[data-tool="inspect"]').first(),
+  ).toBeVisible();
 });
 
-test("folding categories from their headers shortens the list, so the window drops back to one column", async ({ page }) => {
+test("folding categories from their headers shortens the list, so the window drops back to one column", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await fullModernPalette(page);
   expect((await paletteState(page)).classes).toContain("pal-fit-columns");
-  for (const group of ["Living", "Leisure", "Services"]) await page.locator(`.pal-group[data-group="${group}"] > .pal-group-title[role="button"]`).click();
-  await expect(page.locator('.pal-group[data-group="Leisure"] > .pal-group-title[role="button"]')).toHaveAttribute("aria-expanded", "false");
+  for (const group of ["Living", "Leisure", "Services"])
+    await page.locator(`.pal-group[data-group="${group}"] > .pal-group-title[role="button"]`).click();
+  await expect(page.locator('.pal-group[data-group="Leisure"] > .pal-group-title[role="button"]')).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
   await expect(page.locator('#palette .pal-item[data-kind="cinema"]')).toBeHidden();
   const folded = await paletteState(page);
   expect(folded.classes).not.toContain("pal-fit-columns");
@@ -176,18 +192,25 @@ test("folding categories from their headers shortens the list, so the window dro
   expect(folded.width).toBe(176);
   // The folds are remembered.
   await page.reload();
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: { sim?: unknown } }).game?.sim), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { game?: { sim?: unknown } }).game?.sim), undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => document.getElementById("splash")?.remove());
   await expect(page.locator('.pal-group[data-group="Leisure"]')).toHaveClass(/pal-folded/);
   // The keyboard opens one again.
   await page.locator('.pal-group[data-group="Leisure"] > .pal-group-title[role="button"]').focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator('.pal-group[data-group="Leisure"] > .pal-group-title[role="button"]')).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator('.pal-group[data-group="Leisure"] > .pal-group-title[role="button"]')).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
 });
 
 test("a fold stored on a desktop never empties a phone's category tab", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.addInitScript(() => localStorage.setItem("vc-tools-folded-groups", JSON.stringify(["Structure", "Commercial"])));
+  await page.addInitScript(() =>
+    localStorage.setItem("vc-tools-folded-groups", JSON.stringify(["Structure", "Commercial"])),
+  );
   await fullModernPalette(page);
   await page.locator('.pal-tab[data-group="Commercial"]').click();
   await expect(page.locator('#palette .pal-item[data-kind="office"]')).toBeVisible();

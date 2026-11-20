@@ -29,7 +29,9 @@ describe("choosePublicDir (#1057)", () => {
 
   it("lets a dev serve fall back to the player package, and a build with no engine at all through", () => {
     expect(choosePublicDir({ ...base, serve: true, hasToolingPackage: false })).toEqual({ kind: "player" });
-    expect(choosePublicDir({ ...base, tooling: true, hasToolingPackage: false, hasPlayerPackage: false })).toEqual({ kind: "player" });
+    expect(choosePublicDir({ ...base, tooling: true, hasToolingPackage: false, hasPlayerPackage: false })).toEqual({
+      kind: "player",
+    });
   });
 });
 
@@ -97,21 +99,42 @@ describe("toolingEngineFile", () => {
     dir = mkdtempSync(join(tmpdir(), "vc-tooling-serve-"));
     const p = join(dir, "pkg-web-tooling");
     mkdirSync(join(p, "nested"), { recursive: true });
-    for (const f of ["verticopolis_engine.js", "verticopolis_engine_bg.wasm", "BUILD.json"]) writeFileSync(join(p, f), f);
+    for (const f of ["verticopolis_engine.js", "verticopolis_engine_bg.wasm", "BUILD.json"])
+      writeFileSync(join(p, f), f);
     writeFileSync(join(dir, "secret.json"), "{}");
     return p;
   }
 
   it("answers the engine's files with their content types", () => {
     const p = pkg();
-    expect(toolingEngineFile("/engine/verticopolis_engine.js", "/", p)).toEqual({ file: join(p, "verticopolis_engine.js"), type: "text/javascript" });
-    expect(toolingEngineFile("/engine/verticopolis_engine_bg.wasm", "/", p)).toEqual({ file: join(p, "verticopolis_engine_bg.wasm"), type: "application/wasm" });
-    expect(toolingEngineFile("/app/engine/BUILD.json", "/app/", p)).toEqual({ file: join(p, "BUILD.json"), type: "application/json" });
+    expect(toolingEngineFile("/engine/verticopolis_engine.js", "/", p)).toEqual({
+      file: join(p, "verticopolis_engine.js"),
+      type: "text/javascript",
+    });
+    expect(toolingEngineFile("/engine/verticopolis_engine_bg.wasm", "/", p)).toEqual({
+      file: join(p, "verticopolis_engine_bg.wasm"),
+      type: "application/wasm",
+    });
+    expect(toolingEngineFile("/app/engine/BUILD.json", "/app/", p)).toEqual({
+      file: join(p, "BUILD.json"),
+      type: "application/json",
+    });
   });
 
   it("leaves every other request to Vite", () => {
     const p = pkg();
-    for (const path of ["/main.ts", "/engine/", "/engine/missing.js", "/engine/nested", "/engine/../secret.json", "/engine/%2e%2e%2fsecret.json", "/engine/nested/x.js", "/assets/engine/verticopolis_engine.js", "/engine/verticopolis_engine.d.ts.map", "/engine/%E0%A4%A"]) {
+    for (const path of [
+      "/main.ts",
+      "/engine/",
+      "/engine/missing.js",
+      "/engine/nested",
+      "/engine/../secret.json",
+      "/engine/%2e%2e%2fsecret.json",
+      "/engine/nested/x.js",
+      "/assets/engine/verticopolis_engine.js",
+      "/engine/verticopolis_engine.d.ts.map",
+      "/engine/%E0%A4%A",
+    ]) {
       expect(toolingEngineFile(path, "/", p), path).toBeNull();
     }
   });

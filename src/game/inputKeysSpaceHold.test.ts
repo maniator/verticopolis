@@ -323,7 +323,10 @@ describe("the Space hold the game follows", () => {
       expect(app.spacePanKey!(), `${key} keeps the hold`).toBe(true);
     }
     for (const [key, init] of [
-      ["ArrowDown", { altKey: true }], ["ArrowUp", {}], ["F4", {}], ["Enter", {}],
+      ["ArrowDown", { altKey: true }],
+      ["ArrowUp", {}],
+      ["F4", {}],
+      ["Enter", {}],
       ["ArrowDown", { repeat: true }], // held since before the focus came (a Mac)
       [" ", { repeat: true }], // Space's own repeats open it too
       ["\u00a0", { repeat: true, code: "Space" }], // known by its physical key

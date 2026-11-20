@@ -19,7 +19,9 @@ export const FILE_SHORTCUT = {
 
 /** Which File command a key press names, if any: Ctrl (Cmd on a Mac) with O,
  *  S, or Shift and S. Alt is left to the menu bar's own keys. */
-export function fileCommandFor(e: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey">): keyof FileCommands | null {
+export function fileCommandFor(
+  e: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey">,
+): keyof FileCommands | null {
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return null;
   const k = e.key.toLowerCase();
   if (k === "o" && !e.shiftKey) return "open";

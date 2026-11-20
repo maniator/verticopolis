@@ -12,7 +12,6 @@ vi.mock("../../ui/downloadFile", () => ({ downloadFile: vi.fn() }));
  *  file pins the sentences each flag combination renders, so a wording change
  *  is a deliberate edit here rather than an accident. */
 
-
 function show(overrides: Partial<CrashScreenOptions> = {}, save: Partial<CrashScreenOptions["save"]> = {}) {
   const opts: CrashScreenOptions = {
     crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false },
@@ -36,7 +35,15 @@ afterEach(() => {
 describe("crash screen wording and wiring", () => {
   it("replaces the recovery card when a second loss lands during an in-place recovery (#321)", () => {
     const endWait = showGraphicsRecovery();
-    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: true, saveFlushed: true, behindSplash: false, recoveryFailed: false } });
+    const { card } = show({
+      crash: {
+        kind: "webgl-context-lost",
+        repeat: true,
+        saveFlushed: true,
+        behindSplash: false,
+        recoveryFailed: false,
+      },
+    });
     expect(document.getElementById(GRAPHICS_RECOVERY_ID)).toBeNull();
     expect((card as HTMLDialogElement).open).toBe(true);
     endWait(); // the attempt still ends later; taking down a card already gone leaves the crash card up
@@ -71,12 +78,28 @@ describe("crash screen wording and wiring", () => {
   });
 
   it("a repeat crash adds the close-other-apps advice", () => {
-    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: true, saveFlushed: true, behindSplash: false, recoveryFailed: false } });
+    const { card } = show({
+      crash: {
+        kind: "webgl-context-lost",
+        repeat: true,
+        saveFlushed: true,
+        behindSplash: false,
+        recoveryFailed: false,
+      },
+    });
     expect(card.textContent).toContain("second crash in a row");
   });
 
   it("a failed in-place recovery adds the same device-distress advice on a first loss", () => {
-    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: true } });
+    const { card } = show({
+      crash: {
+        kind: "webgl-context-lost",
+        repeat: false,
+        saveFlushed: true,
+        behindSplash: false,
+        recoveryFailed: true,
+      },
+    });
     expect(card.textContent).toContain("tried to restart its graphics");
     expect(card.textContent).toContain("Closing other tabs or apps");
     expect(card.textContent).not.toContain("second crash in a row"); // it was one crash; stay honest
@@ -127,7 +150,11 @@ describe("crash screen wording and wiring", () => {
   it("Download recovery copy hands over the stored text unchanged, or says none is stored", () => {
     const { card } = show({ recoveryText: () => "VCZ1:stored" });
     card.querySelector<HTMLButtonElement>('[data-act="recovery"]')!.click();
-    expect(downloadFile).toHaveBeenCalledWith("verticopolis-recovery-copy.txt", "VCZ1:stored", "application/octet-stream");
+    expect(downloadFile).toHaveBeenCalledWith(
+      "verticopolis-recovery-copy.txt",
+      "VCZ1:stored",
+      "application/octet-stream",
+    );
     expect(card.querySelector(".crash-status")!.textContent).toContain("Recovery copy ready.");
     card.remove();
     const empty = show({ recoveryText: () => null }).card;

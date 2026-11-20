@@ -81,10 +81,18 @@ export class Snapshot {
     return this.report;
   }
 
-  get money(): number { return this.view.money; }
-  get star(): number { return this.view.star; }
-  get mode(): string { return this.view.mode; }
-  get log(): NonNullable<SerializedGame["log"]> { return this.view.log ?? []; }
+  get money(): number {
+    return this.view.money;
+  }
+  get star(): number {
+    return this.view.star;
+  }
+  get mode(): string {
+    return this.view.mode;
+  }
+  get log(): NonNullable<SerializedGame["log"]> {
+    return this.view.log ?? [];
+  }
   get events(): { readonly pending: PendingChoiceRecord | null } {
     return { pending: (this.save().events as { pending?: PendingChoiceRecord | null } | undefined)?.pending ?? null };
   }
@@ -93,13 +101,21 @@ export class Snapshot {
     return { minutes, day, minuteOfDay, hour: Math.floor(minuteOfDay / 60) };
   }
   /** The milestones the tower has reached, by id. */
-  get milestones(): readonly string[] { return (this.save().milestones as string[] | undefined) ?? []; }
+  get milestones(): readonly string[] {
+    return (this.save().milestones as string[] | undefined) ?? [];
+  }
   /** The random stream's state, which the save carries as `seed`. */
-  get rng(): { readonly seed: number } { return { seed: this.save().seed }; }
+  get rng(): { readonly seed: number } {
+    return { seed: this.save().seed };
+  }
   /** The HUD population (the frame header's). */
-  get population(): number { return this.sim.frameSlot("population"); }
+  get population(): number {
+    return this.sim.frameSlot("population");
+  }
   /** Rooms burning now. */
-  get fires(): number { return this.tower.units.filter((u) => u.state === "fire").length; }
+  get fires(): number {
+    return this.tower.units.filter((u) => u.state === "fire").length;
+  }
   get tower(): {
     readonly units: readonly UnitRecord[];
     readonly transports: readonly Readonly<Transport>[];
@@ -119,9 +135,13 @@ export class Snapshot {
     };
   }
   /** The next star's requirements, as the stats screen answers them. */
-  nextStarRequirements(): NextStarView | null { return this.stats().nextStar; }
+  nextStarRequirements(): NextStarView | null {
+    return this.stats().nextStar;
+  }
   /** The ledger's averages, as the stats screen answers them. */
-  incomeBreakdown(): StatsReport["income"] { return this.stats().income; }
+  incomeBreakdown(): StatsReport["income"] {
+    return this.stats().income;
+  }
 }
 
 /** Free the drafts the kit made. */

@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  handleIngest,
-  MAX_BODY_BYTES,
-  originAllowed,
-  RateLimiter,
-  type IngestDeps,
-} from "./analyticsIngest";
+import { handleIngest, MAX_BODY_BYTES, originAllowed, RateLimiter, type IngestDeps } from "./analyticsIngest";
 
 const HOST = "https://us.i.posthog.com";
 const KEY = "phc_test_key";
@@ -210,7 +204,11 @@ describe("handleIngest", () => {
     for (const chunk of [text.length, 700, 1]) {
       // Fresh deps each time, so the rate limiter can never answer for the cap.
       const deps = makeDeps();
-      const req = { method: "POST", headers: { get: () => null }, body: spyBody(text, chunk).body } as unknown as Request;
+      const req = {
+        method: "POST",
+        headers: { get: () => null },
+        body: spyBody(text, chunk).body,
+      } as unknown as Request;
       expect((await handleIngest(req, deps)).status).toBe(413);
     }
   });
@@ -265,7 +263,12 @@ describe("handleIngest", () => {
   it("forwards a valid event to PostHog capture with the key server-side", async () => {
     const deps = makeDeps();
     const res = await handleIngest(
-      postRequest({ event: "star_reached", properties: { star: 3 }, session: "sess-1", ts: "2026-07-22T00:00:00.000Z" }),
+      postRequest({
+        event: "star_reached",
+        properties: { star: 3 },
+        session: "sess-1",
+        ts: "2026-07-22T00:00:00.000Z",
+      }),
       deps,
     );
     expect(res.status).toBe(204);

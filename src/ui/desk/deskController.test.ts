@@ -4,7 +4,16 @@ vi.mock("../../analyticsActions", () => ({ trackAppAction: vi.fn(), trackAppActi
 
 import { trackAppAction, trackAppActionOnce } from "../../analyticsActions";
 import { DESK_MINIMIZED_CLASS } from "@verticopolis/components/windows/desk/deskWindow";
-import { DESK_ANY_SCREEN, DESK_ANY_SCREEN_MQ, DESK_CLASS, DESK_KEY, DESK_MQ, DeskController, deskActive, wireDesk } from "./deskController";
+import {
+  DESK_ANY_SCREEN,
+  DESK_ANY_SCREEN_MQ,
+  DESK_CLASS,
+  DESK_KEY,
+  DESK_MQ,
+  DeskController,
+  deskActive,
+  wireDesk,
+} from "./deskController";
 
 /** The page the desk works on: the game's own elements, in their usual places. */
 const PAGE = `
@@ -83,7 +92,8 @@ describe("DeskController", () => {
     const tower = doc.querySelector("#desk-win-tower .desk-body")!;
     expect([...tower.children].map((e) => e.id)).toEqual(["menubar", "stage", "statusbar"]);
     expect(doc.getElementById("topbar")!.parentElement!.closest("#desk-win-info")).not.toBeNull();
-    for (const id of ["palette", "overview-map", "bulletin-win", "tower-win"]) expect(doc.getElementById(id)!.parentElement!.id).toBe("desk");
+    for (const id of ["palette", "overview-map", "bulletin-win", "tower-win"])
+      expect(doc.getElementById(id)!.parentElement!.id).toBe("desk");
     const tasks = [...doc.querySelectorAll<HTMLElement>(".desk-task")].map((b) => b.dataset.win);
     // Tower Info is closed, and so is the Control Panel.
     expect(tasks).toEqual(["tower", "info", "tools", "map", "bulletin"]);
@@ -220,10 +230,16 @@ describe("DeskController", () => {
     const map = doc.getElementById("overview-map")!;
     const menu = doc.querySelector<HTMLElement>(".desk-win-menu")!;
     const item = (c: string) => menu.querySelector<HTMLButtonElement>(`[data-command="${c}"]`)!;
-    const right = (el: Element) => el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 50, clientY: 60 }));
+    const right = (el: Element) =>
+      el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 50, clientY: 60 }));
     expect(right(doc.querySelector('.desk-task[data-win="map"]')!)).toBe(false);
     expect(menu.hidden).toBe(false);
-    expect([item("restore").disabled, item("minimize").disabled, item("maximize").disabled, item("close").disabled]).toEqual([false, false, true, false]);
+    expect([
+      item("restore").disabled,
+      item("minimize").disabled,
+      item("maximize").disabled,
+      item("close").disabled,
+    ]).toEqual([false, false, true, false]);
     item("minimize").click();
     expect(map.classList.contains(DESK_MINIMIZED_CLASS)).toBe(true);
     expect(menu.hidden).toBe(true);
@@ -241,7 +257,8 @@ describe("DeskController", () => {
     new DeskController(doc).start();
     const menu = doc.querySelector<HTMLElement>(".desk-win-menu")!;
     const item = (c: string) => menu.querySelector<HTMLButtonElement>(`[data-command="${c}"]`)!;
-    const right = (el: Element) => el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 50, clientY: 60 }));
+    const right = (el: Element) =>
+      el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 50, clientY: 60 }));
     for (const [win, button] of [
       ["overview-map", ".overview-map-close"],
       ["bulletin-win", '[data-close="bulletin-win"]'],
@@ -348,14 +365,18 @@ describe("DeskController", () => {
     max.click();
     expect(localStorage.getItem(DESK_KEY.max)).toBe("");
     // The windows it stepped down went back up, and the desk kept their places.
-    expect(Object.keys(JSON.parse(localStorage.getItem(DESK_KEY.layout)!))).toEqual(expect.arrayContaining(["map", "bulletin", "info"]));
+    expect(Object.keys(JSON.parse(localStorage.getItem(DESK_KEY.layout)!))).toEqual(
+      expect.arrayContaining(["map", "bulletin", "info"]),
+    );
   });
 
   it("shows a sound toggled from the Control Panel on the tray and the Sounds icon, with no menu opened", async () => {
     new DeskController(doc).start();
     const sound = doc.getElementById("mb-sound")!;
     // The game's Sound item flips its own check, as menuWiring does.
-    sound.addEventListener("click", () => sound.setAttribute("aria-checked", String(sound.getAttribute("aria-checked") === "false")));
+    sound.addEventListener("click", () =>
+      sound.setAttribute("aria-checked", String(sound.getAttribute("aria-checked") === "false")),
+    );
     const icon = doc.querySelector<HTMLElement>('#desk-win-control [data-control="sounds"]')!;
     expect(icon.textContent).toBe("Sounds: On");
     icon.click();
@@ -400,7 +421,9 @@ describe("DeskController analytics", () => {
     doc.querySelector<HTMLElement>('.desk-win-menu [data-command="minimize"]')!.click();
     expect(trackAppAction).toHaveBeenCalledWith("desk_win_menu", "map_minimize");
     expect(trackAppAction).toHaveBeenCalledWith("desk_window", "map_min");
-    doc.querySelector("#bulletin-win .win-title")!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    doc
+      .querySelector("#bulletin-win .win-title")!
+      .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     expect(trackAppAction).toHaveBeenCalledWith("desk_win_menu_open", "title_bar");
   });
 
@@ -411,7 +434,9 @@ describe("DeskController analytics", () => {
     doc.querySelector<HTMLElement>("#desk-win-tower .desk-btn-close")!.click();
     expect(trackAppAction).toHaveBeenCalledWith("desk_window", "tower_close");
     vi.mocked(trackAppAction).mockClear();
-    doc.querySelector<HTMLElement>('.desk-task[data-win="tower"]')!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    doc
+      .querySelector<HTMLElement>('.desk-task[data-win="tower"]')!
+      .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     doc.querySelector<HTMLElement>('.desk-win-menu [data-command="close"]')!.click();
     expect(close).toHaveBeenCalledTimes(2);
     expect(trackAppAction).toHaveBeenCalledWith("desk_win_menu", "tower_close");

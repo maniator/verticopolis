@@ -25,7 +25,11 @@ test.beforeEach(async ({ page }) => {
 
 /** The page's `engine_status` rows so far, in order. */
 const statusRows = (page: Page): Promise<Row[]> =>
-  page.evaluate(() => ((window as any).__vcEvents as { name: string; props: Row }[]).filter((e) => e.name === "engine_status").map((e) => e.props));
+  page.evaluate(() =>
+    ((window as any).__vcEvents as { name: string; props: Row }[])
+      .filter((e) => e.name === "engine_status")
+      .map((e) => e.props),
+  );
 
 test("a package load that never finishes has already sent its attempt row", async ({ page }) => {
   // The package's requests are held, never answered, as on a tab closed mid-load.
@@ -34,7 +38,9 @@ test("a package load that never finishes has already sent its attempt row", asyn
   await page.route(/\/engine\//, (route) => (release ? route.abort() : void held.push(route)));
   await page.goto("/");
   await expect.poll(() => held.length, { timeout: 30_000 }).toBeGreaterThan(0);
-  await expect.poll(async () => (await statusRows(page)).map((r) => r.trigger), { timeout: 10_000 }).toEqual(["attempt"]);
+  await expect
+    .poll(async () => (await statusRows(page)).map((r) => r.trigger), { timeout: 10_000 })
+    .toEqual(["attempt"]);
   const [attempt] = await statusRows(page);
   expect(attempt).toMatchObject({ trigger: "attempt", engine: "wasm", fallback_reason: "none" });
   // Still only the attempt while the load waits.
@@ -44,7 +50,9 @@ test("a package load that never finishes has already sent its attempt row", asyn
   // Letting the load fail settles the same page life, with no engine left.
   release = true;
   for (const route of held.splice(0)) await route.abort();
-  await expect.poll(async () => (await statusRows(page)).map((r) => r.trigger), { timeout: 30_000 }).toEqual(["attempt", "settle"]);
+  await expect
+    .poll(async () => (await statusRows(page)).map((r) => r.trigger), { timeout: 30_000 })
+    .toEqual(["attempt", "settle"]);
   const [, settle] = await statusRows(page);
   expect(settle.engine).toBe("none");
   expect(settle.fallback_reason).not.toBe("none");

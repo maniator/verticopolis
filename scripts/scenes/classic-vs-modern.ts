@@ -101,8 +101,10 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
           });
           await page.waitForSelector('#editor [data-edit="filmPolicy"]', { timeout: 4000 });
           await page.evaluate(() => {
-            if (!document.querySelector('#editor [data-edit="blockbusterFilm"]')) throw new Error("Modern card shows no blockbuster to book");
-            if (!document.querySelector('#editor [data-edit="ticketPrice"]')) throw new Error("Modern card shows no ticket price");
+            if (!document.querySelector('#editor [data-edit="blockbusterFilm"]'))
+              throw new Error("Modern card shows no blockbuster to book");
+            if (!document.querySelector('#editor [data-edit="ticketPrice"]'))
+              throw new Error("Modern card shows no ticket price");
           });
         },
         wait: 300,
@@ -132,9 +134,12 @@ export const CLASSIC_VS_MODERN_SCENES: Scene[] = [
           });
           await page.waitForSelector('#editor [data-edit="newFilm"]', { timeout: 4000 });
           await page.evaluate(() => {
-            if (document.querySelector('#editor [data-edit="filmPolicy"]')) throw new Error("Classic card shows the Modern booking control");
-            if (document.querySelector('#editor [data-edit="blockbusterFilm"]')) throw new Error("Classic card offers a blockbuster");
-            if (document.querySelector('#editor [data-edit="ticketPrice"]')) throw new Error("Classic card offers a ticket price");
+            if (document.querySelector('#editor [data-edit="filmPolicy"]'))
+              throw new Error("Classic card shows the Modern booking control");
+            if (document.querySelector('#editor [data-edit="blockbusterFilm"]'))
+              throw new Error("Classic card offers a blockbuster");
+            if (document.querySelector('#editor [data-edit="ticketPrice"]'))
+              throw new Error("Classic card offers a ticket price");
           });
         },
         wait: 300,

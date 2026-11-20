@@ -3,7 +3,14 @@ import type { UI } from "./UI";
 import { cleanFileName, freeName, type TowerFileEntry } from "../storage/fileSpace";
 import type { FilePlace } from "./templates/fileDialogPlaces";
 import { rowPress } from "./fileDialogPress";
-import { lastPlace, pickFolderFiles, placeHandlers, rememberPlace, whereWords, type LinkedPlaceCtx } from "./fileDialogPlaces";
+import {
+  lastPlace,
+  pickFolderFiles,
+  placeHandlers,
+  rememberPlace,
+  whereWords,
+  type LinkedPlaceCtx,
+} from "./fileDialogPlaces";
 import { fileRows, withAuto } from "./fileDialogRows";
 import {
   fileDialogTemplate,
@@ -110,7 +117,11 @@ export interface FileDialogResume {
 /** Whether a drag carries files from the device. */
 const carriesFiles = (e: DragEvent): boolean => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
 
-export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">, ctx: FileDialogCtx, resume?: FileDialogResume): void {
+export function showFileDialog(
+  ui: Pick<UI, "openModalTemplate" | "closeModal">,
+  ctx: FileDialogCtx,
+  resume?: FileDialogResume,
+): void {
   const opening = ctx.mode === "open";
   const state = {
     selected: resume?.selected ?? null,
@@ -132,7 +143,9 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
   const placeFiles = (): readonly TowerFileEntry[] => (inLinked() ? linked!.files() : ctx.files());
   const allowed = (): boolean => !inLinked() || linked!.state()?.access === "granted";
   const placeName = (): string => (inLinked() ? `"${linked!.state()!.name}"` : "My Towers");
-  const box = ui.openModalTemplate(html`<h2>${opening ? "Open" : "Save As"}</h2><div class="fd-host"></div>`, { displaceable: opening });
+  const box = ui.openModalTemplate(html`<h2>${opening ? "Open" : "Save As"}</h2><div class="fd-host"></div>`, {
+    displaceable: opening,
+  });
   const host = box.querySelector<HTMLElement>(".fd-host")!;
   box.classList.add("fd-window");
   let rows: FileRow[] = [];
@@ -261,7 +274,8 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
       focusAfterAsk(asked);
       return;
     }
-    if (asked.kind === "replace") void (choice === "alt" && asked.alt ? save(asked.alt, false) : save(asked.name, true));
+    if (asked.kind === "replace")
+      void (choice === "alt" && asked.alt ? save(asked.alt, false) : save(asked.name, true));
     else {
       const target = fileOf(state.selected);
       if (target) void run(() => ctx.remove(target.id));
@@ -382,7 +396,11 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     const menu = host.querySelector<HTMLElement>(".fd-menu");
     if (menu) {
       const inside = (at: number, size: number, room: number) => Math.max(0, Math.min(at, room - size));
-      const kept = { id, x: inside(x - frame.left, menu.offsetWidth, frame.width), y: inside(y - frame.top, menu.offsetHeight, frame.height) };
+      const kept = {
+        id,
+        x: inside(x - frame.left, menu.offsetWidth, frame.width),
+        y: inside(y - frame.top, menu.offsetHeight, frame.height),
+      };
       if (kept.x !== state.menu?.x || kept.y !== state.menu?.y) set({ menu: kept });
     }
     host.querySelector<HTMLElement>(".fd-menu .mb-item")?.focus();
@@ -396,7 +414,8 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
       set({ name: value, selected: r && r.name === value ? r.id : null, line: null });
     },
     filter: (value: FileFilter) => set({ filter: value }),
-    sort: (key: FileSortKey) => set({ sort: { key, down: state.sort.key === key ? !state.sort.down : key === "modified" } }),
+    sort: (key: FileSortKey) =>
+      set({ sort: { key, down: state.sort.key === key ? !state.sort.down : key === "modified" } }),
     primary,
     cancel: () => ui.closeModal(),
     rename: startRename,
@@ -424,7 +443,8 @@ export function showFileDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">,
     fromFolder: () =>
       pickFolderFiles((files) => {
         if (!box.isConnected) return;
-        if (files.length === 0) set({ line: { text: "There are no tower files (.vctower or .TDT) in that folder.", kind: "bad" } });
+        if (files.length === 0)
+          set({ line: { text: "There are no tower files (.vctower or .TDT) in that folder.", kind: "bad" } });
         else void run(() => ctx.add(files, "folder")).then(() => set({ place: "local" }));
       }),
     allow: () => void run(() => linked!.allow()),

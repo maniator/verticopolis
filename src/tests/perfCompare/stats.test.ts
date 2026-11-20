@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { binomialHalfCdf, pairedRatio, frameStats, mean, medianCiRanks, quantile, sampleSd, summarize, verdict } from "./stats";
+import {
+  binomialHalfCdf,
+  pairedRatio,
+  frameStats,
+  mean,
+  medianCiRanks,
+  quantile,
+  sampleSd,
+  summarize,
+  verdict,
+} from "./stats";
 
 describe("quantile", () => {
   it("interpolates linearly between order statistics (type 7)", () => {
@@ -94,11 +104,27 @@ describe("pairedRatio", () => {
   it("takes the median of the per-pair ratios with its order-statistic interval", () => {
     const pairs: [number, number][] = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20].map((a, i) => [a, i + 1]);
     expect(pairedRatio(pairs)).toEqual({ ratio: 2, ciLow: 2, ciHigh: 2, n: 10 });
-    const noisy = pairedRatio([[1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1]]);
+    const noisy = pairedRatio([
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 1],
+      [5, 1],
+      [6, 1],
+      [7, 1],
+      [8, 1],
+      [9, 1],
+      [10, 1],
+    ]);
     expect(noisy).toEqual({ ratio: 5.5, ciLow: 2, ciHigh: 9, n: 10 });
   });
   it("has no interval below six pairs and refuses a zero denominator or no pairs", () => {
-    expect(pairedRatio([[2, 1], [4, 2]])).toMatchObject({ ratio: 2, ciLow: null, ciHigh: null, n: 2 });
+    expect(
+      pairedRatio([
+        [2, 1],
+        [4, 2],
+      ]),
+    ).toMatchObject({ ratio: 2, ciLow: null, ciHigh: null, n: 2 });
     expect(() => pairedRatio([[1, 0]])).toThrow(/against zero/);
     expect(() => pairedRatio([])).toThrow(/no pairs/);
   });

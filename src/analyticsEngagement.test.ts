@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { GAMEPLAY_COMMANDS, PLAY_SECONDS, createEngagementDetector, watchGameplayCommands, type PlaySample } from "./analyticsEngagement";
+import {
+  GAMEPLAY_COMMANDS,
+  PLAY_SECONDS,
+  createEngagementDetector,
+  watchGameplayCommands,
+  type PlaySample,
+} from "./analyticsEngagement";
 import type { EnginePortCommands } from "@verticopolis/components/port/enginePort";
 
 const playing = (clock: number): PlaySample => ({ visible: true, blocked: false, clock });
@@ -10,7 +16,12 @@ function detector() {
 }
 
 /** Play `n` seconds with the clock moving one minute a second, from `from`. */
-function play(d: ReturnType<typeof createEngagementDetector>, n: number, from = 0, sample: (c: number) => PlaySample = playing): number {
+function play(
+  d: ReturnType<typeof createEngagementDetector>,
+  n: number,
+  from = 0,
+  sample: (c: number) => PlaySample = playing,
+): number {
   for (let i = 0; i <= n; i++) d.sample(sample(from + i));
   return from + n;
 }

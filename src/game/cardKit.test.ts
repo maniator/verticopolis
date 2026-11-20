@@ -24,12 +24,7 @@ const layoutCode = (table: "accessLines", name: string) =>
   (LAYOUT as unknown as Record<string, string[]>)[table].indexOf(name);
 
 /** One room's card record, as the engine answers `unitCard`. */
-const card = (
-  id: number,
-  kind: string,
-  floor: number,
-  over: Record<string, number> = {},
-) =>
+const card = (id: number, kind: string, floor: number, over: Record<string, number> = {}) =>
   record("unitCard", {
     id,
     kindCode: code("kinds", kind),
@@ -67,13 +62,10 @@ function tower(mode: "classic" | "modern" = "classic") {
     nearCapacity: 1,
   };
   const port = mockPort({
-    unitCard: (id: number) =>
-      ({ [CENTER]: state.center, [OFFICE]: state.office })[id] ??
-      new Float64Array(0),
+    unitCard: (id: number) => ({ [CENTER]: state.center, [OFFICE]: state.office })[id] ?? new Float64Array(0),
     unitLabel: () => undefined,
     unitSubtype: () => undefined,
-    unitFacts: (id: number) =>
-      facts(id, id === OFFICE ? state.officeFacts : {}),
+    unitFacts: (id: number) => facts(id, id === OFFICE ? state.officeFacts : {}),
     serviceDiagnostics: () => undefined,
     // The population the centers serve, which leaves out Modern's live
     // venue customers, so it differs from the frame header's 40.
@@ -114,16 +106,8 @@ function tower(mode: "classic" | "modern" = "classic") {
 }
 
 /** A line list as the text it renders. */
-const text = (
-  lines: ReturnType<ReturnType<typeof tower>["kit"]["diagnostics"]["unit"]>,
-) =>
-  lines
-    .map((l) =>
-      l.strings
-        .map((s, i) => s + (i < l.values.length ? String(l.values[i]) : ""))
-        .join(""),
-    )
-    .join("\n");
+const text = (lines: ReturnType<ReturnType<typeof tower>["kit"]["diagnostics"]["unit"]>) =>
+  lines.map((l) => l.strings.map((s, i) => s + (i < l.values.length ? String(l.values[i]) : "")).join("")).join("\n");
 
 describe("the card kit's unit and shaft lines over the port", () => {
   it("show a recycling center's fill and capacity lines from one recycling card read, with the population its verdict used", () => {
@@ -132,9 +116,7 @@ describe("the card kit's unit and shaft lines over the port", () => {
     expect(center).toHaveLength(2);
     expect(text(center)).toContain("Fill: 40%");
     // The card's population (37), not the frame header's (40).
-    expect(text(center)).toContain(
-      `${groupDigits(37)}/${groupDigits(2500)} population; demand met`,
-    );
+    expect(text(center)).toContain(`${groupDigits(37)}/${groupDigits(2500)} population; demand met`);
     // One read; the single reads are not stubbed, so a call to one throws.
     expect(vi.mocked(port.recyclingCard).mock.calls.length).toBe(1);
     expect(kit.diagnostics.unit(OFFICE).length).toBeGreaterThan(0);
@@ -180,19 +162,13 @@ describe("the card kit's unit and shaft lines over the port", () => {
     const officeText = text(kit.diagnostics.unit(OFFICE));
     expect(officeText).toContain("Access:");
     expect(officeText).toContain("No elevator or stair reaches this floor.");
-    expect(
-      port.recyclingCard,
-      "an office reads no recycling",
-    ).not.toHaveBeenCalled();
+    expect(port.recyclingCard, "an office reads no recycling").not.toHaveBeenCalled();
     state.center = card(CENTER, "recycling", -1, {
       stateCode: code("unitStates", "construction"),
     });
     kit.cards.forget();
     expect(kit.diagnostics.unit(CENTER)).toEqual([]);
-    expect(
-      port.recyclingCard,
-      "an inert center reads no recycling",
-    ).not.toHaveBeenCalled();
+    expect(port.recyclingCard, "an inert center reads no recycling").not.toHaveBeenCalled();
   });
 
   it("shows the engine-reported Main gripe on both mobile and desktop", () => {
@@ -206,26 +182,9 @@ describe("the card kit's unit and shaft lines over the port", () => {
     const unit = kit.cards.unit(OFFICE)!;
     // The kit's tower is Classic, whose card names the cause only (#549).
     const copy = "Main gripe: the rent is above the going rate.";
-    const mobile = renderToFragment(
-      unitEditorTemplate(
-        unit,
-        kit.catalog(),
-        12,
-        true,
-        kit.diagnostics.unit(OFFICE),
-      ),
-    );
-    const desktop = renderToFragment(
-      unitInspectorTemplate(
-        unit,
-        kit.catalog(),
-        12,
-        kit.diagnostics.unit(OFFICE),
-      ),
-    );
-    expect(mobile.querySelector(".ed-diagnostics")?.textContent).toContain(
-      copy,
-    );
+    const mobile = renderToFragment(unitEditorTemplate(unit, kit.catalog(), 12, true, kit.diagnostics.unit(OFFICE)));
+    const desktop = renderToFragment(unitInspectorTemplate(unit, kit.catalog(), 12, kit.diagnostics.unit(OFFICE)));
+    expect(mobile.querySelector(".ed-diagnostics")?.textContent).toContain(copy);
     expect(desktop.textContent).toContain(copy);
     expect(desktop.textContent).not.toContain("Lower it");
   });
@@ -344,8 +303,7 @@ describe("the card kit's unit and shaft lines over the port", () => {
       "fire",
       "gutted",
     ];
-    for (const state of all)
-      expect(INERT_STATES.has(state), state).toBe(!isOperational({ state }));
+    for (const state of all) expect(INERT_STATES.has(state), state).toBe(!isOperational({ state }));
   });
 });
 
@@ -365,18 +323,13 @@ describe("the card kit's batch price preview", () => {
     const port = mockPort({ quoteRentBatch: quote });
     const reader = { header: { mode: "classic" } } as unknown as ViewReader;
     const kit = createCardKit({ enginePort: port, reader });
-    expect(
-      kit.previewRentBatch("office", "noRate", { onlyDefaultPriced: true }),
-    ).toMatchObject({ matched: 5, eligible: 4, changed: 3 });
-    expect(quote).toHaveBeenCalledExactlyOnceWith(
-      code("kinds", "office"),
-      -1,
-      true,
-    );
-    expect(
-      kit.previewRentBatch("office", 2, {}),
-      "a quote the engine refuses previews nothing",
-    ).toBeNull();
+    expect(kit.previewRentBatch("office", "noRate", { onlyDefaultPriced: true })).toMatchObject({
+      matched: 5,
+      eligible: 4,
+      changed: 3,
+    });
+    expect(quote).toHaveBeenCalledExactlyOnceWith(code("kinds", "office"), -1, true);
+    expect(kit.previewRentBatch("office", 2, {}), "a quote the engine refuses previews nothing").toBeNull();
     expect(quote).toHaveBeenLastCalledWith(code("kinds", "office"), 2, false);
   });
 });

@@ -21,12 +21,25 @@ describe("change notes", () => {
   });
 
   it("reads the level and the Player lines", () => {
-    const n = parseNote(note("app: minor   # what a player notices", "## Player\n- Elevators skip empty floors.\n"), "my-branch.md");
-    expect(n).toEqual({ file: "my-branch.md", app: "minor", player: ["Elevators skip empty floors."], contributors: [] });
+    const n = parseNote(
+      note("app: minor   # what a player notices", "## Player\n- Elevators skip empty floors.\n"),
+      "my-branch.md",
+    );
+    expect(n).toEqual({
+      file: "my-branch.md",
+      app: "minor",
+      player: ["Elevators skip empty floors."],
+      contributors: [],
+    });
   });
 
   it("reads a note from before the split, whose crate: none means nothing", () => {
-    expect(parseNote(note("app: patch", "## Player\n- A fix.\n"), "old.md")).toEqual({ file: "old.md", app: "patch", player: ["A fix."], contributors: [] });
+    expect(parseNote(note("app: patch", "## Player\n- A fix.\n"), "old.md")).toEqual({
+      file: "old.md",
+      app: "patch",
+      player: ["A fix."],
+      contributors: [],
+    });
   });
 
   it("sends an engine change to the engine's repository", () => {
@@ -36,12 +49,26 @@ describe("change notes", () => {
   });
 
   it("reads Contributors lines at any level, and credits each person once", () => {
-    const a = parseNote(note("app: none", "## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n"), "a.md");
+    const a = parseNote(
+      note("app: none", "## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n"),
+      "a.md",
+    );
     expect(a.contributors).toEqual(["trvorth extended the room-capacity sweep (#2198)."]);
-    const b = parseNote(note("app: patch", "## Player\n- A fix.\n## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n- Sam reported it (#670).\n"), "b.md");
-    expect(contributorLines([a, b])).toEqual(["trvorth extended the room-capacity sweep (#2198).", "Sam reported it (#670)."]);
+    const b = parseNote(
+      note(
+        "app: patch",
+        "## Player\n- A fix.\n## Contributors\n- trvorth extended the room-capacity sweep (#2198).\n- Sam reported it (#670).\n",
+      ),
+      "b.md",
+    );
+    expect(contributorLines([a, b])).toEqual([
+      "trvorth extended the room-capacity sweep (#2198).",
+      "Sam reported it (#670).",
+    ]);
     expect(() => parseNote(note("app: none", "## Contributors\n- No period"), "c.md")).toThrow(/period/);
-    expect(() => parseNote(note("app: none", "## Contributors\n- A.\n## Contributors\n- B.\n"), "c.md")).toThrow(/twice/);
+    expect(() => parseNote(note("app: none", "## Contributors\n- A.\n## Contributors\n- B.\n"), "c.md")).toThrow(
+      /twice/,
+    );
   });
 
   it("keeps a credit-only note when the release does not move the app", () => {

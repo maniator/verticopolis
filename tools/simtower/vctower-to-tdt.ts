@@ -33,7 +33,12 @@ function main() {
   const outName = (input: string, i: number) => {
     const stem = basename(input).replace(/\.vctower$/i, "");
     const ver = /_(\d+)$/.exec(stem)?.[1];
-    return `TOWER${ver ?? i + 1}`.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) + ".TDT";
+    return (
+      `TOWER${ver ?? i + 1}`
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 8) + ".TDT"
+    );
   };
 
   for (const [i, input] of inputs.entries()) {
@@ -46,12 +51,16 @@ function main() {
       const name = outName(input, i);
       const out = resolve(SAVES, name);
       writeFileSync(out, built.bytes);
-      console.log(`OK  ${label}\n    -> saves/${name} (${built.bytes.length} bytes; game filename ${built.report.filename})`);
+      console.log(
+        `OK  ${label}\n    -> saves/${name} (${built.bytes.length} bytes; game filename ${built.report.filename})`,
+      );
       // The ExportReport carries comesAlong + staysBehind (both string[]);
       // staysBehind is what the .TDT format cannot represent.
       const behind = built.report?.staysBehind ?? [];
       if (behind.length)
-        console.log(`    stays behind: ${behind.length} (${behind.slice(0, 3).join("; ")}${behind.length > 3 ? "; ..." : ""})`);
+        console.log(
+          `    stays behind: ${behind.length} (${behind.slice(0, 3).join("; ")}${behind.length > 3 ? "; ..." : ""})`,
+        );
     } catch (e) {
       console.error(`SKIP ${basename(input)}\n    ${e instanceof Error ? e.message : String(e)}`);
       process.exitCode = 1;

@@ -46,7 +46,11 @@ export const BRIDGE_PATH = "/help-bridge.html";
  * host) it is a hidden frame of the game's bridge page, which passes messages
  * through. Null where the browser has no channel.
  */
-export function linkToGame(gameOrigin: string, win: Window = window, open: () => BarChannel | null = openBarChannel): GameLink | null {
+export function linkToGame(
+  gameOrigin: string,
+  win: Window = window,
+  open: () => BarChannel | null = openBarChannel,
+): GameLink | null {
   if (gameOrigin === win.location.origin) return channelLink(open);
   return bridgeLink(gameOrigin, win);
 }
@@ -88,7 +92,8 @@ function bridgeLink(gameOrigin: string, win: Window): GameLink {
     for (const request of queued.splice(0)) post(request);
   });
   win.addEventListener("message", (ev) => {
-    if (ev.origin !== gameOrigin || !frame.contentWindow || ev.source !== frame.contentWindow || !isGameStatus(ev.data)) return;
+    if (ev.origin !== gameOrigin || !frame.contentWindow || ev.source !== frame.contentWindow || !isGameStatus(ev.data))
+      return;
     link.onStatus?.(ev.data);
   });
   doc.body.appendChild(frame);

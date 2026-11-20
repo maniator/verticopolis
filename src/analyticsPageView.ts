@@ -49,7 +49,9 @@ const LOCAL_SUFFIXES = [".local", ".lan", ".internal", ".home.arpa"];
 /** A host that is not a public site: an IP address, a single-label name
  *  (`localhost`, a machine on the LAN) or a local network name. */
 function isLocalHost(host: string): boolean {
-  return IPV4.test(host) || host.startsWith("[") || !host.includes(".") || LOCAL_SUFFIXES.some((end) => host.endsWith(end));
+  return (
+    IPV4.test(host) || host.startsWith("[") || !host.includes(".") || LOCAL_SUFFIXES.some((end) => host.endsWith(end))
+  );
 }
 
 /** The referrer's host, lowercased; {@link DIRECT} when there is none, it
@@ -74,7 +76,11 @@ export function pageViewProps(referrer: string, href: string): PageViewProps {
     const value = url.searchParams.get(name);
     utm[name] = value !== null && PLAIN_TOKEN.test(value) ? value : null;
   }
-  return { $referring_domain: referringDomain(referrer), $pathname: GAME_PATHS.includes(url.pathname) ? url.pathname : OTHER_PATH, ...utm };
+  return {
+    $referring_domain: referringDomain(referrer),
+    $pathname: GAME_PATHS.includes(url.pathname) ? url.pathname : OTHER_PATH,
+    ...utm,
+  };
 }
 
 /** Send the page life's landing view. Never throws: a page without a readable

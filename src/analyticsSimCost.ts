@@ -122,7 +122,12 @@ export class SimCostTally {
       for (const cell of cells) {
         if (cell.minutes <= most) continue;
         most = cell.minutes;
-        best = { msPerGameHour: (cell.ms * 60) / cell.minutes, gameHours: cell.minutes / 60, population: cell.peak, speed };
+        best = {
+          msPerGameHour: (cell.ms * 60) / cell.minutes,
+          gameHours: cell.minutes / 60,
+          population: cell.peak,
+          speed,
+        };
       }
     }
     return best;

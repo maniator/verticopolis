@@ -44,7 +44,10 @@ function browserWithLeftovers(): BrowserSpies {
   const cacheNames = ["workbox-precache-v2-https://preview.example/", "workbox-runtime", "someone-elses-cache"];
   Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
   Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistrations } });
-  Object.defineProperty(globalThis, "caches", { configurable: true, value: { keys: vi.fn(async () => cacheNames), delete: cacheDelete } });
+  Object.defineProperty(globalThis, "caches", {
+    configurable: true,
+    value: { keys: vi.fn(async () => cacheNames), delete: cacheDelete },
+  });
   return {
     getRegistrations,
     unregisters,
@@ -93,7 +96,10 @@ describe("registerPWA on a preview deployment", () => {
       await vi.waitFor(() => expect(browser.cacheDelete).toHaveBeenCalledTimes(2));
       expect(browser.getRegistrations).toHaveBeenCalledTimes(1);
       for (const unregister of browser.unregisters) expect(unregister).toHaveBeenCalledTimes(1);
-      expect(browser.cacheDelete.mock.calls.map(([name]) => name)).toEqual(["workbox-precache-v2-https://preview.example/", "workbox-runtime"]);
+      expect(browser.cacheDelete.mock.calls.map(([name]) => name)).toEqual([
+        "workbox-precache-v2-https://preview.example/",
+        "workbox-runtime",
+      ]);
     } finally {
       browser.restore();
     }

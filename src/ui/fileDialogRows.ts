@@ -7,13 +7,21 @@ const TYPE_ORDER: Readonly<Record<FileRow["type"], number>> = { auto: 0, tower: 
 
 /** The window's tower count and size, with the Auto-save when it is listed,
  *  so the header counts every tower the window shows. */
-export function withAuto(usage: { count: number; bytes: number }, auto: FileRow | null): { count: number; bytes: number } {
+export function withAuto(
+  usage: { count: number; bytes: number },
+  auto: FileRow | null,
+): { count: number; bytes: number } {
   return auto ? { count: usage.count + 1, bytes: usage.bytes + (auto.size ?? 0) } : usage;
 }
 
 /** The rows a window shows: the Auto-save first, then the files that pass
  *  the filter, in the chosen order. */
-export function fileRows(auto: FileRow | null, files: readonly TowerFileEntry[], filter: FileFilter, sort: FileDialogView["sort"]): FileRow[] {
+export function fileRows(
+  auto: FileRow | null,
+  files: readonly TowerFileEntry[],
+  filter: FileFilter,
+  sort: FileDialogView["sort"],
+): FileRow[] {
   const rows: FileRow[] = files
     .filter((f) => filter === "all" || f.kind === filter)
     .map((f) => ({ id: f.id, name: f.name, type: f.kind, size: f.size, modified: f.modified }));

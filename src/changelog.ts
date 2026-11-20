@@ -191,7 +191,9 @@ const JOIN = "\u2060";
 export function escapeMarkdown(text: string): string {
   return text
     .replace(/[\\`*_[\]<>~|&$#]/g, "\\$&")
-    .replace(/^[-+]|^(\d+)([.)])/, (m, num?: string, mark?: string) => (num === undefined ? `\\${m}` : `${num}\\${mark}`))
+    .replace(/^[-+]|^(\d+)([.)])/, (m, num?: string, mark?: string) =>
+      num === undefined ? `\\${m}` : `${num}\\${mark}`,
+    )
     .replace(/([@#])(?=[\p{L}\p{N}_])|(:)(?=[\p{L}/]|[\p{N}+-][\w\\+-]*:)/gu, `$1$2${JOIN}`)
     .replace(/\b(GH-)(?=\d)/gi, `$1${JOIN}`)
     .replace(/\b(www)(?=\.)/gi, `$1${JOIN}`)
@@ -207,7 +209,9 @@ export function escapeMarkdown(text: string): string {
  * version has no player notes.
  */
 export function releaseNoteLines(changelog: string, version: string): string[] {
-  return notesForVersion(changelog, version, { maxNotes: Infinity, maxLen: Infinity }).map((n) => `- ${escapeMarkdown(n.replace(/\s+/g, " "))}`);
+  return notesForVersion(changelog, version, { maxNotes: Infinity, maxLen: Infinity }).map(
+    (n) => `- ${escapeMarkdown(n.replace(/\s+/g, " "))}`,
+  );
 }
 
 /**

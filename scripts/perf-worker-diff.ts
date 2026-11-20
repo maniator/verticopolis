@@ -15,7 +15,8 @@ if (dirs.length !== 2) {
   process.stderr.write("usage: perf:worker-diff BEFORE_DIR AFTER_DIR [--out FILE]\n");
   process.exit(2);
 }
-const read = (d: string): CrossInput => JSON.parse(readFileSync(join(resolve(d), "results.json"), "utf8")) as CrossInput;
+const read = (d: string): CrossInput =>
+  JSON.parse(readFileSync(join(resolve(d), "results.json"), "utf8")) as CrossInput;
 const [before, after] = [read(dirs[0]), read(dirs[1])];
 const result = crossRun(before, after);
 const text = crossMarkdown(before, after, result);

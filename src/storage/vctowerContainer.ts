@@ -52,9 +52,7 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
   if (/^VCTOWER1/.test(trimmed)) {
     try {
       const b64 = trimmed.slice("VCTOWER1".length).replace(/\s+/g, "");
-      return parseSaveJson(
-        new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(Buffer.from(b64, "base64"))),
-      );
+      return parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(Buffer.from(b64, "base64"))));
     } catch (e) {
       // A decompression bomb is not a version question and not a damaged file:
       // it decoded fine and is simply too big to hold, so say that instead of
@@ -115,7 +113,9 @@ export function decodeVctowerFile(bytes: Uint8Array, label = "vctower"): unknown
   const head = new TextDecoder("latin1").decode(bytes.subarray(0, BINARY_HEAD.length));
   if (head !== BINARY_HEAD) return decodeVctower(new TextDecoder().decode(bytes), label);
   try {
-    return parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(bytes.subarray(BINARY_HEAD.length))));
+    return parseSaveJson(
+      new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(bytes.subarray(BINARY_HEAD.length))),
+    );
   } catch (e) {
     if (e instanceof SaveTooLargeError) {
       throw new Error(`${label}: this .vctower expands to more data than we will hold; it looks crafted, not saved.`);

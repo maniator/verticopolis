@@ -145,7 +145,9 @@ describe("startServer", () => {
   it("refuses a prefix that is not a path and an overlay folder that does not exist", async () => {
     await expect(startServer(dir, 0, { prefix: "/", dir })).rejects.toThrow(/must be a path/);
     await expect(startServer(dir, 0, { prefix: "engine", dir })).rejects.toThrow(/must be a path/);
-    await expect(startServer(dir, 0, { prefix: "/engine", dir: join(dir, "missing") })).rejects.toThrow(/does not exist/);
+    await expect(startServer(dir, 0, { prefix: "/engine", dir: join(dir, "missing") })).rejects.toThrow(
+      /does not exist/,
+    );
   });
 
   it("refuses an overlay that is not a folder", async () => {

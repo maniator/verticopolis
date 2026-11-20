@@ -10,7 +10,12 @@
  * press (the map, or nothing), so a mouse or touch user keeps the game's keys
  * and a focused map keeps its arrow keys.
  */
-import { DEFAULT_MAP_VIEW, MAP_VIEWS, type MapViewEntry, type MapViewId } from "@verticopolis/components/render/overviewMap/views";
+import {
+  DEFAULT_MAP_VIEW,
+  MAP_VIEWS,
+  type MapViewEntry,
+  type MapViewId,
+} from "@verticopolis/components/render/overviewMap/views";
 
 /** The ids the CSS and the tests name. */
 export const MAP_PICKER_DOM = {
@@ -81,7 +86,12 @@ export class MapViewPicker {
   /** Focus goes back to what held it before a pointer press, when that is
    *  still on the page and can take it; otherwise the select lets go. */
   private giveFocusBack(before: Element | null): void {
-    if (before instanceof HTMLElement && before !== this.select && before.isConnected && before !== before.ownerDocument.body) {
+    if (
+      before instanceof HTMLElement &&
+      before !== this.select &&
+      before.isConnected &&
+      before !== before.ownerDocument.body
+    ) {
       before.focus({ preventScroll: true });
       return;
     }

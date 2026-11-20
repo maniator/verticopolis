@@ -22,7 +22,10 @@ vi.mock("./overviewMapWiring", () => ({
 vi.mock("./fileSpaceCommands", () => files);
 vi.mock("./titleScreen", () => closer);
 vi.mock("@verticopolis/components/windows/movableWindow", () => ({ MovableWindow: movable, WITHIN_PARENT: "parent" }));
-vi.mock("../ui/splashTemplate", () => ({ SPONSOR_URL: "https://sponsor.example/", sponsorOffered: () => sponsor.offered }));
+vi.mock("../ui/splashTemplate", () => ({
+  SPONSOR_URL: "https://sponsor.example/",
+  sponsorOffered: () => sponsor.offered,
+}));
 vi.mock("../analytics", () => ({ trackAppAction: sponsor.track }));
 const recent = vi.hoisted(() => ({ fill: vi.fn(), wire: vi.fn() }));
 vi.mock("./recentMenu", () => ({ fillRecentMenu: recent.fill, wireRecentMenu: recent.wire }));
@@ -107,7 +110,9 @@ describe("wireMenus: File > Open Recent", () => {
     expect(menus.pick).not.toHaveBeenCalled();
     expect(bar.current()).toBe($("mb-file"));
     $("mb-recent-1").dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
-    expect(menus.pick).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ menu: "file", item: "recent_1", via: "keys", grayed: false }));
+    expect(menus.pick).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ menu: "file", item: "recent_1", via: "keys", grayed: false }),
+    );
   });
 
   it("grays Open Recent with the other File commands once the game stopped on its engine", () => {

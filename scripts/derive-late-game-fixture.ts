@@ -86,7 +86,15 @@ const PARKING_FLOOR = 0;
 const RAMP_X = 300;
 const PARKING_SPACES = 4;
 
-type SavedUnit = { id: number; kind: string; floor: number; x: number; run?: number; state?: string; everOccupied?: boolean };
+type SavedUnit = {
+  id: number;
+  kind: string;
+  floor: number;
+  x: number;
+  run?: number;
+  state?: string;
+  everOccupied?: boolean;
+};
 type Save = {
   version: number;
   money: number;
@@ -128,12 +136,13 @@ try {
   const ramp = facility("parkingRamp");
   ok("parking ramp", engine.build(ramp.key, PARKING_FLOOR, RAMP_X));
   const space = facility("parking");
-  for (let i = 0; i < PARKING_SPACES; i++) ok(`parking space ${i}`, engine.build(space.key, PARKING_FLOOR, RAMP_X + ramp.width + i * space.width));
+  for (let i = 0; i < PARKING_SPACES; i++)
+    ok(`parking space ${i}`, engine.build(space.key, PARKING_FLOOR, RAMP_X + ramp.width + i * space.width));
   const officeWidth = facility("office").width;
   const before = start.units.filter((u) => u.kind === "office").length;
   let built = 0;
   for (let floor = 2; floor < TOP_FLOOR && before + built < OFFICES; floor++) {
-    for (let ox = 0; ox + officeWidth <= LOT_WIDTH && before + built < OFFICES; ) {
+    for (let ox = 0; ox + officeWidth <= LOT_WIDTH && before + built < OFFICES;) {
       const r = JSON.parse(engine.build("office", floor, ox)) as { ok: boolean };
       if (r.ok) {
         built += 1;
@@ -150,8 +159,13 @@ try {
   // With no run left, the save is stamped as the engine stamps a save with
   // no floor run, no tall lobby and no schedule (`stamped_save_version` in
   // `engine-rs/src/sim.rs`).
-  save.units = save.units.flatMap(({ run, ...u }) => (run ? Array.from({ length: run }, (_, k) => ({ ...u, id: u.id + k, x: u.x + k })) : [u]));
-  if (save.version !== FLOOR_RUN_SAVE_VERSION) throw new Error(`the engine wrote save version ${save.version}, not the floor-run version ${FLOOR_RUN_SAVE_VERSION}`);
+  save.units = save.units.flatMap(({ run, ...u }) =>
+    run ? Array.from({ length: run }, (_, k) => ({ ...u, id: u.id + k, x: u.x + k })) : [u],
+  );
+  if (save.version !== FLOOR_RUN_SAVE_VERSION)
+    throw new Error(
+      `the engine wrote save version ${save.version}, not the floor-run version ${FLOOR_RUN_SAVE_VERSION}`,
+    );
   save.version = PLAIN_SAVE_VERSION;
   let leased = 0;
   for (const u of save.units) {

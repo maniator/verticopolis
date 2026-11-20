@@ -1,5 +1,13 @@
 import type { GameApp } from "../main";
-import { linePressure, nextTrafficTier, TRAFFIC_LABELS, trafficLevel, worstLine, type LandingLines, type WaitingLine } from "@verticopolis/components/presentation/traffic";
+import {
+  linePressure,
+  nextTrafficTier,
+  TRAFFIC_LABELS,
+  trafficLevel,
+  worstLine,
+  type LandingLines,
+  type WaitingLine,
+} from "@verticopolis/components/presentation/traffic";
 import { floorLabel } from "../ui/floorLabel";
 import { noteFrameError } from "./frameErrors";
 import { trackAppAction } from "../analytics";

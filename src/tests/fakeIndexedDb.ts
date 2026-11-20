@@ -39,12 +39,16 @@ class FakeStore {
     if (this.tx.mode !== "readwrite") throw new Error("put in a read-only transaction");
     const copy = value instanceof Uint8Array ? value.slice() : value;
     const full = this.tx.factory.failPutsOf?.(String(key)) ?? false;
-    return this.tx.queue(() => {
-      this.tx.write(() => {
-        if (!this.tx.factory.dropWrites) this.rows.set(String(key), copy);
-      });
-      return key;
-    }, true, full);
+    return this.tx.queue(
+      () => {
+        this.tx.write(() => {
+          if (!this.tx.factory.dropWrites) this.rows.set(String(key), copy);
+        });
+        return key;
+      },
+      true,
+      full,
+    );
   }
 
   delete(key: IDBValidKey): FakeRequest<undefined> {

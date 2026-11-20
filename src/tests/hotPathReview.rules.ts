@@ -110,9 +110,7 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "Once the PR merges, the table's owner replaces the number with the merge commit.",
     "a port that turns a cached read into a copy is an HP-8 finding",
   ],
-  "## 4. Measuring": [
-    "A visit is one item read, compared, hashed, allocated or serialized",
-  ],
+  "## 4. Measuring": ["A visit is one item read, compared, hashed, allocated or serialized"],
   "## 5. The PR complexity note": [
     "Caches (HP-8): the caches, indexes and counters the engine and the hosts have here",
   ],
@@ -232,10 +230,7 @@ export const PROMPT = [
 export const SKILL_ROOTS = [".claude/skills", ".agents/skills"];
 
 /** The lines of each skill's SKILL.md that load the facts and run the activation step. */
-export const SKILL_HOOKS = [
-  "{workflow.persistent_facts}",
-  "{workflow.activation_steps_append}",
-];
+export const SKILL_HOOKS = ["{workflow.persistent_facts}", "{workflow.activation_steps_append}"];
 
 export type Skill = {
   name: string;
@@ -318,9 +313,7 @@ export const SKILLS: Skill[] = [
       "the record with its resolutions is posted there as a comment",
       "does not count as the deep review",
     ],
-    activation: [
-      "Read sections 1, 6, 7 and 9 of docs/performance/hot-path-review.md now.",
-    ],
+    activation: ["Read sections 1, 6, 7 and 9 of docs/performance/hot-path-review.md now."],
     anchors: {
       "step-01-gather-context.md": [
         "CHECKPOINT",

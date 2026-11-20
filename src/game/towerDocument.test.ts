@@ -21,7 +21,13 @@ import type { SlotInfo } from "../storage/slotInfo";
 import { closeFileSpaceForTests, fileSpace } from "../storage/fileSpace";
 import { SaveGame } from "../storage/SaveGame";
 import { FakeIndexedDb } from "../tests/fakeIndexedDb";
-import { currentFileId, currentLinkedFile, forgetCurrentFile, setCurrentFile, setCurrentLinkedFile } from "./currentFile";
+import {
+  currentFileId,
+  currentLinkedFile,
+  forgetCurrentFile,
+  setCurrentFile,
+  setCurrentLinkedFile,
+} from "./currentFile";
 import {
   bootTowerDocument,
   claimTower,
@@ -59,7 +65,9 @@ function makeApp(name = "Sky Hotel") {
 
 /** The Auto-save's listing, as SaveGame reads it. */
 function listing(savedAt: number | undefined, towerName = "Sky Hotel") {
-  return vi.spyOn(SaveGame, "listSlots").mockReturnValue([{ slot: "auto", exists: savedAt !== undefined, present: true, towerName, savedAt } as SlotInfo]);
+  return vi
+    .spyOn(SaveGame, "listSlots")
+    .mockReturnValue([{ slot: "auto", exists: savedAt !== undefined, present: true, towerName, savedAt } as SlotInfo]);
 }
 
 let app: ReturnType<typeof makeApp>["app"];
@@ -95,10 +103,16 @@ describe("the tower's own file, written by the autosave", () => {
 
     crashCopyWritten(1, 2000, Uint8Array.of(9));
     await towerDocumentSettled();
-    expect(fileSpace.list().map((f) => f.id), "no second file").toEqual([file.id]);
+    expect(
+      fileSpace.list().map((f) => f.id),
+      "no second file",
+    ).toEqual([file.id]);
     expect((await fileSpace.read(file.id))!.subarray(9)).toEqual(Uint8Array.of(9));
     expect(fileSpace.get(file.id)!.modified).toBe(2000);
-    expect((await fileSpace.versions(file.id)).map((v) => v.at), "its first write keeps a version, and the file as it was founded").toEqual([2000, 1000]);
+    expect(
+      (await fileSpace.versions(file.id)).map((v) => v.at),
+      "its first write keeps a version, and the file as it was founded",
+    ).toEqual([2000, 1000]);
   });
 
   it("names a new file 'Name (2)' when that name is taken, never writing over the other", async () => {
@@ -168,16 +182,24 @@ describe("two windows playing the same tower", () => {
     const [sky] = fileSpace.list();
     // The other window writes the same file, straight into the database.
     const index = fake.lastDb!.store("meta").get("index") as { id: string; modified: number }[];
-    fake.lastDb!.store("meta").set("index", index.map((e) => ({ ...e, modified: 1500 })));
+    fake.lastDb!.store("meta").set(
+      "index",
+      index.map((e) => ({ ...e, modified: 1500 })),
+    );
     fake.lastDb!.store("bodies").set(sky.id, Uint8Array.of(5));
     crashCopyWritten(1, 2000, Uint8Array.of(9));
     await towerDocumentSettled();
-    expect(fake.row("verticopolis-files", "bodies", sky.id), "the other window's write stays").toEqual(Uint8Array.of(5));
+    expect(fake.row("verticopolis-files", "bodies", sky.id), "the other window's write stays").toEqual(
+      Uint8Array.of(5),
+    );
     const fork = fileSpace.find("Sky Hotel (2)")!;
     expect(currentFileId()).toBe(fork.id);
     expect((await fileSpace.read(fork.id))!.subarray(9)).toEqual(Uint8Array.of(9));
     expect(m.track).toHaveBeenLastCalledWith("tower_file", "forked");
-    expect(app.ui.toast).toHaveBeenCalledWith(`Another window saved "Sky Hotel" too, so this window's tower is now "Sky Hotel (2)".`, "info");
+    expect(app.ui.toast).toHaveBeenCalledWith(
+      `Another window saved "Sky Hotel" too, so this window's tower is now "Sky Hotel (2)".`,
+      "info",
+    );
     // From then on it writes its own file.
     crashCopyWritten(1, 3000, Uint8Array.of(4));
     await towerDocumentSettled();

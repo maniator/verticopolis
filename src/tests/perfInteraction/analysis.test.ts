@@ -6,7 +6,10 @@ import type { PhaseRecord } from "./pageRecorder";
 const record = (over: Partial<PhaseRecord> = {}): PhaseRecord => ({
   frames: Array.from({ length: 100 }, (_, i) => (i === 99 ? 100 : 16)),
   longTasks: [60, 120],
-  loafs: [{ dur: 120, blocking: 70 }, { dur: 80, blocking: 30 }],
+  loafs: [
+    { dur: 120, blocking: 70 },
+    { dur: 80, blocking: 30 },
+  ],
   events: [
     { name: "pointerdown", dur: 24, delay: 4, proc: 10 },
     { name: "click", dur: 40, delay: 18, proc: 12 },
@@ -80,18 +83,31 @@ describe("A against B", () => {
 
   it("compares frame times as B over A, paired by repetition", () => {
     const p99 = rows.find((r) => r.metric === "frameP99Ms");
-    expect(p99).toMatchObject({ kind: "ratio", medianA: 40, medianB: 20, value: 0.5, pairs: 6, ciLow: 0.5, ciHigh: 0.5 });
+    expect(p99).toMatchObject({
+      kind: "ratio",
+      medianA: 40,
+      medianB: 20,
+      value: 0.5,
+      pairs: 6,
+      ciLow: 0.5,
+      ciHigh: 0.5,
+    });
   });
 
   it("compares blocking as B minus A, so an arm at 0 still compares", () => {
     const total = rows.find((r) => r.metric === "longTaskMsPerSecond");
     expect(total).toMatchObject({ kind: "difference", value: -200, pairs: 6 });
-    const zero = compareArms([run("A", 1, { longTaskMaxMs: 0 }), run("B", 1, { longTaskMaxMs: 0 })], ["pan"]).find((r) => r.metric === "longTaskMaxMs");
+    const zero = compareArms([run("A", 1, { longTaskMaxMs: 0 }), run("B", 1, { longTaskMaxMs: 0 })], ["pan"]).find(
+      (r) => r.metric === "longTaskMaxMs",
+    );
     expect(zero).toMatchObject({ value: 0, pairs: 1, ciLow: null });
   });
 
   it("drops a repetition missing from one arm, for ratios and for differences", () => {
-    const rows5 = compareArms(runs.filter((r) => !(r.arm === "B" && r.rep === 1)), ["pan"]);
+    const rows5 = compareArms(
+      runs.filter((r) => !(r.arm === "B" && r.rep === 1)),
+      ["pan"],
+    );
     const thin = rows5.find((r) => r.metric === "frameP99Ms");
     expect(thin?.pairs).toBe(5);
     expect(thin?.ciLow).toBeNull();
@@ -115,11 +131,20 @@ describe("the command line", () => {
   it("needs both builds and takes the defaults of the PC run", () => {
     expect(() => parseArgs([])).toThrow(/--a and --b are both required/);
     const a = parseArgs(["--a", "x", "--b", "y"]);
-    expect(a).toMatchObject({ reps: 6, throttles: [1, 4], phaseMs: 20000, scenario: "large", viewport: { width: 1920, height: 1080 }, allowSoftware: false });
+    expect(a).toMatchObject({
+      reps: 6,
+      throttles: [1, 4],
+      phaseMs: 20000,
+      scenario: "large",
+      viewport: { width: 1920, height: 1080 },
+      allowSoftware: false,
+    });
   });
 
   it("reads the options and refuses mistakes", () => {
-    expect(parseArgs(["--a", "x", "--b", "y", "--throttles", "1,6", "--viewport", "1280x720", "--reps", "3"])).toMatchObject({ throttles: [1, 6], viewport: { width: 1280, height: 720 }, reps: 3 });
+    expect(
+      parseArgs(["--a", "x", "--b", "y", "--throttles", "1,6", "--viewport", "1280x720", "--reps", "3"]),
+    ).toMatchObject({ throttles: [1, 6], viewport: { width: 1280, height: 720 }, reps: 3 });
     expect(parseArgs(["--a", "x", "--b", "y", "--quick"])).toMatchObject({ reps: 1, throttles: [1], phaseMs: 3000 });
     expect(() => parseArgs(["--a", "x", "--b", "y", "--reps", "0"])).toThrow(/positive whole number/);
     expect(() => parseArgs(["--a", "x", "--b", "y", "--scenario", "huge"])).toThrow(/unknown scenario/);

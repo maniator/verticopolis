@@ -11,7 +11,11 @@ describe("trayClock", () => {
 });
 
 describe("DeskTaskbar", () => {
-  let handlers: { task: ReturnType<typeof vi.fn>; start: ReturnType<typeof vi.fn>; controlPanel?: ReturnType<typeof vi.fn> };
+  let handlers: {
+    task: ReturnType<typeof vi.fn>;
+    start: ReturnType<typeof vi.fn>;
+    controlPanel?: ReturnType<typeof vi.fn>;
+  };
   let bar: DeskTaskbar;
 
   function make(withControl = true): DeskTaskbar {
@@ -87,10 +91,14 @@ describe("DeskTaskbar", () => {
   it("runs a picked item's game menu item, and opens the Control Panel from its item and the tray", () => {
     make();
     startButton().click();
-    items().find((b) => b.dataset.item === "btn-settings")!.click();
+    items()
+      .find((b) => b.dataset.item === "btn-settings")!
+      .click();
     expect(handlers.start).toHaveBeenCalledWith("btn-settings");
     expect(menu().hidden).toBe(true);
-    items().find((b) => b.dataset.item === CONTROL_PANEL_ITEM)!.click();
+    items()
+      .find((b) => b.dataset.item === CONTROL_PANEL_ITEM)!
+      .click();
     expect(handlers.controlPanel).toHaveBeenCalledTimes(1);
     expect(handlers.start).toHaveBeenCalledWith(CONTROL_PANEL_ITEM);
     document.querySelector<HTMLElement>(".desk-tray-display")!.click();

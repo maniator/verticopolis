@@ -16,12 +16,7 @@
  * it cannot read rather than check against nothing.
  */
 
-export type FieldType =
-  | "markdown"
-  | "input"
-  | "textarea"
-  | "dropdown"
-  | "checkboxes";
+export type FieldType = "markdown" | "input" | "textarea" | "dropdown" | "checkboxes";
 
 export interface FormField {
   type: FieldType;
@@ -45,22 +40,18 @@ export const NO_RESPONSE = "_No response_";
 
 const unquote = (value: string): string => {
   const v = value.trim();
-  if (v.length >= 2 && (v[0] === '"' || v[0] === "'") && v[v.length - 1] === v[0])
-    return v.slice(1, -1);
+  if (v.length >= 2 && (v[0] === '"' || v[0] === "'") && v[v.length - 1] === v[0]) return v.slice(1, -1);
   return v;
 };
 
-const indentOf = (line: string): number =>
-  line.length - line.trimStart().length;
+const indentOf = (line: string): number => line.length - line.trimStart().length;
 
 /** Reads one issue form's name, labels and fields. */
 export function parseIssueForm(yaml: string): IssueForm {
   const lines = yaml.split(/\r?\n/);
   const name = unquote(/^name:\s*(.+)$/m.exec(yaml)?.[1] ?? "");
   const labelLine = /^labels:\s*\[(.*)\]\s*$/m.exec(yaml)?.[1] ?? "";
-  const labels = [...labelLine.matchAll(/"([^"]+)"|'([^']+)'/g)].map(
-    (m) => m[1] ?? m[2],
-  );
+  const labels = [...labelLine.matchAll(/"([^"]+)"|'([^']+)'/g)].map((m) => m[1] ?? m[2]);
 
   const fields: FormField[] = [];
   let field: FormField | null = null;
@@ -106,46 +97,27 @@ export function parseIssueForm(yaml: string): IssueForm {
       optionIndent = key[1] === "options" ? keyIndent + 4 : -1;
       continue;
     }
-    if (
-      section === "validations" &&
-      indent === keyIndent + 2 &&
-      key?.[1] === "required"
-    ) {
+    if (section === "validations" && indent === keyIndent + 2 && key?.[1] === "required") {
       field.required = unquote(key[2]) === "true";
       continue;
     }
-    if (
-      section === "attributes" &&
-      optionIndent >= 0 &&
-      field.type === "dropdown" &&
-      indent === optionIndent
-    ) {
+    if (section === "attributes" && optionIndent >= 0 && field.type === "dropdown" && indent === optionIndent) {
       const choice = /^\s*- (.+)$/.exec(line);
       if (choice) field.options.push(unquote(choice[1]));
       continue;
     }
-    if (
-      section === "attributes" &&
-      optionIndent >= 0 &&
-      field.type === "checkboxes"
-    ) {
+    if (section === "attributes" && optionIndent >= 0 && field.type === "checkboxes") {
       const option = /^\s*- label:\s*(.+)$/.exec(line);
       if (option && indent === optionIndent) {
         lastOption = unquote(option[1]);
-      } else if (
-        key?.[1] === "required" &&
-        indent === optionIndent + 2 &&
-        lastOption !== null
-      ) {
+      } else if (key?.[1] === "required" && indent === optionIndent + 2 && lastOption !== null) {
         if (unquote(key[2]) === "true") field.requiredOptions.push(lastOption);
       }
     }
   }
   const asked = fields.filter((f) => f.type !== "markdown");
   if (!name || asked.length === 0 || asked.some((f) => !f.label)) {
-    throw new Error(
-      `cannot read the issue form "${name || "(unnamed)"}": no fields, or a field without a label`,
-    );
+    throw new Error(`cannot read the issue form "${name || "(unnamed)"}": no fields, or a field without a label`);
   }
   return { name, labels, fields };
 }
@@ -154,15 +126,7 @@ export function parseIssueForm(yaml: string): IssueForm {
 const STATE_LABELS = new Set(["needs-triage", "classic", "modern"]);
 
 /** Type labels the backlog uses for internal work, all filed with the Task form. */
-export const TASK_TYPE_LABELS = [
-  "task",
-  "chore",
-  "tests",
-  "build",
-  "tooling",
-  "perf",
-  "review-deferral",
-];
+export const TASK_TYPE_LABELS = ["task", "chore", "tests", "build", "tooling", "perf", "review-deferral"];
 
 /**
  * The form an issue with these labels should follow: the first form, in
@@ -170,10 +134,7 @@ export const TASK_TYPE_LABELS = [
  * label) the issue carries, with every internal-work label counting as the
  * Task form's. Undefined when no type label matches.
  */
-export function formForLabels(
-  issueLabels: string[],
-  forms: IssueForm[],
-): IssueForm | undefined {
+export function formForLabels(issueLabels: string[], forms: IssueForm[]): IssueForm | undefined {
   const has = new Set(issueLabels);
   for (const form of forms) {
     const type = form.labels.find((l) => !STATE_LABELS.has(l));
@@ -190,19 +151,13 @@ export function answers(body: string): Map<string, string> {
   let current: string | null = null;
   let lines: string[] = [];
   const close = () => {
-    if (current !== null && !out.has(current))
-      out.set(current, lines.join("\n").trim());
+    if (current !== null && !out.has(current)) out.set(current, lines.join("\n").trim());
   };
   let fence: string | null = null;
   for (const line of body.split(/\r?\n/)) {
     const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
     if (fence === null && marker) fence = marker;
-    else if (
-      fence !== null &&
-      marker?.[0] === fence[0] &&
-      marker.length >= fence.length
-    )
-      fence = null;
+    else if (fence !== null && marker?.[0] === fence[0] && marker.length >= fence.length) fence = null;
     const heading = fence === null ? /^### +(.+?)\s*$/.exec(line) : null;
     if (heading) {
       close();
@@ -234,11 +189,9 @@ export function checkIssueBody(body: string, form: IssueForm): string[] {
       continue;
     }
     const empty = answer === "" || answer === NO_RESPONSE;
-    if (field.required && empty)
-      problems.push(`"### ${field.label}" is required but has no answer`);
+    if (field.required && empty) problems.push(`"### ${field.label}" is required but has no answer`);
     for (const option of field.requiredOptions) {
-      if (!ticked(answer, option))
-        problems.push(`"### ${field.label}" does not tick "- [x] ${option}"`);
+      if (!ticked(answer, option)) problems.push(`"### ${field.label}" does not tick "- [x] ${option}"`);
     }
   }
   return problems;

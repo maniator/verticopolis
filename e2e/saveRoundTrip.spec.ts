@@ -23,7 +23,10 @@ const UNREADABLE_KEY = "simtower-clone-unreadable";
 /** A save slot from 4.2 or earlier: My Towers copies it in once and leaves the key alone. */
 const SLOT_1_KEY = "simtower-clone-slot-1";
 /** A save from save format version 1, in the file container. */
-const OLD_FILE = readFileSync(new URL("../node_modules/@verticopolis/engine/conformance/fixtures/towerone-star1.vctower", import.meta.url), "utf8");
+const OLD_FILE = readFileSync(
+  new URL("../node_modules/@verticopolis/engine/conformance/fixtures/towerone-star1.vctower", import.meta.url),
+  "utf8",
+);
 const OLD_SAVE = inflateRawSync(Buffer.from(OLD_FILE.split("\n")[1]!, "base64")).toString();
 
 /** Seed browser storage once, before the page's own scripts, so a reload keeps what the game wrote. */
@@ -38,7 +41,9 @@ async function seed(page: Page, entries: Record<string, string>): Promise<void> 
 /** Load `url` and wait for the game on the Rust engine. */
 async function boot(page: Page, url: string): Promise<void> {
   await page.goto(url);
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+    timeout: 30_000,
+  });
   expect(await page.evaluate(() => (window as any).__vcEngineBoot.engine)).toBe("wasm");
 }
 
@@ -58,19 +63,29 @@ async function playAndSave(page: Page, after: number): Promise<number> {
   });
 }
 
-const clockReads = (page: Page, minutes: number) => page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, minutes, { timeout: 10_000 });
+const clockReads = (page: Page, minutes: number) =>
+  page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, minutes, { timeout: 10_000 });
 
-test("the engine loads the autosave, plays, saves, reloads and downloads it as a binary VCTOWER2 file", async ({ page }) => {
+test("the engine loads the autosave, plays, saves, reloads and downloads it as a binary VCTOWER2 file", async ({
+  page,
+}) => {
   await boot(page, "/");
   const first = await playAndSave(page, 0);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+    timeout: 30_000,
+  });
   await clockReads(page, first);
   const second = await playAndSave(page, first);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+    timeout: 30_000,
+  });
   await clockReads(page, second);
-  const [download] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => (window as any).game.saveLoad.exportGame())]);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.evaluate(() => (window as any).game.saveLoad.exportGame()),
+  ]);
   const file = readFileSync((await download.path())!);
   expect(file.subarray(0, 9).toString("latin1")).toBe("VCTOWER2\n");
   // The raw deflate bytes: no base64 line.
@@ -85,7 +100,10 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
   await page.evaluate((bytes) => (window as any).game.saveLoad.importGame(Uint8Array.from(bytes)), Array.from(file));
   await expect(page.getByText("Tower imported.")).toBeVisible();
   await clockReads(page, exported.minutes);
-  expect(await page.evaluate(() => JSON.stringify((window as any).game.reader.header)), "every header figure matches the exported tower").toBe(exported.header);
+  expect(
+    await page.evaluate(() => JSON.stringify((window as any).game.reader.header)),
+    "every header figure matches the exported tower",
+  ).toBe(exported.header);
 });
 
 test("the towers come back from IndexedDB after a reload, the same game", async ({ page }) => {
@@ -101,7 +119,8 @@ test("the towers come back from IndexedDB after a reload, the same game", async 
   // A My Towers file too, so the check covers more than the autosave.
   const fileId = await page.evaluate(() => (window as any).game.saveFile("Round trip") as Promise<string>);
   // The engine's whole state, parsed so a number reads the same however it was written.
-  const engine = async () => JSON.parse(await page.evaluate(() => (window as any).__vcEngine.port.serialize() as string)) as unknown;
+  const engine = async () =>
+    JSON.parse(await page.evaluate(() => (window as any).__vcEngine.port.serialize() as string)) as unknown;
   const before = await engine();
   expect((before as { units: unknown[] }).units.length).toBeGreaterThan(0);
   const saves = await storedSaves(page);
@@ -111,9 +130,14 @@ test("the towers come back from IndexedDB after a reload, the same game", async 
   expect(saves[`idb:${AUTO_KEY}`]).toMatch(/^VCZ1:/);
   // Put another tower, with no save time, in the localStorage copies: the
   // database copy is the one with a time, so boot must take it from there.
-  await page.evaluate(([keys, other]) => (keys as readonly string[]).forEach((k) => localStorage.setItem(k, other as string)), [[AUTO_KEY], OLD_SAVE] as const);
+  await page.evaluate(
+    ([keys, other]) => (keys as readonly string[]).forEach((k) => localStorage.setItem(k, other as string)),
+    [[AUTO_KEY], OLD_SAVE] as const,
+  );
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate(() => (window as any).game.setSpeed(0));
   expect(await engine(), "the autosave from IndexedDB is the same game").toEqual(before);
   await page.evaluate((id) => (window as any).game.openFile(id), fileId);
@@ -135,13 +159,17 @@ test("a tower file saved by a newer version is refused and changes nothing", asy
   expect(await storedSaves(page)).toEqual(storedBefore);
 });
 
-test("an older version's autosave loads, a failed import changes nothing, and an older file imports", async ({ page }) => {
+test("an older version's autosave loads, a failed import changes nothing, and an older file imports", async ({
+  page,
+}) => {
   const old = JSON.parse(OLD_SAVE) as { version: number; money: number };
   expect(old.version).toBe(1);
   // An old save slot too, so the import check below covers more than the autosave.
   await seed(page, { [LEGACY_AUTO_KEY]: OLD_SAVE, [SLOT_1_KEY]: OLD_SAVE });
   await boot(page, "/");
-  await page.waitForFunction((money) => (window as any).game.reader.header.money === money, old.money, { timeout: 10_000 });
+  await page.waitForFunction((money) => (window as any).game.reader.header.money === money, old.money, {
+    timeout: 10_000,
+  });
   await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
   const live = () => page.evaluate(() => (window as any).__vcEngine.port.serialize() as string);
   // Hold the 30-second autosave while the refusals run: on a slow runner the
@@ -203,7 +231,10 @@ test("an unreadable autosave is kept, not overwritten, and downloads as it was s
   expect(await storedSave(page, UNREADABLE_KEY)).toBe(unreadable);
   // The kept text downloads from the Open window exactly as it was stored.
   await page.keyboard.press("Control+o");
-  const [download] = await Promise.all([page.waitForEvent("download"), page.locator(".fd-kept").getByRole("button", { name: "Download it" }).click()]);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator(".fd-kept").getByRole("button", { name: "Download it" }).click(),
+  ]);
   // Text that starts like a tower file is named as one, so Import from file takes it after an update.
   expect(download.suggestedFilename()).toBe("verticopolis-unreadable-save.vctower");
   expect(readFileSync((await download.path())!, "utf8")).toBe(unreadable);

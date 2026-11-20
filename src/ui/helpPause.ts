@@ -31,7 +31,9 @@ export interface HelpPausePorts {
 /** The window and document the new-tab return watch listens on. */
 export interface ReturnWatchTarget {
   win: Pick<Window, "addEventListener" | "removeEventListener">;
-  doc: Pick<Document, "addEventListener" | "removeEventListener" | "hasFocus"> & { readonly visibilityState: DocumentVisibilityState };
+  doc: Pick<Document, "addEventListener" | "removeEventListener" | "hasFocus"> & {
+    readonly visibilityState: DocumentVisibilityState;
+  };
 }
 
 export const PAUSED_FOR_HELP = "Paused while Help is open";

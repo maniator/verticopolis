@@ -16,11 +16,23 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHANGES_DIR, isNoteFile } from "../src/build/changeNotes.ts";
-import { BOT_BRANCH, RELEASE_BRANCH, checkFeature, checkRelease, type Change, type Tree } from "../src/build/versionCheck.ts";
+import {
+  BOT_BRANCH,
+  RELEASE_BRANCH,
+  checkFeature,
+  checkRelease,
+  type Change,
+  type Tree,
+} from "../src/build/versionCheck.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const run = (cmd: string, args: string[]): string =>
-  execFileSync(cmd, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 256 * 1024 * 1024 });
+  execFileSync(cmd, args, {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 256 * 1024 * 1024,
+  });
 const git = (args: string[]): string => run("git", args);
 
 function arg(name: string): string | undefined {
@@ -76,4 +88,6 @@ if (errors.length > 0) {
   for (const e of errors) console.error(`  - ${e}`);
   process.exit(1);
 }
-console.log(`version-check: ${kind} ${branch} is consistent with ${base.slice(0, 12)} (${changes.length} changed files).`);
+console.log(
+  `version-check: ${kind} ${branch} is consistent with ${base.slice(0, 12)} (${changes.length} changed files).`,
+);

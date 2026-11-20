@@ -333,7 +333,13 @@ export function sampleTowerSpec(): TdtSpec {
     currentDay: 3,
     floors: [
       // TDT 9 = B1 (ours 0): parking ramp (ID 44) + a stall.
-      { index: 9, tenants: [{ left: 100, right: 116, type: 44 }, { left: 116, right: 120, type: 11 }] },
+      {
+        index: 9,
+        tenants: [
+          { left: 100, right: 116, type: 44 },
+          { left: 116, right: 120, type: 11 },
+        ],
+      },
       // TDT 10 = ground (ours 1): the lobby concourse.
       { index: 10, leftEdge: 80, rightEdge: 220, tenants: [{ left: 80, right: 220, type: 24 }] },
       // TDT 11 = 2F: offices, one tenanted, one priced High.

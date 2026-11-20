@@ -32,10 +32,27 @@ import { bindKeys } from "./game/inputKeys";
 import { watchLostRelease } from "./game/lostRelease";
 import { SPEEDS, applySpeed } from "./game/frameLoop";
 import { disarmSkyBridge } from "./game/skyBridgeGestures";
-import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal, refreshBuildPreview } from "./game/buildPreview";
+import {
+  placeSimpleBuild,
+  updateBuildPreview,
+  isTransportTool,
+  pickedAt,
+  clearBuildRefusal,
+  refreshBuildPreview,
+} from "./game/buildPreview";
 import { LobbyHeightChoice, trackLobbyHeightKeys } from "./game/lobbyHeight";
 import { BulldozeDragChoice } from "./game/bulldozeDrag";
-import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion, togglePassersBy, isPassersBy, applyPassersBy } from "./game/audioPrefs";
+import {
+  toggleMute,
+  setVolume,
+  toggleReducedMotion,
+  toggleSteadyClock,
+  isSteadyClock,
+  applyReducedMotion,
+  togglePassersBy,
+  isPassersBy,
+  applyPassersBy,
+} from "./game/audioPrefs";
 import { showStats, loadFromSlot } from "./game/appModals";
 import { openFile, saveFile } from "./game/fileSpaceCommands";
 import { jumpToTraffic, refreshTraffic } from "./game/trafficHud";
@@ -88,15 +105,24 @@ class GameApp implements GameAppPorts {
   /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
   /** The elevator schedule review for older towers (#1548). @internal */ scheduleReview!: ScheduleReview;
   /** The tower the tooling harnesses edit by hand (`toolingSim.ts`); undefined on the Rust engine in production. */
-  get sim(): ToolingTower | undefined { return toolingSim(this); }
-  set sim(sim: ToolingTower) { this.adoptSim(sim); }
+  get sim(): ToolingTower | undefined {
+    return toolingSim(this);
+  }
+  set sim(sim: ToolingTower) {
+    this.adoptSim(sim);
+  }
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
   /** Lot geometry, exposed for tooling (e.g. the screenshot harness). */
   get grid() {
     const world = catalogOf(this).world;
-    return { width: world.lotWidth, minFloor: world.minFloor, maxFloor: world.maxFloor, lobbyInterval: world.lobbyInterval };
+    return {
+      width: world.lotWidth,
+      minFloor: world.minFloor,
+      maxFloor: world.maxFloor,
+      lobbyInterval: world.lobbyInterval,
+    };
   }
   speed = 1;
   tool: Tool = { type: "inspect" };
@@ -110,7 +136,8 @@ class GameApp implements GameAppPorts {
    *  @internal */
   frameErrors: FrameErrorEntry[] = [];
   /** @internal */ shownWin = false;
-  /** @internal When the TOWER congratulations may open, after an answered emergency's outcome toast (#1134). */ winHeldUntil = -Infinity;
+  /** @internal When the TOWER congratulations may open, after an answered emergency's outcome toast (#1134). */ winHeldUntil =
+    -Infinity;
   /** @internal A save existed at boot but couldn't be read; `saveWasNewer`
    *  says a newer build wrote it, `unreadableKept` that it was kept aside. */
   saveWasCorrupt = false;
@@ -185,9 +212,7 @@ class GameApp implements GameAppPorts {
    *  must read as NON-mobile here (world-anchored editor/inspector popovers,
    *  desktop splash) to stay consistent with the CSS. Cached so per-frame
    *  anchoring doesn't construct a MediaQueryList each tick. @internal */
-  mobileMq = window.matchMedia(
-    "(max-width: 767px), (max-width: 1023px) and (max-height: 599px)",
-  );
+  mobileMq = window.matchMedia("(max-width: 767px), (max-width: 1023px) and (max-height: 599px)");
   /** First-run splash + onboarding (pure DOM chrome). @internal */
   onboarding!: OnboardingController;
   /** Per-device accessibility preferences (localStorage, off the save). @internal */
@@ -343,13 +368,27 @@ class GameApp implements GameAppPorts {
   }
 
   // Audio / accessibility / prefs commands, bodies in game/audioPrefs.ts.
-  toggleMute(): boolean { return toggleMute(this); }
-  setVolume(kind: "music" | "ambience" | "sfx", value: number): void { setVolume(this, kind, value); }
-  toggleReducedMotion(): boolean { return toggleReducedMotion(this); }
-  toggleSteadyClock(): boolean { return toggleSteadyClock(this); }
-  isSteadyClock(): boolean { return isSteadyClock(this); }
-  togglePassersBy(): boolean { return togglePassersBy(this); }
-  isPassersBy(): boolean { return isPassersBy(this); }
+  toggleMute(): boolean {
+    return toggleMute(this);
+  }
+  setVolume(kind: "music" | "ambience" | "sfx", value: number): void {
+    setVolume(this, kind, value);
+  }
+  toggleReducedMotion(): boolean {
+    return toggleReducedMotion(this);
+  }
+  toggleSteadyClock(): boolean {
+    return toggleSteadyClock(this);
+  }
+  isSteadyClock(): boolean {
+    return isSteadyClock(this);
+  }
+  togglePassersBy(): boolean {
+    return togglePassersBy(this);
+  }
+  isPassersBy(): boolean {
+    return isPassersBy(this);
+  }
 
   /** Replay the Getting Started onboarding, unless the splash is up. */
   replayOnboarding(): void {
@@ -362,12 +401,20 @@ class GameApp implements GameAppPorts {
   }
 
   // Stats, Auto-save and My Towers commands, bodies in game/appModals.ts and game/fileSpaceCommands.ts.
-  showStats(): void { void showStats(this); }
-  loadFromSlot(slot: "auto"): void { loadFromSlot(this, slot); }
+  showStats(): void {
+    void showStats(this);
+  }
+  loadFromSlot(slot: "auto"): void {
+    loadFromSlot(this, slot);
+  }
   /** Save the tower in My Towers as `name` (File > Save As…); answers its id. */
-  saveFile(name: string): Promise<string> { return saveFile(this, name); }
+  saveFile(name: string): Promise<string> {
+    return saveFile(this, name);
+  }
   /** Open My Towers file `id` (the Open window); settles once the tower is in. */
-  openFile(id: string): Promise<void> { return openFile(this, id); }
+  openFile(id: string): Promise<void> {
+    return openFile(this, id);
+  }
 
   /** Set the game speed (index into {@link SPEEDS}): updates the engine's pause
    *  state and the toolbar's active button. The single place the three concerns
@@ -375,9 +422,9 @@ class GameApp implements GameAppPorts {
   setSpeed(s: number): void {
     applySpeed(this, s);
     this.engine.paused = SPEEDS[s] === 0;
-    document.querySelectorAll("#speed button[data-speed]").forEach((b) =>
-      b.classList.toggle("active", Number((b as HTMLElement).dataset.speed) === s),
-    );
+    document
+      .querySelectorAll("#speed button[data-speed]")
+      .forEach((b) => b.classList.toggle("active", Number((b as HTMLElement).dataset.speed) === s));
   }
 
   /** The live speed index, so a dialog (the Compare modal) can pause the tower
@@ -395,19 +442,31 @@ class GameApp implements GameAppPorts {
   // Kept as methods because KeyboardPlay's deps call them on the app, and the
   // gameControllers.integration.test.ts mirror re-implements the same bodies.
 
-  /** @internal */ placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null { return placeSimpleBuild(this, kind, tile, floor); }
-  /** @internal */ isTransportTool(): boolean { return isTransportTool(this); }
-  /** @internal */ updateBuildPreview(tile: number, floor: number): void { updateBuildPreview(this, tile, floor); }
-  /** @internal */ pickedAt(floor: number, tile: number): Picked | null { return pickedAt(this, floor, tile); }
+  /** @internal */ placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null {
+    return placeSimpleBuild(this, kind, tile, floor);
+  }
+  /** @internal */ isTransportTool(): boolean {
+    return isTransportTool(this);
+  }
+  /** @internal */ updateBuildPreview(tile: number, floor: number): void {
+    updateBuildPreview(this, tile, floor);
+  }
+  /** @internal */ pickedAt(floor: number, tile: number): Picked | null {
+    return pickedAt(this, floor, tile);
+  }
   /** Refresh the traffic HUD chip; throws if the engine's answer or the draw
    *  fails. Body in game/trafficHud.ts; a method on the instance because the
    *  screenshot tooling (scripts/scenes/features.ts, screenshot-page-ops.ts)
    *  awaits `window.game.refreshTraffic()` to pin the chip. @internal */
-  refreshTraffic(): void { refreshTraffic(this); }
+  refreshTraffic(): void {
+    refreshTraffic(this);
+  }
   /** The Traffic readout's tap, answering whether the camera went to a line
    *  and its spotlight went up. Body in game/trafficHud.ts; the screenshot
    *  tooling (scripts/scenes/trafficJump.ts) checks the answer. @internal */
-  jumpToTraffic(): boolean { return jumpToTraffic(this); }
+  jumpToTraffic(): boolean {
+    return jumpToTraffic(this);
+  }
 
   // ---- PWA update ---------------------------------------------------------
 
@@ -463,25 +522,47 @@ class GameApp implements GameAppPorts {
 
   /** Follow the tower the engine holds now: another tower, a tooling restore or an undo or
    *  redo step (see game/towerFollow). @internal */
-  followSwap(follow: TowerFollow = "swap"): void { followEngineTower(this, follow); }
+  followSwap(follow: TowerFollow = "swap"): void {
+    followEngineTower(this, follow);
+  }
 
   /** Swap in a tower a tooling harness built by hand, on either engine. @internal */
-  adoptSim(sim: ToolingTower, keepCamera = false): void { adoptToolingSim(this, sim, keepCamera); }
+  adoptSim(sim: ToolingTower, keepCamera = false): void {
+    adoptToolingSim(this, sim, keepCamera);
+  }
   /** Hand a harness's edits of `sim` to the engine now. @internal */
-  syncSim(): void { syncToolingSim(this); }
+  syncSim(): void {
+    syncToolingSim(this);
+  }
   /** Tooling: draw the engine again after a hand edit on `sim` reached it. */
-  followEdit(): void { followToolingEdit(this); }
+  followEdit(): void {
+    followToolingEdit(this);
+  }
 
   // ---- Undo / redo (the steps live in the engine; see game/appHistory) ----
   // Thin delegators kept so the many gesture call sites read unchanged.
 
-  /** @internal */ captureUndo(label: string): void { this.history.capture(label); }
-  /** @internal */ commitUndo(): void { this.history.commit(); }
-  /** @internal */ discardUndo(): void { this.history.discard(); }
-  /** @internal */ undoGesture(): number { return this.history.gesture(); }
-  /** @internal */ showSteps(): void { setHistoryButtons(this.ui, this.enginePort); }
-  undo(): Promise<void> { return this.history.undo(); }
-  redo(): Promise<void> { return this.history.redo(); }
+  /** @internal */ captureUndo(label: string): void {
+    this.history.capture(label);
+  }
+  /** @internal */ commitUndo(): void {
+    this.history.commit();
+  }
+  /** @internal */ discardUndo(): void {
+    this.history.discard();
+  }
+  /** @internal */ undoGesture(): number {
+    return this.history.gesture();
+  }
+  /** @internal */ showSteps(): void {
+    setHistoryButtons(this.ui, this.enginePort);
+  }
+  undo(): Promise<void> {
+    return this.history.undo();
+  }
+  redo(): Promise<void> {
+    return this.history.redo();
+  }
 }
 
 export { GameApp };

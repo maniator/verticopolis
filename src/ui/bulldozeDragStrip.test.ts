@@ -21,7 +21,8 @@ beforeEach(() => {
 });
 afterEach(() => strip.remove());
 
-const pressed = (root: ParentNode) => [...root.querySelectorAll("button")].map((b) => [b.textContent, b.getAttribute("aria-pressed")]);
+const pressed = (root: ParentNode) =>
+  [...root.querySelectorAll("button")].map((b) => [b.textContent, b.getAttribute("aria-pressed")]);
 
 describe("syncBulldozeDragStrip", () => {
   it("shows both choices while the bulldozer is armed, the pick pressed", () => {
@@ -44,7 +45,12 @@ describe("syncBulldozeDragStrip", () => {
 describe("bulldozePickerFor", () => {
   it("picks on the choice from the strip, then redraws the card and the strip", () => {
     let clears: DragClears = "one kind";
-    const choice = { get clears() { return clears; }, pick: vi.fn((c: DragClears) => (clears = c)) };
+    const choice = {
+      get clears() {
+        return clears;
+      },
+      pick: vi.fn((c: DragClears) => (clears = c)),
+    };
     const toolInfo = document.createElement("div");
     const ui = { cb: { bulldozeDrag: () => choice }, tool: { type: "bulldoze" }, el: { toolInfo } } as unknown as UI;
     syncBulldozeDragStrip(ui.tool, bulldozePickerFor(ui));
@@ -63,7 +69,15 @@ describe("renderToolCard", () => {
   it("draws the Bulldoze card with its Drag clears choice and shows the strip, then hides it for another tool", () => {
     const choice = { clears: "everything" as DragClears, pick: vi.fn() };
     const toolInfo = document.createElement("div");
-    const ui = { cb: { bulldozeDrag: () => choice, lobbyHeight: () => ({ picked: 1, pick: vi.fn() }), getCatalog: () => catalogFor("modern") }, tool: { type: "bulldoze" }, el: { toolInfo } } as unknown as UI;
+    const ui = {
+      cb: {
+        bulldozeDrag: () => choice,
+        lobbyHeight: () => ({ picked: 1, pick: vi.fn() }),
+        getCatalog: () => catalogFor("modern"),
+      },
+      tool: { type: "bulldoze" },
+      el: { toolInfo },
+    } as unknown as UI;
     renderToolCard(ui, { type: "bulldoze" });
     expect(pressed(toolInfo.querySelector(".ti-drag-clears")!).map(([, on]) => on)).toEqual(["false", "true"]);
     expect(strip.hidden).toBe(false);

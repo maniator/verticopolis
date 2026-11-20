@@ -82,7 +82,11 @@ describe("whether the fireworks play", () => {
     expect(shouldPlayLaunchFireworks(g)).toBe(true);
     latchLaunchFireworks(() => storage);
     expect(shouldPlayLaunchFireworks(g)).toBe(false);
-    expect(shouldPlayLaunchFireworks(gate({ version: "3.12.3", previewDeploy: true, automated: true, storage: () => memoryStorage() }))).toBe(false);
+    expect(
+      shouldPlayLaunchFireworks(
+        gate({ version: "3.12.3", previewDeploy: true, automated: true, storage: () => memoryStorage() }),
+      ),
+    ).toBe(false);
   });
 
   it("never plays under browser automation, so screenshots and e2e runs stay clean", () => {
@@ -119,7 +123,9 @@ describe("whether the fireworks play", () => {
 
   it("plays a forced preview on any version, under automation, without touching the latch", () => {
     const storage = memoryStorage({ [LAUNCH_FIREWORKS_SEEN_KEY]: "1" });
-    expect(shouldPlayLaunchFireworks(gate({ version: "3.12.3", automated: true, forced: true, storage: () => storage }))).toBe(true);
+    expect(
+      shouldPlayLaunchFireworks(gate({ version: "3.12.3", automated: true, forced: true, storage: () => storage })),
+    ).toBe(true);
     expect(storage.getItem).not.toHaveBeenCalled();
     expect(storage.setItem).not.toHaveBeenCalled();
   });
@@ -201,11 +207,13 @@ describe("the show", () => {
     document.body.append(dialog);
     const box = document.createElement("div");
     const ui = {
-      openModalTemplate: vi.fn((result: TemplateResult, _opts?: { displaceable?: boolean; onDisplaced?: () => void }) => {
-        render(result, box);
-        dialog.append(box);
-        return box;
-      }),
+      openModalTemplate: vi.fn(
+        (result: TemplateResult, _opts?: { displaceable?: boolean; onDisplaced?: () => void }) => {
+          render(result, box);
+          dialog.append(box);
+          return box;
+        },
+      ),
       wireActions: vi.fn(),
     };
     return { ui, dialog, box, close: () => dialog.replaceChildren() };
@@ -249,10 +257,13 @@ describe("the show", () => {
     const ways: [string, (dialog: HTMLDialogElement, box: HTMLElement) => void][] = [
       ["ok", (_d, box) => box.querySelector<HTMLElement>("[data-act='close']")!.click()],
       ["x", (d) => d.dispatchEvent(new Event("cancel", { cancelable: true }))],
-      ["escape", (d, box) => {
-        box.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-        d.dispatchEvent(new Event("cancel", { cancelable: true }));
-      }],
+      [
+        "escape",
+        (d, box) => {
+          box.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          d.dispatchEvent(new Event("cancel", { cancelable: true }));
+        },
+      ],
       ["backdrop", (d) => d.click()],
     ];
     for (const [how, close] of ways) {
@@ -382,7 +393,11 @@ describe("the welcome window", () => {
       WELCOME_LINKS.whatsNew.label,
     ]);
     const urls = links.map((a) => new URL(a.getAttribute("href")!, "https://example.test"));
-    expect(urls.map((u) => u.pathname)).toEqual([WELCOME_LINKS.firstTower.href, WELCOME_LINKS.modes.href, WELCOME_LINKS.whatsNew.href]);
+    expect(urls.map((u) => u.pathname)).toEqual([
+      WELCOME_LINKS.firstTower.href,
+      WELCOME_LINKS.modes.href,
+      WELCOME_LINKS.whatsNew.href,
+    ]);
     for (const [i, a] of links.entries()) {
       expect(a.target).toBe("_blank");
       expect(a.rel).toContain("noopener");

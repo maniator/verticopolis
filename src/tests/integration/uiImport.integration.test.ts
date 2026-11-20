@@ -12,7 +12,8 @@ beforeEach(() => {
 });
 
 describe("import picker: only tower files, filtered where the platform can", () => {
-  const ANDROID_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36";
+  const ANDROID_UA =
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36";
   const pickerWindow = window as { showOpenFilePicker?: unknown };
 
   afterEach(() => {
@@ -71,7 +72,12 @@ describe("import picker: only tower files, filtered where the platform can", () 
       { description: "Tower files (.vctower, .TDT)", accept: { [TOWER_PICKER_MIME]: [".vctower", ".tdt"] } },
     ]);
     expect(TOWER_PICKER_MIME).toBe("application/x-verticopolis-tower");
-    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload", { name: "tower.vctower", bytes: new TextEncoder().encode("VCTOWER1\npayload") }));
+    await vi.waitFor(() =>
+      expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload", {
+        name: "tower.vctower",
+        bytes: new TextEncoder().encode("VCTOWER1\npayload"),
+      }),
+    );
     expect(click).not.toHaveBeenCalled();
   });
 
@@ -113,7 +119,9 @@ describe("import picker: only tower files, filtered where the platform can", () 
 
   it("a native picker the page may not open falls back to the <input> picker", async () => {
     const { ui } = makeUI();
-    pickerWindow.showOpenFilePicker = vi.fn().mockRejectedValue(new DOMException("Cross origin sub frames", "SecurityError"));
+    pickerWindow.showOpenFilePicker = vi
+      .fn()
+      .mockRejectedValue(new DOMException("Cross origin sub frames", "SecurityError"));
     const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
     openImport(ui);
     await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));

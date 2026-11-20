@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { floorsOfPort } from "../../game/portAccess";
 import type { GameMode, UnitState } from "@verticopolis/components/shared/types";
 import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
-import { EVAL_TIERS, RENT_TIERS, RoomTierReader, type EvalTier, type RentTier, type RoomTiers } from "@verticopolis/components/port/roomTiers";
+import {
+  EVAL_TIERS,
+  RENT_TIERS,
+  RoomTierReader,
+  type EvalTier,
+  type RentTier,
+  type RoomTiers,
+} from "@verticopolis/components/port/roomTiers";
 import { ViewReader } from "@verticopolis/components/port/viewReader";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
@@ -15,7 +22,6 @@ import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
  * room's state and score are set through its save, as a saved tower carries
  * them; the TypeScript engine has no Map views and is not involved.
  */
-
 
 type RustEngine = EnginePort & { free(): void; setMoney(amount: number): void };
 const freed: RustEngine[] = [];
@@ -110,7 +116,13 @@ interface Row {
 }
 
 function rows(t: RoomTiers): Row[] {
-  return Array.from({ length: t.size }, (_, i) => ({ id: t.id(i), floor: t.floor(i), x: t.x(i), evalTier: t.evalTier(i), rentTier: t.rentTier(i) }));
+  return Array.from({ length: t.size }, (_, i) => ({
+    id: t.id(i),
+    floor: t.floor(i),
+    x: t.x(i),
+    evalTier: t.evalTier(i),
+    rentTier: t.rentTier(i),
+  }));
 }
 
 function tierAt(all: readonly Row[], floor: number, x: number): Row | undefined {
@@ -180,17 +192,33 @@ describe.skipIf(!hasWasmPackage())("roomTiers on the Rust engine", () => {
 
   for (const mode of ["classic", "modern"] as const) {
     it(`${mode}: cuts the evaluation at the engine's keep and gripe lines`, () => {
-      const rooms = scores.map(([satisfaction], i) => ({ kind: "office" as const, floor: 2, x: 152 + i * 9, state: "occupied" as const, satisfaction }));
-      const rust = towerWith(mode, [...rooms, { kind: "office", floor: 3, x: 152, state: "vacating", satisfaction: 0.5 }]);
+      const rooms = scores.map(([satisfaction], i) => ({
+        kind: "office" as const,
+        floor: 2,
+        x: 152 + i * 9,
+        state: "occupied" as const,
+        satisfaction,
+      }));
+      const rust = towerWith(mode, [
+        ...rooms,
+        { kind: "office", floor: 3, x: 152, state: "vacating", satisfaction: 0.5 },
+      ]);
       const all = rows(new RoomTierReader(rust).read());
-      for (const [i, [score, want]] of scores.entries()) expect(tierAt(all, 2, rooms[i].x)?.evalTier, `satisfaction ${score}`).toBe(want);
+      for (const [i, [score, want]] of scores.entries())
+        expect(tierAt(all, 2, rooms[i].x)?.evalTier, `satisfaction ${score}`).toBe(want);
       expect(tierAt(all, 3, 152)?.evalTier, "a tenant on notice is rated by its score").toBe("good");
     });
   }
 
   for (const mode of ["classic", "modern"] as const) {
     it(`${mode}: a room exactly on the keep line or the gripe line still reads Good after a save round trip`, () => {
-      const rooms = [KEEP_LINE, GRIPE_LINE].map((satisfaction, i) => ({ kind: "office" as const, floor: 2, x: 160 + i * 20, state: "occupied" as const, satisfaction }));
+      const rooms = [KEEP_LINE, GRIPE_LINE].map((satisfaction, i) => ({
+        kind: "office" as const,
+        floor: 2,
+        x: 160 + i * 20,
+        state: "occupied" as const,
+        satisfaction,
+      }));
       const saved = towerWith(mode, rooms).serialize();
       const reloaded = wasm().Engine.newGame(12, mode) as unknown as RustEngine;
       freed.push(reloaded);
@@ -213,7 +241,12 @@ describe.skipIf(!hasWasmPackage())("roomTiers on the Rust engine", () => {
     ]);
     const reader = new RoomTierReader(rust);
     const before = rows(reader.read());
-    for (const [floor, x] of [[2, 160], [3, 160], [3, 190]]) expect(tierAt(before, floor, x)?.rentTier, `${floor},${x} on the default`).toBe("average");
+    for (const [floor, x] of [
+      [2, 160],
+      [3, 160],
+      [3, 190],
+    ])
+      expect(tierAt(before, floor, x)?.rentTier, `${floor},${x} on the default`).toBe("average");
     const office = tierAt(before, 2, 160)!.id;
     const ladder: readonly [number, RentTier][] = [
       [2_000, "veryLow"],

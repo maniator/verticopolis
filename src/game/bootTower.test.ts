@@ -5,7 +5,11 @@ import { bootTower } from "./bootTower";
 import { NEWER_SAVE_REFUSAL } from "./portLifecycle";
 
 const portRefusing = (reason: string): EnginePort =>
-  ({ setBackdrop: vi.fn(), loadSave: vi.fn(() => Float64Array.of(0, 0)), lastReason: () => reason }) as unknown as EnginePort;
+  ({
+    setBackdrop: vi.fn(),
+    loadSave: vi.fn(() => Float64Array.of(0, 0)),
+    lastReason: () => reason,
+  }) as unknown as EnginePort;
 
 describe("bootTower", () => {
   it("flags a stored save the engine refused as written by a newer build", () => {
@@ -34,7 +38,11 @@ describe("bootTower", () => {
   it("loads the save without its people on the boot after a crash, and whole otherwise (#2209)", () => {
     const save = JSON.stringify({ money: 5, crowd: { people: [] }, dispatch: { cars: [] } });
     // The stored text is stamped with its build and write time as it is packed.
-    const loads = () => ({ setBackdrop: vi.fn(), loadSave: vi.fn((_text: string) => Float64Array.of(1, 0)), lastReason: () => "" });
+    const loads = () => ({
+      setBackdrop: vi.fn(),
+      loadSave: vi.fn((_text: string) => Float64Array.of(1, 0)),
+      lastReason: () => "",
+    });
     localStorage.clear();
     localStorage.setItem("verticopolis-save", SaveGame.packSync(save));
     const afterCrash = loads();
@@ -45,7 +53,11 @@ describe("bootTower", () => {
     expect(loaded).not.toHaveProperty("dispatch");
     const plain = loads();
     expect(bootTower(plain as unknown as EnginePort, false)).toMatchObject({ loaded: true });
-    expect(JSON.parse(plain.loadSave.mock.calls[0][0] as string)).toMatchObject({ money: 5, crowd: { people: [] }, dispatch: { cars: [] } });
+    expect(JSON.parse(plain.loadSave.mock.calls[0][0] as string)).toMatchObject({
+      money: 5,
+      crowd: { people: [] },
+      dispatch: { cars: [] },
+    });
   });
 
   it("flags nothing when no save is stored", () => {

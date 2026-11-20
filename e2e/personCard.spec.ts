@@ -28,7 +28,10 @@ async function towerWithAWalker(page: Page): Promise<number> {
 
 /** The point over person `id`'s figure, on the page and on the canvas
  *  (`dispatchTouch` takes canvas points). */
-async function figurePoint(page: Page, id: number): Promise<{ x: number; y: number; canvas: { x: number; y: number } }> {
+async function figurePoint(
+  page: Page,
+  id: number,
+): Promise<{ x: number; y: number; canvas: { x: number; y: number } }> {
   return page.evaluate((who) => {
     const e = (window as any).game.engine;
     const rec = e.crowdActors.get(who);
@@ -41,7 +44,9 @@ async function figurePoint(page: Page, id: number): Promise<{ x: number; y: numb
   }, id);
 }
 
-test("a click with Inspect opens a walking person's card, and Follow keeps the camera on them (#2092)", async ({ page }) => {
+test("a click with Inspect opens a walking person's card, and Follow keeps the camera on them (#2092)", async ({
+  page,
+}) => {
   const id = await towerWithAWalker(page);
   await page.waitForTimeout(300); // a frame draws the figure where the camera now is
   await page.click('.pal-item[data-tool="inspect"]');
@@ -78,7 +83,13 @@ test("a click with Inspect opens a walking person's card, and Follow keeps the c
       // failure says where they were and whether the follow still held.
       const cam = { x: Math.round(e.cam.pos.x), y: Math.round(e.cam.pos.y), zoom: e.cam.zoom };
       const button = document.querySelector("#editor .ed-row .btn[data-edit]")?.textContent?.trim() ?? null;
-      return { onScreen: inside, at: s && { x: Math.round(s.x), y: Math.round(s.y) }, view: { w: box.width, h: box.height }, cam, button };
+      return {
+        onScreen: inside,
+        at: s && { x: Math.round(s.x), y: Math.round(s.y) },
+        view: { w: box.width, h: box.height },
+        cam,
+        button,
+      };
     }, open);
   // objectContaining prints the whole record on a failure; toMatchObject would
   // print only the onScreen line.

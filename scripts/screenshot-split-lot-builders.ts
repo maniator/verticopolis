@@ -49,7 +49,7 @@ export function buildSplitLotTower(): void {
     if (s.tower.unitAt(1, x)) throw new Error(`the lobbies touch at ${x}`);
   }
   const fill = (kind: string, f: number, [lo, hi]: [number, number], people: number): void => {
-    for (let x = lo + 5; x <= hi; ) {
+    for (let x = lo + 5; x <= hi;) {
       const r = s.tower.place(kind, f, x);
       if (!r.ok) {
         x += 1;
@@ -105,7 +105,7 @@ export function buildSplitGapTowers(): void {
     for (let f = 2; f <= top; f++) for (let x = lo; x <= hi; x++) s.tower.place("floor", f, x);
     if (!s.tower.placeTransport("elevatorStandard", lo + 1, 1, top).ok) throw new Error(`no elevator at ${lo + 1}`);
     for (let f = 2; f <= top; f++) {
-      for (let x = lo + 6; x + 9 <= hi + 1; ) {
+      for (let x = lo + 6; x + 9 <= hi + 1;) {
         const r = s.tower.place(f % 6 === 0 ? "condo" : "office", f, x);
         if (!r.ok) {
           x += 1;

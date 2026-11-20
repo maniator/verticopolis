@@ -4,7 +4,14 @@ import { MISMATCH_RELOAD_KEY, claimMismatchReload, engineFilesFromAnotherBuild }
 
 beforeEach(() => sessionStorage.clear());
 
-const detail = { file: "wasm", expected: "111111111111", found: "222222222222", expectedPackage: "aaaaaaaaaaaa", servedPackage: "bbbbbbbbbbbb", controlled: false } as const;
+const detail = {
+  file: "wasm",
+  expected: "111111111111",
+  found: "222222222222",
+  expectedPackage: "aaaaaaaaaaaa",
+  servedPackage: "bbbbbbbbbbbb",
+  controlled: false,
+} as const;
 
 /** A load refused because the files are from another build, on a page no worker controls. */
 function mismatch(kind: PackageFailure["kind"] = "mismatch", controlled = false): EngineBootFailure {
@@ -24,7 +31,9 @@ describe("engine files from another build", () => {
 
   it("is not a file that did not arrive, a link error, a package that cannot save, or a later stage", () => {
     expect(engineFilesFromAnotherBuild(mismatch("load-failed"))).toBe(false);
-    expect(engineFilesFromAnotherBuild({ stage: "load", reason: "package-mismatch", message: "import mismatch" })).toBe(false);
+    expect(engineFilesFromAnotherBuild({ stage: "load", reason: "package-mismatch", message: "import mismatch" })).toBe(
+      false,
+    );
     expect(engineFilesFromAnotherBuild({ ...mismatch(), cause: "no-save-writer" })).toBe(false);
     expect(engineFilesFromAnotherBuild({ ...mismatch(), stage: "start" })).toBe(false);
     expect(engineFilesFromAnotherBuild({ ...mismatch(), reason: "boot-error" })).toBe(false);
@@ -63,7 +72,12 @@ describe("the tab's one reload for matching files", () => {
 
   it("never reloads when the tab cannot remember it did", () => {
     expect(claimMismatchReload(null, "a", mismatch())).toBe(false);
-    const throws = { getItem: () => null, setItem: () => { throw new Error("quota"); } };
+    const throws = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
     expect(claimMismatchReload(throws, "a", mismatch())).toBe(false);
     const forgets = { getItem: () => null, setItem: () => {} };
     expect(claimMismatchReload(forgets, "a", mismatch())).toBe(false);

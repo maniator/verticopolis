@@ -49,8 +49,18 @@ import {
 } from "../src/build/thirdPartyNotices.ts";
 import { installedLinkProblems } from "../src/build/installedLinks.ts";
 import { MAPLESS_PUBLIC_SCRIPTS } from "../src/build/publicFiles.ts";
-import { ENGINE_PORTS, ENGINE_THIRD_PARTY, engineRecordPackages, portVersionProblems } from "../src/build/rustNotices.ts";
-import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "@verticopolis/components/host/enginePackageNames";
+import {
+  ENGINE_PORTS,
+  ENGINE_THIRD_PARTY,
+  engineRecordPackages,
+  portVersionProblems,
+} from "../src/build/rustNotices.ts";
+import {
+  ENGINE_BUILD_RECORD,
+  ENGINE_DIR,
+  ENGINE_GLUE,
+  ENGINE_WASM,
+} from "@verticopolis/components/host/enginePackageNames";
 import { readLicenseFiles } from "./license-files.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
@@ -85,7 +95,10 @@ try {
 } catch {
   fail("package.json is missing or not valid JSON, so its dependencies cannot be checked for linked packages");
 }
-const linked = typeof rootManifest === "object" && rootManifest !== null ? linkedDependencyProblems(rootManifest as Record<string, unknown>) : ["package.json is not an object"];
+const linked =
+  typeof rootManifest === "object" && rootManifest !== null
+    ? linkedDependencyProblems(rootManifest as Record<string, unknown>)
+    : ["package.json is not an object"];
 // What is installed can differ from what is declared (a hand-made symlink, an
 // unsaved npm link), so the installed tree is checked too.
 const nodeModules = join(ROOT, "node_modules");
@@ -93,9 +106,13 @@ linked.push(...installedLinkProblems(nodeModules));
 const hiddenLock = join(nodeModules, ".package-lock.json");
 if (existsSync(hiddenLock)) {
   try {
-    linked.push(...lockfileLinkProblems(JSON.parse(readFileSync(hiddenLock, "utf8")), "node_modules/.package-lock.json"));
+    linked.push(
+      ...lockfileLinkProblems(JSON.parse(readFileSync(hiddenLock, "utf8")), "node_modules/.package-lock.json"),
+    );
   } catch {
-    fail("node_modules/.package-lock.json is not valid JSON, so the installed tree cannot be checked for linked packages");
+    fail(
+      "node_modules/.package-lock.json is not valid JSON, so the installed tree cannot be checked for linked packages",
+    );
   }
 }
 const lockPath = join(ROOT, "package-lock.json");
@@ -177,7 +194,8 @@ for (const map of maps) {
       // (workbox-build's template in a temporary folder, vite-plugin-pwa's
       // virtual module).
       if (inRepo === null) {
-        if (typeof s !== "string" || !isKnownOutsideRepoSource(s)) fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is outside the repository`);
+        if (typeof s !== "string" || !isKnownOutsideRepoSource(s))
+          fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is outside the repository`);
         continue;
       }
       // A node_modules path that names no package (a tool cache such as
@@ -201,7 +219,9 @@ for (const map of maps) {
     // carry a tool's code; it passes only when an `INJECTED_CODE` entry marked
     // for ids outside the repository attributes it.
     else if (typeof s === "string" && !isKnownOutsideRepoSource(s)) {
-      fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which names no local file; add it to INJECTED_CODE with its package`);
+      fail(
+        `${relative(ROOT, map)} lists ${JSON.stringify(s)}, which names no local file; add it to INJECTED_CODE with its package`,
+      );
     }
   }
 }
@@ -234,7 +254,9 @@ const problems: string[] = [];
 for (const [dir, origin] of dirs) {
   const manifestPath = join(dir, "package.json");
   if (!existsSync(manifestPath)) {
-    problems.push(`${relative(ROOT, dir)}: no package.json (from ${origin.startsWith("injected:") ? origin : relative(ROOT, origin)})`);
+    problems.push(
+      `${relative(ROOT, dir)}: no package.json (from ${origin.startsWith("injected:") ? origin : relative(ROOT, origin)})`,
+    );
     continue;
   }
   let manifest: { name?: unknown; version?: unknown; license?: unknown; licenses?: unknown };
@@ -270,7 +292,8 @@ for (const [dir, origin] of dirs) {
 /** The version `npm ci` installed for package `name`, or null. */
 function installedVersion(name: string): string | null {
   try {
-    const v = (JSON.parse(readFileSync(join(nodeModules, name, "package.json"), "utf8")) as { version?: unknown }).version;
+    const v = (JSON.parse(readFileSync(join(nodeModules, name, "package.json"), "utf8")) as { version?: unknown })
+      .version;
     return typeof v === "string" ? v : null;
   } catch {
     return null;
@@ -285,7 +308,9 @@ if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(
     try {
       return JSON.parse(readFileSync(path, "utf8"));
     } catch {
-      fail(`${relative(ROOT, path)} is missing or not valid JSON, so the WASM engine that ships cannot be attributed (reinstall it with npm install)`);
+      fail(
+        `${relative(ROOT, path)} is missing or not valid JSON, so the WASM engine that ships cannot be attributed (reinstall it with npm install)`,
+      );
     }
   };
   const build = read(join(DIST, "engine", "BUILD.json")) as { sources?: unknown } | null;
@@ -300,11 +325,16 @@ if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(
   }
   // The record describes this package and nothing else, so another file here would ship unattributed.
   const extra = statSync(engineDir).isDirectory() ? readdirSync(engineDir).filter((f) => !ENGINE_FILES.has(f)) : [];
-  if (extra.length > 0) problems.push(`dist/engine/ ships ${extra.join(", ")}, which the engine's record does not describe`);
+  if (extra.length > 0)
+    problems.push(`dist/engine/ ships ${extra.join(", ")}, which the engine's record does not describe`);
   // The installed engine package ports these, so its record must list each one.
   const ports = ENGINE_PORTS;
   problems.push(...portVersionProblems(ports, installedVersion));
-  const engine = engineRecordPackages(read(recordPath), { sources: build?.sources, wasm, ports: ports.map((p) => p.name) });
+  const engine = engineRecordPackages(read(recordPath), {
+    sources: build?.sources,
+    wasm,
+    ports: ports.map((p) => p.name),
+  });
   problems.push(...engine.problems.map((p) => `${relative(ROOT, recordPath)}: ${p}`));
   packages.push(...engine.packages);
 }

@@ -59,7 +59,7 @@ export function buildCanonTower(): void {
   s.tower.placeTransport("elevatorExpress", left + 20, 1, 30);
   s.tower.placeTransport("stairs", right - 12, 1, 2);
   const fill = (f: number, kind: string, state: string) => {
-    for (let x = left + 26; x + 1 <= right; ) {
+    for (let x = left + 26; x + 1 <= right;) {
       const r = s.tower.place(kind, f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -70,7 +70,7 @@ export function buildCanonTower(): void {
       } else x += 1;
     }
   };
-  for (let x = left + 26; x + 1 <= right; ) {
+  for (let x = left + 26; x + 1 <= right;) {
     const r = s.tower.place("fastFood", 2, x);
     if (r.ok) {
       const u = s.tower.getUnit(r.unitId);
@@ -104,7 +104,7 @@ export function buildCanonTower(): void {
   const platformBank = s.tower.placeTransport("elevatorStandard", left + 2, -3, 15);
   if (!platformBank.ok) throw new Error(`hero platform bank failed: ${platformBank.reason}`);
   s.tower.place("parkingRamp", -1, left);
-  for (let x = left + 16; x + 1 <= right; ) {
+  for (let x = left + 16; x + 1 <= right;) {
     const r = s.tower.place("parking", -1, x);
     if (r.ok) x += s.tower.getUnit(r.unitId).width;
     else x += 1;
@@ -140,7 +140,7 @@ export function buildBasement(): void {
   // offices up top so the tower has workers who need parking
   s.tower.placeTransport("elevatorStandard", left + 4, 1, 6);
   for (let f = 2; f <= 6; f++) {
-    for (let x = left + 10; x + 1 <= right; ) {
+    for (let x = left + 10; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -157,7 +157,7 @@ export function buildBasement(): void {
   for (const f of [0, -1, -2, -3]) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
   for (const f of [0, -1]) {
     s.tower.place("parkingRamp", f, left + 4);
-    for (let x = left + 20; x + 1 <= right; ) {
+    for (let x = left + 20; x + 1 <= right;) {
       const r = s.tower.place("parking", f, x);
       if (r.ok) x += s.tower.getUnit(r.unitId).width;
       else x += 1;
@@ -215,7 +215,7 @@ export function buildModernPricingTower(): void {
   s.tower.placeTransport("elevatorStandard", left + 4, 1, 8);
   // Offices on 2..5, leased, reading each placed unit's canon width to advance.
   for (let f = 2; f <= 5; f++) {
-    for (let x = left + 8; x + 1 <= right; ) {
+    for (let x = left + 8; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -231,7 +231,7 @@ export function buildModernPricingTower(): void {
   const sizes = [2, 3, 4, 5];
   let ci = 0;
   for (let f = 6; f <= 8; f++) {
-    for (let x = left + 8; x + 1 <= right; ) {
+    for (let x = left + 8; x + 1 <= right;) {
       const r = s.tower.place("condo", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -250,7 +250,8 @@ export function buildModernPricingTower(): void {
   // would document a state the mode cannot reach; the Classic tenancy shot is
   // the one that shows the split.
   const f5 = s.tower.units.filter((u: any) => u.kind === "office" && u.floor === 5).sort((a: any, b: any) => a.x - b.x);
-  if (f5.length < 5) throw new Error(`pricing-modern tower staged only ${f5.length} floor-5 offices (need 5 for the vacancy row)`);
+  if (f5.length < 5)
+    throw new Error(`pricing-modern tower staged only ${f5.length} floor-5 offices (need 5 for the vacancy row)`);
   for (let i = 0; i < 5; i++) {
     const u = f5[i];
     u.state = "empty";
@@ -296,7 +297,7 @@ export function buildScheduleTowerModern(): void {
   const std = s.tower.transports.find((t: any) => t.kind === "elevatorStandard");
   s.tower.setCars(std.id, 4);
   for (let f = 2; f <= 9; f++) {
-    for (let x = left + 10; x + 1 <= right - 10; ) {
+    for (let x = left + 10; x + 1 <= right - 10;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -363,7 +364,7 @@ export function buildScheduleTowerClassic(): void {
   const std = s.tower.transports.find((t: any) => t.kind === "elevatorStandard");
   s.tower.setCars(std.id, 4);
   for (let f = 2; f <= 9; f++) {
-    for (let x = left + 10; x + 1 <= right - 10; ) {
+    for (let x = left + 10; x + 1 <= right - 10;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -432,11 +433,12 @@ export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "
   // column cycles by band INDEX ((b-1)/15 = 0,1,2,3,...) so the x offset stays an
   // INTEGER; placeTransport doesn't floor x, and a fractional column would key the
   // structure map as "floor:6.4" (never matching), silently failing every shaft.
-  for (let b = 1; b < top; b += 15) s.tower.placeTransport("elevatorStandard", left + 4 + (((b - 1) / 15) % 4) * 6, b, Math.min(b + 15, top));
+  for (let b = 1; b < top; b += 15)
+    s.tower.placeTransport("elevatorStandard", left + 4 + (((b - 1) / 15) % 4) * 6, b, Math.min(b + 15, top));
   if (top > 20) s.tower.placeTransport("elevatorExpress", cx, 1, top);
   let placed = 0;
   for (let f = 2; f <= top && placed < wantOffices; f++) {
-    for (let x = left; x + 1 <= right && placed < wantOffices; ) {
+    for (let x = left; x + 1 <= right && placed < wantOffices;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);
@@ -459,7 +461,13 @@ export function pgGrowToStar(arg: number | { target: number; mode: "classic" | "
     // a game build gives them: unpriced, the settle's load snaps them and says so over the star line.
     for (let i = 0; i < 2; i++) {
       const r = s.tower.place("hotelSuite", amenityFloor, left + 48 + i * 12);
-      if (r.ok) Object.assign(s.tower.getUnit(r.unitId), { state: "asleep", rent: ((r: any) => (r.rungs ? r.rungs[2].value : r.default))(g.getCatalog().facilities.find((f: any) => f.key === "hotelSuite").rent) });
+      if (r.ok)
+        Object.assign(s.tower.getUnit(r.unitId), {
+          state: "asleep",
+          rent: ((r: any) => (r.rungs ? r.rungs[2].value : r.default))(
+            g.getCatalog().facilities.find((f: any) => f.key === "hotelSuite").rent,
+          ),
+        });
     }
     s.vipFavorable = true; // stands in for a favorable VIP review
     // A basement stack, laid top-down so each deck rests on the one above:
