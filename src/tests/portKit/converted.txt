@@ -4,27 +4,11 @@
 # engine itself), and `npm run test:port` runs them with the engine required. src/tests/portKit/converted.guard.test.ts keeps this list
 # and the files that use the kit in step.
 src/tests/integration/fire.integration.test.ts
-src/tests/integration/batchPricing.integration.test.ts
-src/tests/integration/milestones.integration.test.ts
-src/tests/integration/nextStarRequirements.integration.test.ts
-src/tests/integration/elevatorStats.integration.test.ts
 src/tests/integration/trafficTeeth.integration.test.ts
 src/tests/integration/onboarding.integration.test.ts
-src/tests/integration/cardVerdicts.integration.test.ts
 src/tests/integration/storageEngineSave.integration.test.ts
 src/tests/integration/traffic.integration.test.ts
 src/tests/integration/heatmap.integration.test.ts
 src/tests/integration/venueOccupancy.integration.test.ts
-src/tests/integration/segmentRoutingMealRush.integration.test.ts
-src/tests/integration/personRoundTripVenueCap.integration.test.ts
-src/tests/integration/attendanceTripwireEngine.integration.test.ts
-src/tests/integration/hotelLateCheckoutEngine.integration.test.ts
-src/tests/integration/faqWeatherEngine.integration.test.ts
-src/tests/integration/retailTalliesEngine.integration.test.ts
-src/tests/integration/cinemaBookingEngine.integration.test.ts
-src/tests/integration/overheadEngine.integration.test.ts
-src/tests/integration/condoRelocationEngine.integration.test.ts
-src/tests/integration/condoModesEngine.integration.test.ts
-src/tests/integration/roomCountsEngine.integration.test.ts
-src/tests/integration/portServiceDiagnostics.integration.test.ts
 src/tests/integration/towerCallItems.integration.test.ts
+src/tests/portKit/portSim.integration.test.ts
