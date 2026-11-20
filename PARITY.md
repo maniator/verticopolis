@@ -59,7 +59,7 @@ other does not.
 
 ## Time, audio, presentation
 - ✅ The 1994 "breathing clock" (presentation only; Steady clock turns it off)
-- ✅ The canon compressed calendar in Classic (`docs/canon/tdt-format.md` §3); Modern may pick a real-world length
+- ✅ The canon compressed calendar in Classic ([tdt-format.md](https://github.com/Verticopolis/engine/blob/main/docs/tdt/tdt-format.md) §3 in Verticopolis/engine); Modern may pick a real-world length
 - ✅ Day and night, lit windows, weather (cosmetic), the crane until floor 100, exterior escape stairs, grand lobbies
 - ✅ Location-aware soundtrack and effects; pan, zoom and pinch
 

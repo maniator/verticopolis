@@ -15,9 +15,9 @@ const SHOP_SUBTYPES = facility("shop").subtypes;
 
 /**
  * Canon tripwire: the engine catalog's values asserted against the 1994
- * original's ground truth. Each block cites its source: a
- * docs/canon/tdt-format.md section where the .TDT save format documents the
- * fact, or the FAQ-derived canon (CLAUDE.md "Canon reference", PARITY.md, or
+ * original's ground truth. Each block cites its source: a section of
+ * tdt-format.md (docs/tdt/ in Verticopolis/engine) where the .TDT save format
+ * documents the fact, or the FAQ-derived canon (CLAUDE.md "Canon reference", PARITY.md, or
  * the sourced comment in engine-rs/src/facilities.rs) where the save format
  * doesn't carry it. If a test here fails, either the change broke canon (fix
  * the change) or canon itself was re-derived from a better source (update the

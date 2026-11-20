@@ -24,8 +24,8 @@ import {
 /**
  * Declarative synthetic `.TDT` byte-buffer builder for the importer tests.
  *
- * Layout facts come from `docs/canon/tdt-format.md`; the same single source
- * of truth the parser reads; so the fixture and the parser can only drift if
+ * Layout facts come from `docs/tdt/tdt-format.md` in Verticopolis/engine, the
+ * same single source of truth the parser reads, so the fixture and the parser can only drift if
  * the doc does. Every buffer is synthesized from scratch: NEVER commit bytes
  * from a real (copyrighted) SimTower save.
  */

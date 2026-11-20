@@ -8,13 +8,13 @@ CI, and you must supply your own game disc.
 
 ## Clean-room boundary (read this)
 
-Verticopolis is a clean-room clone (`docs/canon/tdt-format.md`). The rule is
+Verticopolis is a clean-room clone ([tdt-format.md](https://github.com/Verticopolis/engine/blob/main/docs/tdt/tdt-format.md) in Verticopolis/engine). The rule is
 about **game bytes, not tooling**:
 
 - **Committed here:** a generic Microsoft-KWAJ decompressor (`kwajd.c`, a thin
   libmspack wrapper with no game IP), an ISO extractor, a Wine/Docker harness,
-  and `verify-tdt.py` (just `docs/canon/tdt-format.md` expressed as code; that
-  doc, already in the repo, is far more detailed than any tool here).
+  and `verify-tdt.py` (just the engine's `docs/tdt/tdt-format.md` expressed as
+  code; that doc, already public, is far more detailed than any tool here).
 - **NEVER committed** (gitignored): the ISO, extracted game binaries
   (`gamedata/`), the Wine prefix (`wineprefix/`), manuals, and any `.TDT` the
   real game writes. Test fixtures must be **our own output**, never bytes the
@@ -148,7 +148,7 @@ Each command reads a real save you supply (the ones you made in the game land in
 part and writes DOS 8.3-named files into the same folder as the save, so keep the save in `tools/simtower/saves/` (only our own output; the input is not copied and is never overwritten).
 Then `./run.sh load /wine/drive_c/saves/<NAME>.TDT` for each file and report what the command
 prints under "READ". The owner's PC run of 2026-11-04 answered all four questions; the findings are in
-`docs/canon/tdt-format.md` (sections 5.1, 7 and 9). The commands stay for re-checking a later codec change.
+[tdt-format.md](https://github.com/Verticopolis/engine/blob/main/docs/tdt/tdt-format.md) in Verticopolis/engine (sections 5.1, 7 and 9). The commands stay for re-checking a later codec change.
 
 | Command | Files | Question |
 | --- | --- | --- |
