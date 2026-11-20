@@ -24,6 +24,12 @@ on:
 permissions:
   contents: read
 
+# A newer push or PR update (Dependabot rebases included) cancels the older
+# run for the same PR or branch. Runs on main are kept.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
