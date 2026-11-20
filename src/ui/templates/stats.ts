@@ -48,10 +48,12 @@ export function parkingNeedWords(
   officesShareOneSpace: boolean,
   fmt: (n: number) => string,
 ): string {
+  const count = (n: number, noun: string) => `${fmt(n)} ${noun}${n === 1 ? "" : "s"}`;
   if (officesShareOneSpace) {
-    return `${fmt(d.total)} needed (offices ${fmt(d.offices)} + ${fmt(d.suites)} suite${d.suites === 1 ? "" : "s"})`;
+    return `${fmt(d.total)} needed (offices ${fmt(d.offices)} + ${count(d.suites, "suite")})`;
   }
-  return `${fmt(d.total)} needed (${fmt(d.offices)} offices + ${fmt(d.suites)} suites${d.homes > 0 ? ` + ${fmt(d.homes)} homes` : ""})`;
+  const homes = d.homes > 0 ? ` + ${count(d.homes, "home")}` : "";
+  return `${fmt(d.total)} needed (${count(d.offices, "office")} + ${count(d.suites, "suite")}${homes})`;
 }
 
 /** The screen for a stats report, the port's view and the tower's catalog:
