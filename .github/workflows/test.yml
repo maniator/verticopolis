@@ -55,17 +55,33 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       tests: ${{ steps.filter.outputs.tests }}
       lane: ${{ steps.filter.outputs.lane }}
+      image: ${{ steps.pin.outputs.image }}
     steps:
-      # Only the classifier is needed; a full checkout is not.
+      # Only the classifier and the Playwright pin are needed; a full checkout
+      # is not.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         with:
           persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /.nvmrc
+            /package.json
+            /package-lock.json
             /scripts/pr-lane.ts
             /src/build/prLane.ts
+
+      # The Playwright container tag, from the repository's own Playwright
+      # version, so the browser jobs' Chromium can never drift from the one the
+      # baselines were minted with. container.image is fixed before a job's
+      # steps run, so the tag has to come from an earlier job; it comes from
+      # this one so the browser jobs can start as soon as the lane is known.
+      - id: pin
+        run: |
+          ver=$(jq -r '.packages["node_modules/playwright"].version // empty' package-lock.json)
+          [ -n "$ver" ] || ver=$(jq -r '.devDependencies.playwright' package.json | tr -cd '0-9.')
+          [ -n "$ver" ] || { echo "::error::no Playwright version in package-lock.json or package.json"; exit 1; }
+          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
+          echo "Playwright image: mcr.microsoft.com/playwright:v${ver}-jammy"
 
       - name: Use Node.js (from .nvmrc)
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
@@ -113,61 +129,6 @@ jobs:
           # Past the API's listing limit, the change runs everything.
           [ "$(grep -c '^F ' "$list" || true)" -lt "$limit" ] || full "listing limit reached"
           node scripts/pr-lane.ts "$list" || full "classifier failed"
-
-  # The tooling app (a VC_TOOLING=1 build, which serves the
-  # @verticopolis/engine/tooling package to the browser projects, #1057),
-  # built once and handed to the e2e jobs as a run artifact. npm ci installs
-  # the engine package, which carries the tooling build, so nothing here
-  # compiles Rust.
-  tooling-app:
-    needs: changes
-    # Skipped only on a successful "false" from the filter (prose-only change).
-    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # The npm cache matters here: the browser jobs wait on this job.
-      - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-
-      # Build the tooling app once and share it with both browser jobs.
-      # This artifact carries checksums and source SHA so consumers verify
-      # they are testing an immutable build from this exact commit.
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build tooling app
-        run: npm run build
-        env:
-          VC_TOOLING: "1"
-
-      - name: Pack tooling app
-        shell: bash
-        run: |
-          tar -C dist -czf "$RUNNER_TEMP/tooling-dist.tgz" .
-          (
-            cd "$RUNNER_TEMP"
-            sha256sum tooling-dist.tgz > tooling-dist.tgz.sha256
-          )
-          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/tooling-dist.source-sha"
-
-      - name: Upload tooling app artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: tooling-dist
-          overwrite: true
-          path: |
-            ${{ runner.temp }}/tooling-dist.tgz
-            ${{ runner.temp }}/tooling-dist.tgz.sha256
-            ${{ runner.temp }}/tooling-dist.source-sha
-          if-no-files-found: error
 
   # Lint, typecheck, the build and the change-note check, beside the unit test
   # shards instead of before them. The `test` job below reports this job's
@@ -462,26 +423,6 @@ jobs:
           echo "host suite shards: $SHARDS"
           test "$SHARDS" = success
 
-  # Resolve the Playwright container tag from the repo's own Playwright version so
-  # the e2e jobs' browser can never drift from the one baselines were minted with
-  # the whole basis of a stable visual gate. (container.image is fixed before a
-  # job's steps run, so the tag has to come from a prior job's output.)
-  resolve-image:
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      image: ${{ steps.pin.outputs.image }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - id: pin
-        run: |
-          ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
-          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
-
   # Tier-2 end-to-end smoke: drive the BUILT app in a real browser and prove the
   # TOWER win surfaces (the congratulations modal), plus the visual.spec.ts pixel
   # baselines. Runs INSIDE the pinned Playwright image, the same Chromium build
@@ -490,7 +431,7 @@ jobs:
   # in its own job so the container pull never slows the fast lint/test lane.
   e2e-serial:
     name: e2e-serial
-    needs: [changes, resolve-image, tooling-app]
+    needs: changes
     # Skipped only for a prose-only change; a skipped job counts as passed for
     # the required check. With code changed, a failed engine package or image
     # lookup fails this job instead of skipping it.
@@ -500,7 +441,7 @@ jobs:
     permissions:
       contents: read
     container:
-      image: ${{ needs.resolve-image.outputs.image }}
+      image: ${{ needs.changes.outputs.image }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -516,21 +457,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Download tooling app artifact
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: tooling-dist
-          path: ${{ runner.temp }}/tooling-dist
-
-      - name: Verify and unpack tooling app
-        shell: bash
-        run: |
-          cd "$RUNNER_TEMP/tooling-dist"
-          sha256sum -c tooling-dist.tgz.sha256
-          test "$(< tooling-dist.source-sha)" = "$GITHUB_SHA"
-          rm -rf "$GITHUB_WORKSPACE/dist"
-          mkdir -p "$GITHUB_WORKSPACE/dist"
-          tar -C "$GITHUB_WORKSPACE/dist" -xzf tooling-dist.tgz
+      # The tooling app (a VC_TOOLING=1 build, which serves the
+      # @verticopolis/engine/tooling package to the browser projects, #1057).
+      # Each browser job builds its own from this commit: the build takes
+      # about ten seconds, while a separate build job cost the run a whole
+      # extra wait for a runner before any browser job could start.
+      - name: Build tooling app
+        run: npm run build
+        env:
+          VC_TOOLING: "1"
 
       - name: Run end-to-end tests
         run: npm run e2e -- --project=chromium-serial
@@ -581,7 +516,7 @@ jobs:
     # third 3. The e2e-general-result job below reports the eight shards as one
     # e2e-general check, which is required.
     name: e2e-general (shard ${{ matrix.shard }} of 8)
-    needs: [changes, resolve-image, tooling-app]
+    needs: changes
     # As the e2e-serial job: skipped only for a prose-only change.
     if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
@@ -593,7 +528,7 @@ jobs:
     permissions:
       contents: read
     container:
-      image: ${{ needs.resolve-image.outputs.image }}
+      image: ${{ needs.changes.outputs.image }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -633,21 +568,15 @@ jobs:
           fi
           grep -F "carries test code (src/tests/phoneTier.ts)" canary.log
 
-      - name: Download tooling app artifact
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: tooling-dist
-          path: ${{ runner.temp }}/tooling-dist
-
-      - name: Verify and unpack tooling app
-        shell: bash
-        run: |
-          cd "$RUNNER_TEMP/tooling-dist"
-          sha256sum -c tooling-dist.tgz.sha256
-          test "$(< tooling-dist.source-sha)" = "$GITHUB_SHA"
-          rm -rf "$GITHUB_WORKSPACE/dist"
-          mkdir -p "$GITHUB_WORKSPACE/dist"
-          tar -C "$GITHUB_WORKSPACE/dist" -xzf tooling-dist.tgz
+      # The tooling app (a VC_TOOLING=1 build, which serves the
+      # @verticopolis/engine/tooling package to the browser projects, #1057).
+      # Each browser job builds its own from this commit: the build takes
+      # about ten seconds, while a separate build job cost the run a whole
+      # extra wait for a runner before any browser job could start.
+      - name: Build tooling app
+        run: npm run build
+        env:
+          VC_TOOLING: "1"
 
       # Every shard lists the whole suite with the filters it runs and
       # computes the same split, so each spec file runs on exactly one shard
