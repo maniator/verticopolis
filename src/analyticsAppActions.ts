@@ -211,4 +211,7 @@ export type AppActionName =
   // A tap on the HUD's Traffic readout above Smooth (src/game/trafficHud.ts):
   // the camera went to the floor it names. `detail` `shafts` when the
   // transports behind the reading were found and lit, `none` when not.
-  | "traffic_jump";
+  | "traffic_jump"
+  // A tap on the Map opened a card (src/game/overviewMapCard.ts): `detail`
+  // the Map's view, `eval`, `pricing`, `hotel`, `occupancy` or `traffic`.
+  | "map_card";

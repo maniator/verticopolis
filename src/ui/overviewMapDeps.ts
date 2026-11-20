@@ -4,7 +4,12 @@
  */
 import type { FacilityKind } from "@verticopolis/engine/model/types";
 import type { HallRun } from "@verticopolis/components/render/lobbyHalls";
-import type { MapCamera, MapCameraCenter, MapWorld } from "@verticopolis/components/render/overviewMap/geometry";
+import type {
+  MapCamera,
+  MapCameraCenter,
+  MapLayout,
+  MapWorld,
+} from "@verticopolis/components/render/overviewMap/geometry";
 import type { MapViewInput } from "@verticopolis/components/render/overviewMap/model";
 import type { OverviewMapViews } from "./overviewMapViews";
 
@@ -12,6 +17,16 @@ import type { OverviewMapViews } from "./overviewMapViews";
 export interface OverviewMapSource {
   readonly view: MapViewInput;
   readonly world: MapWorld;
+}
+
+/** A tap on the map, after it moved the view: where it landed, in map
+ *  pixels on `layout`, and how far from a room it may land and still count
+ *  as on it (`reach`, map pixels). */
+export interface MapTap {
+  readonly layout: MapLayout;
+  readonly x: number;
+  readonly y: number;
+  readonly reach: number;
 }
 
 /** The camera fields the window reads, filled in place each frame. */
@@ -35,6 +50,9 @@ export interface OverviewMapDeps {
   isPhone(): boolean;
   /** Where the open or closed choice is kept, or null without storage. */
   readonly storage: Storage | null;
+  /** A tap on the map moved the view (see `MapTap`); the game opens the card
+   *  of what the selected view shows there. */
+  tapped?(tap: MapTap): void;
   /** The views and their dropdown (the game always passes them); without them the window
    *  draws the Edit view alone. */
   readonly views?: OverviewMapViews | null;

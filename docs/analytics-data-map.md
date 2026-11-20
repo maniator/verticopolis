@@ -355,6 +355,18 @@ nothing and sends nothing. Read it against sessions that saw the readout above
 Smooth to tell whether players find the tap. The "Traffic readout taps"
 dashboard tile splits it by `detail`.
 
+## The Map's cards
+
+`app_action` `map_card` counts a click or tap on the Map that opened a card
+(`src/game/overviewMapCard.ts`): the room under the tap, or the nearest room
+within reach, on the Eval, Pricing, Hotel and Occupancy views, and the shaft
+serving the tapped floor nearest the tap on the Traffic view. `detail` is the
+Map's view at the tap: `eval`, `pricing`, `hotel`, `occupancy` or `traffic`.
+A tap on the Edit view, or one that lands near no room (on Traffic, on a floor
+no shaft serves), opens nothing and sends nothing. Read it against sessions
+that opened the Map to tell whether players use the Map to find a room's
+gripe. The "Map card taps" dashboard tile splits it by `detail`.
+
 ## The manual's links to the game
 
 The help site (help.verticopolis.com) reports through the same relay:

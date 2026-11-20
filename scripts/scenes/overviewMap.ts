@@ -7,6 +7,12 @@
  */
 import { type Scene, PHONE } from "../screenshot-env.ts";
 import { buildOverlayTower, buildSplitGapTowers } from "../screenshot-builders.ts";
+import { tapMapColor } from "./mapCardTap.ts";
+
+/** The Eval view's Terrible swatch and the Traffic view's Jammed, Busy and
+ *  Clear swatches (the components' `EVAL_VIEW_STYLE` and `HEAT_VIEW_STYLE`). */
+const TERRIBLE = ["#b01818"];
+const TRAFFIC = ["#d23c3c", "#c27c12", "#2f8f46"];
 
 export const OVERVIEW_MAP_SCENES: Scene[] = [
   // Open air of 2, 3 and 7 tiles between four towers: each gap shows on the
@@ -68,6 +74,37 @@ export const OVERVIEW_MAP_SCENES: Scene[] = [
         setup: async (page) => {
           if (await page.locator("#overview-map").isHidden()) await page.click("#btn-map");
           await page.waitForSelector("#overview-map:not([hidden])");
+        },
+      },
+    ],
+  },
+  // A tap on a red room opens its card (the editor, and on a computer the
+  // hover card naming its main gripe); on Traffic a tap on a floor opens the
+  // nearest passenger shaft's card. No frame: the tap moves the view.
+  {
+    id: "overview-map-cards",
+    outDir: "features",
+    build: buildOverlayTower,
+    assertUnits: 200,
+    shots: [
+      { name: "map-eval-card", mapView: "eval", setup: (page) => tapMapColor(page, TERRIBLE) },
+      { name: "map-traffic-card", mapView: "traffic", setup: (page) => tapMapColor(page, TRAFFIC) },
+    ],
+  },
+  {
+    id: "overview-map-cards-phone",
+    outDir: "features",
+    viewport: PHONE,
+    build: buildOverlayTower,
+    assertUnits: 200,
+    shots: [
+      {
+        name: "map-phone-eval-card",
+        mapView: "eval",
+        setup: async (page) => {
+          if (await page.locator("#overview-map").isHidden()) await page.click("#btn-map");
+          await page.waitForSelector("#overview-map:not([hidden])");
+          await tapMapColor(page, TERRIBLE, true);
         },
       },
     ],

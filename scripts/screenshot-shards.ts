@@ -205,6 +205,10 @@ export const SHARDS: Record<string, string[]> = {
   // the rescue helicopter flying in and spraying; two small frozen towers
   // run by the engine's own ticks; its own shard, as new features get.
   "fire-response": ["fire-guards", "fire-helicopter"],
+  // A tap on the Map opens a card: a Terrible room on Eval (the hover card on
+  // a computer with Inspect held, the room card on a phone) and a jammed floor
+  // on Traffic; its own shard, as new features get.
+  "map-card": ["overview-map-cards", "overview-map-cards-phone"],
   misc: [
     "tablet",
     "mobile",
