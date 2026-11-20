@@ -1,21 +1,23 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, type TemplateResult } from "lit-html";
+import { viewTemplate } from "../testing/litTestUtils";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
+import { render } from "lit-html";
 import type { UI } from "../UI";
 import { ctxDouble } from "./saverTestKit.fixture";
 import { openScreenSaverDialog, type SaverDialogPorts } from "./saverDialog";
 import type { SaverPrefs } from "./saverPrefs";
 
 /** The UI's two modal primitives as spies: opening renders the template into
- *  a box on the page, as `UI.openModalTemplate` does; closing removes it. */
+ *  a box on the page, as `UI.openModal` does; closing removes it. */
 function uiDouble() {
   let box: HTMLElement | null = null;
   const ui = {
-    openModalTemplate: vi.fn((t: TemplateResult) => {
+    openModal: vi.fn((t: ModalView) => {
       box?.remove();
       box = document.createElement("div");
       box.className = "test-modal";
       document.body.append(box);
-      render(t, box);
+      render(viewTemplate(t), box);
       return box;
     }),
     closeModal: vi.fn(() => {
@@ -63,7 +65,7 @@ describe("the Screen Saver dialog", () => {
     expect(b.querySelector<HTMLSelectElement>("#saver-wait")!.value).toBe("5");
     expect(b.querySelector<HTMLInputElement>("#saver-return")!.checked).toBe(true);
     expect(ports.makeScene).toHaveBeenCalledWith("night", 88, 66);
-    expect(ui.openModalTemplate).toHaveBeenCalledWith(expect.anything(), { displaceable: true });
+    expect(ui.openModal).toHaveBeenCalledWith(expect.anything(), { displaceable: true });
   });
 
   it("keeps the choices on OK", () => {

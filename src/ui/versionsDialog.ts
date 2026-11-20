@@ -40,9 +40,9 @@ export function versionWhen(at: number, now = Date.now()): string {
   return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
 }
 
-export function showVersionsDialog(ui: Pick<UI, "openModalTemplate" | "closeModal">, ctx: VersionsCtx): void {
+export function showVersionsDialog(ui: Pick<UI, "openModal" | "closeModal">, ctx: VersionsCtx): void {
   const state = { selected: ctx.versions[0]?.key ?? null, busy: false, line: null as FileNote | null };
-  const box = ui.openModalTemplate(html`<h2>Previous Versions</h2><div class="pv-host"></div>`);
+  const box = ui.openModal({ title: "Previous Versions", body: html`<div class="pv-host"></div>` });
   box.classList.add("pv-window");
   const host = box.querySelector<HTMLElement>(".pv-host")!;
   const picked = () => ctx.versions.find((v) => v.key === state.selected) ?? null;

@@ -1,4 +1,5 @@
-import { iconElement, type IconName } from "@verticopolis/components/windows/icons";
+import type { IconName } from "@verticopolis/components/windows/icons";
+import { iconNode } from "./iconNodes";
 
 /**
  * Inject the static toolbar and transport icons once at boot (issue #721). The
@@ -16,7 +17,7 @@ import { iconElement, type IconName } from "@verticopolis/components/windows/ico
  */
 export function mountToolbarIcons(): void {
   const put = (sel: string, name: IconName, size = 16): void => {
-    document.querySelector(sel)?.prepend(iconElement(name, { size }));
+    document.querySelector(sel)?.prepend(iconNode(name, { size }));
   };
   put(".brand", "brand");
   put(".menubar-brand", "brand"); // the phone menu bar's compact logo
@@ -29,6 +30,6 @@ export function mountToolbarIcons(): void {
   const speed: Partial<Record<string, IconName>> = { "0": "pause", "1": "speed1", "2": "speed2", "3": "speed3" };
   for (const b of document.querySelectorAll<HTMLElement>("#speed button[data-speed]")) {
     const name = speed[b.dataset.speed ?? ""];
-    if (name) b.replaceChildren(iconElement(name, { size: 14 }));
+    if (name) b.replaceChildren(iconNode(name, { size: 14 }));
   }
 }

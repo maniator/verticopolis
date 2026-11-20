@@ -118,7 +118,7 @@ export interface FileDialogResume {
 const carriesFiles = (e: DragEvent): boolean => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
 
 export function showFileDialog(
-  ui: Pick<UI, "openModalTemplate" | "closeModal">,
+  ui: Pick<UI, "openModal" | "closeModal">,
   ctx: FileDialogCtx,
   resume?: FileDialogResume,
 ): void {
@@ -143,9 +143,12 @@ export function showFileDialog(
   const placeFiles = (): readonly TowerFileEntry[] => (inLinked() ? linked!.files() : ctx.files());
   const allowed = (): boolean => !inLinked() || linked!.state()?.access === "granted";
   const placeName = (): string => (inLinked() ? `"${linked!.state()!.name}"` : "My Towers");
-  const box = ui.openModalTemplate(html`<h2>${opening ? "Open" : "Save As"}</h2><div class="fd-host"></div>`, {
-    displaceable: opening,
-  });
+  const box = ui.openModal(
+    { title: opening ? "Open" : "Save As", body: html`<div class="fd-host"></div>` },
+    {
+      displaceable: opening,
+    },
+  );
   const host = box.querySelector<HTMLElement>(".fd-host")!;
   box.classList.add("fd-window");
   let rows: FileRow[] = [];

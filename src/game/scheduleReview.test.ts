@@ -47,7 +47,7 @@ function harness(answer = Float64Array.of(1, 0), reason?: string) {
     engine: () => engine,
     reader: () => reader as unknown as ViewReader,
     kit: () => kit as unknown as CardKit,
-    // Each draw is a fresh dialog box, as `openModalTemplate` makes one per open.
+    // Each draw is a fresh dialog box, as `openModal` makes one per open.
     ui: {
       toast: vi.fn(),
       sayVisibly: vi.fn(),

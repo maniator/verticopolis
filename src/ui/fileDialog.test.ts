@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, type TemplateResult } from "lit-html";
+import { viewTemplate } from "./testing/litTestUtils";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
+import { render } from "lit-html";
 
 const m = vi.hoisted(() => ({ track: vi.fn() }));
 vi.mock("../analytics", () => ({ trackAppAction: m.track }));
@@ -23,7 +25,7 @@ let listeners: (() => void)[];
 let ctx: FileDialogCtx & {
   [K in "open" | "save" | "rename" | "duplicate" | "remove" | "add" | "fromComputer"]: ReturnType<typeof vi.fn>;
 };
-let ui: { openModalTemplate: ReturnType<typeof vi.fn>; closeModal: ReturnType<typeof vi.fn> };
+let ui: { openModal: ReturnType<typeof vi.fn>; closeModal: ReturnType<typeof vi.fn> };
 let box: HTMLElement | null;
 
 function makeCtx(mode: "open" | "saveAs", over: Partial<FileDialogCtx> = {}) {
@@ -68,9 +70,9 @@ beforeEach(() => {
   listeners = [];
   box = null;
   ui = {
-    openModalTemplate: vi.fn((tpl: TemplateResult) => {
+    openModal: vi.fn((tpl: ModalView) => {
       box = document.createElement("div");
-      render(tpl, box);
+      render(viewTemplate(tpl), box);
       document.body.append(box);
       return box;
     }),

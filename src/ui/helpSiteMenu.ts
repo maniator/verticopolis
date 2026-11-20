@@ -4,21 +4,34 @@
  * the game, print), Edit (find, copy this page's link), Options (light, dark
  * or the system's look) and Help (what's new, report a problem, sponsor).
  *
- * The bar's behavior (opening, pointing, the keys) is the game's
- * {@link MenuBar}. This module only says what each item does. Every item
- * carries `data-help-item`, the code a pick reports to analytics
- * (`help_menu_pick`), so the item and its event can never disagree.
+ * The bar's markup and behavior (opening, pointing, the keys) are the
+ * components' {@link MenuBar}, drawn from the model {@link helpMenuModel}
+ * builds. This module only says what each item does. Every item carries
+ * `data-help-item`, the code a pick reports to analytics (`help_menu_pick`),
+ * so the item and its event can never disagree.
  *
- * Cost: nothing runs until someone opens a menu or picks an item.
+ * Cost: the bar is drawn once, and again as Options opens (to check the
+ * current look). Nothing else runs until someone picks an item.
  */
 
 import { MenuBar } from "@verticopolis/components/windows/menuBar";
+import type { MenuBarModel, MenuItemModel } from "@verticopolis/components/windows/menuBar";
 
 /** The looks Starlight's theme switch offers. */
 export type HelpTheme = "light" | "dark" | "auto";
 
+/** The addresses the bar's links go to, from the site's own config. */
+export interface HelpMenuLinks {
+  /** The game (verticopolis.com, or this host in a /help build). */
+  readonly game: string;
+  readonly whatsNew: string;
+  readonly report: string;
+  readonly sponsor: string;
+}
+
 /** What the menu needs from the page around it, so tests can stand in. */
 export interface HelpMenuDeps {
+  readonly links: HelpMenuLinks;
   /** True in a tab the game opened, where the game item goes back to it. */
   readonly fromGame: boolean;
   /** Back to the game that opened this tab (src/ui/fromGame.ts). */
@@ -39,47 +52,87 @@ export interface HelpMenuDeps {
 export const BACK_TO_GAME_LABEL = "Back to Game";
 export const PLAY_LABEL = "Play Verticopolis";
 
-/** The Options item for each look. */
-const THEME_ITEMS: Record<HelpTheme, string> = {
-  light: "theme_light",
-  dark: "theme_dark",
-  auto: "theme_auto",
-};
+/** The look each Options item picks, by its code. */
+const THEME_ITEMS: readonly (readonly [code: string, theme: HelpTheme, label: string])[] = [
+  ["theme_light", "light", "Light"],
+  ["theme_dark", "dark", "Dark"],
+  ["theme_auto", "auto", "Match My Device"],
+];
 
-/** Wire the bar under `root` and return it. */
-export function wireHelpMenu(root: HTMLElement, deps: HelpMenuDeps): MenuBar {
-  const item = (code: string) => root.querySelector<HTMLElement>(`[data-help-item="${code}"]`);
+/** A new tab's link attributes, for the pages off this site. */
+const NEW_TAB = { target: "_blank", rel: "noopener noreferrer" } as const;
 
-  const game = item("game");
-  if (game) {
-    game.textContent = deps.fromGame ? BACK_TO_GAME_LABEL : PLAY_LABEL;
-    if (deps.fromGame) game.addEventListener("click", (e) => deps.backToGame(e));
-  }
-
-  const actions: Record<string, () => void> = {
-    print: () => deps.print(),
-    find: () => deps.openSearch(),
-    copy_link: () => void deps.copyLink(deps.pageUrl()).catch(() => {}),
-    theme_light: () => deps.setTheme("light"),
-    theme_dark: () => deps.setTheme("dark"),
-    theme_auto: () => deps.setTheme("auto"),
-  };
-
-  root.addEventListener("click", (e) => {
-    const picked = (e.target as Element | null)?.closest<HTMLElement>("[data-help-item]");
-    if (!picked || !root.contains(picked)) return;
-    const code = picked.dataset.helpItem ?? "";
-    deps.track(code);
-    actions[code]?.();
+/** The bar for the current look: the Options item for `theme` is checked. */
+export function helpMenuModel(deps: HelpMenuDeps, theme: HelpTheme): MenuBarModel {
+  /** An item that reports its `code` when picked, then runs `run`. */
+  const item = (code: string, label: string, rest: Partial<MenuItemModel> = {}, run?: (e: MouseEvent) => void) => ({
+    label,
+    data: { "help-item": code },
+    onPick: (e: MouseEvent) => {
+      deps.track(code);
+      run?.(e);
+    },
+    ...rest,
   });
+  return {
+    id: "help-menubar",
+    label: "Help menu",
+    className: "help-menubar print:hidden",
+    menus: [
+      {
+        id: "hm-file",
+        label: "File",
+        mnemonic: 0,
+        items: [
+          item(
+            "game",
+            deps.fromGame ? BACK_TO_GAME_LABEL : PLAY_LABEL,
+            { href: deps.links.game },
+            deps.fromGame ? (e) => deps.backToGame(e) : undefined,
+          ),
+          { kind: "separator" },
+          item("print", "Print…", { shortcut: "Ctrl+P" }, () => deps.print()),
+        ],
+      },
+      {
+        id: "hm-edit",
+        label: "Edit",
+        mnemonic: 0,
+        items: [
+          item("find", "Find…", { shortcut: "Ctrl+K" }, () => deps.openSearch()),
+          item("copy_link", "Copy Link to This Page", {}, () => void deps.copyLink(deps.pageUrl()).catch(() => {})),
+        ],
+      },
+      {
+        id: "hm-options",
+        label: "Options",
+        mnemonic: 0,
+        items: THEME_ITEMS.map(([code, look, label]) =>
+          item(code, label, { checked: look === theme, radio: true }, () => deps.setTheme(look)),
+        ),
+      },
+      {
+        id: "hm-help",
+        label: "Help",
+        mnemonic: 0,
+        items: [
+          item("whats_new", "What's New", { href: deps.links.whatsNew }),
+          item("report", "Report a Problem…", { href: deps.links.report, ...NEW_TAB }),
+          { kind: "separator" },
+          item("sponsor", "Sponsor Verticopolis", { href: deps.links.sponsor, ...NEW_TAB }),
+        ],
+      },
+    ],
+  };
+}
 
-  return new MenuBar(root, {
+/** Draw the bar into `host` and return it. Options checks the current look
+ *  each time it opens, since the theme switch can change it meanwhile. */
+export function wireHelpMenu(host: HTMLElement, deps: HelpMenuDeps): MenuBar {
+  const bar: MenuBar = new MenuBar(host, helpMenuModel(deps, deps.theme()), {
     onOpen: (menu) => {
-      const current = deps.theme();
-      for (const [theme, code] of Object.entries(THEME_ITEMS) as Array<[HelpTheme, string]>) {
-        const radio = menu.querySelector(`[data-help-item="${code}"]`);
-        radio?.setAttribute("aria-checked", String(theme === current));
-      }
+      if (menu.id === "hm-options-menu") bar.render(helpMenuModel(deps, deps.theme()));
     },
   });
+  return bar;
 }

@@ -1,4 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { fromGameHref } from "../fromGame";
 import { helpUrl } from "../../helpAddress";
 
@@ -23,9 +24,10 @@ function helpLink(link: { label: string; href: string }): TemplateResult {
   return html`<a href=${fromGameHref(helpUrl(link.href), "welcome")} target="_blank" rel="noopener noreferrer">${link.label}<span class="visually-hidden"> (opens in a new tab)</span></a>`;
 }
 
-export function welcomeModalTemplate(): TemplateResult {
-  return html`
-      <h2>Welcome to Verticopolis™</h2>
+export function welcomeModalTemplate(): ModalView {
+  return {
+    title: "Welcome to Verticopolis™",
+    body: html`
       <p>Build a tower floor by floor, from one lobby to a five-star skyscraper. New here? Good places to start:</p>
       <ul>
         <li>${helpLink(WELCOME_LINKS.firstTower)}</li>
@@ -33,5 +35,6 @@ export function welcomeModalTemplate(): TemplateResult {
       </ul>
       <p>Coming back? There's a new menu bar across the top. ${helpLink(WELCOME_LINKS.whatsNew)}. Thanks for building with us.</p>
       <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" autofocus>OK</button></div>
-    `;
+    `,
+  };
 }

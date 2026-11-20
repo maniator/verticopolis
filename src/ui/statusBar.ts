@@ -1,5 +1,5 @@
 import type { GameMode } from "@verticopolis/engine/model/types";
-import { appendMessageWithIcons } from "@verticopolis/components/windows/icons";
+import { appendMessage } from "./iconNodes";
 import { RULE_SET_NAME } from "./ruleSetName";
 
 /**
@@ -42,6 +42,6 @@ export function showNewsInStatusBar(text: string, doc: Document = document, spea
   // The bulletin's own icon swap: a known leading emoji becomes a pixel icon,
   // and the rest stays text nodes.
   cell.replaceChildren();
-  appendMessageWithIcons(cell, text);
+  appendMessage(cell, text);
   cell.title = text;
 }

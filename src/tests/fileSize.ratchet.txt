@@ -37,7 +37,6 @@ src/tests/perfWorker/analysis.ts
 src/tests/perfWorker/main.ts
 src/tests/perfWorker/runner.ts
 src/ui/Onboarding.ts
-src/ui/UI.ts
 src/ui/desk/deskController.ts
 src/ui/fileDialog.ts
 src/ui/overviewMapWindow.ts

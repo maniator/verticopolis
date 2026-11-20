@@ -6,7 +6,7 @@ import { renderToFragment, click } from "../testing/litTestUtils";
  * The TOWER-achieved congratulations modal body (migrated in the final sweep,
  * the one dialog outside the epic list). Package: the window grammar the modal
  * mount skins (a top-level h2), the celebratory copy, and the Continue action
- * dispatching its inline @click. The controller path (openModalTemplate mount,
+ * dispatching its inline @click. The controller path (openModal mount,
  * ✕/Esc close) is pinned by the congratsTower integration test.
  */
 

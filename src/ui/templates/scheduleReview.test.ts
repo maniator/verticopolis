@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "lit-html";
+import { viewTemplate } from "../testing/litTestUtils";
 import { scheduleReviewEntry, scheduleReviewTemplate, type ReviewRow } from "./scheduleReview";
 
 const flat: ReviewRow = {
@@ -18,7 +19,7 @@ const staggered: ReviewRow = {
 
 const draw = (rows: readonly ReviewRow[]): HTMLElement => {
   const box = document.createElement("div");
-  render(scheduleReviewTemplate(rows), box);
+  render(viewTemplate(scheduleReviewTemplate(rows)), box);
   return box;
 };
 const acts = (el: Element): string[] => [...el.querySelectorAll<HTMLElement>("[data-act]")].map((b) => b.dataset.act!);

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, type TemplateResult } from "lit-html";
-import { renderToFragment } from "./testing/litTestUtils";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
+import { render } from "lit-html";
+import { renderToFragment, viewTemplate } from "./testing/litTestUtils";
 import { WELCOME_LINKS, welcomeModalTemplate } from "./templates/welcome";
 import {
   LAUNCH_FIREWORKS_SEEN_KEY,
@@ -199,7 +200,7 @@ describe("the show", () => {
   }
 
   /** The UI's two modal primitives as spies. Opening renders the template into
-   *  a box inside a dialog, as `UI.openModalTemplate` does; closing empties
+   *  a box inside a dialog, as `UI.openModal` does; closing empties
    *  the dialog, as `UI.closeModal` does. */
   function modalPort() {
     const dialog = document.createElement("dialog");
@@ -207,13 +208,11 @@ describe("the show", () => {
     document.body.append(dialog);
     const box = document.createElement("div");
     const ui = {
-      openModalTemplate: vi.fn(
-        (result: TemplateResult, _opts?: { displaceable?: boolean; onDisplaced?: () => void }) => {
-          render(result, box);
-          dialog.append(box);
-          return box;
-        },
-      ),
+      openModal: vi.fn((result: ModalView, _opts?: { displaceable?: boolean; onDisplaced?: () => void }) => {
+        render(viewTemplate(result), box);
+        dialog.append(box);
+        return box;
+      }),
       wireActions: vi.fn(),
     };
     return { ui, dialog, box, close: () => dialog.replaceChildren() };
@@ -223,8 +222,8 @@ describe("the show", () => {
     stubCanvas();
     const { ui, box } = modalPort();
     showLaunchFireworks({ ui, reducedMotion: true, raf: vi.fn() });
-    expect(ui.openModalTemplate).toHaveBeenCalledTimes(1);
-    expect(ui.openModalTemplate.mock.calls[0]![1]).toMatchObject({ displaceable: true });
+    expect(ui.openModal).toHaveBeenCalledTimes(1);
+    expect(ui.openModal.mock.calls[0]![1]).toMatchObject({ displaceable: true });
     expect(ui.wireActions).toHaveBeenCalledWith(box);
     expect(box.querySelector(":scope > h2")!.textContent).toBe("Welcome to Verticopolis™");
   });
@@ -246,7 +245,7 @@ describe("the show", () => {
     const { ui, dialog } = modalPort();
     const onClosed = vi.fn();
     showLaunchFireworks({ ui, reducedMotion: true, raf: vi.fn(), onClosed });
-    ui.openModalTemplate.mock.calls[0]![1]!.onDisplaced!();
+    ui.openModal.mock.calls[0]![1]!.onDisplaced!();
     dialog.dispatchEvent(new Event("close")); // the replacing dialog closes
     expect(onClosed).not.toHaveBeenCalled();
   });
@@ -298,7 +297,7 @@ describe("the show", () => {
     analytics.trackAppAction.mockClear();
     const { ui, dialog, box } = modalPort();
     showLaunchFireworks({ ui, reducedMotion: true, raf: vi.fn() });
-    ui.openModalTemplate.mock.calls[0]![1]!.onDisplaced!();
+    ui.openModal.mock.calls[0]![1]!.onDisplaced!();
     box.querySelector("a")!.addEventListener("click", (e) => e.preventDefault());
     box.querySelector("a")!.click(); // the replacing dialog's own link, as it were
     dialog.dispatchEvent(new Event("close"));
@@ -412,13 +411,13 @@ describe("the boot call", () => {
     history.replaceState(null, "", "/");
   });
 
-  const port = () => ({ openModalTemplate: vi.fn(() => document.createElement("div")), wireActions: vi.fn() });
+  const port = () => ({ openModal: vi.fn(() => document.createElement("div")), wireActions: vi.fn() });
 
   /** A port whose box sits in a real dialog, so the boot's close hook is wired. */
   function dialogPort() {
     const dialog = document.createElement("dialog");
     const ui = {
-      openModalTemplate: vi.fn(() => {
+      openModal: vi.fn(() => {
         const box = document.createElement("div");
         dialog.replaceChildren(box);
         return box;
@@ -434,12 +433,12 @@ describe("the boot call", () => {
     const { ui, dialog } = dialogPort();
     maybeLaunchFireworks(ui, () => true);
     maybeLaunchFireworks(ui, () => true); // reloaded without closing it
-    expect(ui.openModalTemplate).toHaveBeenCalledTimes(2);
+    expect(ui.openModal).toHaveBeenCalledTimes(2);
     expect(localStorage.getItem(LAUNCH_FIREWORKS_SEEN_KEY)).toBeNull();
     dialog.dispatchEvent(new Event("close"));
     expect(localStorage.getItem(LAUNCH_FIREWORKS_SEEN_KEY)).toBe("1");
     maybeLaunchFireworks(ui, () => true);
-    expect(ui.openModalTemplate).toHaveBeenCalledTimes(2);
+    expect(ui.openModal).toHaveBeenCalledTimes(2);
     localStorage.removeItem(LAUNCH_FIREWORKS_SEEN_KEY);
   });
 
@@ -457,7 +456,7 @@ describe("the boot call", () => {
     const ui = port();
     const reducedMotion = vi.fn(() => true);
     maybeLaunchFireworks(ui, reducedMotion);
-    expect(ui.openModalTemplate).toHaveBeenCalledTimes(1);
+    expect(ui.openModal).toHaveBeenCalledTimes(1);
     expect(reducedMotion).toHaveBeenCalledTimes(1);
   });
 
@@ -466,7 +465,7 @@ describe("the boot call", () => {
     const ui = port();
     const reducedMotion = vi.fn(() => true);
     maybeLaunchFireworks(ui, reducedMotion, true);
-    expect(ui.openModalTemplate).not.toHaveBeenCalled();
+    expect(ui.openModal).not.toHaveBeenCalled();
     expect(reducedMotion).not.toHaveBeenCalled();
     expect(localStorage.getItem(LAUNCH_FIREWORKS_SEEN_KEY)).toBeNull();
   });
@@ -477,7 +476,7 @@ describe("the boot call", () => {
     const ui = port();
     const reducedMotion = vi.fn(() => true);
     maybeLaunchFireworks(ui, reducedMotion);
-    expect(ui.openModalTemplate).not.toHaveBeenCalled();
+    expect(ui.openModal).not.toHaveBeenCalled();
     expect(reducedMotion).not.toHaveBeenCalled();
     localStorage.removeItem(LAUNCH_FIREWORKS_SEEN_KEY);
   });

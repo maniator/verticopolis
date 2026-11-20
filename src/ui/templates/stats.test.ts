@@ -323,7 +323,7 @@ describe("the exterminator row is never a dialog footer", () => {
     // and pinning that would park a button on an opaque band over the sections
     // the player is scrolling through. The components stylesheet pins only a
     // direct child of `.modal-box`; this proves the other half, that the
-    // exterminator row really is nested. `openModalTemplate` makes the modal template's
+    // exterminator row really is nested. `openModal` makes the modal template's
     // TOP-LEVEL nodes the children of `.modal-box`, so "not a top-level node"
     // is exactly "not reachable by that selector".
     const housekeeping = { rooms: 1, crews: 0, maids: 0, dailyCapacity: 0, outOfReach: 0, dirty: 0, infested: 1 };

@@ -1,4 +1,4 @@
-import type { TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import type { UI } from "./UI";
 import { HelpPause, PAUSED_FOR_HELP } from "./helpPause";
 import { aboutTemplate } from "./templates/about";
@@ -121,17 +121,13 @@ interface HelpDialogOpts {
  * starts after, so a render that throws never leaves the tower paused with no
  * dialog to close. Returns the box and its `finish` (close and end the pause).
  */
-function openHelpDialog(
-  ui: UI,
-  result: TemplateResult,
-  opts: HelpDialogOpts = {},
-): { box: HTMLElement; finish: () => void } {
+function openHelpDialog(ui: UI, view: ModalView, opts: HelpDialogOpts = {}): { box: HTMLElement; finish: () => void } {
   const pause = helpPause(ui);
   const dialog = ui.el.modal as HTMLDialogElement;
   const replacing = dialog.open;
   let box!: HTMLElement;
   pause.swap(() => {
-    box = ui.openModalTemplate(result, {
+    box = ui.openModal(view, {
       displaceable: opts.displaceable ?? true,
       onDisplaced: () => pause.displaced(),
     });

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { viewTemplate } from "./testing/litTestUtils";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { render } from "lit-html";
 import { showStarUp } from "./uiStarUp";
 import type { UI } from "./UI";
@@ -17,9 +19,9 @@ function stage() {
   let opts: ModalOpts = {};
   const ui = {
     el: { modal: dialog },
-    openModalTemplate: vi.fn((result, o: ModalOpts = {}) => {
+    openModal: vi.fn((result: ModalView, o: ModalOpts = {}) => {
       opts = o;
-      render(result, dialog);
+      render(viewTemplate(result), dialog);
       return dialog;
     }),
     closeModal: vi.fn(),

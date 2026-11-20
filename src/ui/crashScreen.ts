@@ -1,7 +1,7 @@
 import { downloadFile } from "./downloadFile";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl, type CrashTower } from "../game/crashReport";
 import type { CrashDescription, FrameErrorEntry } from "../game/crashReport";
-import { escapeHtml } from "@verticopolis/components/windows/escape";
+import { html, nothing, render, type TemplateResult } from "lit-html";
 import { readRecoveryText } from "../storage/recoveryCopy";
 import { downloadRecoveryCopy, RECOVERY_COPY_STATUS } from "./recoveryCopy";
 import { GRAPHICS_RECOVERY_ID } from "./graphicsRecovery";
@@ -62,30 +62,33 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
   // Device-distress advice: shown for a rapid double crash AND for a first
   // loss whose in-place recovery failed or timed out (the GPU stayed wedged
   // for seconds, which is the same distress signal by another route).
-  let repeatLine = "";
+  let repeatLine: TemplateResult | typeof nothing = nothing;
   if (opts.crash.repeat)
-    repeatLine = `<p><b>This is the second crash in a row.</b> Closing other tabs or apps before reloading may help.</p>`;
+    repeatLine = html`<p><b>This is the second crash in a row.</b> Closing other tabs or apps before reloading may help.</p>`;
   else if (opts.crash.recoveryFailed)
-    repeatLine = `<p><b>The game tried to restart its graphics and couldn't.</b> Closing other tabs or apps before reloading may help.</p>`;
+    repeatLine = html`<p><b>The game tried to restart its graphics and couldn't.</b> Closing other tabs or apps before reloading may help.</p>`;
 
   const dialog = document.createElement("dialog");
   dialog.id = CRASH_SCREEN_ID;
   dialog.className = "win crash-card";
   dialog.setAttribute("role", "alertdialog");
   dialog.setAttribute("aria-labelledby", "crash-screen-title");
-  dialog.innerHTML = `
+  render(
+    html`
       <h2 id="crash-screen-title" class="win-title">The game crashed</h2>
       <p>The graphics driver reset while the game was running. On phones and tablets this usually means the device ran out of graphics memory, often on a very large tower at the fastest speed.</p>
-      <p>${escapeHtml(saveLine)}</p>
+      <p>${saveLine}</p>
       ${repeatLine}
       <p>A crash report helps us fix this. It's a zip with the crash details and your tower save; nothing is sent anywhere until you attach it to a bug report yourself.</p>
       <p class="crash-status" aria-live="polite"></p>
       <div class="modal-actions">
         <button class="btn" data-act="download">Download crash report</button>
         <button class="btn" data-act="recovery">Download recovery copy</button>
-        <a class="btn" data-act="report" target="_blank" rel="noopener noreferrer" href="${escapeHtml(bugReportUrl({ version: opts.version, crash: opts.crash }))}">Report a bug<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>
+        <a class="btn" data-act="report" target="_blank" rel="noopener noreferrer" href=${bugReportUrl({ version: opts.version, crash: opts.crash })}>Report a bug<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>
         <button class="btn primary" data-act="reload" autofocus>Reload game</button>
-      </div>`;
+      </div>`,
+    dialog,
+  );
   document.body.appendChild(dialog);
   // Escape must not dismiss the card: the game behind it cannot draw, so
   // closing would strand the player on a dead canvas with no controls.

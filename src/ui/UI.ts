@@ -7,8 +7,8 @@ import type { ElevatorSchedule } from "@verticopolis/engine/model/engineTypes";
 import type { CalendarKind } from "@verticopolis/engine/model/engineTypes";
 import type { UpdateInfo } from "../pwa";
 import { downloadFile } from "./downloadFile";
-import { render, type TemplateResult } from "lit-html";
-import { iconElement } from "@verticopolis/components/windows/icons";
+import type { TemplateResult } from "lit-html";
+import { iconNode } from "./iconNodes";
 import { mountToolbarIcons } from "./uiToolbarIcons";
 import type { ReviewRow } from "./templates/scheduleReview";
 import type { BulldozeDragPicker, LobbyHeightPicker } from "./templates/toolInfo";
@@ -22,13 +22,8 @@ import * as status from "./uiStatus";
 import type { HudSource } from "./uiStatus";
 import { buildPalette } from "./uiPalette";
 import { wireBulletinReadBack } from "./bulletinReadBack";
-import {
-  ModalPrecedence,
-  routeNotice,
-  type ModalOpts,
-  type NoticeKind,
-} from "@verticopolis/components/windows/modalPrecedence";
-import { finishModal } from "@verticopolis/components/windows/uiModal";
+import type { ModalOpts, ModalPrecedence, NoticeKind } from "@verticopolis/components/windows/modalPrecedence";
+import { ModalShell, type ModalView } from "@verticopolis/components/windows/uiModal";
 import { isEngineStopped } from "../game/interactionState";
 
 export type Tool =
@@ -246,49 +241,30 @@ export class UI {
 
   // ---- Modal primitives (friend-modules build their dialogs on these) -----
 
-  /** Renders a lit `TemplateResult` into the shared modal with the window
-   *  grammar (see {@link finishModal}). The template renders into a box FRESH
-   *  per open and discarded by closeModal(), so lit's part-cache never shares a
-   *  container across opens: one container, one renderer. render() only touches
-   *  this child box; the dialog itself is only ever cleared via replaceChildren
-   *  (here and in closeModal), never written as HTML. It renders once per open,
-   *  so the ✕ finishModal appends into the rendered h2 is safe; any initial
-   *  focus is the dialog controller's explicit side effect, not this mount's job.
+  /** The shared `<dialog>` every message box opens in: the components'
+   *  window grammar (title bar, ✕, notice line) around a view. Built after
+   *  `el`, whose dialog it takes. @internal friend-module access. */
+  readonly modal = new ModalShell(this.el.modal as HTMLDialogElement, {
+    gameStopped: isEngineStopped,
+    toast: (text, kind) => this.toast(text, kind),
+  });
+
+  /** Open `view` in the shared modal, replacing what it showed, and return
+   *  its box. Every open draws fresh elements; any initial focus is the
+   *  dialog controller's own side effect, not this call's job.
    *  @internal friend-module access (uiDialogs). */
-  openModalTemplate(result: TemplateResult, opts: ModalOpts = {}): HTMLElement {
-    const dialog = this.el.modal as HTMLDialogElement;
-    const displacing = dialog.open;
-    dialog.replaceChildren();
-    // After the clear, before the mount: a notice raised by the broken-leash
-    // path then lands in the INCOMING dialog, not the one being wiped.
-    this.precedence.opening(displacing, opts);
-    const box = document.createElement("div");
-    box.className = "modal-box win win-closable";
-    render(result, box);
-    dialog.appendChild(box);
-    return finishModal(dialog, box, {
-      titleBarClose: (cls, onClick) => this.titleBarClose(cls, onClick),
-      closeModal: () => this.closeModal(),
-      drainNotice: (b) => this.precedence.drainNotice(b),
-      gameStopped: isEngineStopped,
-    });
+  openModal(view: ModalView, opts: ModalOpts = {}): HTMLElement {
+    return this.modal.open(view, opts);
+  }
+
+  /** Redraw the open modal with `view`; lit touches only what changed.
+   *  @internal friend-module access (the dialogs that redraw from state). */
+  renderModal(view: ModalView): void {
+    this.modal.render(view);
   }
 
   closeModal(): void {
-    const dialog = this.el.modal as HTMLDialogElement;
-    const wasOpen = dialog.open;
-    if (wasOpen) dialog.close();
-    dialog.replaceChildren();
-    // The title h2 goes with the wiped content; drop the reference to it too,
-    // so aria-labelledby never dangles at a stale/missing id while the dialog
-    // is closed (finishModal re-sets it fresh on the next open).
-    //
-    // ALL teardown happens before the leash fires. A waiting report re-opens
-    // from inside `closed()`, setting a fresh label on the way in, and tearing
-    // down afterwards would strip the label off the dialog that just opened,
-    // leaving the report with no accessible name.
-    dialog.removeAttribute("aria-labelledby");
-    this.precedence.closed(wasOpen);
+    this.modal.close();
   }
 
   /** Bind click handlers to a dialog's [data-act] buttons. Every lookup is loud
@@ -318,9 +294,11 @@ export class UI {
     return x;
   }
 
-  /** Who may take the shared dialog; rules in `./modalPrecedence`.
-   *  @internal friend-module access (uiDialogs). */
-  precedence = new ModalPrecedence();
+  /** Who may take the shared dialog; rules in the components'
+   *  `modalPrecedence`. @internal friend-module access (uiDialogs). */
+  get precedence(): ModalPrecedence {
+    return this.modal.precedence;
+  }
 
   /** Say something that must reach the player even when a dialog is up.
    *
@@ -334,7 +312,7 @@ export class UI {
    *  Only `kind` "bad" is styled and announced as an error (calm good news, #785).
    *  @internal friend-module access (uiDialogs / saveLoad / uiImport / frameLoop / exportFlow). */
   sayVisibly(text: string, kind: NoticeKind = "bad", again = true): void {
-    routeNotice(this.el.modal as HTMLDialogElement, this.precedence, text, (t) => this.toast(t, kind), again, kind);
+    this.modal.say(text, again, kind);
   }
 
   /** True while any modal is on screen (the shared `<dialog>` is open). Callers
@@ -347,7 +325,7 @@ export class UI {
 
   /** Topbar mute glyph, set by toggleMute for every caller so all views agree (SPEC-splash-mute CAP-2). */
   setAudioGlyph(muted: boolean): void {
-    this.el.audioToggle.replaceChildren(iconElement(muted ? "mute" : "sound"));
+    this.el.audioToggle.replaceChildren(iconNode(muted ? "mute" : "sound"));
     this.el.audioToggle.setAttribute("aria-pressed", String(muted));
   }
 

@@ -1,4 +1,5 @@
-import { html, type TemplateResult } from "lit-html";
+import { html } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import type { UI } from "../UI";
 import { SCHEMES, SCHEME_NAMES, type SchemeId } from "./appearancePrefs";
 
@@ -20,9 +21,10 @@ export interface AppearanceHandlers {
   onCancel(): void;
 }
 
-export function appearanceTemplate(picked: SchemeId, h: AppearanceHandlers): TemplateResult {
-  return html`
-    <h2>Appearance</h2>
+export function appearanceTemplate(picked: SchemeId, h: AppearanceHandlers): ModalView {
+  return {
+    title: "Appearance",
+    body: html`
     <fieldset class="appearance-group">
       <legend>Scheme</legend>
       <div class="appearance-samples" role="radiogroup" aria-label="Scheme">
@@ -45,7 +47,8 @@ export function appearanceTemplate(picked: SchemeId, h: AppearanceHandlers): Tem
       <button class="btn primary" data-appearance="ok" @click=${h.onOk}>OK</button>
       <button class="btn" data-appearance="cancel" @click=${h.onCancel}>Cancel</button>
     </div>
-  `;
+  `,
+  };
 }
 
 /** Open the dialog with `current` picked. `save` hears OK with the pick. */
@@ -61,6 +64,6 @@ export function openAppearanceDialog(ui: UI, current: SchemeId, save: (id: Schem
     },
     onCancel: () => ui.closeModal(),
   };
-  const box = ui.openModalTemplate(appearanceTemplate(picked, handlers), { displaceable: true });
+  const box = ui.openModal(appearanceTemplate(picked, handlers), { displaceable: true });
   box.querySelector<HTMLInputElement>(`input[value="${current}"]`)?.focus();
 }

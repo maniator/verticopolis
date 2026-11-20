@@ -1,5 +1,6 @@
 import type { GameApp } from "../main";
-import { MenuBar } from "@verticopolis/components/windows/menuBar";
+import { MenuBar, type MenuBarOptions } from "@verticopolis/components/windows/menuBar";
+import { gameMenuModel } from "./menuModel";
 import { MovableWindow, WITHIN_PARENT } from "@verticopolis/components/windows/movableWindow";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../ui/paletteCollapse";
@@ -27,8 +28,8 @@ import { firstDragReporter, reportWindowClose } from "./movableWindows";
 import { deskActive } from "../ui/desk/deskController";
 
 /**
- * The menu bar's commands (index.html `#menubar`, behavior in
- * `ui/menuBar.ts`). The items whose ids predate the bar (btn-new,
+ * The menu bar's commands. The components' MenuBar draws the bar from
+ * `gameMenuModel` (menuModel.ts) into index.html's `#menubar-host`. The items whose ids predate the bar (btn-new,
  * btn-settings, btn-stats, btn-help, btn-about, btn-install-menu) keep the
  * click handlers `UI.wireControls` gives them; this wires the rest: Quick
  * Save, Close, Import, Export, Undo and Redo, Rename, Call Fire Rescue, Call
@@ -158,14 +159,67 @@ function grayLike(id: string, twin: Element | null): void {
   else item.removeAttribute("aria-disabled");
 }
 
-/** Wire the menu bar once; a page without it, or a second call, does nothing. */
+/** A bar {@link drawMenuBar} drew, and the hooks {@link wireMenus} gives it. */
+interface DrawnBar {
+  readonly bar: MenuBar;
+  hooks: Pick<MenuBarOptions, "onTrip" | "onDismiss" | "onOpen">;
+}
+
+/** The bar drawn into each host, so the boot flow wires the one main drew. */
+const drawnBars = new WeakMap<HTMLElement, DrawnBar>();
+
+/** Draw the menu bar into index.html's `#menubar-host`, once. The game draws
+ *  it before the UI is built, since the UI and the boot flow wire its items
+ *  by id; until {@link wireMenus} runs, a menu opens with nothing to refresh
+ *  and reports nothing. A page without the host, or a second call, draws
+ *  nothing. */
+export function drawMenuBar(doc: Document = document): MenuBar | null {
+  const host = doc.getElementById("menubar-host");
+  if (!host || drawnBars.has(host)) return null;
+  const sponsorUrl = sponsorOffered() ? SPONSOR_URL : null;
+  const onSponsor = () => trackAppAction("sponsor_click", "menu");
+  const drawn: DrawnBar = {
+    hooks: {},
+    bar: new MenuBar(host, gameMenuModel({ sponsorUrl, onSponsor }), {
+      onTrip: (title, via) => drawn.hooks.onTrip?.(title, via),
+      onDismiss: (title, how, browsed) => drawn.hooks.onDismiss?.(title, how, browsed),
+      onOpen: (menu) => drawn.hooks.onOpen?.(menu),
+    }),
+  };
+  drawnBars.set(host, drawn);
+  return drawn.bar;
+}
+
+/** Wire the bar {@link drawMenuBar} drew, once; a page without it, or a
+ *  second call, does nothing. */
 export function wireMenus(app: GameApp): MenuBar | null {
-  const root = document.getElementById("menubar");
+  const host = document.getElementById("menubar-host");
+  const drawn = host ? drawnBars.get(host) : undefined;
   const stage = document.getElementById("stage");
-  if (!root || !stage || root.dataset.wired) return null;
-  root.dataset.wired = "1";
+  if (!host || !drawn || !stage || host.dataset.wired) return null;
+  host.dataset.wired = "1";
+  const root: HTMLElement = host;
   const ui = app.ui;
   const storage = browserStorage();
+  // The same test Settings uses (`isSplashUp`): the title screen is up while
+  // its element is on the page, whatever body class a removal left behind.
+  const titleScreenUp = isSplashUp;
+  const screen = (): MenuScreen => (titleScreenUp() ? "title" : "tower");
+
+  const bar = drawn.bar;
+  // The bar's hooks: the analytics of a trip, and the items' states read as
+  // a menu opens.
+  drawn.hooks = {
+    onTrip: (title, via) => {
+      const menu = menuNameOf(title.id);
+      if (menu) trackMenuOpen({ menu, via, screen: screen() });
+    },
+    onDismiss: (title, how, browsed) => {
+      const menu = menuNameOf(title.id);
+      if (menu) trackMenuDismiss({ menu, how, screen: screen(), browsed });
+    },
+    onOpen: (menu) => fitMenus(menu),
+  };
 
   // Tower Info and Bulletin. A phone starts both closed.
   const onPhone = app.mobileMq?.matches ?? false;
@@ -241,12 +295,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
   // Help.
   on("mb-compare", () => ui.showCompare());
   on("mb-replay", () => ui.cb.onReplayOnboarding());
-  wireSponsor();
 
-  // The same test Settings uses (`isSplashUp`): the title screen is up while
-  // its element is on the page, whatever body class a removal left behind.
-  const titleScreenUp = isSplashUp;
-  const screen = (): MenuScreen => (titleScreenUp() ? "title" : "tower");
   // The title screen is a child of the body with a body class of its own
   // (ui/Onboarding.ts): the bar follows either one changing at once, not
   // only when a menu next opens. The callback is a lookup and ten
@@ -282,7 +331,8 @@ export function wireMenus(app: GameApp): MenuBar | null {
     },
     true,
   );
-  keepMenuBarHeight(root);
+  const nav = host.querySelector<HTMLElement>(".menubar");
+  if (nav) keepMenuBarHeight(nav);
 
   /** One `menu_pick`, while a menu is open (a script's click is not a pick). */
   function reportPick(item: HTMLElement, e: MouseEvent): void {
@@ -310,61 +360,52 @@ export function wireMenus(app: GameApp): MenuBar | null {
     if (!grayed) trackAppAction("file_key", FILE_KEY_DETAIL[command]);
   }
 
-  const bar = new MenuBar(root, {
-    onTrip: (title, via) => {
-      const menu = menuNameOf(title.id);
-      if (menu) trackMenuOpen({ menu, via, screen: screen() });
-    },
-    onDismiss: (title, how, browsed) => {
-      const menu = menuNameOf(title.id);
-      if (menu) trackMenuDismiss({ menu, how, screen: screen(), browsed });
-    },
-    onOpen: (menu) => {
-      if (menu.id === "mb-file-menu") fillRecentMenu();
-      check("mb-win-tools", !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS));
-      check("mb-win-map", overviewMapOpen(app));
-      for (const w of floating) check(w.item, !!w.win && !w.win.hidden);
-      check("mb-win-statusbar", !document.body.classList.contains(STATUS_BAR_HIDDEN_CLASS));
-      check("mb-fullscreen", !!document.fullscreenElement);
-      // The installed app on a phone is not offered Full Screen (fullScreenItem.ts).
-      fitFullScreenItem(app.mobileMq?.matches ?? false);
-      check("mb-sound", !ui.cb.isMuted());
-      grayLike("mb-undo", ui.el.undo);
-      grayLike("mb-redo", ui.el.redo);
-      const noTower = titleScreenUp();
-      fitToScreen(noTower);
-      // A tower the game stopped on cannot be saved, so it cannot be closed either.
-      // Nor can it be opened over, saved or saved as (the File keys refuse them too).
-      const stopped = isEngineStopped();
-      for (const id of ENGINE_FILE_ITEMS) {
-        if (stopped) document.getElementById(id)?.setAttribute("aria-disabled", "true");
-        else document.getElementById(id)?.removeAttribute("aria-disabled");
-      }
-      // Fire Rescue and the exterminator, read from the engine only as the
-      // Tower menu opens (towerCallItems.ts). A stopped engine answers
-      // nothing, so both stay grayed.
-      if (menu.id === "mb-tower-menu" && !noTower) {
-        let calls: TowerCalls = { fireRescue: false, exterminator: null };
-        if (!stopped) {
-          try {
-            calls = towerCalls(app);
-          } catch {
-            // An engine that cannot answer leaves both grayed; the calls
-            // themselves would refuse anyway.
-          }
+  /** Read the menus' check marks, grayed and hidden items as `menu` opens. */
+  function fitMenus(menu: HTMLElement): void {
+    if (menu.id === "mb-file-menu") fillRecentMenu();
+    check("mb-win-tools", !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS));
+    check("mb-win-map", overviewMapOpen(app));
+    for (const w of floating) check(w.item, !!w.win && !w.win.hidden);
+    check("mb-win-statusbar", !document.body.classList.contains(STATUS_BAR_HIDDEN_CLASS));
+    check("mb-fullscreen", !!document.fullscreenElement);
+    // The installed app on a phone is not offered Full Screen (fullScreenItem.ts).
+    fitFullScreenItem(app.mobileMq?.matches ?? false);
+    check("mb-sound", !ui.cb.isMuted());
+    grayLike("mb-undo", ui.el.undo);
+    grayLike("mb-redo", ui.el.redo);
+    const noTower = titleScreenUp();
+    fitToScreen(noTower);
+    // A tower the game stopped on cannot be saved, so it cannot be closed either.
+    // Nor can it be opened over, saved or saved as (the File keys refuse them too).
+    const stopped = isEngineStopped();
+    for (const id of ENGINE_FILE_ITEMS) {
+      if (stopped) document.getElementById(id)?.setAttribute("aria-disabled", "true");
+      else document.getElementById(id)?.removeAttribute("aria-disabled");
+    }
+    // Fire Rescue and the exterminator, read from the engine only as the
+    // Tower menu opens (towerCallItems.ts). A stopped engine answers
+    // nothing, so both stay grayed.
+    if (menu.id === "mb-tower-menu" && !noTower) {
+      let calls: TowerCalls = { fireRescue: false, exterminator: null };
+      if (!stopped) {
+        try {
+          calls = towerCalls(app);
+        } catch {
+          // An engine that cannot answer leaves both grayed; the calls
+          // themselves would refuse anyway.
         }
-        showTowerCalls(calls);
       }
-      // The Tools fold exists on the desktop layout only, and in a tower.
-      const tools = document.getElementById("mb-win-tools");
-      // On the 1994 desk Tools never folds; its Window menu brings it up.
-      if (tools) tools.hidden = noTower || !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent;
-      // Install app's separator shows with it (installAffordance.ts shows the item).
-      const install = document.getElementById("btn-install-menu");
-      const installSep = root.querySelector<HTMLElement>(".mb-install-sep");
-      if (installSep) installSep.hidden = !install || install.hidden;
-    },
-  });
+      showTowerCalls(calls);
+    }
+    // The Tools fold exists on the desktop layout only, and in a tower.
+    const tools = document.getElementById("mb-win-tools");
+    // On the 1994 desk Tools never folds; its Window menu brings it up.
+    if (tools) tools.hidden = noTower || !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent;
+    // Install app's separator shows with it (installAffordance.ts shows the item).
+    const install = document.getElementById("btn-install-menu");
+    const installSep = root.querySelector<HTMLElement>(".mb-install-sep");
+    if (installSep) installSep.hidden = !install || install.hidden;
+  }
   return bar;
 }
 
@@ -375,18 +416,6 @@ function keepMenuBarHeight(root: HTMLElement): void {
   const write = () => document.documentElement.style.setProperty("--menubar-h", `${root.offsetHeight}px`);
   write();
   if (typeof ResizeObserver === "function") new ResizeObserver(write).observe(root);
-}
-
-/** The Help menu's Sponsor item: the splash's tip jar link (owner,
- *  2026-11-14), the same address, left out of the Android app for the same
- *  reason (`sponsorOffered`). A tap counts as `sponsor_click` from `menu`. */
-function wireSponsor(): void {
-  const link = document.getElementById("mb-sponsor");
-  if (!(link instanceof HTMLAnchorElement)) return;
-  link.hidden = !sponsorOffered();
-  if (link.hidden) return;
-  link.href = SPONSOR_URL;
-  link.addEventListener("click", () => trackAppAction("sponsor_click", "menu"));
 }
 
 /** What the Full Screen item says on a browser that cannot fill the screen

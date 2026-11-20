@@ -5,7 +5,7 @@ import { HudTower, pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../engineHost/towerCatalog";
 import { catalogFor } from "../catalogFixture";
 import { html, type TemplateResult } from "lit-html";
-import { finishModal, MODAL_TITLE_ID } from "@verticopolis/components/windows/uiModal";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import type { UI } from "../../ui/UI";
 import { openImport } from "../../ui/uiImport";
 import { mountAppDom, makeUI } from "../uiFixture";
@@ -75,7 +75,7 @@ vi.mock("../../ui/uiStatus", async (importOriginal) => {
  *  - titleBarClose: every DOM-built ✕ comes from the one shared recipe —
  *    a real <button> with classes "btn xs", aria-label "Close", ✕ glyph — so
  *    the modal ✕ and the inspector ✕ can't drift apart again.
- *  - openModalTemplate: the window grammar (.modal-box.win box, top-level h2 becomes
+ *  - openModal: the window grammar (.modal-box.win box, top-level h2 becomes
  *    the .win-title bar, nested h2s are never skinned), the ✕ is appended
  *    AFTER showModal so it's the title bar's last child (keyboard focus lands
  *    on the primary action, not on ✕), and the ✕ routes through the dialog's
@@ -135,7 +135,7 @@ describe("wireActions — the anti-dead-button contract", () => {
     expect(dialog().open).toBe(true);
     click('[data-act="close"]');
     expect(dialog().open).toBe(false);
-    expect(dialog().innerHTML).toBe(""); // closeModal also empties the dialog
+    expect(dialog().children).toHaveLength(0); // closeModal also empties the dialog
   });
 
   it("binds the schedule review's buttons, and puts focus where the caller asks (#1548)", () => {
@@ -236,7 +236,7 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
 
   it("the inspector ✕ survives a same-card lit re-render, is never duplicated, and STAYS LIVE", () => {
     // Hover picks re-render the card every move; the ✕ is a foreign node
-    // appended after the h4's lit-managed content (the finishModal pattern),
+    // appended after the h4's lit-managed content,
     // so it must survive a same-shape re-render, and a re-show must not
     // append a second one. The legacy innerHTML path minted a fresh button
     // on every show; the retained button changes that lifecycle, so pin that
@@ -267,23 +267,23 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
   });
 });
 
-describe("openModalTemplate — the window grammar", () => {
-  // openModalTemplate is private but is THE window factory; its return value and
-  // skinning rules are the contract every show* method builds on.
-  const open = (ui: UI, content: TemplateResult): HTMLElement => (ui as any).openModalTemplate(content);
+describe("openModal — the window grammar", () => {
+  // openModal is THE window factory; its return value and the window grammar
+  // around a view are the contract every show* method builds on.
+  const open = (ui: UI, view: ModalView): HTMLElement => ui.openModal(view);
 
   it("wraps content in .modal-box.win and returns that box", () => {
     const { ui } = makeUI();
-    const box = open(ui, html`<h2>Title</h2><p>body</p>`);
+    const box = open(ui, { title: "Title", body: html`<p>body</p>` });
     expect(box).toBe(dialog().firstElementChild);
     expect(box.classList.contains("modal-box")).toBe(true);
     expect(box.classList.contains("win")).toBe(true);
     expect(dialog().open).toBe(true);
   });
 
-  it("skins only the TOP-LEVEL h2 as .win-title — an h2 nested in body content is untouched", () => {
+  it("draws the title bar as .win-title; an h2 inside the body is untouched", () => {
     const { ui } = makeUI();
-    const box = open(ui, html`<h2>Window Title</h2><div><h2>Section heading</h2></div>`);
+    const box = open(ui, { title: "Window Title", body: html`<div><h2>Section heading</h2></div>` });
     const [title, nested] = [...box.querySelectorAll("h2")];
     expect(title.classList.contains("win-title")).toBe(true);
     expect(nested.classList.contains("win-title")).toBe(false);
@@ -292,7 +292,7 @@ describe("openModalTemplate — the window grammar", () => {
 
   it("points the dialog's aria-labelledby at the title-text span, so a screen reader announces which dialog opened", () => {
     const { ui } = makeUI();
-    const box = open(ui, html`<h2>Window Title</h2><p>body</p>`);
+    const box = open(ui, { title: "Window Title", body: html`<p>body</p>` });
     const labelId = dialog().getAttribute("aria-labelledby");
     expect(labelId).toBeTruthy();
     const title = box.querySelector(":scope > h2")!;
@@ -303,11 +303,11 @@ describe("openModalTemplate — the window grammar", () => {
   });
 
   it("excludes the ✕ button from the accessible name: the labeled span carries the title text alone", () => {
-    // Regression guard: finishModal used to label the h2 itself, and the ✕
-    // is appended into that same h2, so a screen reader announced the title
+    // Regression guard: the modal once labeled the h2 itself, and the ✕
+    // sits in that same h2, so a screen reader announced the title
     // plus the ✕'s own accessible name ("Close"), e.g. "Settings Close".
     const { ui } = makeUI();
-    open(ui, html`<h2>Settings</h2><p>body</p>`);
+    open(ui, { title: "Settings", body: html`<p>body</p>` });
     const labelId = dialog().getAttribute("aria-labelledby")!;
     const titleSpan = document.getElementById(labelId)!;
     expect(titleSpan.textContent).toContain("Settings");
@@ -317,35 +317,15 @@ describe("openModalTemplate — the window grammar", () => {
 
   it("never labels the dialog with a nested (non-title-bar) h2", () => {
     const { ui } = makeUI();
-    open(ui, html`<h2>Window Title</h2><div><h2>Section heading</h2></div>`);
+    open(ui, { title: "Window Title", body: html`<div><h2>Section heading</h2></div>` });
     const labelId = dialog().getAttribute("aria-labelledby")!;
     expect(document.getElementById(labelId)!.textContent).toContain("Window Title");
     expect(document.getElementById(labelId)!.textContent).not.toContain("Section heading");
   });
 
-  it("leaves a caller-supplied h2 id untouched; aria-labelledby points at the title-text span, not the caller id", () => {
-    const { ui } = makeUI();
-    open(ui, html`<h2 id="custom-title-id">Titled</h2><p>body</p>`);
-    const title = dialog().querySelector<HTMLElement>("h2.win-title")!;
-    expect(title.id).toBe("custom-title-id"); // caller id preserved, never read or overwritten
-    const labelId = dialog().getAttribute("aria-labelledby");
-    expect(labelId).not.toBe("custom-title-id");
-    expect(labelId).toBe("verticopolis-modal-title"); // the shared MODAL_TITLE_ID, stamped on the span
-    const titleSpan = document.getElementById(labelId!)!;
-    expect(titleSpan.tagName).toBe("SPAN");
-    expect(titleSpan.parentElement).toBe(title); // nested inside the caller's own h2
-    expect(titleSpan.textContent).toContain("Titled");
-  });
-
-  it("clears aria-labelledby rather than leaving it dangling when a modal renders no top-level h2", () => {
-    const { ui } = makeUI();
-    open(ui, html`<p>no title here</p>`);
-    expect(dialog().hasAttribute("aria-labelledby")).toBe(false);
-  });
-
   it("appends exactly one ✕, as the LAST child of the title bar (focus lands on the primary action, not ✕)", () => {
     const { ui } = makeUI();
-    const box = open(ui, html`<h2>Title</h2><button class="btn primary" data-act="close">OK</button>`);
+    const box = open(ui, { title: "Title", body: html`<button class="btn primary" data-act="close">OK</button>` });
     const title = box.querySelector(":scope > h2")!;
     const xs = box.querySelectorAll(".modal-x");
     expect(xs.length).toBe(1);
@@ -354,7 +334,7 @@ describe("openModalTemplate — the window grammar", () => {
 
   it("✕ routes through the dialog's cancel path (a cancelable cancel event), not closeModal directly", () => {
     const { ui } = makeUI();
-    open(ui, html`<h2>Title</h2>`);
+    open(ui, { title: "Title", body: html`` });
     // Steal the cancel path the way showEventChoice does. If ✕ called
     // closeModal() directly, this handler would be bypassed and the dialog
     // would close anyway.
@@ -370,18 +350,18 @@ describe("openModalTemplate — the window grammar", () => {
 
   it("with the default cancel handler, ✕ and Esc (cancel) both close the modal", () => {
     const { ui } = makeUI();
-    open(ui, html`<h2>Title</h2>`);
+    open(ui, { title: "Title", body: html`` });
     click(".modal-x");
     expect(dialog().open).toBe(false);
 
-    open(ui, html`<h2>Title</h2>`);
+    open(ui, { title: "Title", body: html`` });
     dialog().dispatchEvent(new Event("cancel", { cancelable: true })); // what Esc produces
     expect(dialog().open).toBe(false);
   });
 
   it("a backdrop click (target === dialog) closes the modal", () => {
     const { ui } = makeUI();
-    open(ui, html`<h2>Title</h2>`);
+    open(ui, { title: "Title", body: html`` });
     dialog().click();
     expect(dialog().open).toBe(false);
   });
@@ -412,7 +392,7 @@ describe("openModalTemplate — the window grammar", () => {
     const { ui } = makeUI();
     const onResolve = vi.fn();
     ui.showEventChoice("A fire has broken out!", "$50,000", onResolve);
-    // showEventChoice overrides finishModal's default backdrop handler with its
+    // showEventChoice overrides the modal's default backdrop handler with its
     // own decline path; fire a backdrop click (target === the dialog itself).
     dialog().click();
     expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
@@ -442,10 +422,10 @@ describe("openModalTemplate — the window grammar", () => {
   });
 });
 
-describe("openModalTemplate — the lit mount path shares the window grammar", () => {
-  it("wraps a template in .modal-box.win, skins the top-level h2, and shows the dialog", () => {
+describe("openModal: every dialog wears the window grammar", () => {
+  it("draws a view in .modal-box.win under its title bar, and shows the dialog", () => {
     const { ui } = makeUI();
-    const box = ui.openModalTemplate(html`<h2>Title</h2><p>body</p>`);
+    const box = ui.openModal({ title: "Title", body: html`<p>body</p>` });
     expect(box.classList.contains("modal-box")).toBe(true);
     expect(box.classList.contains("win")).toBe(true);
     expect(box.querySelector(":scope > h2")!.classList.contains("win-title")).toBe(true);
@@ -454,7 +434,7 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
 
   it("appends exactly one ✕ as the LAST child of the title bar, with the shared recipe", () => {
     const { ui } = makeUI();
-    const box = ui.openModalTemplate(html`<h2>Title</h2><button class="btn primary">OK</button>`);
+    const box = ui.openModal({ title: "Title", body: html`<button class="btn primary">OK</button>` });
     const title = box.querySelector(":scope > h2")!;
     const xs = box.querySelectorAll<HTMLButtonElement>(".modal-x");
     expect(xs.length).toBe(1);
@@ -465,7 +445,7 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
 
   it("the ✕ closes through the dialog's cancel path", () => {
     const { ui } = makeUI();
-    ui.openModalTemplate(html`<h2>Title</h2>`);
+    ui.openModal({ title: "Title", body: html`` });
     expect(dialog().open).toBe(true);
     click(".modal-x");
     expect(dialog().open).toBe(false);
@@ -473,16 +453,16 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
 
   it("Esc/cancel closes the template modal", () => {
     const { ui } = makeUI();
-    ui.openModalTemplate(html`<h2>Title</h2>`);
+    ui.openModal({ title: "Title", body: html`` });
     dialog().dispatchEvent(new Event("cancel", { cancelable: true }));
     expect(dialog().open).toBe(false);
   });
 
   it("renders a fresh box per open: reopening leaves exactly one box and one ✕", () => {
     const { ui } = makeUI();
-    ui.openModalTemplate(html`<h2>First</h2>`);
+    ui.openModal({ title: "First", body: html`` });
     ui.closeModal();
-    const box2 = ui.openModalTemplate(html`<h2>Second</h2>`);
+    const box2 = ui.openModal({ title: "Second", body: html`` });
     expect(dialog().querySelectorAll(".modal-box").length).toBe(1);
     expect(dialog().querySelectorAll(".modal-x").length).toBe(1);
     expect(box2.querySelector(":scope > h2")!.textContent).toContain("Second");
@@ -490,7 +470,7 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
 
   it("wires aria-labelledby to the title-text span for the lit mount path too", () => {
     const { ui } = makeUI();
-    const box = ui.openModalTemplate(html`<h2>Set all offices</h2><p>body</p>`);
+    const box = ui.openModal({ title: "Set all offices", body: html`<p>body</p>` });
     const labelId = dialog().getAttribute("aria-labelledby");
     expect(labelId).toBeTruthy();
     const title = box.querySelector(":scope > h2")!;
@@ -502,14 +482,14 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
 
   it("relabels cleanly on close/reopen: same shared id, no dangling reference while closed, no duplicate ids", () => {
     const { ui } = makeUI();
-    ui.openModalTemplate(html`<h2>First</h2>`);
+    ui.openModal({ title: "First", body: html`` });
     const firstId = dialog().getAttribute("aria-labelledby");
     expect(firstId).toBeTruthy();
 
     ui.closeModal();
     expect(dialog().hasAttribute("aria-labelledby")).toBe(false); // nothing visible to dangle a reference to
 
-    ui.openModalTemplate(html`<h2>Second</h2>`);
+    ui.openModal({ title: "Second", body: html`` });
     const secondId = dialog().getAttribute("aria-labelledby");
     expect(secondId).toBe(firstId); // the shared id is reused, now naming the new title
     expect(document.getElementById(secondId!)!.textContent).toContain("Second");
@@ -517,58 +497,20 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
   });
 
   it("opens no modal over the engine-failure message, through the real UI wiring", () => {
-    // UI hands finishModal `isEngineStopped`; a late modal (an import report
+    // UI hands the modal `isEngineStopped`; a late modal (an import report
     // finishing after the stop) would cover the message's Reload button.
     const { ui } = makeUI();
     const failure = document.createElement("div");
     failure.id = "engine-failure";
     document.body.appendChild(failure);
     try {
-      ui.openModalTemplate(html`<h2>Import report</h2><p>body</p>`);
+      ui.openModal({ title: "Import report", body: html`<p>body</p>` });
       expect(dialog().open).toBe(false);
     } finally {
       failure.remove();
     }
-    ui.openModalTemplate(html`<h2>Import report</h2><p>body</p>`);
+    ui.openModal({ title: "Import report", body: html`<p>body</p>` });
     expect(dialog().open).toBe(true);
-  });
-
-  it("stays idempotent if finishModal ever ran twice over the same rendered title bar, without wiping the DOM in between", () => {
-    // Regression guard (Copilot review on #405): finishModal's `while
-    // (h2.firstChild) …` used to move EVERY child of the h2, including a ✕
-    // appended by an earlier run, into a freshly nested span. A second call
-    // on the same title bar should reuse the existing span and leave the ✕
-    // where it is instead of nesting spans or folding "Close" into the
-    // accessible name.
-    const { ui } = makeUI();
-    const box = ui.openModalTemplate(html`<h2>Settings</h2><p>body</p>`);
-    const dlg = dialog();
-
-    // Drive finishModal a second time over the SAME dialog/box DOM: no close,
-    // no innerHTML wipe, the exact repeat-mount scenario the review flagged.
-    // Called through the extracted grammar, with the same wiring UI passes it.
-    finishModal(dlg, box, {
-      titleBarClose: (cls, onClick) => ui.titleBarClose(cls, onClick),
-      closeModal: () => ui.closeModal(),
-      drainNotice: () => {},
-      gameStopped: () => false,
-    });
-
-    const titleId = MODAL_TITLE_ID;
-    const spans = box.querySelectorAll(`#${titleId}`);
-    expect(spans.length).toBe(1); // exactly one title span, never nested
-    const titleSpan = spans[0] as HTMLElement;
-    expect(titleSpan.querySelector(`#${titleId}`)).toBeNull(); // not nested inside itself
-
-    expect(titleSpan.textContent).not.toContain("Close");
-    expect(titleSpan.textContent).not.toContain("✕");
-    expect(titleSpan.textContent).toContain("Settings");
-
-    const labelId = dlg.getAttribute("aria-labelledby");
-    expect(labelId).toBe(titleId);
-    expect(document.getElementById(labelId!)).toBe(titleSpan);
-
-    expect(box.querySelectorAll(".modal-x").length).toBe(1); // no duplicate close button either
   });
 });
 
@@ -597,7 +539,7 @@ describe("confirmModal — lit template mount", () => {
 });
 
 describe("aria-labelledby across the real dialogs: every modal names itself for a screen reader", () => {
-  // Every show* method funnels through finishModal, so this pins the
+  // Every show* method opens through the modal, so this pins the
   // contract end to end (not just the shared primitive) across dialogs with
   // very different wiring: a plain wireActions dialog, a caller-supplied
   // title, and the emergency dialog that overrides oncancel and renders no
@@ -1652,7 +1594,7 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     makeUI();
     document.getElementById("btn-settings")!.click();
     expect(dialog().open).toBe(true);
-    // openModalTemplate appends its ✕ affordance inside the heading; match the title.
+    // openModal appends its ✕ affordance inside the heading; match the title.
     expect(dialog().querySelector("h2")!.textContent).toContain("Settings");
   });
 

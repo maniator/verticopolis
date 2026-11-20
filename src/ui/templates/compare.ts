@@ -1,4 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import * as classicVsModern from "../../../help-site/src/content/docs/classic-vs-modern.md";
 import type { GameMode } from "@verticopolis/engine/model/types";
 import { fromGameHref } from "../fromGame";
@@ -41,12 +42,14 @@ function openLinksInNewTab(e: MouseEvent): void {
  * grammar. The controller pauses the tower on open and restores the prior speed
  * on close, so reading the reference never costs the player elevator time.
  */
-export function compareModalTemplate(): TemplateResult {
-  return html`
-      <h2>Classic vs Modern</h2>
+export function compareModalTemplate(): ModalView {
+  return {
+    title: "Classic vs Modern",
+    body: html`
       ${compareTemplate()}
       <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" autofocus>Got it</button></div>
-    `;
+    `,
+  };
 }
 
 /**
@@ -55,12 +58,14 @@ export function compareModalTemplate(): TemplateResult {
  * `help.css` hides the other column and the page's intro), under a line that
  * names the tower and its rules. The name is lit-html text, never markup.
  */
-export function towerRulesModalTemplate(name: string, mode: GameMode): TemplateResult {
+export function towerRulesModalTemplate(name: string, mode: GameMode): ModalView {
   const rules = RULE_SET_NAME[mode];
-  return html`
-      <h2>This Tower's Rules</h2>
+  return {
+    title: "This Tower's Rules",
+    body: html`
       <p class="tower-rules-lead">${name || "Your tower"} plays by <b>${rules}</b> rules, chosen when it was founded. Here is what that means.</p>
       <div class="help-md tower-rules" data-rules=${mode} @click=${openLinksInNewTab}>${classicVsModern.intro()}</div>
       <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" autofocus>Got it</button></div>
-    `;
+    `,
+  };
 }

@@ -1,4 +1,5 @@
-import { html, type TemplateResult } from "lit-html";
+import { html } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import type { UI } from "../UI";
 import { runScene } from "./screenSaver";
 import type { SaverScene } from "./saverScene";
@@ -48,10 +49,11 @@ export interface SaverDialogHandlers {
   onCancel(): void;
 }
 
-export function screenSaverTemplate(p: SaverPrefs, h: SaverDialogHandlers): TemplateResult {
+export function screenSaverTemplate(p: SaverPrefs, h: SaverDialogHandlers): ModalView {
   const none = p.saver === NO_SAVER;
-  return html`
-    <h2>Screen Saver</h2>
+  return {
+    title: "Screen Saver",
+    body: html`
     <div class="saver-monitor" aria-hidden="true">
       <div class="saver-bezel"><canvas class="saver-screen" width=${MONITOR_W} height=${MONITOR_H}></canvas></div>
       <div class="saver-stand"></div>
@@ -82,7 +84,8 @@ export function screenSaverTemplate(p: SaverPrefs, h: SaverDialogHandlers): Temp
       <button class="btn primary" data-saver="ok" @click=${h.onOk}>OK</button>
       <button class="btn" data-saver="cancel" @click=${h.onCancel}>Cancel</button>
     </div>
-  `;
+  `,
+  };
 }
 
 /** Open the dialog over the tower with `start` as its first choices. */
@@ -133,7 +136,7 @@ export function openScreenSaverDialog(ui: UI, start: SaverPrefs, ports: SaverDia
     onCancel: close,
   };
   function mount(): void {
-    box = ui.openModalTemplate(screenSaverTemplate(draft, handlers), { displaceable: true });
+    box = ui.openModal(screenSaverTemplate(draft, handlers), { displaceable: true });
     // Set the lists from the draft once their options are in place: an
     // option marked selected before it joins its list does not hold in every
     // DOM.

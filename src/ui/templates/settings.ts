@@ -1,4 +1,5 @@
-import { html, nothing, type TemplateResult } from "lit-html";
+import { html, nothing } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 
 /**
  * The Settings dialog body: sound levels plus the presentation toggles. Authored
@@ -34,12 +35,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * `showSettings` reads the live tower state and sets the initial checked
  * value.
  */
-export function settingsTemplate(
-  version: string,
-  showBuilding = false,
-  engine = "",
-  showPassersBy = false,
-): TemplateResult {
+export function settingsTemplate(version: string, showBuilding = false, engine = "", showPassersBy = false): ModalView {
   const passersBy = showPassersBy
     ? html`
       <div class="set-row">
@@ -55,8 +51,9 @@ export function settingsTemplate(
         <p class="set-note" id="note-auto-bridge">When on, dropping a room or floor near existing structure fills the walkway between them. Turn off and floors still appear under each room, just never across the gap, so separate sections stay disconnected.</p>
       </div>`
     : nothing;
-  return html`
-      <h2>Settings</h2>
+  return {
+    title: "Settings",
+    body: html`
       <h3>Sound</h3>
       <p style="color:var(--muted)">Levels apply right away and are remembered on this device. The sound button up top mutes everything.</p>
       <div class="vol-row"><label for="vol-music">Music</label><input id="vol-music" type="range" min="0" max="100" step="1"><span class="vol-val" data-vol-val="vol-music" aria-hidden="true"></span></div>
@@ -75,5 +72,6 @@ export function settingsTemplate(
       ${building}
       <p class="set-version">Verticopolis™ <span class="app-version">v${version}</span>${engine}</p>
       <div class="modal-actions modal-footer"><button class="btn primary" data-act="close" autofocus>Close</button></div>
-    `;
+    `,
+  };
 }

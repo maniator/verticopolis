@@ -1,4 +1,5 @@
-import { html, nothing, type TemplateResult } from "lit-html";
+import { html, nothing } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
 import type { StarDutyId } from "@verticopolis/engine/catalog/starDutyTypes";
 import type { NextStarView, StatsReport } from "@verticopolis/engine/port/panels";
@@ -67,7 +68,7 @@ export function starUpScreen(from: number, to: number, catalog: Catalog, report:
 const stars = (n: number) => "★".repeat(n);
 
 /** The box's body and its OK button. */
-export function starUpTemplate(screen: StarUpScreen, onOk: () => void): TemplateResult {
+export function starUpTemplate(screen: StarUpScreen, onOk: () => void): ModalView {
   const h = screen.headsUp;
   const rooms = screen.rooms.length > 0 ? html`<p>You can now build: ${screen.rooms.join(", ")}.</p>` : nothing;
   const spaces = (n: number) => `${groupDigits(n)} space${n === 1 ? "" : "s"}`;
@@ -85,9 +86,12 @@ export function starUpTemplate(screen: StarUpScreen, onOk: () => void): Template
   const next = h?.next
     ? html`<div class="stats-grid star-up-next">${nextStarSection(h.next, screen.topFloor)}</div>`
     : nothing;
-  return html`<h2>${iconTemplate("milestone", { size: 20 })}Star Rating</h2>
+  return {
+    title: html`${iconTemplate("milestone", { size: 20 })}Star Rating`,
+    body: html`
     <p class="star-up-rating" aria-label=${`${screen.star} stars`}>${stars(screen.star)}</p>
     <p>Congratulations! Your tower is now rated <b>${screen.star} stars</b>.</p>
     ${rooms}${duties}${next}
-    <div class="modal-actions modal-footer"><button class="btn primary" data-act="ok" @click=${onOk}>OK</button></div>`;
+    <div class="modal-actions modal-footer"><button class="btn primary" data-act="ok" @click=${onOk}>OK</button></div>`,
+  };
 }

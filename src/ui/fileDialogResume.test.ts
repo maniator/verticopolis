@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, type TemplateResult } from "lit-html";
+import { viewTemplate } from "./testing/litTestUtils";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
+import { render } from "lit-html";
 
 vi.mock("../analytics", () => ({ trackAppAction: vi.fn() }));
 
@@ -23,10 +25,10 @@ const files = [entry("a", "Alpha", 10), entry("c", "Charlie", 20), entry("b", "B
 
 let boxes: HTMLElement[] = [];
 const ui = {
-  openModalTemplate: vi.fn((tpl: TemplateResult) => {
+  openModal: vi.fn((tpl: ModalView) => {
     boxes.forEach((b) => b.remove());
     const box = document.createElement("div");
-    render(tpl, box);
+    render(viewTemplate(tpl), box);
     document.body.append(box);
     boxes.push(box);
     return box;
@@ -90,7 +92,7 @@ describe("back from Previous versions…", () => {
       live().remove();
 
       back();
-      expect(ui.openModalTemplate).toHaveBeenCalledTimes(2);
+      expect(ui.openModal).toHaveBeenCalledTimes(2);
       expect(names(), "the sort the player chose").toEqual(sorted);
       expect(q("#fd-row-c").getAttribute("aria-selected")).toBe("true");
       expect(q<HTMLInputElement>("#fd-name").value).toBe("Charlie");

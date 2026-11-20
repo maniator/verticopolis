@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import type { UpdateInfo } from "../../pwa";
 import { SHORT_NOTES } from "../../pwaUpdateInfo";
 import { fromGameHref } from "../fromGame";
@@ -103,7 +104,7 @@ export function updatePromptTemplate(
   info: UpdateInfo | null | undefined,
   actions: UpdatePromptActions,
   options: UpdatePromptOptions = {},
-): TemplateResult {
+): ModalView {
   const notes = info?.notes ?? [];
   // Keep a real sha (it anchors a bug report to an exact build) but drop the
   // "unknown" placeholder a non-git build would stamp.
@@ -115,8 +116,9 @@ export function updatePromptTemplate(
   const buildLine = idText ? html`<p class="build-id">Build ${idText}</p>` : nothing;
   const kind = info?.kind ? html`<p class="update-kind"><strong>${KIND_LABEL[info.kind]}</strong></p>` : nothing;
   const engineLine = info?.engineLine ? html`<p class="build-id">${info.engineLine}</p>` : nothing;
-  return html`
-      <h2>Update available</h2>
+  return {
+    title: "Update available",
+    body: html`
       ${kind}
       <p>A newer version of Verticopolis is ready. Update now saves your tower and reloads onto it. You won't lose any progress.</p>
       <p>Or keep playing: it'll apply next time you reopen.</p>
@@ -128,5 +130,6 @@ export function updatePromptTemplate(
         <button class="btn" data-act="later" autofocus @click=${actions.onLater}>Later</button>
         <button class="btn primary" data-act="update" @click=${actions.onUpdate}>Update now</button>
       </div>
-    `;
+    `,
+  };
 }

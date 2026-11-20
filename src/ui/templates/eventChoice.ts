@@ -1,4 +1,5 @@
-import { html, type TemplateResult } from "lit-html";
+import { html } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { iconTemplate, messageWithIcons } from "@verticopolis/components/windows/icons";
 
 /**
@@ -26,13 +27,15 @@ export interface EventChoiceActions {
   onDecline: () => void;
 }
 
-export function eventChoiceTemplate(message: string, costLabel: string, actions: EventChoiceActions): TemplateResult {
-  return html`
-      <h2>${iconTemplate("warning", { size: 16 })}Emergency</h2>
+export function eventChoiceTemplate(message: string, costLabel: string, actions: EventChoiceActions): ModalView {
+  return {
+    title: html`${iconTemplate("warning", { size: 16 })}Emergency`,
+    body: html`
       <p>${messageWithIcons(message)}</p>
       <div class="modal-actions modal-footer">
         <button class="btn primary" data-act="accept" @click=${actions.onAccept}>Pay ${costLabel}</button>
         <button class="btn" data-act="decline" @click=${actions.onDecline}>Decline</button>
       </div>
-    `;
+    `,
+  };
 }

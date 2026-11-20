@@ -43,29 +43,14 @@ vi.mock("../ui/overviewMapPrefs", () => ({
   }),
 }));
 
-import { wireMenus } from "./menuWiring";
+import { wireMenus, drawMenuBar } from "./menuWiring";
 
 /** The File menu with Open Recent as index.html lays it out. */
 function mount(): void {
-  const item = (id: string) => `<button class="mb-item" id="${id}" role="menuitem">${id}</button>`;
   document.body.innerHTML = `
-    <nav id="menubar">
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-file" aria-expanded="false" aria-controls="mb-file-menu"><u>F</u>ile</button>
-        <div class="mb-pop" id="mb-file-menu" role="menu" hidden>
-          ${item("mb-import")}
-          <div class="mb-sub" role="none">
-            <button class="mb-item mb-sub-title" id="mb-recent" role="menuitem" aria-expanded="false" aria-controls="mb-recent-menu">Open Recent</button>
-            <div class="mb-pop mb-subpop" id="mb-recent-menu" role="menu" hidden>
-              <button class="mb-item mb-recent" id="mb-recent-1" role="menuitem"><u>1</u>Sky</button>
-              <button class="mb-item" id="mb-recent-none" role="menuitem" aria-disabled="true" hidden>No recent towers</button>
-            </div>
-          </div>
-          ${item("mb-quick-save")}${item("mb-close")}${item("mb-export")}
-        </div>
-      </div>
-    </nav>
+    <div id="menubar-host"></div>
     <main id="stage"></main>`;
+  drawMenuBar();
 }
 
 function fakeApp(): GameApp {

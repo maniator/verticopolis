@@ -27,6 +27,7 @@ import { createUICallbacks, type GameAppPorts } from "./game/uiCallbacks";
 import type { UpdateInfo } from "./pwa";
 import type { FrameErrorEntry } from "./game/crashReport";
 import { wireControllers, runBootFlow } from "./game/appBoot";
+import { drawMenuBar } from "./game/menuWiring";
 import { wireEngine } from "./game/engineWiring";
 import { bindKeys } from "./game/inputKeys";
 import { watchLostRelease } from "./game/lostRelease";
@@ -244,6 +245,8 @@ class GameApp implements GameAppPorts {
 
   constructor(tower: BootTower) {
     this.canvas = document.getElementById("view") as HTMLCanvasElement;
+    // The menu bar first: the UI and the boot flow wire its items by id.
+    drawMenuBar();
     // Boot loaded the stored tower into the engine (`bootTower`). It tells
     // "no save" from "save present but unreadable": a corrupt/incompatible
     // autosave must NOT masquerade as a continuable tower (that would offer

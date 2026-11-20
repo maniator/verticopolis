@@ -19,7 +19,7 @@ import {
 const PAGE = `
   <div id="app">
     <div id="topbar">Info</div>
-    <nav id="menubar"><button id="mb-options">Options</button><div id="mb-window-menu"><button id="mb-dw-info" data-desk-win="info">Info</button><button id="mb-dw-map" data-desk-win="map">Map</button></div><button id="mb-win-map">Map</button><button id="mb-win-statusbar">Status Bar</button><button id="mb-fullscreen">Full Screen</button><button id="mb-close">Close</button><button id="mb-sound" aria-checked="true">Sound</button></nav>
+    <div id="menubar-host"><nav id="menubar"><button id="mb-options">Options</button><div id="mb-window-menu"><button id="mb-dw-info" data-desk-win="info">Info</button><button id="mb-dw-map" data-desk-win="map">Map</button></div><button id="mb-win-map">Map</button><button id="mb-win-statusbar">Status Bar</button><button id="mb-fullscreen">Full Screen</button><button id="mb-close">Close</button><button id="mb-sound" aria-checked="true">Sound</button></nav></div>
     <div id="stage">tower</div>
     <div id="statusbar">status</div>
     <aside id="palette" class="win"><div class="win-title">Tools</div></aside>
@@ -54,7 +54,7 @@ function page(url = "http://localhost/"): Document {
 
 /** Where each of the game's elements sits: its parent's id. */
 function places(): Record<string, string | undefined> {
-  const ids = ["topbar", "menubar", "stage", "statusbar", "palette", "overview-map", "bulletin-win", "tower-win"];
+  const ids = ["topbar", "menubar-host", "stage", "statusbar", "palette", "overview-map", "bulletin-win", "tower-win"];
   return Object.fromEntries(ids.map((id) => [id, doc.getElementById(id)?.parentElement?.id]));
 }
 
@@ -90,7 +90,7 @@ describe("DeskController", () => {
     new DeskController(doc).start();
     expect(doc.body.classList.contains(DESK_CLASS)).toBe(true);
     const tower = doc.querySelector("#desk-win-tower .desk-body")!;
-    expect([...tower.children].map((e) => e.id)).toEqual(["menubar", "stage", "statusbar"]);
+    expect([...tower.children].map((e) => e.id)).toEqual(["menubar-host", "stage", "statusbar"]);
     expect(doc.getElementById("topbar")!.parentElement!.closest("#desk-win-info")).not.toBeNull();
     for (const id of ["palette", "overview-map", "bulletin-win", "tower-win"])
       expect(doc.getElementById(id)!.parentElement!.id).toBe("desk");

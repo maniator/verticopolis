@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, type TemplateResult } from "lit-html";
+import { viewTemplate } from "./testing/litTestUtils";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
+import { render } from "lit-html";
 import type { TowerFileEntry } from "../storage/fileSpace";
 import type { LinkedFolderState } from "../storage/linkedFolder";
 import { showFileDialog, type FileDialogCtx, type FileNote } from "./fileDialog";
@@ -14,7 +16,7 @@ const entry = (id: string, name: string, kind: TowerFileEntry["kind"] = "tower")
 });
 
 let box: HTMLElement | null;
-let ui: { openModalTemplate: ReturnType<typeof vi.fn>; closeModal: ReturnType<typeof vi.fn> };
+let ui: { openModal: ReturnType<typeof vi.fn>; closeModal: ReturnType<typeof vi.fn> };
 let folder: LinkedFolderState | null;
 let linked: {
   [K in keyof LinkedPlaceCtx]: LinkedPlaceCtx[K] extends (...a: never[]) => unknown
@@ -107,9 +109,9 @@ beforeEach(() => {
   linked = makeLinked();
   resetFilePlaceForTests();
   ui = {
-    openModalTemplate: vi.fn((tpl: TemplateResult) => {
+    openModal: vi.fn((tpl: ModalView) => {
       box = document.createElement("div");
-      render(tpl, box);
+      render(viewTemplate(tpl), box);
       document.body.append(box);
       return box;
     }),

@@ -1,5 +1,4 @@
 import type { UI } from "./UI";
-import { render } from "lit-html";
 import {
   elevatorScheduleTemplate,
   floorLabel,
@@ -286,7 +285,8 @@ export function showElevatorScheduleDialog(
   };
 
   function rerender(): void {
-    render(elevatorScheduleTemplate(sctx, state, handlers), box);
+    // Never once another dialog has taken the modal, which this view would overwrite.
+    if (box.isConnected) ui.renderModal(elevatorScheduleTemplate(sctx, state, handlers));
   }
   /** Advice about strip numbers must not critique a hidden strip: whenever the
    *  sentence turns critical while the Modern fold is shut, open it. */
@@ -518,10 +518,10 @@ export function showElevatorScheduleDialog(
 
   recompute();
   unfoldOnAdvice(); // an already-critical shaft opens with the fold unfolded
-  const box = ui.openModalTemplate(elevatorScheduleTemplate(sctx, state, handlers));
+  const box = ui.openModal(elevatorScheduleTemplate(sctx, state, handlers));
   // The dirty guard must cover EVERY dismissal, not just the Cancel button: Esc and
   // the title-bar ✕ arrive as the dialog's cancelable "cancel" event, a backdrop
-  // click as a click on the dialog element itself. finishModal re-sets both
+  // click as a click on the dialog element itself. The modal re-sets both
   // handlers fresh on every open, so overriding them here cannot leak into other
   // dialogs; preventDefault holds the native Esc close while the confirm arms.
   const dlg = box.closest("dialog");

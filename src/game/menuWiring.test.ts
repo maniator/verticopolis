@@ -52,45 +52,15 @@ import {
   TOWER_ONLY_ITEMS,
   TOWER_ONLY_MENUS,
   toggleFullScreen,
+  drawMenuBar,
   wireMenus,
 } from "./menuWiring";
 
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */
 function mount(): void {
-  const item = (id: string, role = "menuitem") => `<button class="mb-item" id="${id}" role="${role}">${id}</button>`;
   document.body.innerHTML = `
-    <nav id="menubar">
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-file" aria-expanded="false" aria-controls="mb-file-menu"><u>F</u>ile</button>
-        <div class="mb-pop" id="mb-file-menu" role="menu" hidden>
-          ${item("mb-quick-save")}${item("mb-close")}${item("mb-import")}${item("mb-export")}${item("mb-undo")}${item("mb-redo")}
-          ${item("mb-rename")}${item("mb-rules")}${item("mb-compare")}${item("mb-replay")}
-          ${item("mb-win-tools", "menuitemcheckbox")}${item("mb-win-map", "menuitemcheckbox")}
-          ${item("mb-win-tower", "menuitemcheckbox")}${item("mb-win-bulletin", "menuitemcheckbox")}
-          ${item("mb-win-statusbar", "menuitemcheckbox")}${item("mb-fullscreen", "menuitemcheckbox")}
-          ${item("mb-sound", "menuitemcheckbox")}
-          <a class="mb-item" id="mb-sponsor" hidden>Sponsor</a>
-          ${item("btn-new")}${item("btn-stats")}
-          <hr class="mb-sep mb-install-sep" hidden /><button class="mb-item" id="btn-install-menu" hidden>Install</button>
-          <hr class="mb-sep" id="mb-save-sep" /><hr class="mb-sep" id="mb-close-sep" />
-        </div>
-      </div>
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-edit" aria-expanded="false" aria-controls="mb-edit-menu"><u>E</u>dit</button>
-        <div class="mb-pop" id="mb-edit-menu" role="menu" hidden>${item("mb-edit-probe")}</div>
-      </div>
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-tower" aria-expanded="false" aria-controls="mb-tower-menu"><u>T</u>ower</button>
-        <div class="mb-pop" id="mb-tower-menu" role="menu" hidden>
-          ${item("mb-fire-rescue")}<button class="mb-item" id="mb-exterminator" role="menuitem" hidden>Call Exterminator</button>
-        </div>
-      </div>
-      <div class="mb-menu">
-        <button class="mb-title" id="mb-window" aria-expanded="false" aria-controls="mb-window-menu"><u>W</u>indow</button>
-        <div class="mb-pop" id="mb-window-menu" role="menu" hidden></div>
-      </div>
-    </nav>
+    <div id="menubar-host"></div>
     <div id="palette"></div>
     <button id="btn-palette-collapse"></button>
     <main id="stage">
@@ -100,6 +70,7 @@ function mount(): void {
     <input id="tower-name" />
     <button id="btn-undo" aria-disabled="true"></button>
     <button id="btn-redo"></button>`;
+  drawMenuBar();
 }
 
 function fakeApp(onPhone = false) {
@@ -348,7 +319,7 @@ describe("wireMenus", () => {
     for (const id of ["btn-new", "mb-import"]) expect($(id).hidden, id).toBe(false);
     // The arrow keys and the Alt letters skip a menu that left the bar.
     $("mb-file").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    expect(document.activeElement).toBe($("mb-file"));
+    expect(document.activeElement).toBe($("mb-options"));
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true }));
     expect(bar.current()).toBeNull();
     splash.querySelector("button")!.addEventListener("click", splashNew);
@@ -433,19 +404,19 @@ describe("wireMenus analytics", () => {
 
   it("a grayed item reports a grayed pick with no state, and the menu stays open", () => {
     const bar = wireMenus(fakeApp().app)!; // the toolbar's Undo is grayed
-    pointerClick($("mb-file"));
+    pointerClick($("mb-edit"));
     pointerClick($("mb-undo"));
     expect(menus.pick).toHaveBeenCalledExactlyOnceWith({
-      menu: "file",
+      menu: "edit",
       item: "undo",
       via: "pointer",
       screen: "tower",
       browsed: 1,
       grayed: true,
     });
-    expect(bar.current()).toBe($("mb-file"));
+    expect(bar.current()).toBe($("mb-edit"));
     bar.close(true, "escape");
-    expect(menus.dismiss).toHaveBeenCalledExactlyOnceWith({ menu: "file", how: "escape", screen: "tower", browsed: 1 });
+    expect(menus.dismiss).toHaveBeenCalledExactlyOnceWith({ menu: "edit", how: "escape", screen: "tower", browsed: 1 });
   });
 
   it("a click with no menu open (a script's) is not a pick", () => {

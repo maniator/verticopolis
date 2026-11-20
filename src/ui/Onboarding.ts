@@ -2,7 +2,7 @@ import { html, nothing, render as litRender } from "lit-html";
 import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 import { isDialogOpen, isEngineStopped } from "../game/interactionState";
-import { iconElement } from "@verticopolis/components/windows/icons";
+import { iconNode } from "./iconNodes";
 import { openFoldedPaletteAround } from "./paletteCollapse";
 import { DESK_TITLE_CLASS } from "./desk/deskTitle";
 
@@ -248,7 +248,7 @@ export class OnboardingController {
         ? (e: Event) => {
             const btn = e.currentTarget as HTMLButtonElement;
             const muted = onToggleMute();
-            btn.replaceChildren(iconElement(muted ? "mute" : "sound"));
+            btn.replaceChildren(iconNode(muted ? "mute" : "sound"));
             btn.setAttribute("aria-pressed", String(muted));
           }
         : undefined,

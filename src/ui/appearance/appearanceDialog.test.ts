@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, type TemplateResult } from "lit-html";
+import { viewTemplate } from "../testing/litTestUtils";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
+import { render } from "lit-html";
 import type { UI } from "../UI";
 import { openAppearanceDialog } from "./appearanceDialog";
 
 /** The UI's two modal primitives as spies: opening renders the template into
- *  a box on the page, as `UI.openModalTemplate` does; closing removes it. */
+ *  a box on the page, as `UI.openModal` does; closing removes it. */
 function uiDouble() {
   let box: HTMLElement | null = null;
   const ui = {
-    openModalTemplate: vi.fn((t: TemplateResult) => {
+    openModal: vi.fn((t: ModalView) => {
       box?.remove();
       box = document.createElement("div");
       document.body.append(box);
-      render(t, box);
+      render(viewTemplate(t), box);
       return box;
     }),
     closeModal: vi.fn(() => {
@@ -41,7 +43,7 @@ describe("the Appearance dialog", () => {
     const names = [...box()!.querySelectorAll(".appearance-name")].map((n) => n.textContent);
     expect(names).toEqual(["Standard", "Skyline", "High Contrast"]);
     expect(box()!.querySelector<HTMLInputElement>('input[value="skyline"]')!.checked).toBe(true);
-    expect(ui.openModalTemplate).toHaveBeenCalledWith(expect.anything(), { displaceable: true });
+    expect(ui.openModal).toHaveBeenCalledWith(expect.anything(), { displaceable: true });
   });
 
   it("hands OK the picked scheme and closes", () => {

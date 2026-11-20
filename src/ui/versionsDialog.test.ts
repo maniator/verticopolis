@@ -11,7 +11,7 @@ function makeUi() {
   const box = document.createElement("div");
   const dialog = document.createElement("dialog");
   const ui = {
-    openModalTemplate: vi.fn(() => {
+    openModal: vi.fn(() => {
       document.body.replaceChildren(dialog);
       dialog.replaceChildren(box);
       box.innerHTML = '<h2>Previous Versions</h2><div class="pv-host"></div>';

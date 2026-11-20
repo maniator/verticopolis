@@ -229,6 +229,10 @@ html.vc-help-bar-showing body {
 .sl-menu-button {
   top: calc(var(--vc-menubar-h) + (var(--sl-nav-height) - var(--vc-menubar-h) - var(--sl-menu-button-size)) / 2);
 }
+/* MenuBar.astro's host: the bar inside it lays out as if the host were not there. */
+#help-menubar-host {
+  display: contents;
+}
 .help-menubar {
   position: absolute;
   inset-inline: 0;

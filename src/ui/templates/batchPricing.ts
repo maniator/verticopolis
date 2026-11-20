@@ -1,4 +1,5 @@
-import { html, nothing, type TemplateResult } from "lit-html";
+import { html, nothing } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { live } from "lit-html/directives/live.js";
 import type { BatchTarget, BatchRentResult } from "@verticopolis/engine/model/engineTypes";
 import type { PriceRung } from "@verticopolis/engine/model/engineTypes";
@@ -121,9 +122,10 @@ export function batchRungPreviewMessage(ctx: BatchRungCtx, choice: RungChoice, r
   return msg;
 }
 
-export function batchRungTemplate(ctx: BatchRungCtx, state: BatchRungState, h: BatchRungHandlers): TemplateResult {
-  return html`
-      <h2>Set all ${ctx.noun}</h2>
+export function batchRungTemplate(ctx: BatchRungCtx, state: BatchRungState, h: BatchRungHandlers): ModalView {
+  return {
+    title: html`Set all ${ctx.noun}`,
+    body: html`
       <p class="bp-rung-lead">Set every ${ctx.single} to</p>
       <div class="bp-rung">${rungPickerTemplate({
         id: "bp-rung",
@@ -137,17 +139,19 @@ export function batchRungTemplate(ctx: BatchRungCtx, state: BatchRungState, h: B
       <div class="modal-actions modal-footer">
         <button class="btn primary" id="bp-apply" data-act="apply" ?disabled=${state.applyDisabled} @click=${h.onApply}>${state.noRateArmed ? "Confirm No Rate" : "Apply"}</button>
         <button class="btn" data-act="close" @click=${h.onCancel}>Cancel</button>
-      </div>`;
+      </div>`,
+  };
 }
 
 export function batchPricingTemplate(
   ctx: BatchPricingCtx,
   state: BatchPricingState,
   h: BatchPricingHandlers,
-): TemplateResult {
+): ModalView {
   const { noun, priceWord, band } = ctx;
-  return html`
-      <h2>Set all ${noun}</h2>
+  return {
+    title: html`Set all ${noun}`,
+    body: html`
       <div class="batch-modes">
         <label><input type="radio" name="bp-mode" value="set" ?checked=${state.mode === "set"} @change=${h.onModeChange} /> Set ${priceWord} to</label>
         <span class="bp-amount"><button type="button" class="btn" data-bp="dec" aria-label="decrease" @click=${h.onDec}>–</button>
@@ -161,5 +165,6 @@ export function batchPricingTemplate(
       <div class="modal-actions modal-footer">
         <button class="btn primary" id="bp-apply" data-act="apply" ?disabled=${state.applyDisabled} @click=${h.onApply}>${state.resetArmed ? "Confirm reset" : "Apply"}</button>
         <button class="btn" data-act="close" @click=${h.onCancel}>Cancel</button>
-      </div>`;
+      </div>`,
+  };
 }

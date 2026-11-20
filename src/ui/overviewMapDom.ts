@@ -1,4 +1,4 @@
-import { iconElement } from "@verticopolis/components/windows/icons";
+import { iconNode } from "./iconNodes";
 
 /**
  * The overview MAP window's elements (#343): the window with its title bar,
@@ -71,7 +71,7 @@ export function buildMapDom(doc: Document): MapDom {
   toggle.id = MAP_DOM_ID.toggle;
   toggle.className = "btn overview-map-toggle";
   // The glyph shows on desktop only (the phone pill keeps its word alone).
-  toggle.append(iconElement("map"), "Map");
+  toggle.append(iconNode("map", {}, doc), "Map");
   toggle.title = "Show the tower map";
   toggle.setAttribute("aria-controls", MAP_DOM_ID.window);
   return { root, title, close, body, towerCanvas, viewCanvas, summary, toggle };

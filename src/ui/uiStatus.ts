@@ -10,7 +10,7 @@ import { clockOf } from "../engineHost/headerClock";
 import type { SimView } from "@verticopolis/engine/port/view";
 import type { UI } from "./UI";
 import { render } from "lit-html";
-import { appendMessageWithIcons } from "@verticopolis/components/windows/icons";
+import { appendMessage } from "./iconNodes";
 import { groupDigits } from "@verticopolis/components/windows/format";
 import { paletteWindow, relabelPalette, syncPaletteTabs } from "./uiPalette";
 import { refitPalette } from "./paletteFit";
@@ -343,14 +343,14 @@ function readLog(src: HudSource, seq: number): (Pick<LogEntry, "text" | "kind"> 
 }
 
 /** One bulletin line. Still never interpolates engine text into innerHTML:
- *  `appendMessageWithIcons` keeps every character of `e.text` as a TEXT NODE and
+ *  `appendMessage` keeps every character of `e.text` as a TEXT NODE and
  *  only swaps a known leading emoji for a trusted, code-built icon element (#721).
  *  The icon is `currentColor`, so it inherits this line's severity color (the
  *  `${e.kind}` class), matching the text. */
 function logLine(e: Pick<LogEntry, "text" | "kind">): HTMLDivElement {
   const d = document.createElement("div");
   d.className = `log-line ${e.kind}`;
-  appendMessageWithIcons(d, e.text);
+  appendMessage(d, e.text);
   return d;
 }
 
@@ -387,7 +387,7 @@ export function showTower(ui: Pick<UI, "resetLog" | "update">, src: HudSource, g
 export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): void {
   const t = document.createElement("div");
   t.className = `toast ${kind}`;
-  appendMessageWithIcons(t, text);
+  appendMessage(t, text);
   // The rail is polite (role="status") so routine good/info toasts never
   // interrupt a screen reader mid-sentence, and a catch-up flush of several at
   // once queues instead of barging. A genuine error is the exception: mark it
