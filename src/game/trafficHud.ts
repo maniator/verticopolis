@@ -12,10 +12,10 @@ import { floorLabel } from "../ui/floorLabel";
 import { noteFrameError } from "./frameErrors";
 import { trackAppAction } from "../analytics";
 import { spotlightTraffic, type SpotSpan } from "@verticopolis/components/render/excalibur/trafficSpotlight";
-import type { TransportView } from "@verticopolis/components/port/view";
-import type { PortRecord } from "@verticopolis/components/port/enginePort";
+import type { TransportView } from "@verticopolis/engine/port/view";
+import type { PortRecord } from "@verticopolis/engine/port/enginePort";
 import { TILE } from "@verticopolis/components/render/scale";
-import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "@verticopolis/components/shared/viewZoom";
+import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "@verticopolis/engine/model/viewZoom";
 
 /**
  * The color-blind-safe traffic HUD, split out of the `GameApp` class. On every
@@ -53,7 +53,7 @@ export function refreshTraffic(app: GameApp): void {
 
 /** The worst line of each queue projection read, so the ~6 Hz refresh walks
  *  a step's landings once: the projection is kept per crowd step and tower
- *  revision (`PortRenderSim.queueView`), so a new step is a new key. */
+ *  revision (`FrameReader.queueView`), so a new step is a new key. */
 const worstOf = new WeakMap<LandingLines, WaitingLine | null>();
 
 /** The tower's worst waiting line now, from the renderer's queue projection. */

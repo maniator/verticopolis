@@ -1,5 +1,5 @@
 import { html, nothing, render } from "lit-html";
-import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
 import { lobbyHeightButtons, toolInfoFor, type LobbyHeightPicker } from "./templates/toolInfo";
 import type { UI } from "./UI";
 

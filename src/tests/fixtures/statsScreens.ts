@@ -1,5 +1,5 @@
-import type { StatsReport, TowerStats } from "@verticopolis/components/port/panels";
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { StatsReport, TowerStats } from "@verticopolis/engine/port/panels";
+import type { GameMode } from "@verticopolis/engine/model/types";
 import type { StatsScreen } from "../../ui/templates/stats";
 import { catalogFor } from "../catalogFixture";
 import { LAYOUT } from "../portKit/mockPort";

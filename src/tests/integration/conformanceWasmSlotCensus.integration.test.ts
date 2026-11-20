@@ -10,11 +10,11 @@ import towerFile from "@verticopolis/engine/conformance/fixtures/towerone_6.vcto
 import { draftTower, type Draft } from "../portKit/drafts";
 import { SaveGame } from "../../storage/SaveGame";
 import { setSlotPopulationReader } from "../../storage/slotCensus";
-import { populationReaderFromModule } from "@verticopolis/components/host/slotPopulation";
+import { populationReaderFromModule } from "../../engineHost/slotPopulation";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { saveOf, importTower } from "../fixtures/saveText";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 
 /** The tower's population, from the engine's stats strip. */
 function population(sim: Draft): number {

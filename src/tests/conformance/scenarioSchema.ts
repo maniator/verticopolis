@@ -1,8 +1,8 @@
 import { COMPONENT_FIXTURES } from "../packagePaths";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
-import { MAX_BRUSH_TILES } from "@verticopolis/components/port/request";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
+import { MAX_BRUSH_TILES } from "@verticopolis/engine/port/request";
 
 /** The Rust engine's Classic catalog as checked in (the file `catalogFor` in
  *  `src/tests/catalogFixture.ts` reads; `portReads.integration.test.ts` holds

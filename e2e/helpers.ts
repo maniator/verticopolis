@@ -15,7 +15,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { MAP_OPEN_STORAGE_KEY, MAP_OPEN_VALUE } from "../src/ui/overviewMapPrefs";
 import type { FixtureBuilder, FixtureTower } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { GameMode } from "@verticopolis/engine/model/types";
 import { storedSave as storedSaveIn, storedSavesInPage } from "../src/build/storedSaves";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

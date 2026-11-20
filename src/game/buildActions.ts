@@ -1,23 +1,19 @@
-import {
-  catalogBuildKind,
-  catalogFacility,
-  catalogTileCost,
-  type Catalog,
-} from "@verticopolis/components/catalog/catalogTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { catalogBuildKind, catalogTileCost, type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import type { Picked } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "@verticopolis/components/audio/Audio";
-import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
-import { outcome, type PortCodes } from "@verticopolis/components/port/portCodes";
-import type { BrushKind } from "@verticopolis/components/port/commands";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import type { EnginePort, PortRecord } from "@verticopolis/engine/port/enginePort";
+import { outcome, type PortCodes } from "@verticopolis/engine/port/portCodes";
+import type { BrushKind } from "@verticopolis/engine/port/commands";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { groupDigits } from "@verticopolis/components/windows/format";
 import { quoteShaft } from "./portAccess";
 import { lobbyHeightFor } from "./lobbyHeight";
 import { finishesHalfBridge, quoteSkyBridge, type SkyBridgeClick } from "./skyBridgeTool";
-import { finishedSkyBridgeAt } from "@verticopolis/components/port/skyBridgeView";
+import { finishedSkyBridgeAt } from "@verticopolis/engine/port/skyBridgeView";
 import { pickedSkyBridgeLook } from "../ui/skyBridgeLookStrip";
 import { trackAppAction } from "../analyticsActions";
 

@@ -1,9 +1,4 @@
-import {
-  repairEnginePackage,
-  repairMessage,
-  updateRegistration,
-  type RepairResult,
-} from "@verticopolis/components/host/engineRepair";
+import { repairEnginePackage, repairMessage, updateRegistration, type RepairResult } from "./engineHost/engineRepair";
 
 /**
  * The stop screen's Repair engine files button (#985, design 5.4): runs the

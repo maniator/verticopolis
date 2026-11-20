@@ -1,7 +1,7 @@
 import { trackEvent } from "./analyticsCore";
-import type { GameMode } from "@verticopolis/components/shared/types";
-import type { HeaderView } from "@verticopolis/components/port/view";
-import type { ImportReportFacts } from "@verticopolis/components/port/tdtReportFacts";
+import type { GameMode } from "@verticopolis/engine/model/types";
+import type { HeaderView } from "@verticopolis/engine/port/view";
+import type { ImportReportFacts } from "@verticopolis/engine/port/tdtReportFacts";
 
 /**
  * Tower file analytics (owner, 2026-11-13): whether an import or export

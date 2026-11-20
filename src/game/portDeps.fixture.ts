@@ -1,8 +1,8 @@
 import type { Draft } from "../tests/portKit/drafts";
 import { portOf } from "./cardKit.fixture";
 import { catalogOf, isUnlocked, newViewReader } from "./portAccess";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 
 /** The engine, codes and reader the game's controllers take as getters, built
  *  over the draft's engine (the Rust engine) the way the app builds them. The

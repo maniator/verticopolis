@@ -1,7 +1,7 @@
 import type { TemplateResult } from "lit-html";
-import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
-import type { PersonDetail } from "@verticopolis/components/port/personCards";
+import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
+import type { PersonDetail } from "@verticopolis/engine/port/personCards";
 import { PERSON_FOLLOW_ACTION, personCardTemplate, type PersonMood } from "../ui/templates/personCard";
 
 /**

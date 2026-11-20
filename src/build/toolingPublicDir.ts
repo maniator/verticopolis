@@ -1,6 +1,6 @@
 import { cpSync, existsSync, rmSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "@verticopolis/components/host/enginePackageNames";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "@verticopolis/engine/host/enginePackageNames";
 
 /** The engine folder's name inside the public folder (`engine`). */
 const ENGINE_FOLDER = ENGINE_DIR.replace(/\/$/, "");

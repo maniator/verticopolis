@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import {
   serviceDiagnosticsFixture,
   lobbyDistanceFixture,
@@ -10,10 +10,10 @@ import {
   type StartTower,
 } from "../fixtures/serviceDiagnostics.fixture";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
 import { draftTower, type Draft } from "../portKit/portSim";
 import { placeUnit } from "../portKit/draftFixtures";
-import type { GameMode, SerializedGame, UnitState } from "@verticopolis/components/shared/types";
+import type { GameMode, SerializedGame, UnitState } from "@verticopolis/engine/model/types";
 
 /**
  * Service diagnostics on the Rust engine through its WASM binding, read from

@@ -14,7 +14,7 @@ import {
   noteEngineSettled,
   noteEngineWriterLatched,
 } from "./analyticsEngineStatus";
-import { FALLBACK_REASONS, FALLBACK_STAGES } from "@verticopolis/components/host/engineBoot";
+import { FALLBACK_REASONS, FALLBACK_STAGES } from "./engineHost/engineBoot";
 import { APP_VERSION } from "./appVersion";
 
 /**

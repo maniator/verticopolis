@@ -4,8 +4,8 @@ import type {
   AutoTuneProposal,
   PresetProposal,
   ScheduleFacts,
-} from "@verticopolis/components/port/enginePort";
-import { SCHEDULE_HOURS } from "@verticopolis/components/port/scheduleSlots";
+} from "@verticopolis/engine/port/enginePort";
+import { SCHEDULE_HOURS } from "@verticopolis/engine/port/scheduleSlots";
 import { makeUI, mountAppDom } from "../tests/uiFixture";
 import type { FloorRow } from "./templates/elevatorSchedule";
 import { scheduleDialogUX } from "./scheduleDialogRules";

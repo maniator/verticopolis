@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { catalogOn } from "@verticopolis/components/catalog/towerCatalog";
+import { catalogOn } from "../../engineHost/towerCatalog";
 import { newViewReader } from "../../game/portAccess";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { unitPrice } from "../../ui/catalogPricing";
-import { Cards } from "@verticopolis/components/port/cards";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
-import type { ViewReader } from "@verticopolis/components/port/viewReader";
+import { Cards } from "@verticopolis/engine/port/cards";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import { scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
+import type { ViewReader } from "@verticopolis/engine/port/viewReader";
 import { engineFromSave, look, must, noEngine, smallTower } from "../portKit/rustEngine";
 
 /**

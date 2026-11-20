@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { catalogFor } from "../tests/catalogFixture";
 import { office, rec, root, setup } from "./editorActions.fixture";
 
-vi.mock("@verticopolis/components/port/headerClock", () => ({
+vi.mock("../engineHost/headerClock", () => ({
   clockOf: () => ({ hour: 9, isWeekend: true }),
 }));
 

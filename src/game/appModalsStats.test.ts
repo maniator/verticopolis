@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import type { GameApp } from "../main";
 import { showStats, confirmExterminate } from "./appModals";
 import { statsTemplate } from "../ui/templates/stats";
-import { towerCatalog } from "@verticopolis/components/catalog/towerCatalog";
-import { statsReport } from "@verticopolis/components/port/statsSheet";
+import { towerCatalog } from "../engineHost/towerCatalog";
+import { statsReport } from "@verticopolis/engine/port/statsSheet";
 import { makeApp, makeSim, settle, withExterminator, type Refusal } from "./appModals.fixture";
 
 /**

@@ -1,4 +1,4 @@
-import type { WasmModule } from "@verticopolis/components/binding/binding";
+import type { WasmModule } from "@verticopolis/engine/binding/binding";
 import type { Scenario } from "./scenarios";
 
 /**

@@ -7,9 +7,9 @@ import type { MenuDismissProps, MenuOpenProps, MenuPickProps } from "./analytics
 import type { PageViewProps } from "./analyticsPageView";
 import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
 import type { GameplayMilestoneId } from "@verticopolis/engine/events/gameplayEvents";
-import type { FallbackStage } from "@verticopolis/components/host/engineBoot";
-import type { EngineChoice } from "@verticopolis/components/host/engineChoice";
-import type { TrapKind } from "@verticopolis/components/host/hostFault";
+import type { FallbackStage } from "./engineHost/engineBoot";
+import type { EngineChoice } from "./engineHost/engineChoice";
+import type { TrapKind } from "@verticopolis/engine/host/hostFault";
 import type { AppActionName } from "./analyticsAppActions";
 import type { FileFailureCode } from "./analyticsActions";
 

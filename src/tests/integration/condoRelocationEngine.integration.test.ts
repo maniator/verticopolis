@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import { newSeededDraft, lay, LOT_WIDTH } from "../portKit/draftFixtures";
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { GameMode } from "@verticopolis/engine/model/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** Household-aware condo departures (Modern only), on both engines. Moved from

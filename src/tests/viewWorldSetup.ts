@@ -1,5 +1,5 @@
 import { catalogFor } from "./catalogFixture";
-import { useFallbackCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
+import { useFallbackCatalogSource } from "../engineHost/towerCatalog";
 import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
 import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
 

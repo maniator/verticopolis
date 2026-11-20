@@ -1,4 +1,4 @@
-import type { CatalogRules } from "@verticopolis/components/catalog/catalogTypes";
+import type { CatalogRules } from "@verticopolis/engine/catalog/catalogTypes";
 
 /**
  * What the elevator schedule dialog (#305) shows, decided from the engine's

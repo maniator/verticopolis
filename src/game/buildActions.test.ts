@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { catalogFacility, catalogTileCost } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogTileCost } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { viewWorld } from "@verticopolis/components/presentation/viewWorld";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { catalogFor } from "../tests/catalogFixture";
 import { LAYOUT, mockPort } from "../tests/portKit/mockPort";
 import { brushTiles } from "../ui/placement";

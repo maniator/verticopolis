@@ -2,10 +2,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { floorsOfPort, newViewReader } from "../../game/portAccess";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { decodeVctower } from "../../storage/vctowerContainer";
-import { clockOf } from "@verticopolis/components/port/headerClock";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import { clockOf } from "../../engineHost/headerClock";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { engineFromSave, look, noEngine } from "../portKit/rustEngine";
 import { CONFORMANCE_ROOT } from "../packagePaths";
 

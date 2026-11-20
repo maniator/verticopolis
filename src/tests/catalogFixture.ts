@@ -1,9 +1,9 @@
 import { COMPONENT_FIXTURES } from "./packagePaths";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
-import type { GameMode } from "@verticopolis/components/shared/types";
+import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
+import type { GameMode } from "@verticopolis/engine/model/types";
 
 /**
  * The Rust engine's catalog for each mode, as its `catalog(mode)` export

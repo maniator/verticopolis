@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { SaveGame } from "../storage/SaveGame";
 import { bootTower } from "./bootTower";
 import { NEWER_SAVE_REFUSAL } from "./portLifecycle";

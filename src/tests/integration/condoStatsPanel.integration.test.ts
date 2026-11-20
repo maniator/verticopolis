@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { statsBodyOf } from "../../ui/templates/stats.fixture";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 import { portOf, unitEditor } from "../../game/cardKit.fixture";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { groupDigits } from "@verticopolis/components/windows/format";
 import { catalogFor } from "../catalogFixture";
 import { LOT_WIDTH, lay, mustBuild } from "../portKit/draftFixtures";

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import type { HeatmapMode } from "@verticopolis/components/shared/engineTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { HeatmapMode } from "@verticopolis/engine/model/engineTypes";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
 import { extentFloors, fitLayout, mapExtent } from "@verticopolis/components/render/overviewMap/geometry";
 import type { HeatCellView } from "@verticopolis/components/render/overviewMap/heatView";

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
-import { INSTANCE_METHODS, STATIC_METHODS, TOOLING_METHODS } from "@verticopolis/components/binding/binding";
+import { INSTANCE_METHODS, STATIC_METHODS, TOOLING_METHODS } from "@verticopolis/engine/binding/binding";
 
 /**
  * The Rust-only build (src/build/engineBundle.ts) in a real browser. The

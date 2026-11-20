@@ -11,7 +11,7 @@ import {
 } from "./stats";
 import { catalogFor } from "../../tests/catalogFixture";
 import { renderToFragment } from "../testing/litTestUtils";
-import type { StarGateId } from "@verticopolis/components/port/panels";
+import type { StarGateId } from "@verticopolis/engine/port/panels";
 import { LAYOUT } from "../../tests/portKit/mockPort";
 import { ledger, milestoneList, statsScreenFor, type ScreenParts } from "../../tests/fixtures/statsScreens";
 

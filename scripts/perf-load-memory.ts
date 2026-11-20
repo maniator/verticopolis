@@ -54,7 +54,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUILD_SECTION, customSectionsOf, parseBuildMetadata } from "@verticopolis/components/host/buildSection";
+import { BUILD_SECTION, customSectionsOf, parseBuildMetadata } from "@verticopolis/engine/host/buildSection";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const REPO = resolve(dirname(SCRIPT), "..");

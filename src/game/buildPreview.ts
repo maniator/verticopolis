@@ -1,21 +1,17 @@
 import type { GameApp } from "../main";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import type { Picked } from "@verticopolis/components/render/excalibur/TowerEngine";
-import {
-  catalogBuildKind,
-  catalogFacility,
-  catalogTileCost,
-  type Catalog,
-} from "@verticopolis/components/catalog/catalogTypes";
+import { catalogBuildKind, catalogTileCost, type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";
 import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
 import { FLOOR } from "@verticopolis/components/render/scale";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft, type BuildQuote } from "./portAccess";
-import { NOT_ENOUGH_MONEY } from "@verticopolis/components/port/request";
+import { NOT_ENOUGH_MONEY } from "@verticopolis/engine/port/request";
 import { lobbyHeightFor } from "./lobbyHeight";
 import { quoteSkyBridge, quotedTiles, skyBridgeLabel } from "./skyBridgeTool";
-import { finishedSkyBridgeAt } from "@verticopolis/components/port/skyBridgeView";
+import { finishedSkyBridgeAt } from "@verticopolis/engine/port/skyBridgeView";
 import { pickedSkyBridgeLook } from "../ui/skyBridgeLookStrip";
 import { groupDigits } from "@verticopolis/components/windows/format";
 

@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import { expect, it } from "vitest";
 import { describeWithCodec, parseTDT } from "../conformance/tdtWasm";
 import { wasm } from "../conformance/wasmEngine";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
 import { CONFORMANCE_ROOT } from "../packagePaths";
 
 const DIR = resolve(CONFORMANCE_ROOT, "fixtures/tdt-reddit");

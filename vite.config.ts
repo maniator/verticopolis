@@ -15,7 +15,7 @@ import {
 } from "./src/build/enginePackageBuild";
 import { MAX_RELEASES, type BuildFingerprint } from "./src/pwaUpdateInfo";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
-import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "@verticopolis/components/host/enginePackageNames";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "@verticopolis/engine/host/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
 import {
   assembleToolingPublicDir,

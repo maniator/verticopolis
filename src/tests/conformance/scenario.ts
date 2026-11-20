@@ -3,8 +3,8 @@ import { CHARGE_OPS, applyCharge, type ChargeCommand, type ChargeEngine } from "
 import { TUNE_OPS, applyTune, expectOk, expectOutcome, type TuneCommand } from "./tuneOps";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { FacilityKind, GameMode } from "@verticopolis/components/shared/types";
-import type { FilmPolicy } from "@verticopolis/components/port/commands";
+import type { FacilityKind, GameMode } from "@verticopolis/engine/model/types";
+import type { FilmPolicy } from "@verticopolis/engine/port/commands";
 import { reloadChanged } from "./reloadCheck";
 import { digest } from "./canonical";
 import { check, own, type Spec } from "./scenarioSchema";

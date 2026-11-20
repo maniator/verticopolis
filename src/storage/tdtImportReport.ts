@@ -3,7 +3,7 @@
  * {@link ImportReport} shown before the tower is adopted, built from the
  * numbers the Rust codec counts while it decodes (the `loadTdt` record).
  */
-import type { ImportReportFacts } from "@verticopolis/components/port/tdtReportFacts";
+import type { ImportReportFacts } from "@verticopolis/engine/port/tdtReportFacts";
 import { groupDigits } from "@verticopolis/components/windows/format";
 
 /** What the fidelity-report modal shows before the player adopts the tower. */

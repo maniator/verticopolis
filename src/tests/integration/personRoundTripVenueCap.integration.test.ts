@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { catalogFor } from "../catalogFixture";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
-import type { Person } from "@verticopolis/components/shared/engineTypes";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
+import type { Person } from "@verticopolis/engine/model/engineTypes";
 import { PortSim, describeEngines, type Leg, draftTower } from "../portKit/portSim";
 
 /** A facility's published facts (width, population, attendance), from the

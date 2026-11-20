@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { catalogFor } from "../catalogFixture";
 
 /** The Classic catalog: the engine's published rule table, which is what the

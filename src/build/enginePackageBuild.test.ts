@@ -9,8 +9,8 @@ import {
   ENGINE_DIR,
   ENGINE_GLUE,
   ENGINE_WASM,
-} from "@verticopolis/components/host/enginePackageNames";
-import { engineBuildRecord } from "@verticopolis/components/host/enginePackageRecord";
+} from "@verticopolis/engine/host/enginePackageNames";
+import { engineBuildRecord } from "@verticopolis/engine/host/enginePackageRecord";
 import {
   ENGINE_REVISION_SUFFIX,
   INTEGRITY_FILES,

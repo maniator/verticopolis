@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { statsReport } from "@verticopolis/components/port/statsSheet";
+import { statsReport } from "@verticopolis/engine/port/statsSheet";
 import { canCallExterminator } from "../ui/templates/stats";
 import { catalogOf } from "./portAccess";
 

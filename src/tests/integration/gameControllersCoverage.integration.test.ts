@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { catalogFor } from "../catalogFixture";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
-import { useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
+import { useTowerCatalogSource } from "../../engineHost/towerCatalog";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { draftTower, draftFromSave, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
@@ -11,11 +11,11 @@ import type {
   BatchRentResult,
   BatchTarget,
   PriceOptions,
-} from "@verticopolis/components/shared/engineTypes";
+} from "@verticopolis/engine/model/engineTypes";
 import { priceOptionsFor } from "../../ui/catalogPricing";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
-import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
-import type { Transport, Unit } from "@verticopolis/components/shared/types";
+import type { ElevatorSchedule } from "@verticopolis/engine/model/engineTypes";
+import type { Transport, Unit } from "@verticopolis/engine/model/types";
 import type { Picked, TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
 import {
@@ -41,8 +41,8 @@ import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { portDeps } from "../../game/portDeps.fixture";
-import { INVALID_COMMAND, MAX_TEXT } from "@verticopolis/components/port/request";
-import { PortEvents } from "@verticopolis/components/port/portEvents";
+import { INVALID_COMMAND, MAX_TEXT } from "@verticopolis/engine/port/request";
+import { PortEvents } from "@verticopolis/engine/port/portEvents";
 import { hasWasmPackage } from "../conformance/wasmEngine";
 
 /** The `.TDT` tests read and write files through the Rust package, so they run

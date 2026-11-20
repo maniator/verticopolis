@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { MAX_TEXT, NOT_ENOUGH_MONEY } from "@verticopolis/components/port/request";
+import { MAX_TEXT, NOT_ENOUGH_MONEY } from "@verticopolis/engine/port/request";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import { catalogFor } from "../tests/catalogFixture";
 import { CATALOG, lift, office, rec, root, setup } from "./editorActions.fixture";
 
-vi.mock("@verticopolis/components/port/headerClock", () => ({
+vi.mock("../engineHost/headerClock", () => ({
   clockOf: () => ({ hour: 9, isWeekend: true }),
 }));
 

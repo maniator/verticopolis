@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { strFromU8, unzipSync } from "fflate";
 import { engineFailureArchive } from "./failureArchive";
-import type { EngineBootFailure } from "@verticopolis/components/host/engineBoot";
+import type { EngineBootFailure } from "../engineHost/engineBoot";
 
 const failure: EngineBootFailure = {
   stage: "host",

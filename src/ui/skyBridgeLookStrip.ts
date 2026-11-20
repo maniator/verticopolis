@@ -1,5 +1,5 @@
 import { html, nothing, render } from "lit-html";
-import type { CatalogSkyBridge } from "@verticopolis/components/catalog/skyBridgeTypes";
+import type { CatalogSkyBridge } from "@verticopolis/engine/catalog/skyBridgeTypes";
 
 /**
  * The Sky Bridge tool's look strip (Modern; owner, 2026-11-16: "let the users

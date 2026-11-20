@@ -23,8 +23,8 @@ import {
   repoRelativeSource,
   type EmittedChunk,
 } from "../src/build/engineBundle.ts";
-import { ENGINE_DIR, ENGINE_GLUE } from "@verticopolis/components/host/enginePackageNames";
-import { TOOLING_METHODS } from "@verticopolis/components/binding/toolingMethods";
+import { ENGINE_DIR, ENGINE_GLUE } from "@verticopolis/engine/host/enginePackageNames";
+import { TOOLING_METHODS } from "@verticopolis/engine/binding/toolingMethods";
 import { MAPLESS_PUBLIC_SCRIPTS } from "../src/build/publicFiles.ts";
 import { sourceToPath } from "../src/build/thirdPartyNotices.ts";
 

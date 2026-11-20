@@ -1,5 +1,5 @@
 import { html, nothing, render as litRender } from "lit-html";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 import { isDialogOpen, isEngineStopped } from "../game/interactionState";
 import { iconElement } from "@verticopolis/components/windows/icons";

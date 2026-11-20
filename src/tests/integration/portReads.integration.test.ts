@@ -2,10 +2,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
-import type { HeatmapMode } from "@verticopolis/components/shared/engineTypes";
-import { clockOf, type ClockView } from "@verticopolis/components/port/headerClock";
-import { PortCodes, outcome } from "@verticopolis/components/port/portCodes";
-import { PortEvents } from "@verticopolis/components/port/portEvents";
+import type { HeatmapMode } from "@verticopolis/engine/model/engineTypes";
+import { clockOf, type ClockView } from "../../engineHost/headerClock";
+import { PortCodes, outcome } from "@verticopolis/engine/port/portCodes";
+import { PortEvents } from "@verticopolis/engine/port/portEvents";
 import { draftTower } from "../portKit/drafts";
 import { catalogFixturePath } from "../catalogFixture";
 import { wasm } from "../conformance/wasmEngine";
@@ -156,7 +156,7 @@ function renderTower() {
   return { engine, reader, r: newRenderSim(engine, reader) };
 }
 
-describe.skipIf(noEngine)("PortRenderSim on the engine", () => {
+describe.skipIf(noEngine)("FrameReader on the engine", () => {
   it("reads the founded tower, then follows the frame through play", () => {
     const { engine, reader, r } = renderTower();
     expect([r.mode, r.rng.initialSeed, r.view, r.weather, r.population]).toEqual(["modern", 5, null, "clear", 0]);

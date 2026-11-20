@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import { inflateSync } from "fflate";
 import { FLOOR, TILE, TowerEngine } from "@verticopolis/components/render/excalibur/TowerEngine";
 import { viewWorld } from "@verticopolis/components/presentation/viewWorld";
-import type { SerializedGame, SerializedView } from "@verticopolis/components/shared/types";
+import type { SerializedGame, SerializedView } from "@verticopolis/engine/model/types";
 import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
 import { SaveLoad } from "../../game/saveLoad";
 import { buildTDT, parseTDT } from "../conformance/tdtWasm";
@@ -11,7 +11,7 @@ import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 import { loadAuto, withPorts } from "../fixtures/saveText";
 import { draftTower, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 
 /** The view a tower's save carries. */
 const viewOf = (sim: Draft | null): SerializedView | undefined => sim?.serialize().view;

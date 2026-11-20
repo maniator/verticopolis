@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import type { Unit } from "@verticopolis/components/shared/types";
-import type { Transport } from "@verticopolis/components/shared/types";
+import type { Unit } from "@verticopolis/engine/model/types";
+import type { Transport } from "@verticopolis/engine/model/types";
 import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
 
 /**

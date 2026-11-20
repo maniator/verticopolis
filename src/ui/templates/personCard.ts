@@ -1,9 +1,10 @@
 import { html, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
-import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import { type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { isHotelKind } from "@verticopolis/components/presentation/viewKinds";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
-import type { PersonDetail, PersonPurpose, ShiftStep, TripPlace } from "@verticopolis/components/port/personCards";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
+import type { PersonDetail, PersonPurpose, ShiftStep, TripPlace } from "@verticopolis/engine/port/personCards";
 import { floorTag } from "@verticopolis/components/windows/format";
 
 /**

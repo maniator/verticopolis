@@ -1,5 +1,5 @@
-import type { VacateReason } from "@verticopolis/components/shared/types";
-import { VACATE_REASON_TEXT } from "@verticopolis/components/shared/vacateReasonText";
+import type { VacateReason } from "@verticopolis/engine/model/types";
+import { VACATE_REASON_TEXT } from "@verticopolis/components/model/vacateReasonText";
 import { floorLabel } from "./floorLabel";
 import { groupDigits } from "@verticopolis/components/windows/format";
 

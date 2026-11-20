@@ -1,6 +1,7 @@
 import { html, type TemplateResult } from "lit-html";
-import { catalogFacility, type Catalog } from "@verticopolis/components/catalog/catalogTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { type Catalog } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 
 /**
  * Card lines the shipped Rust card and the TypeScript reference card share,

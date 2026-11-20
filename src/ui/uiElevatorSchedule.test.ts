@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import type { AutoTuneProposal, PresetProposal, ScheduleFacts } from "@verticopolis/components/port/enginePort";
+import type { AutoTuneProposal, PresetProposal, ScheduleFacts } from "@verticopolis/engine/port/enginePort";
 import {
   CARS,
   CLASSIC_UX,

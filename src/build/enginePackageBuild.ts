@@ -15,13 +15,13 @@ import {
   ENGINE_DIR,
   ENGINE_GLUE,
   ENGINE_WASM,
-} from "@verticopolis/components/host/enginePackageNames";
+} from "@verticopolis/engine/host/enginePackageNames";
 import {
   canonicalFilesJson,
   expectedOf,
   parseEngineRecord,
   type ExpectedEnginePackage,
-} from "@verticopolis/components/host/enginePackageRecord";
+} from "@verticopolis/engine/host/enginePackageRecord";
 
 /** A text file as the page reads it: the page's TextDecoder drops a leading
  *  byte order mark, so the build does too. */

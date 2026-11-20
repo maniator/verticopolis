@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildDiagnostics } from "@verticopolis/components/host/engineDiagnostics";
-import { parseEngineIdentity, readEngineIdentity } from "@verticopolis/components/host/engineIdentity";
+import { buildDiagnostics } from "../../engineHost/engineDiagnostics";
+import { parseEngineIdentity, readEngineIdentity } from "@verticopolis/engine/host/engineIdentity";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { ENGINE_ROOT } from "../packagePaths";
 

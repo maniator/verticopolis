@@ -1,11 +1,11 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { Catalog } from "@verticopolis/components/catalog/catalogTypes";
+import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
 import { iconTemplate } from "@verticopolis/components/windows/icons";
 import { LEDGER_CATS, LEDGER_LABELS, MILESTONE_COPY } from "@verticopolis/components/presentation/statsCopy";
 import { floorTag, groupDigits } from "@verticopolis/components/windows/format";
-import { clockOf, type ClockHeader } from "@verticopolis/components/port/headerClock";
-import type { ElevatorStatsRow, NextStarView, StarGateId, StatsReport } from "@verticopolis/components/port/panels";
-import type { HeaderView } from "@verticopolis/components/port/view";
+import { clockOf, type ClockHeader } from "../../engineHost/headerClock";
+import type { ElevatorStatsRow, NextStarView, StarGateId, StatsReport } from "@verticopolis/engine/port/panels";
+import type { HeaderView } from "@verticopolis/engine/port/view";
 import type { HelpTopic } from "../helpTopics";
 import { helpTopicLink } from "./helpTopicLink";
 

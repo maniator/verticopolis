@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
-import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
+import { scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
 import { diffPaths, load, play } from "./scheduleReview.fixture";
 import { noEngine } from "../portKit/rustEngine";
 

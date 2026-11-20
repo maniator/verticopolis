@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { towerCatalog } from "@verticopolis/components/catalog/towerCatalog";
+import { towerCatalog } from "../../engineHost/towerCatalog";
 import { portOf } from "../../game/cardKit.fixture";
 import { draftTower } from "../portKit/drafts";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
 import { bindViewKinds, findViewKind } from "@verticopolis/components/presentation/viewKinds";
 import { catalogFor } from "../catalogFixture";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 
 /**

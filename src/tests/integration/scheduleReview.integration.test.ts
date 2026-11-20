@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
-import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
+import { scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
 import { keepAct, recoverAct, reviewAct } from "../../ui/templates/scheduleReview";
 import { diffPaths, load, memory, play } from "./scheduleReview.fixture";
 import { look, noEngine } from "../portKit/rustEngine";

@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
 import { catalogOf } from "./portAccess";
 import { editorPlacedByPlayer, forgetEditorPlacement } from "./movableWindows";
 import { focusScreenRect } from "@verticopolis/components/render/excalibur/personFocus";

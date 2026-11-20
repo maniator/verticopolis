@@ -24,7 +24,7 @@ vi.mock("./engineCrash/mismatchReload", async (importOriginal) => {
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 import { sendToRelay } from "./analyticsRelay";
 import { resetEngineStatus } from "./analyticsEngineStatus";
-import { EngineBootError, type PackageFailure } from "@verticopolis/components/host/engineBoot";
+import { EngineBootError, type PackageFailure } from "./engineHost/engineBoot";
 import { MISMATCH_RELOAD_KEY, MISMATCH_RELOAD_LINE, reloadForMatchingFiles } from "./engineCrash/mismatchReload";
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */

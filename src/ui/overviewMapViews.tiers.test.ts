@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
-import type { EvalTier, RentTier } from "@verticopolis/components/port/roomTiers";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
+import type { EvalTier, RentTier } from "@verticopolis/engine/port/roomTiers";
 import { SKY_HEADROOM_FLOORS } from "@verticopolis/components/render/cameraBounds";
 import { extentFloors, fitLayout, mapExtent } from "@verticopolis/components/render/overviewMap/geometry";
 import type { MapPaintContext, PatternSource } from "@verticopolis/components/render/overviewMap/paint";

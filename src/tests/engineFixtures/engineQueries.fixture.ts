@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { newSeededDraft } from "../portKit/draftFixtures";
-import { Cards } from "@verticopolis/components/port/cards";
+import { Cards } from "@verticopolis/engine/port/cards";
 import { type MakeEngine, type Subject, VIEW_LAYOUT, kind, lobbyCenter, must, subject } from "./engineSubject.fixture";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
-import { statsReport } from "@verticopolis/components/port/statsSheet";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
+import { statsReport } from "@verticopolis/engine/port/statsSheet";
 
 /**
  * The panel queries of `EnginePort` on the Rust engine (PR 5e part 4

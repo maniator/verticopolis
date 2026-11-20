@@ -1,5 +1,5 @@
-import type { DiagnosticsReport, DiagnosticsRow } from "@verticopolis/components/host/engineDiagnostics";
-import { liveDiagnostics } from "@verticopolis/components/host/engineDiagnosticsLive";
+import type { DiagnosticsReport, DiagnosticsRow } from "../engineHost/engineDiagnostics";
+import { liveDiagnostics } from "../engineHost/engineDiagnosticsLive";
 
 /**
  * The game's side of the engine diagnostics: the components package's report

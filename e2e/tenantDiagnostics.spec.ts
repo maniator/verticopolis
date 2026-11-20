@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { lobbyDistanceFixture } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import type { Unit } from "@verticopolis/components/shared/types";
+import type { Unit } from "@verticopolis/engine/model/types";
 import { buildInPage, expectEngineHosted } from "./helpers";
 
 /**

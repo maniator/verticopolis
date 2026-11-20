@@ -20,7 +20,7 @@ import { describe, it, expect } from "vitest";
  */
 
 // --- 1. Compile-time surface: every exported TYPE. ---
-import type { Person, PersonState } from "@verticopolis/components/shared/engineTypes";
+import type { Person, PersonState } from "@verticopolis/engine/model/engineTypes";
 import type { ExportReport } from "../storage/tdtExportReport";
 import type { ImportReport } from "../storage/tdtImportReport";
 import type { SlotInfo } from "../storage/SaveGame";

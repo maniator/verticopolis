@@ -1,4 +1,4 @@
-import type { GameMode, SerializedGame } from "@verticopolis/components/shared/types";
+import type { GameMode, SerializedGame } from "@verticopolis/engine/model/types";
 import type { SlotInfo } from "./slotInfo";
 
 // The slot-metadata shape lives in its own module (pure types, no runtime), and

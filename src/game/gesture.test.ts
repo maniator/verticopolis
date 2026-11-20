@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { catalogFor } from "../tests/catalogFixture";
 import { classifyGesture, isPaintKind } from "./gesture";
 import type { Tool } from "../ui/UI";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 
 const CAT = catalogFor("classic");
 

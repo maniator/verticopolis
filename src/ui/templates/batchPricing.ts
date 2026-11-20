@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import type { BatchTarget, BatchRentResult } from "@verticopolis/components/shared/engineTypes";
-import type { PriceRung } from "@verticopolis/components/shared/engineTypes";
+import type { BatchTarget, BatchRentResult } from "@verticopolis/engine/model/engineTypes";
+import type { PriceRung } from "@verticopolis/engine/model/engineTypes";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { groupDigits } from "@verticopolis/components/windows/format";
 

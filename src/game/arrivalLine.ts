@@ -1,4 +1,4 @@
-import type { SimView } from "@verticopolis/components/port/view";
+import type { SimView } from "@verticopolis/engine/port/view";
 
 /**
  * The Bulletin's first line when a tower arrives with no messages (party,

@@ -11,9 +11,9 @@ import {
   type LineWaitTier,
 } from "@verticopolis/components/presentation/traffic";
 import { floorLabel } from "../../ui/floorLabel";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 
 vi.mock("../../analytics", () => ({ trackAppAction: vi.fn() }));
 

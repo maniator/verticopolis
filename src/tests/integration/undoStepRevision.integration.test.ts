@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { EnginePort, PortRecord } from "@verticopolis/components/port/enginePort";
+import type { EnginePort, PortRecord } from "@verticopolis/engine/port/enginePort";
 import { done, kind, lobbyCenter, must, subject, type Subject } from "../engineFixtures/engineSubject.fixture";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { releaseDrafts } from "../portKit/drafts";

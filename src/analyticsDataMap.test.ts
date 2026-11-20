@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { ENGAGED_BY } from "./analyticsEngagement";
-import { TRAP_KINDS } from "@verticopolis/components/host/hostFault";
+import { TRAP_KINDS } from "@verticopolis/engine/host/hostFault";
 import {
   ENGINE_STATUS_REASONS,
   ENGINE_BUILDS,
@@ -12,16 +12,16 @@ import {
   ENGINE_STATUS_TRIGGERS,
   MAX_ENGINE_STATUS_ROWS,
 } from "./analyticsEngineStatus";
-import { FALLBACK_STAGES } from "@verticopolis/components/host/engineBoot";
+import { FALLBACK_STAGES } from "./engineHost/engineBoot";
 import { MAX_BODY_BYTES, RATE_LIMIT_MAX } from "./analyticsIngest";
-import type { EngineChoice } from "@verticopolis/components/host/engineChoice";
+import type { EngineChoice } from "./engineHost/engineChoice";
 import {
   TDT_IMPORT_ANOMALIES,
   TDT_TRANSPORT_ANOMALIES,
   tdtImportReadProps,
   type TowerFileProps,
 } from "./analyticsFiles";
-import type { ImportReportFacts } from "@verticopolis/components/port/tdtReportFacts";
+import type { ImportReportFacts } from "@verticopolis/engine/port/tdtReportFacts";
 
 /** Every engine a page life can ask for. Typed against `EngineChoice` both
  *  ways, so a new choice fails the typecheck here until the map lists it. */

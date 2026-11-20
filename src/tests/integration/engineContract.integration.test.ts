@@ -1,5 +1,5 @@
 import { afterEach, describe, it } from "vitest";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { describeEngineContract } from "../engineFixtures/engineContract.fixture";
 import { describeEngineLifecycle } from "../engineFixtures/engineLifecycle.fixture";
 import { describeEngineQueries } from "../engineFixtures/engineQueries.fixture";

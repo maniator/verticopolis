@@ -1,4 +1,4 @@
-import type { ExportReportFacts } from "@verticopolis/components/port/tdtReportFacts";
+import type { ExportReportFacts } from "@verticopolis/engine/port/tdtReportFacts";
 import { groupDigits } from "@verticopolis/components/windows/format";
 
 /** The elevator slots a `.TDT` file holds. */

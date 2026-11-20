@@ -1,5 +1,5 @@
-import type { HeatmapMode } from "@verticopolis/components/shared/engineTypes";
-import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import type { HeatmapMode } from "@verticopolis/engine/model/engineTypes";
+import type { WasmEngine } from "@verticopolis/engine/binding/binding";
 import type { EngineStart, ScenarioEngine, Start } from "./scenario";
 import { startWasmHandle, wasm, wasmEngine, wasmFxSlots } from "./wasmEngine";
 

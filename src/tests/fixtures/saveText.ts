@@ -1,10 +1,10 @@
 import { SaveGame } from "../../storage/SaveGame";
-import type { SerializedGame } from "@verticopolis/components/shared/serializedGame";
+import type { SerializedGame } from "@verticopolis/engine/model/serializedGame";
 import { loadStored } from "../../game/portLifecycle";
 import type { SaveLoadDeps } from "../../game/saveLoad";
 import { newViewReader } from "../../game/portAccess";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { draftTower, type Draft } from "../portKit/drafts";
 
 /**

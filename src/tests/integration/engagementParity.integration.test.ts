@@ -3,7 +3,7 @@ vi.mock("../../analyticsEngineStatus", () => ({ noteEngineEngaged: vi.fn() }));
 import { noteEngineEngaged } from "../../analyticsEngineStatus";
 import { PLAY_SECONDS } from "../../analyticsEngagement";
 import { startEngagementWatch } from "../../game/engagementWatch";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { kind, lobbyCenter, subject, type MakeEngine } from "../engineFixtures/engineSubject.fixture";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { releaseDrafts } from "../portKit/drafts";

@@ -1,11 +1,11 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { useTowerCatalogSource } from "../../engineHost/towerCatalog";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
 import { createCardKit } from "../../game/cardKit";
 import { newViewReader } from "../../game/portAccess";
 import { swapDone } from "../../game/portLifecycle";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import {
   CARD_TEXT_CASES,

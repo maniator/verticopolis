@@ -8,9 +8,9 @@ import {
   type SchedState,
   type SchedHandlers,
 } from "./templates/elevatorSchedule";
-import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
-import type { OriginRings } from "@verticopolis/components/shared/engineTypes";
-import { SCHEDULE_HOURS } from "@verticopolis/components/port/scheduleSlots";
+import type { ElevatorSchedule } from "@verticopolis/engine/model/engineTypes";
+import type { OriginRings } from "@verticopolis/engine/model/engineTypes";
+import { SCHEDULE_HOURS } from "@verticopolis/engine/port/scheduleSlots";
 import { hotspotFloors, type ElevatorScheduleUX } from "./scheduleDialogRules";
 import type {
   AssistedPreset,
@@ -18,7 +18,7 @@ import type {
   PresetProposal,
   ScheduleFacts,
   SchedulePresetName,
-} from "@verticopolis/components/port/enginePort";
+} from "@verticopolis/engine/port/enginePort";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
 import { autoAnnouncement, fillFromProposal, tunedAnnouncement } from "./uiElevatorScheduleAuto";
 

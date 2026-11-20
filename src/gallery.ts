@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
-import type { Catalog, CatalogFacility } from "@verticopolis/components/catalog/catalogTypes";
-import type { FacilityKind, UnitState } from "@verticopolis/components/shared/types";
+import type { Catalog, CatalogFacility } from "@verticopolis/engine/catalog/catalogTypes";
+import type { FacilityKind, UnitState } from "@verticopolis/engine/model/types";
 import type { DrawCtx } from "@verticopolis/components/render/sprites";
 import { drawRoomPortrait, drawTransportPortrait } from "@verticopolis/components/render/roomPortrait";
 import { pageShell } from "./ui/templates/pageShell";
@@ -9,7 +9,7 @@ import { injectPageTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
 import { bindViewWorld } from "@verticopolis/components/presentation/viewWorld";
 import { bindViewKinds } from "@verticopolis/components/presentation/viewKinds";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
 import { loadGameEngine } from "./engineLoad";
 import { helpUrl } from "./helpAddress";
 

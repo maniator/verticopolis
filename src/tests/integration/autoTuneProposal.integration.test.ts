@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ElevatorSchedule } from "@verticopolis/components/shared/engineTypes";
-import { SCHEDULE_HOURS, scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
+import type { ElevatorSchedule } from "@verticopolis/engine/model/engineTypes";
+import { SCHEDULE_HOURS, scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
 import { MIXED, WARM, COLD, measure, openEngine, ring, tower, type Slots } from "../fixtures/scheduleTower";
 import { hasWasmPackage } from "../conformance/wasmEngine";
 

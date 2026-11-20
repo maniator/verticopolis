@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SaveGame } from "../storage/SaveGame";
-import { PortCodes } from "@verticopolis/components/port/portCodes";
+import { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { mockPort } from "../tests/portKit/mockPort";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
@@ -13,7 +13,7 @@ import {
 } from "../analytics";
 import { precedenceUi } from "../ui/precedenceUi.fixture";
 import { showImportReport } from "../ui/uiDialogs";
-import { exportFacts, importFacts } from "@verticopolis/components/port/tdtRecords";
+import { exportFacts, importFacts } from "@verticopolis/engine/port/tdtRecords";
 import { RESUME_AFTER_RECOVERY_KEY, SaveLoad, type SaveLoadDeps } from "./saveLoad";
 
 vi.mock("../analytics", async (importActual) => ({
@@ -32,7 +32,7 @@ vi.mock("./interactionState", () => ({
 }));
 vi.mock("../ui/Onboarding", () => ({ shouldArm: vi.fn(() => true) }));
 vi.mock("./legacyImportAdopt", () => ({ adoptConfirmedLegacyImport: vi.fn() }));
-vi.mock("@verticopolis/components/port/tdtRecords", () => ({
+vi.mock("@verticopolis/engine/port/tdtRecords", () => ({
   exportFacts: vi.fn(() => ({})),
   importFacts: vi.fn(() => ({})),
 }));

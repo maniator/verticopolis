@@ -1,5 +1,6 @@
-import { catalogFacility, catalogOpenAt, type CatalogFacility } from "@verticopolis/components/catalog/catalogTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+import { type CatalogFacility } from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility, catalogOpenAt } from "@verticopolis/components/render/catalogIndex";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 import { catalogFor } from "./catalogFixture";
 
 /**

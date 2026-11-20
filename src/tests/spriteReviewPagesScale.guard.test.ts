@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { catalogFor } from "./catalogFixture";
 import { FLOOR, TILE } from "@verticopolis/components/render/scale";
-import type { Transport, Unit } from "@verticopolis/components/shared/types";
+import type { Transport, Unit } from "@verticopolis/engine/model/types";
 import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
 
 /**

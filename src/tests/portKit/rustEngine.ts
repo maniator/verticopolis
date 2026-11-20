@@ -1,10 +1,10 @@
 import { afterEach } from "vitest";
-import { useTowerCatalogSource } from "@verticopolis/components/catalog/towerCatalog";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
+import { useTowerCatalogSource } from "../../engineHost/towerCatalog";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
 import { draftTower, releaseDrafts, type Draft } from "./drafts";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { ToolingTower, type ToolingEngine } from "../../game/toolingTower";
-import type { EnginePort } from "@verticopolis/components/port/enginePort";
+import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 
 /**
  * The Rust engine for the port's integration suites. The port's unit tests

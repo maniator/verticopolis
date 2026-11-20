@@ -20,7 +20,7 @@ import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow"
 import { gameplaySession, setCommonProps } from "../analytics";
 import { reportCrashException } from "../analyticsErrors";
 import { bindEngineBridge, flushBeforeTowerSwap } from "../analyticsEngineBridge";
-import { clockOf } from "@verticopolis/components/port/headerClock";
+import { clockOf } from "../engineHost/headerClock";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { wireMenus } from "./menuWiring";

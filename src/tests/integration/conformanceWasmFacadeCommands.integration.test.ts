@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readCatalog } from "@verticopolis/components/binding/catalog";
-import type { GameMode } from "@verticopolis/components/shared/types";
+import { readCatalog } from "@verticopolis/engine/binding/catalog";
+import type { GameMode } from "@verticopolis/engine/model/types";
 import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
-import type { WasmEngine } from "@verticopolis/components/binding/binding";
+import type { WasmEngine } from "@verticopolis/engine/binding/binding";
 
 /**
  * The command answers the Rust-backed facade reads (slice 6d, #1216), through

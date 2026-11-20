@@ -1,12 +1,12 @@
 import {
-  catalogFacility,
   type Catalog,
   type CatalogCalendar,
   type CatalogRent,
   type CatalogRentCadence,
-} from "@verticopolis/components/catalog/catalogTypes";
-import type { CalendarKind, PriceOptions, PriceRung } from "@verticopolis/components/shared/engineTypes";
-import type { FacilityKind } from "@verticopolis/components/shared/types";
+} from "@verticopolis/engine/catalog/catalogTypes";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
+import type { CalendarKind, PriceOptions, PriceRung } from "@verticopolis/engine/model/engineTypes";
+import type { FacilityKind } from "@verticopolis/engine/model/types";
 
 /**
  * The price controls for a kind, read from the tower's catalog (#921) in the

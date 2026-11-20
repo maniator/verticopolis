@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { outcome } from "@verticopolis/components/port/portCodes";
+import { outcome } from "@verticopolis/engine/port/portCodes";
 
 /** What the player is told when the call is refused, by the engine's reason. */
 export const FIRE_RESCUE_REFUSED = {

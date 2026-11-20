@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { scheduleSlots } from "@verticopolis/components/port/scheduleSlots";
+import { scheduleSlots } from "@verticopolis/engine/port/scheduleSlots";
 import { trackAppAction } from "../analytics";
 import { lift, rec, SCHEDULE, setup, type Answers } from "./editorActions.fixture";
 
@@ -8,7 +8,7 @@ vi.mock("../analytics", async (importActual) => ({
   trackAppAction: vi.fn(),
 }));
 
-vi.mock("@verticopolis/components/port/headerClock", () => ({
+vi.mock("../engineHost/headerClock", () => ({
   clockOf: () => ({ hour: 9, isWeekend: true }),
 }));
 

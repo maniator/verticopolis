@@ -1,5 +1,5 @@
 import { Inflate } from "fflate";
-import { wellFormed } from "@verticopolis/components/shared/wellFormed";
+import { wellFormed } from "@verticopolis/components/model/wellFormed";
 
 /**
  * Compression + base64 codec for the persistence layer. Extracted from

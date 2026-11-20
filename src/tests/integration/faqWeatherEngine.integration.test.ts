@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { newSeededDraft, LOT_WIDTH } from "../portKit/draftFixtures";
-import type { WeatherKind } from "@verticopolis/components/shared/types";
+import type { WeatherKind } from "@verticopolis/engine/model/types";
 import { PortSim, describeEngines, type Leg, type Draft } from "../portKit/portSim";
 
 /**

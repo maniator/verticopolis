@@ -22,7 +22,7 @@ import { openSaves } from "./storage/SaveGame";
 import { BOOT_SEED, bootTower, type BootTower } from "./game/bootTower";
 import { setSlotPopulationReader } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
-import { populationReaderFromModule } from "@verticopolis/components/host/slotPopulation";
+import { populationReaderFromModule } from "./engineHost/slotPopulation";
 import {
   noteEngineAttempt,
   noteEngineCrashReload,
@@ -32,7 +32,7 @@ import {
 } from "./analyticsEngineStatus";
 import { startEngagementWatch } from "./game/engagementWatch";
 import { TRAP_REASON, noteEngineThrow, runningTowerStage, watchEngineTraps } from "./game/engineFault";
-import { trapKind } from "@verticopolis/components/host/hostFault";
+import { trapKind } from "@verticopolis/engine/host/hostFault";
 import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
 import {
@@ -44,12 +44,12 @@ import {
   publishBootState,
   settleEngineIdentity,
   type EngineBootState,
-} from "@verticopolis/components/host/engineBoot";
-import { refreshSplashVersion } from "@verticopolis/components/host/engineLabel";
+} from "./engineHost/engineBoot";
+import { refreshSplashVersion } from "./engineHost/engineLabel";
 import { APP_VERSION } from "./appVersion";
 import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
 import { downloadEngineFailureArchive } from "./engineCrash/failureArchive";
-import { pageControlled, repairOffered } from "@verticopolis/components/host/engineRepair";
+import { pageControlled, repairOffered } from "./engineHost/engineRepair";
 import { runEngineRepair } from "./engineRepairControl";
 import { DEBUG_FLAG, debugFlagOn, storedDebugFlags } from "./debugFlags";
 import { PREVIEW_DEPLOY } from "./deployTarget";

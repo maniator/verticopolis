@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { withPorts } from "../fixtures/saveText";
 import { catalogFor } from "../catalogFixture";
-import { catalogFacility } from "@verticopolis/components/catalog/catalogTypes";
-import type { FacilityKind, Transport, Unit } from "@verticopolis/components/shared/types";
-import { PortEvents } from "@verticopolis/components/port/portEvents";
+import { catalogFacility } from "@verticopolis/components/render/catalogIndex";
+import type { FacilityKind, Transport, Unit } from "@verticopolis/engine/model/types";
+import { PortEvents } from "@verticopolis/engine/port/portEvents";
 import { LOT_WIDTH } from "../portKit/draftFixtures";
 import { draftTower, type Draft } from "../portKit/drafts";
 import { noEngine } from "../portKit/rustEngine";
