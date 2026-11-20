@@ -20,9 +20,8 @@ flowchart TD
     Lint --> Fast["test: merges the shard reports,<br/>applies the coverage floors"]
     Shards --> Fast
     Lane -->|full| EngineLegs["test-engine (unit) · (port-kit)<br/>test-engine (host) shards"]
-    Lane -->|full| Tooling["tooling-app: the tooling build"]
-    Tooling --> E2E["e2e-serial: visual baselines, perf gate"]
-    Tooling --> E2EG["e2e-general shards<br/>(split by measured time)"]
+    Lane -->|full| E2E["e2e-serial: visual baselines, perf gate"]
+    Lane -->|full| E2EG["e2e-general shards<br/>(split by measured time)"]
     Drift --> Shoot["shoot jobs: shards packed by render time,<br/>each shard rendered twice and byte-compared"]
     Shoot --> Verify["verify-drift: the gallery must match"]
 ```
@@ -50,8 +49,12 @@ branch rules.
   build and the change-note check run beside the shards instead of before
   them.
 - **The engine package.** `npm ci` installs it with the rest of the
-  dependencies, at the versions `package.json` pins. `tooling-app` builds the
-  tooling app once and hands it to the browser jobs as an artifact.
+  dependencies, at the versions `package.json` pins. Each browser job builds
+  its own tooling app (about ten seconds), and the `changes` job reads the
+  Playwright image tag, so the browser jobs start as soon as the lane is
+  known. Every job waits for a free runner first, and a job that needs
+  another job waits again once that one finishes, so each stage of `needs`
+  adds a wait on a busy day; see "Runner queue" below.
 - **Browser suites.** Both run in the pinned Playwright image (the tag comes
   from the Playwright version in `package-lock.json`). `e2e-serial` runs the
   pixel baselines and the perf gate with one worker. `e2e-general` runs the
@@ -61,6 +64,18 @@ branch rules.
   ones; refresh the table with `node scripts/e2e-shards.ts measure` over one
   run's shard logs, or the shards drift apart and the slowest one sets the
   run's time.
+
+### Runner queue
+
+The Verticopolis organization's GitHub-hosted runners are shared by every
+repository in it, and only a fixed number of jobs run at once (20 on
+2026-11-20, measured from the jobs' start and end times). A push to a web pull
+request asks for about 40 jobs across Test CI, the drift check, CodeQL and the
+small checks, so on a busy day most of a run's wall time is spent waiting for
+a runner rather than running. On 2026-11-20 one Test CI run took 22.8 minutes
+on the clock with about 7 minutes of work on its longest path; a quiet run of
+the same workflow took 9. Fewer stages of `needs` and fewer jobs per push keep
+that wait down.
 
 ### Screenshot drift check (`pr-drift-check.yml`)
 
