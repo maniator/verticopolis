@@ -1,4 +1,4 @@
-import { COMPONENT_FIXTURES } from "../packagePaths";
+import { ENGINE_FIXTURES } from "../packagePaths";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { vi } from "vitest";
@@ -55,7 +55,7 @@ export interface Layout {
   records: Record<string, string[]>;
 }
 
-export const FIXTURES = COMPONENT_FIXTURES;
+export const FIXTURES = ENGINE_FIXTURES;
 /** The layout fixture's text, as the engine's `viewLayout()` answers it. */
 export const LAYOUT_TEXT = JSON.stringify(JSON.parse(readFileSync(resolve(FIXTURES, "viewLayout.json"), "utf8")));
 export const LAYOUT = JSON.parse(LAYOUT_TEXT) as Layout;

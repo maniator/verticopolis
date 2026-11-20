@@ -270,7 +270,7 @@ export class UI {
       titleBarClose: (cls, onClick) => this.titleBarClose(cls, onClick),
       closeModal: () => this.closeModal(),
       drainNotice: (b) => this.precedence.drainNotice(b),
-      engineStopped: isEngineStopped,
+      gameStopped: isEngineStopped,
     });
   }
 

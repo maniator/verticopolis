@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { repoRel, sourceFiles } from "./guardFiles";
-import { srcFile } from "./packagePaths";
+import { ENGINE_ROOT, srcFile } from "./packagePaths";
 
 /**
  * One player-facing name for the engine (#1197, spec "One player-facing
@@ -16,15 +16,15 @@ import { srcFile } from "./packagePaths";
  * identifiers keep their names.
  */
 
-/** The engine's copy modules: the host's (from the components package, as
- *  it ships them) and the game's own. */
+/** The engine's copy modules: the game's own host files, the engine
+ *  package's host as it ships, and the components' catalog check. */
 const COPY_MODULES = [
-  srcFile("wasmhost/engineLabel.ts"),
-  srcFile("wasmhost/engineDiagnostics.ts"),
-  srcFile("wasmhost/engineBoot.ts"),
-  srcFile("wasmhost/hostFault.ts"),
-  srcFile("wasmhost/rustEngine.ts"),
-  srcFile("wasmhost/catalogCheck.ts"),
+  resolve("src/engineHost/engineLabel.ts"),
+  resolve("src/engineHost/engineDiagnostics.ts"),
+  resolve("src/engineHost/engineBoot.ts"),
+  resolve(ENGINE_ROOT, "host/hostFault.js"),
+  resolve(ENGINE_ROOT, "host/rustEngine.js"),
+  srcFile("presentation/catalogCheck.ts"),
   resolve("src/build/thirdPartyNotices.ts"),
   resolve("src/bootstrap.ts"),
 ];

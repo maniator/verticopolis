@@ -418,9 +418,9 @@ diagrams). The prose conventions below are the source of truth.
 - **`src/main.ts`**: the composition root that wires input, engine, and the
   game loop together.
 
-Code reads the catalog through the catalog handle (`towerCatalog`,
-`catalogTypes`, `@verticopolis/components/catalog/*`), the frame view
-(`@verticopolis/components/host/frameView`) or an engine query (#868).
+Code reads the catalog through the catalog handle (`src/engineHost/towerCatalog`,
+`@verticopolis/engine/catalog/*`), the frame view
+(`@verticopolis/engine/host/frameView`) or an engine query (#868).
 
 The tower grid is **two-layered**: a structural layer (floor/lobby) with a room
 layer sitting on top, exactly like the original SimTower corridor model.

@@ -16,7 +16,7 @@ import { basename } from "node:path";
 import { deflateSync } from "fflate";
 import { buildTDT, parseTDT } from "../../src/tests/conformance/tdtWasm";
 import { draftTower } from "../../src/tests/portKit/drafts";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
 
 function toVctower(save: unknown) {
   const json = new TextEncoder().encode(JSON.stringify(save));

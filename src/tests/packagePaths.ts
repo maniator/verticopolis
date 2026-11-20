@@ -1,8 +1,8 @@
 /**
  * Where the installed Verticopolis packages live, for the tests and scripts
- * that read their files rather than import their modules: the components'
- * engine-written JSON fixtures, the engine tooling build that the Node suites
- * drive, and the conformance data the referee replays.
+ * that read their files rather than import their modules: the engine's
+ * JSON fixtures, the engine tooling build that the Node suites drive, and
+ * the conformance data the referee replays.
  */
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -13,13 +13,13 @@ const root = (pkg: string): string => dirname(require.resolve(`${pkg}/package.js
 
 /** `@verticopolis/components`, as installed. */
 export const COMPONENTS_ROOT = root("@verticopolis/components");
-/** The components' fixtures written from the engine (catalogs, the view layout). */
-export const COMPONENT_FIXTURES = resolve(COMPONENTS_ROOT, "lib/simport/fixtures");
 /** The components' stylesheets as the package ships them: `styles.css` and
  *  `styles/`, laid out as they were under `src/` before the split. */
 export const COMPONENT_STYLES = resolve(COMPONENTS_ROOT, "lib");
 /** `@verticopolis/engine`, the player build the game ships. */
 export const ENGINE_ROOT = root("@verticopolis/engine");
+/** The engine's JSON fixtures (the catalogs, the view layout). */
+export const ENGINE_FIXTURES = resolve(ENGINE_ROOT, "fixtures");
 /** `@verticopolis/engine/tooling`, the build with the tier 3 ops. */
 export const ENGINE_TOOLING_ROOT = resolve(ENGINE_ROOT, "tooling");
 /** `@verticopolis/engine/conformance`: scenarios, pinned hashes, fixtures. */
@@ -40,7 +40,7 @@ export function conformanceFile(path: string): string {
 const SRC = resolve(REPO, "src");
 /** The `src/` folders that moved to the components package, by their old name. */
 const MOVED =
-  /^(render|presentation|catalog|shared|engineBinding|simport|wasmhost|events|audio|styles)\/|^ui\/(movableWindow|menuBar|uiModal|modalPrecedence|icons|iconPaths\.generated|format|escape|overviewMapInput|desk\/desk(Window|Geometry))|^styles\.css$/;
+  /^(render|presentation|audio|styles)\/|^ui\/(movableWindow|menuBar|uiModal|modalPrecedence|icons|iconPaths\.generated|format|escape|overviewMapInput|desk\/desk(Window|Geometry))|^styles\.css$/;
 
 /**
  * A file a test reads by its path under `src/`. A file that moved to the
