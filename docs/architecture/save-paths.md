@@ -98,8 +98,8 @@ none of a `.TDT` itself. Its part is the UI around the engine's calls:
   `port.tdtExport` and `port.tdtFile` give it.
 
 The integration tests (`tdtImport`, `tdtExport`, `tdtRealSaves`) run these
-paths against the real engine package, and `canon.integration.test.ts` checks
-the engine's catalog against the format notes.
+paths against the real engine package. The engine tests its catalog against
+the format notes itself.
 
 ## Where the saves are kept
 

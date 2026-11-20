@@ -13,9 +13,8 @@ import { createCardKit } from "./cardKit";
  * port: the engine's service facts reach the editor and the inspector, the
  * kit reads them once until it is told the tower moved, and a unit with no
  * service facts adds no service lines. The wording of each section is
- * `portServiceDiagnostics.test.ts`; the facts on the Rust engine (an inert
- * unit's sections switched off included) are
- * `portServiceDiagnostics.integration.test.ts`.
+ * `portServiceDiagnostics.test.ts`; the facts themselves (an inert unit's
+ * sections switched off included) are tested in the engine.
  */
 
 const ID = 40;

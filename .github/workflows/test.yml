@@ -247,14 +247,8 @@ jobs:
   # runners (one runner took close to five minutes). Each shard writes a blob
   # report with its coverage, and the `test` job merges them and applies the
   # coverage floors in vite.config.ts to the whole run, so a shard turns its
-  # own floors off.
-  #
-  # Two long port-kit suites are excluded here and run without coverage on the
-  # unit leg of test-engine below, in parallel: condoRelocationEngine (30
-  # years of hourly ticks, about 60 s locally, 390 s under coverage against its
-  # 300 s limit) and roomCountsEngine (a check after every step on three
-  # conformance towers, 225 s under coverage against 300 s). The engine
-  # conformance suite runs in Verticopolis/engine, through the same binding.
+  # own floors off. The engine conformance suite runs in Verticopolis/engine,
+  # through the same binding.
   test-shard:
     name: test (shard ${{ matrix.shard }} of 4)
     needs: changes
@@ -284,8 +278,6 @@ jobs:
           --coverage.reporter=text-summary
           --coverage.thresholds.statements=0 --coverage.thresholds.lines=0
           --coverage.thresholds.functions=0 --coverage.thresholds.branches=0
-          --exclude '**/condoRelocationEngine.integration.test.ts'
-          --exclude '**/roomCountsEngine.integration.test.ts'
 
       - name: Upload this shard's report
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -404,16 +396,10 @@ jobs:
           VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project unit
 
-      # The port-kit suites run on their own port-kit leg, and the two long
-      # ones the test job leaves out run on the unit leg, without coverage,
-      # after the unit tests, so the legs finish at about the same time.
+      # The port-kit suites run on their own port-kit leg.
       - name: Port-kit suites
         if: ${{ needs.changes.outputs.code != 'false' && matrix.leg == 'port-kit' }}
         run: npm run test:port
-
-      - name: Long port-kit suites (no coverage)
-        if: ${{ !cancelled() && needs.changes.outputs.code != 'false' && needs.changes.outputs.tests != 'false' && matrix.leg == 'unit' }}
-        run: npm exec --no -- vitest run --project integration condoRelocationEngine roomCountsEngine
 
   # The suites that start the Rust engine themselves (conformance, the
   # goldens, perf comparison), run once per PR; the test:wasm script's
