@@ -4,7 +4,7 @@ const engine = vi.hoisted(() => ({ catalog: vi.fn(), report: vi.fn() }));
 vi.mock("./portAccess", () => ({ catalogOf: engine.catalog }));
 vi.mock("@verticopolis/engine/port/statsSheet", () => ({ statsReport: engine.report }));
 
-import { TOWER_CALL_ITEM, showTowerCalls, towerCalls } from "./towerCallItems";
+import { TOWER_CALL_ITEM, towerCallStates, towerCalls } from "./towerCallItems";
 
 const MODERN_RECOVERY = { calloutFee: 5_000, perRoomFee: 2_000 };
 const STRIP = Float64Array.of(7);
@@ -82,27 +82,22 @@ describe("towerCalls: Modern", () => {
   });
 });
 
-describe("showTowerCalls", () => {
-  beforeEach(() => {
-    document.body.innerHTML = `<button id="${TOWER_CALL_ITEM.fireRescue}"></button><button id="${TOWER_CALL_ITEM.exterminator}" hidden></button>`;
-  });
-  const fire = () => document.getElementById(TOWER_CALL_ITEM.fireRescue)!;
-  const pests = () => document.getElementById(TOWER_CALL_ITEM.exterminator)!;
-
+describe("towerCallStates", () => {
   it("lights what can be called and grays the rest", () => {
-    showTowerCalls({ fireRescue: true, exterminator: false });
-    expect(fire().hasAttribute("aria-disabled")).toBe(false);
-    expect(pests().hidden).toBe(false);
-    expect(pests().getAttribute("aria-disabled")).toBe("true");
-    showTowerCalls({ fireRescue: false, exterminator: true });
-    expect(fire().getAttribute("aria-disabled")).toBe("true");
-    expect(pests().hasAttribute("aria-disabled")).toBe(false);
+    expect(towerCallStates({ fireRescue: true, exterminator: false })).toEqual({
+      [TOWER_CALL_ITEM.fireRescue]: { disabled: false },
+      [TOWER_CALL_ITEM.exterminator]: { disabled: true, hidden: false },
+    });
+    expect(towerCallStates({ fireRescue: false, exterminator: true })).toEqual({
+      [TOWER_CALL_ITEM.fireRescue]: { disabled: true },
+      [TOWER_CALL_ITEM.exterminator]: { disabled: false, hidden: false },
+    });
   });
 
-  it("leaves the exterminator out where the rules have none", () => {
-    showTowerCalls({ fireRescue: false, exterminator: true });
-    showTowerCalls({ fireRescue: false, exterminator: null });
-    expect(pests().hidden).toBe(true);
-    expect(pests().getAttribute("aria-disabled")).toBe("true");
+  it("leaves the exterminator out, grayed, where the rules have none", () => {
+    expect(towerCallStates({ fireRescue: false, exterminator: null })[TOWER_CALL_ITEM.exterminator]).toEqual({
+      disabled: true,
+      hidden: true,
+    });
   });
 });

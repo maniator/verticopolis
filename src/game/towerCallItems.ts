@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import { statsReport } from "@verticopolis/engine/port/statsSheet";
 import { canCallExterminator } from "../ui/templates/stats";
 import { catalogOf } from "./portAccess";
+import type { MenuEntryState } from "./menuBarHost";
 
 /**
  * The Tower menu's two calls for help (party 2026-11-15,
@@ -48,18 +49,11 @@ export function towerCalls(app: CallsApp): TowerCalls {
   return { fireRescue: report.stats.fires > 0 && !choiceWaiting, exterminator: canCallExterminator(report, catalog) };
 }
 
-function lit(item: HTMLElement | null, on: boolean): void {
-  if (!item) return;
-  if (on) item.removeAttribute("aria-disabled");
-  else item.setAttribute("aria-disabled", "true");
-}
-
-/** Gray or light the two items, and show the exterminator only where the
- *  rules have one. */
-export function showTowerCalls(calls: TowerCalls, doc: Document = document): void {
-  lit(doc.getElementById(TOWER_CALL_ITEM.fireRescue), calls.fireRescue);
-  const exterminator = doc.getElementById(TOWER_CALL_ITEM.exterminator);
-  if (!exterminator) return;
-  exterminator.hidden = calls.exterminator === null;
-  lit(exterminator, calls.exterminator === true);
+/** Fire Rescue grayed unless it can be called, and the exterminator grayed
+ *  the same way and shown only where the rules have one. */
+export function towerCallStates(calls: TowerCalls): Record<string, MenuEntryState> {
+  return {
+    [TOWER_CALL_ITEM.fireRescue]: { disabled: !calls.fireRescue },
+    [TOWER_CALL_ITEM.exterminator]: { disabled: calls.exterminator !== true, hidden: calls.exterminator === null },
+  };
 }

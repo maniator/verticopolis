@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import type { MenuBar } from "@verticopolis/components/windows/menuBar";
-import { drawnBar, onMenuItem } from "./menuBarHost";
+import { drawnBar, onMenuItem, setMenuState, type MenuEntryState } from "./menuBarHost";
 import { MovableWindow, WITHIN_PARENT } from "@verticopolis/components/windows/movableWindow";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../ui/paletteCollapse";
@@ -21,8 +21,8 @@ import { fillRecentMenu, wireRecentMenu } from "./recentMenu";
 import { overviewMapOpen, setOverviewMapOpen } from "./overviewMapWiring";
 import { callFireRescue } from "./fireRescueCall";
 import { confirmExterminate } from "./appModals";
-import { TOWER_CALL_ITEM, showTowerCalls, towerCalls, type TowerCalls } from "./towerCallItems";
-import { fitFullScreenItem } from "./fullScreenItem";
+import { TOWER_CALL_ITEM, towerCallStates, towerCalls, type TowerCalls } from "./towerCallItems";
+import { fullScreenStates } from "./fullScreenItem";
 import { firstDragReporter, reportWindowClose } from "./movableWindows";
 import { deskActive } from "../ui/desk/deskController";
 
@@ -132,29 +132,17 @@ function remember(storage: Store | null, key: string, open: boolean): void {
 
 const on = (id: string, run: () => void): void => onMenuItem(id, run);
 
-function check(id: string, checked: boolean): void {
-  document.getElementById(id)?.setAttribute("aria-checked", String(checked));
+/** The menus and items that need a tower, shown only when one is open. */
+function screenStates(titleScreenUp: boolean): Record<string, MenuEntryState> {
+  const states: Record<string, MenuEntryState> = {};
+  for (const id of [...TOWER_ONLY_MENUS, ...TOWER_ONLY_ITEMS]) states[id] = { hidden: titleScreenUp };
+  return states;
 }
 
-/** Show the menus and items that need a tower only when one is open. */
-function fitToScreen(titleScreenUp: boolean): void {
-  for (const id of TOWER_ONLY_MENUS) {
-    const menu = document.getElementById(id)?.parentElement;
-    if (menu) menu.hidden = titleScreenUp;
-  }
-  for (const id of TOWER_ONLY_ITEMS) {
-    const item = document.getElementById(id);
-    if (item) item.hidden = titleScreenUp;
-  }
-}
-
-/** Gray a menu item out the way the toolbar grays its twin. */
-function grayLike(id: string, twin: Element | null): void {
-  const item = document.getElementById(id);
-  if (!item) return;
-  if (twin?.getAttribute("aria-disabled") === "true") item.setAttribute("aria-disabled", "true");
-  else item.removeAttribute("aria-disabled");
-}
+/** A menu item grayed the way the toolbar grays its twin. */
+const grayedLike = (twin: Element | null): MenuEntryState => ({
+  disabled: twin?.getAttribute("aria-disabled") === "true",
+});
 
 /** Wire the bar {@link drawMenuBar} drew, once; a page without it, or a
  *  second call, does nothing. */
@@ -254,7 +242,7 @@ export function wireMenus(app: GameApp): MenuBar | null {
   // show the change without a menu opening.
   on("mb-sound", () => {
     ui.cb.onToggleAudio();
-    check("mb-sound", !ui.cb.isMuted());
+    setMenuState({ "mb-sound": { checked: !ui.cb.isMuted() } });
   });
   on("mb-win-tools", () => document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.click());
   on("mb-fullscreen", () => toggleFullScreen(ui));
@@ -264,11 +252,12 @@ export function wireMenus(app: GameApp): MenuBar | null {
 
   // The title screen is a child of the body with a body class of its own
   // (ui/Onboarding.ts): the bar follows either one changing at once, not
-  // only when a menu next opens. The callback is a lookup and ten
-  // attribute writes, on a body child or class change only.
-  fitToScreen(titleScreenUp());
+  // only when a menu next opens. The callback compares eleven states and
+  // draws the bar again only when one changed, on a body child or class
+  // change only.
+  setMenuState(screenStates(titleScreenUp()));
   if (typeof MutationObserver === "function") {
-    new MutationObserver(() => fitToScreen(titleScreenUp())).observe(document.body, {
+    new MutationObserver(() => setMenuState(screenStates(titleScreenUp()))).observe(document.body, {
       childList: true,
       attributes: true,
       attributeFilter: ["class"],
@@ -329,25 +318,25 @@ export function wireMenus(app: GameApp): MenuBar | null {
   /** Read the menus' check marks, grayed and hidden items as `menu` opens. */
   function fitMenus(menu: HTMLElement): void {
     if (menu.id === "mb-file-menu") fillRecentMenu();
-    check("mb-win-tools", !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS));
-    check("mb-win-map", overviewMapOpen(app));
-    for (const w of floating) check(w.item, !!w.win && !w.win.hidden);
-    check("mb-win-statusbar", !document.body.classList.contains(STATUS_BAR_HIDDEN_CLASS));
-    check("mb-fullscreen", !!document.fullscreenElement);
-    // The installed app on a phone is not offered Full Screen (fullScreenItem.ts).
-    fitFullScreenItem(app.mobileMq?.matches ?? false);
-    check("mb-sound", !ui.cb.isMuted());
-    grayLike("mb-undo", ui.el.undo);
-    grayLike("mb-redo", ui.el.redo);
     const noTower = titleScreenUp();
-    fitToScreen(noTower);
     // A tower the game stopped on cannot be saved, so it cannot be closed either.
     // Nor can it be opened over, saved or saved as (the File keys refuse them too).
     const stopped = isEngineStopped();
-    for (const id of ENGINE_FILE_ITEMS) {
-      if (stopped) document.getElementById(id)?.setAttribute("aria-disabled", "true");
-      else document.getElementById(id)?.removeAttribute("aria-disabled");
-    }
+    const states: Record<string, MenuEntryState> = {};
+    // One entry can take states from several of the rules below.
+    const put = (id: string, state: MenuEntryState) => (states[id] = { ...states[id], ...state });
+    put("mb-win-tools", { checked: !document.getElementById("palette")?.classList.contains(PALETTE_COLLAPSED_CLASS) });
+    put("mb-win-map", { checked: overviewMapOpen(app) });
+    for (const w of floating) put(w.item, { checked: !!w.win && !w.win.hidden });
+    put("mb-win-statusbar", { checked: !document.body.classList.contains(STATUS_BAR_HIDDEN_CLASS) });
+    put("mb-fullscreen", { checked: !!document.fullscreenElement });
+    put("mb-sound", { checked: !ui.cb.isMuted() });
+    put("mb-undo", grayedLike(ui.el.undo));
+    put("mb-redo", grayedLike(ui.el.redo));
+    for (const [id, state] of Object.entries(screenStates(noTower))) put(id, state);
+    for (const id of ENGINE_FILE_ITEMS) put(id, { disabled: stopped });
+    // The installed app on a phone is not offered Full Screen (fullScreenItem.ts).
+    for (const [id, state] of Object.entries(fullScreenStates(app.mobileMq?.matches ?? false))) put(id, state);
     // Fire Rescue and the exterminator, read from the engine only as the
     // Tower menu opens (towerCallItems.ts). A stopped engine answers
     // nothing, so both stay grayed.
@@ -361,16 +350,15 @@ export function wireMenus(app: GameApp): MenuBar | null {
           // themselves would refuse anyway.
         }
       }
-      showTowerCalls(calls);
+      for (const [id, state] of Object.entries(towerCallStates(calls))) put(id, state);
     }
     // The Tools fold exists on the desktop layout only, and in a tower.
-    const tools = document.getElementById("mb-win-tools");
     // On the 1994 desk Tools never folds; its Window menu brings it up.
-    if (tools) tools.hidden = noTower || !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent;
+    put("mb-win-tools", { hidden: noTower || !document.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.offsetParent });
     // Install app's separator shows with it (installAffordance.ts shows the item).
     const install = document.getElementById("btn-install-menu");
-    const installSep = root.querySelector<HTMLElement>(".mb-install-sep");
-    if (installSep) installSep.hidden = !install || install.hidden;
+    put("mb-install-sep", { hidden: !install || install.hidden });
+    setMenuState(states);
   }
   return bar;
 }

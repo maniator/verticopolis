@@ -7,8 +7,17 @@
  * item's `onPick` (menuModel.ts) runs every action registered for its id, so
  * no module adds a listener to an element the bar draws. A click on the item,
  * from the pointer, the keyboard or a script's `click()`, runs them alike.
+ *
+ * A module that checks, grays or hides an entry says so with
+ * {@link setMenuState}, which draws the bar again from its model with that
+ * state, so nothing writes to an element the bar draws.
  */
-import { MenuBar, type MenuBarOptions } from "@verticopolis/components/windows/menuBar";
+import {
+  MenuBar,
+  type MenuBarModel,
+  type MenuBarOptions,
+  type MenuEntryModel,
+} from "@verticopolis/components/windows/menuBar";
 import { gameMenuModel } from "./menuModel";
 import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";
 import { trackAppAction } from "../analytics";
@@ -16,10 +25,21 @@ import { trackAppAction } from "../analytics";
 /** What an item does when it is picked. */
 export type MenuAction = (event: MouseEvent) => void;
 
-/** A drawn bar: the bar, the hooks {@link wireMenus} attaches, and each
- *  item's actions by id. */
+/** What a page changes on a drawn entry: an item's check mark, an item's or
+ *  submenu's gray, and whether an entry, or a whole menu by its title's id,
+ *  shows. A field left out keeps what the model or an earlier state said. */
+export interface MenuEntryState {
+  readonly checked?: boolean;
+  readonly disabled?: boolean;
+  readonly hidden?: boolean;
+}
+
+/** A drawn bar: the bar, the model it was drawn from, the entries' states,
+ *  the hooks {@link wireMenus} attaches, and each item's actions by id. */
 export interface DrawnBar {
   readonly bar: MenuBar;
+  readonly model: MenuBarModel;
+  readonly states: Map<string, MenuEntryState>;
   hooks: Pick<MenuBarOptions, "onTrip" | "onDismiss" | "onOpen">;
   readonly actions: Map<string, MenuAction[]>;
 }
@@ -42,24 +62,23 @@ export function drawMenuBar(doc: Document = document): MenuBar | null {
   const host = doc.getElementById("menubar-host");
   if (!host || drawnBars.has(host)) return null;
   const actions = new Map<string, MenuAction[]>();
+  const model = gameMenuModel({
+    sponsorUrl: sponsorOffered() ? SPONSOR_URL : null,
+    onSponsor: () => trackAppAction("sponsor_click", "menu"),
+    pick: (id) => (event) => {
+      for (const run of actions.get(id) ?? []) run(event);
+    },
+  });
   const drawn: DrawnBar = {
     hooks: {},
     actions,
-    bar: new MenuBar(
-      host,
-      gameMenuModel({
-        sponsorUrl: sponsorOffered() ? SPONSOR_URL : null,
-        onSponsor: () => trackAppAction("sponsor_click", "menu"),
-        pick: (id) => (event) => {
-          for (const run of actions.get(id) ?? []) run(event);
-        },
-      }),
-      {
-        onTrip: (title, via) => drawn.hooks.onTrip?.(title, via),
-        onDismiss: (title, how, browsed) => drawn.hooks.onDismiss?.(title, how, browsed),
-        onOpen: (menu) => drawn.hooks.onOpen?.(menu),
-      },
-    ),
+    model,
+    states: new Map(),
+    bar: new MenuBar(host, model, {
+      onTrip: (title, via) => drawn.hooks.onTrip?.(title, via),
+      onDismiss: (title, how, browsed) => drawn.hooks.onDismiss?.(title, how, browsed),
+      onOpen: (menu) => drawn.hooks.onOpen?.(menu),
+    }),
   };
   drawnBars.set(host, drawn);
   return drawn.bar;
@@ -83,4 +102,45 @@ export function onMenuItem(id: string, run: MenuAction, doc: Document = document
   const list = actions.get(id);
   if (list) list.push(run);
   else actions.set(id, [run]);
+}
+
+/** Check, gray or show the entries `changes` names, on the bar drawn on
+ *  `doc`'s page, and draw the bar again once if any of them changed. A page
+ *  without the bar changes nothing. */
+export function setMenuState(changes: Readonly<Record<string, MenuEntryState>>, doc: Document = document): void {
+  const drawn = drawnBar(doc);
+  if (!drawn) return;
+  let changed = false;
+  for (const [id, change] of Object.entries(changes)) {
+    const was = drawn.states.get(id) ?? {};
+    const next = { ...was, ...change };
+    if (next.checked === was.checked && next.disabled === was.disabled && next.hidden === was.hidden) continue;
+    drawn.states.set(id, next);
+    changed = true;
+  }
+  if (changed) drawn.bar.render(withStates(drawn.model, drawn.states));
+}
+
+/** `model` with each entry's state laid over it, a menu's by its title's id. */
+export function withStates(model: MenuBarModel, states: ReadonlyMap<string, MenuEntryState>): MenuBarModel {
+  return {
+    ...model,
+    menus: model.menus.map((menu) => {
+      const hidden = states.get(menu.id)?.hidden;
+      return { ...menu, ...(hidden === undefined ? {} : { hidden }), items: entriesWith(menu.items, states) };
+    }),
+  };
+}
+
+function entriesWith<E extends MenuEntryModel>(
+  entries: readonly E[],
+  states: ReadonlyMap<string, MenuEntryState>,
+): E[] {
+  return entries.map((entry) => {
+    const state = entry.id === undefined ? undefined : states.get(entry.id);
+    const own = entry.kind === "submenu" ? { ...entry, items: entriesWith(entry.items, states) } : entry;
+    if (!state) return own;
+    if (own.kind === "separator") return state.hidden === undefined ? own : { ...own, hidden: state.hidden };
+    return { ...own, ...state };
+  });
 }
