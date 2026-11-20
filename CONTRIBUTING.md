@@ -68,8 +68,9 @@ is breached. Run it locally when you touch measured code. CI runs it without
 `src/tests/integration/condoRelocationEngine.integration.test.ts` and
 `src/tests/integration/roomCountsEngine.integration.test.ts`, which have their
 own step without coverage (the 30-year condo run and the every-step
-room-count walk are too slow under coverage on a shared runner); `npm test`
-still runs everything.
+room-count walk are too slow under coverage on a shared runner), and splits
+the rest across four runners whose reports the `test` job merges before it
+applies the floors; `npm test` still runs everything.
 
 Workflow YAML and test-runner configuration are configuration, not behavior.
 Do not create standalone test files, or add assertions to existing tests, that
@@ -540,7 +541,7 @@ Rules for the release PR:
 - **Screenshots never change on a release branch.** Drift that shows up only
   there is a bug to fix on `main`, never something to approve on the release.
 
-CI's "Versions and change notes" step in the test job (`npm run
+CI's "Versions and change notes" step in the lint and build job (`npm run
 version:check` locally, after committing) holds both sides to this: a feature
 PR keeps every version line and changelog heading as `main` has them, keeps
 `main`'s pending notes and adds a note when it changes a deployed path. A

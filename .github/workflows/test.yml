@@ -169,18 +169,20 @@ jobs:
             ${{ runner.temp }}/tooling-dist.source-sha
           if-no-files-found: error
 
-  test:
+  # Lint, typecheck, the build and the change-note check, beside the unit test
+  # shards instead of before them. The `test` job below reports this job's
+  # result with the shards', so `test` stays the one required check.
+  lint-build:
+    name: lint and build
     needs: changes
-    # Even a failed classifier must not silently suppress this required check.
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
-    # About ten minutes at the slowest in the last two days.
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
       - name: No test-relevant files changed
         if: ${{ needs.changes.outputs.tests == 'false' }}
-        run: echo "Only unrelated CI metadata/docs changed; lint, unit tests and build skipped."
+        run: echo "Only unrelated CI metadata/docs changed; lint and build skipped."
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ needs.changes.outputs.tests != 'false' }}
@@ -206,27 +208,6 @@ jobs:
         if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
         run: npm run typecheck
 
-      # Two long port-kit suites are excluded here and run without coverage on
-      # the unit leg of test-engine below, in parallel with this one:
-      # condoRelocationEngine (30 years of hourly ticks, about 60 s locally, 390 s under coverage
-      # against its 300 s limit) and roomCountsEngine (a check after every step
-      # on three conformance towers, 225 s under coverage against 300 s). The
-      # engine conformance suite runs on the Rust engine (conformanceWasm, in
-      # test:wasm:host on the test-engine (host) shards).
-      - name: Run tests
-        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
-        run: npm run test:coverage -- --run --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
-
-      # Docs, planning files and .changes notes only: the guard tests that read
-      # them (the backlog mirror, the changelog, the change notes) are unit
-      # tests, and no integration test reads them.
-      - name: Unit tests (docs or notes only, no coverage)
-        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane == 'prose' }}
-        run: npx vitest run --project unit
-
-      # The two excluded suites run without coverage on the unit leg of
-      # test-engine, beside this job instead of after it.
-
       # This job only proves the bundle builds, so it opts out of the engine
       # requirement scripts/verify-precache.ts puts on every build (the
       # e2e-general job's player build covers the engine package). The build
@@ -240,7 +221,8 @@ jobs:
       # Versions move only in a release PR; a feature PR adds a .changes note
       # instead (CONTRIBUTING.md "Versioning"). The checkout is the PR's merge
       # commit, so its first parent is main as the PR would merge into it. It runs
-      # last and after a failed step too, so a missing note never hides a test result.
+      # last and after a failed step too, so a missing note never hides a lint
+      # or build result.
       - name: Versions and change notes
         if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.changes.outputs.tests != 'false' }}
         env:
@@ -248,6 +230,122 @@ jobs:
         run: |
           git fetch --no-tags --quiet --depth=2 origin "$GITHUB_SHA"
           node scripts/version-check.ts --base HEAD^1 --branch "$HEAD_REF"
+
+  # The unit and integration suites under coverage, split by Vitest across four
+  # runners (one runner took close to five minutes). Each shard writes a blob
+  # report with its coverage, and the `test` job merges them and applies the
+  # coverage floors in vite.config.ts to the whole run, so a shard turns its
+  # own floors off.
+  #
+  # Two long port-kit suites are excluded here and run without coverage on the
+  # unit leg of test-engine below, in parallel: condoRelocationEngine (30
+  # years of hourly ticks, about 60 s locally, 390 s under coverage against its
+  # 300 s limit) and roomCountsEngine (a check after every step on three
+  # conformance towers, 225 s under coverage against 300 s). The engine
+  # conformance suite runs on the Rust engine (conformanceWasm, in
+  # test:wasm:host on the test-engine (host) shards).
+  test-shard:
+    name: test (shard ${{ matrix.shard }} of 4)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: >-
+          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob
+          --coverage.reporter=text-summary
+          --coverage.thresholds.statements=0 --coverage.thresholds.lines=0
+          --coverage.thresholds.functions=0 --coverage.thresholds.branches=0
+          --exclude '**/condoRelocationEngine.integration.test.ts'
+          --exclude '**/roomCountsEngine.integration.test.ts'
+
+      - name: Upload this shard's report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: .vitest-reports/
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+  # The required `test` check: merges the shards' reports, applies the
+  # coverage floors to the whole run, and fails when lint and build failed.
+  # The prose lane (docs, planning files and .changes notes) runs only the
+  # unit project here, without coverage: the guard tests that read those files
+  # are unit tests.
+  test:
+    needs: [changes, lint-build, test-shard]
+    # Even a failed classifier must not silently suppress this required check.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Lint and build passed
+        env:
+          LINT_BUILD: ${{ needs.lint-build.result }}
+        run: |
+          echo "lint and build: $LINT_BUILD"
+          test "$LINT_BUILD" = success
+
+      - name: No test-relevant files changed
+        if: ${{ needs.changes.outputs.tests == 'false' }}
+        run: echo "Only unrelated CI metadata/docs changed; unit tests skipped."
+
+      - name: Every test shard passed
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
+        env:
+          SHARDS: ${{ needs.test-shard.result }}
+        run: |
+          echo "test shards: $SHARDS"
+          test "$SHARDS" = success
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.changes.outputs.tests != 'false' }}
+
+      - name: Use Node.js (from .nvmrc)
+        if: ${{ needs.changes.outputs.tests != 'false' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        if: ${{ needs.changes.outputs.tests != 'false' }}
+        run: npm ci
+
+      - name: Download the shards' reports
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: vitest-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+
+      - name: Merge the reports and check coverage
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane != 'prose' }}
+        run: npx vitest --merge-reports --coverage
+
+      - name: Unit tests (docs or notes only, no coverage)
+        if: ${{ needs.changes.outputs.tests != 'false' && needs.changes.outputs.lane == 'prose' }}
+        run: npx vitest run --project unit
 
   # The suites that need the engine package, which npm ci installs. The unit
   # leg runs the unit tests, which include the engine package's own

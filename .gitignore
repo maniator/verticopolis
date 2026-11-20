@@ -56,3 +56,4 @@ src/public/engine/
 
 # Playwright MCP server snapshots and traces (tools/agent-env/playwright-mcp.mjs)
 .playwright-mcp/
+.vitest-reports/
