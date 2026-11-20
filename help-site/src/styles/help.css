@@ -65,7 +65,7 @@
 .vc-help-bar-btn[hidden] {
   display: none;
 }
-html.vc-help-bar-showing body {
+html.vc-help-bar-showing:not(.vc-embedded) body {
   padding-bottom: 6rem;
 }
 

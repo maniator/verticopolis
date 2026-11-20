@@ -291,7 +291,8 @@ export class DeskController {
     );
     this.syncControl = control.sync;
 
-    // The Player's Manual: closed until Help opens a page in it.
+    // The Player's Manual: closed until Help opens a page in it (uiHelp.ts,
+    // which also holds the tower's pause), so the desk never opens it itself.
     const manual = new ManualWindow(doc, {
       closed: () => trackDeskClose("help"),
       shown: () => this.bringUp("help"),
@@ -302,7 +303,6 @@ export class DeskController {
         limits: HELP_LIMITS,
         canMax: true,
         isOpen: () => manual.isOpen(),
-        open: () => manual.show("/help/", "game_menu"),
         close: () => manual.close(),
       }),
     );

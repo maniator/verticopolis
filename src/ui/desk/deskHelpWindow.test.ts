@@ -109,9 +109,20 @@ describe("ManualWindow", () => {
     expect(win.isOpen()).toBe(false);
     expect(hooks.closed).toHaveBeenCalledTimes(1);
     expect(waiting).toHaveBeenCalledTimes(1);
-    expect(win.frame.page.getAttribute("src")).toBeNull();
+    expect(frameWin.location.replace).toHaveBeenLastCalledWith("about:blank");
     expect(win.current()).toBeNull();
     expect(win.frame.root.querySelector(".desk-title-text")!.textContent).toBe(MANUAL_TITLE);
+  });
+
+  it("opens again in place after a close, so the game's history stays clean", () => {
+    const { win, frameWin } = placed();
+    win.show("/help/", "game_menu");
+    win.close();
+    win.show("/help/rooms/", "help_key");
+    expect(win.isOpen()).toBe(true);
+    expect(frameWin.location.replace).toHaveBeenLastCalledWith(
+      expect.stringMatching(/^\/help\/rooms\/\?from=game&via=help_key/),
+    );
   });
 
   it("ends the waiting listeners when the desk comes down, without counting a close", () => {

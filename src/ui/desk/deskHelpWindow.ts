@@ -65,7 +65,9 @@ export class ManualWindow {
   show(path: string, source: GameHelpSource): void {
     const href = fromGameHref(helpUrl(path), source);
     const frameWin = this.frame.page.contentWindow;
-    if (this.isOpen() && frameWin && this.frame.page.getAttribute("src")) frameWin.location.replace(href);
+    // Only the frame's first page may come from `src`: once it has shown one,
+    // a new `src` would add an entry to the game's history.
+    if (frameWin && this.frame.page.getAttribute("src")) frameWin.location.replace(href);
     else this.frame.page.src = href;
     this.frame.root.hidden = false;
     this.hooks.shown();
@@ -77,7 +79,9 @@ export class ManualWindow {
   }
 
   /** Close the window (the player's ✕ or the window menu) and empty its
-   *  frame, so a page's scripts stop; the next open starts a fresh history. */
+   *  frame, so a page's scripts stop; the next open starts a fresh history.
+   *  The frame is emptied with `replace`: removing its `src` would navigate it
+   *  to a blank page with a new entry in the game's history. */
   close(): void {
     if (!this.isOpen()) return;
     this.shut();
@@ -93,7 +97,7 @@ export class ManualWindow {
 
   private shut(): void {
     this.frame.root.hidden = true;
-    this.frame.page.removeAttribute("src");
+    this.frame.page.contentWindow?.location.replace("about:blank");
     this.pages = [];
     this.at = -1;
     this.frame.setNav({ back: false, forward: false });
