@@ -97,10 +97,11 @@ none of a `.TDT` itself. Its part is the UI around the engine's calls:
 - **The download.** Export names the file and downloads the bytes
   `port.tdtExport` and `port.tdtFile` give it.
 
-The `tdtImport` integration test runs these paths against the real engine
-package. The engine tests its export and the real 1997 saves in its own
-Rust suite (`tests/tdt_*.rs` in Verticopolis/engine). The engine tests its catalog against
-the format notes itself.
+The game's tests cover its own part: `tdtImportHelpers.test.ts` the sniff,
+and the two report tests the sentences. The engine tests the codec in its
+own Rust suite (`tests/tdt_*.rs` in Verticopolis/engine): the import, the
+export and the real 1997 saves. It also tests its catalog against the
+format notes itself.
 
 ## Where the saves are kept
 

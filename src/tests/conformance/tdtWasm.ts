@@ -65,38 +65,6 @@ export function parseTDT(input: ArrayBuffer | Uint8Array, filename: string): Par
   }
 }
 
-/** What the binary walk read, as far as the import's record tells it. */
-export interface TdtWalk {
-  /** The header's notes, then the walk's warnings. */
-  warnings: string[];
-  /** The save's own elevator shafts in table order, or null when the walk gave
-   *  up on the table and the importer rebuilt them from the floors. */
-  elevators: { x: number; cars: number; stops: number }[] | null;
-  /** One entry per flight the walk read, or null when it gave up. */
-  stairs: unknown[] | null;
-  parkingConnected: number | null;
-  peopleCount: number | null;
-}
-
-const ELEVATOR_KINDS = new Set(["elevatorStandard", "elevatorService", "elevatorExpress"]);
-
-/** The walk of a `.TDT` file: the Rust import's notes and decode facts, with the
- *  shafts read back off the imported save. */
-export function parseTdtBinary(input: ArrayBuffer | Uint8Array, filename = "TOWER.TDT"): TdtWalk {
-  const { save, notes, facts } = parseTDT(input, filename);
-  const decoded = facts.decoded;
-  const shafts = save.transports.filter((t) => ELEVATOR_KINDS.has(t.kind));
-  return {
-    warnings: notes,
-    elevators: decoded
-      ? shafts.map((t) => ({ x: t.x, cars: t.cars, stops: t.top - t.bottom + 1 - (t.skipFloors?.length ?? 0) }))
-      : null,
-    stairs: decoded ? Array.from({ length: facts.flights }) : null,
-    parkingConnected: facts.parkingConnected,
-    peopleCount: facts.peopleCount,
-  };
-}
-
 /** Write a save as a `.TDT` file the way the game does. */
 export function buildTDT(save: SerializedGame | string): BuiltTdt {
   const engine = wasm().Engine.fromSave(typeof save === "string" ? save : JSON.stringify(save));
