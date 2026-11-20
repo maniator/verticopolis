@@ -180,11 +180,12 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   `GRID.width`.
 
 ## UI design system
-- `docs/design-system.md` is the contract for all UI/CSS work: tokens + components
-  (`.btn`/`.win`/`.win-title`/`.well`/`.field`/`.kv`) in `src/styles.css` and the parts it imports
-  (`src/styles/`, `src/styles/game/`), organized as ONE
+- `docs/design-system.md` in Verticopolis/components is the contract for all UI/CSS work: tokens +
+  components (`.btn`/`.win`/`.win-title`/`.well`/`.field`/`.kv`) in its `src/styles.css` and the parts
+  it imports (`src/styles/`, `src/styles/game/`), organized as ONE
   generation of CSS. **No skin on IDs; edit rules, never out-specify them; press-only button
-  feedback; one primary per dialog; the splash is box art and stays un-unified.**
+  feedback; one primary per dialog; the splash is box art and stays un-unified.** The game's own
+  rules for building windows in code are `docs/ui/windows-in-code.md`.
 
 ## Performance & platform gotchas
 - **Hot paths get a complexity review, and it is a review gate.** The tick loop
