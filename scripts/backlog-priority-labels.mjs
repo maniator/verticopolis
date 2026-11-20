@@ -61,10 +61,10 @@ const isPriority = (p) => PRIORITY_LABELS.includes(/** @type {Priority} */ (p));
 const HEADER = "| Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |";
 
 /** Issue number to the priority its row records. Rows without a `#N` in the GH
- *  column (finished rows carry `—`) are skipped, and so are rows citing
- *  `Verticopolis/engine#N` or `Verticopolis/components#N`: those issues live in
- *  another repository, which this job's token cannot label; backlogIssueMirror.test.ts
- *  already fails CI on any other GH value and on a malformed row. A row whose
+ *  column (finished rows carry `—`) are skipped, and so is any other GH value,
+ *  such as another repository's issue, which this job's token cannot label;
+ *  backlogIssueMirror.test.ts already fails CI on any other GH value and on a
+ *  malformed row. A row whose
  *  Priority is not P1/P2/P3 is reported in `errors` rather than guessed. Pipes
  *  escaped as `\|` inside Notes do not split cells, matching that test.
  *  @param {string} markdown

@@ -2,7 +2,7 @@ import { html, type TemplateResult } from "lit-html";
 
 /**
  * lit-html templates for the UI dialogs, the declarative replacement for the
- * retired string builders (see the plan of record,
+ * retired string builders (see the plan of record in Verticopolis/components,
  * `_bmad-output/planning-artifacts/design/ui-rendering-engine-2026-07-14/`).
  * Unlike the string builders, a template binds its actions inline with `@click`,
  * so the dialog controller no longer needs a separate `wireActions` pass. lit

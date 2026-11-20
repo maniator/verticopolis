@@ -120,6 +120,28 @@ you need to generate or shape ideas rather than implement them:
 **Victor** (innovation), **Sophia** (storytelling), **Caravaggio** (presentations).
 
 BMAD planning/implementation artifacts are written under `_bmad-output/`.
+
+**Every Verticopolis repository has its own BMAD setup (2026-11-20).**
+Verticopolis/engine and Verticopolis/components carry the same install (core
+and bmm 6.9.0, cis v0.2.1, gds v0.6.0, in `_bmad/_config/manifest.yaml`) with
+their own `_bmad/custom/` overrides and their own `_bmad-output/`: project
+context, backlog, specs, plans and party memory. Plan and review engine or
+components work from that repository's root, so its skills read its config
+and write to its backlog. The records and backlog rows about the engine and
+the components moved there from this repository with their git history.
+
+- A change to a skill in `.agents/skills/`, to `_bmad/` outside
+  `_bmad/custom/`, or a BMAD upgrade ships to every repository on the same
+  day, as one pull request per repository, each linking the others. Before
+  the others open, compare each install with this one from checkouts side by
+  side; the only differences should be the ones the change explains:
+  `diff -r ../web/.agents/skills .agents/skills` and
+  `diff -r -x custom ../web/_bmad _bmad`.
+- A need of one repository alone goes in its `_bmad/custom/<skill>.toml`,
+  never into the installer-managed files.
+- The hot-path checklist stays one page,
+  `docs/performance/hot-path-review.md` here; the other repositories' review
+  overrides read it from this repository.
 The quality gates and code-review conventions in
 [CONTRIBUTING.md](./CONTRIBUTING.md) still apply on top of any BMAD workflow.
 BMAD organizes the work; it doesn't replace `npm test` or self-review before

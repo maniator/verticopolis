@@ -362,8 +362,8 @@ flowchart LR
 How the game boots, checks and repairs the package, steps it each frame and
 handles a fault is [docs/architecture/engine-host.md](docs/architecture/engine-host.md).
 The original contract, with the reasoning behind each choice, is
-[`engine-port-contract.md`](_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md)
-(a dated planning record).
+[`engine-port-contract.md`](https://github.com/Verticopolis/engine/blob/main/_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md)
+(a dated planning record in Verticopolis/engine).
 
 ## Where to go next
 
