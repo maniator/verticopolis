@@ -195,7 +195,7 @@ Verticopolis has **two test tiers**:
   `engineStatusRows`, `visual`, `perf`, `overviewMapPerf`) and runs with one worker, as
   the `e2e-serial` job; `chromium` holds the general browser regression suite,
   including `e2e/engineBoot.spec.ts` (boot, failures and offline start), and CI
-  runs it as the `e2e-general` job, in six shards on six runners. The spec
+  runs it as the `e2e-general` job, in eight shards on eight runners. The spec
   files are split by measured time (`scripts/e2e-shards.ts`, with the seconds
   in `src/tests/ci/e2eShardSeconds.json`); a new spec counts six seconds a test
   until the table is refreshed with `node scripts/e2e-shards.ts measure` over
