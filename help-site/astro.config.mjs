@@ -1,3 +1,4 @@
+// @ts-check
 // The player help site at help.verticopolis.com: the player's manual, written
 // in src/content/docs/. The game shows one of its pages itself, the Classic and
 // Modern summary when you found a tower (src/ui/templates/compare.ts, compiled by
@@ -52,6 +53,7 @@ try {
  *  this build's address for it ({@link siteHref}). A no-op in a /help build. */
 const siteLinks = {
   name: "verticopolis-site-links",
+  /** @type {import("satteri").HastFilteredVisitor<import("hast").Element>} */
   element: {
     filter: ["a"],
     visit(node, ctx) {
@@ -108,8 +110,11 @@ export default defineConfig({
       ],
       head: [
         ...sharedHead,
-        { tag: "script", content: schemeBootScript() },
-        { tag: "script", content: oldAnchorRedirects(OLD_ANCHORS) },
+        { tag: /** @type {const} */ ("script"), content: schemeBootScript() },
+        {
+          tag: /** @type {const} */ ("script"),
+          content: oldAnchorRedirects(OLD_ANCHORS),
+        },
       ],
       sidebar,
     }),
