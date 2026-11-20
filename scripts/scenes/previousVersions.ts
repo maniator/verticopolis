@@ -19,7 +19,7 @@ import { PHONE, type Scene, type Shot } from "../screenshot-env.ts";
 /** Page-context: give the live tower a file, "Sky Hotel", with versions an
  *  autosave kept yesterday and today and one saved by hand. */
 async function pgMakeVersions(): Promise<void> {
-  const w = window as unknown as { game: any };
+  const w = window;
   const g = w.game;
   const pinned = Date.now();
   const at = (minutesAgo: number) =>
@@ -47,7 +47,7 @@ async function pgMakeVersions(): Promise<void> {
 
 /** Page-context: a second tower file nobody wrote over yet. */
 async function pgFileWithNone(): Promise<void> {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   await g.saveFile("Harbour Point");
   // Back to Sky Hotel's file, so Harbour Point is not the tower being played.
   await g.saveFile("Sky Hotel");
@@ -57,7 +57,7 @@ async function pgFileWithNone(): Promise<void> {
 type FileItem = "mb-import" | "mb-export";
 
 async function openWindow(page: Page, item: FileItem = "mb-import"): Promise<void> {
-  await page.evaluate(() => (window as unknown as { game: any }).game.ui.closeModal?.());
+  await page.evaluate(() => window.game.ui.closeModal?.());
   await page.evaluate((id) => document.getElementById(id)?.click(), item);
   await page.waitForSelector("#modal .fd-row", { timeout: 4000 });
 }

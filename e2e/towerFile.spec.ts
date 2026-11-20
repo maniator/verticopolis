@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -30,7 +29,7 @@ async function seed(page: Page): Promise<void> {
 
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
   await expect(page.locator('[data-splash="continue"]'), "the title screen offers Continue").toBeVisible();
@@ -38,7 +37,7 @@ async function boot(page: Page): Promise<void> {
 
 async function continueTower(page: Page): Promise<void> {
   await page.locator('[data-splash="continue"]').click();
-  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+  await page.waitForFunction(() => window.game.enginePort.towerName() === "Tower One", undefined, {
     timeout: 15_000,
   });
 }
@@ -61,18 +60,18 @@ const row = (page: Page, name: string) =>
 
 /** Open the row called `name` in the Open window, and wait for its tower. */
 async function openRow(page: Page, name: string): Promise<void> {
-  const before = await page.evaluate(() => (window as any).game.enginePort.generation());
+  const before = await page.evaluate(() => window.game.enginePort.generation());
   await openWindow(page);
   await expect.poll(() => rowNames(page), { timeout: 15_000 }).toContain(name);
   await row(page, name).dblclick();
   await expect(page.locator(".fd")).toBeHidden();
-  await page.waitForFunction((g) => (window as any).game.enginePort.generation() !== g, before, { timeout: 15_000 });
+  await page.waitForFunction((g) => window.game.enginePort.generation() !== g, before, { timeout: 15_000 });
 }
 
 /** The live tower as the engine saves it, without the write's own stamp. */
 async function towerState(page: Page): Promise<Record<string, unknown>> {
   return page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(0);
     const save = JSON.parse(g.enginePort.serialize());
     delete save.savedAt;
@@ -84,12 +83,12 @@ async function towerState(page: Page): Promise<Record<string, unknown>> {
 /** Play the live tower on until its clock passes a few more minutes, then pause. */
 async function play(page: Page): Promise<void> {
   const start = await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(3);
     return g.reader.header.minutes as number;
   });
-  await page.waitForFunction((m) => (window as any).game.reader.header.minutes > m + 30, start, { timeout: 45_000 });
-  await page.evaluate(() => (window as any).game.setSpeed(0));
+  await page.waitForFunction((m) => window.game.reader.header.minutes > m + 30, start, { timeout: 45_000 });
+  await page.evaluate(() => window.game.setSpeed(0));
 }
 
 /** Right-click `name` in the Open window and open its Previous Versions window. */
@@ -108,7 +107,7 @@ test("the autosave writes the tower's own file, and after a reload it opens to t
   await boot(page);
   await continueTower(page);
   await play(page);
-  await page.evaluate(() => (window as any).game.saveLoad.autosave());
+  await page.evaluate(() => window.game.saveLoad.autosave());
   const left = await towerState(page);
   await previousVersions(page, OWN);
   await expect(
@@ -141,9 +140,9 @@ test("File > Save keeps a version by hand, and Previous versionsâ€¦ opens it as 
     "Saved by you",
   );
   await page.locator(".pv-row").first().click();
-  const before = await page.evaluate(() => (window as any).game.enginePort.generation());
+  const before = await page.evaluate(() => window.game.enginePort.generation());
   await page.locator(".pv-buttons .btn", { hasText: "Open" }).click();
-  await page.waitForFunction((g) => (window as any).game.enginePort.generation() !== g, before, { timeout: 15_000 });
+  await page.waitForFunction((g) => window.game.enginePort.generation() !== g, before, { timeout: 15_000 });
   expect(await towerState(page), "the version is the tower as it was saved").toEqual(saved);
   await openWindow(page);
   await expect.poll(() => rowNames(page), { timeout: 15_000 }).toContain(OWN);
@@ -169,8 +168,8 @@ test("opening a 4.2 save slot's file keeps it as it was, and Previous versionsâ€
   const original = page.locator(".pv-row", { has: page.locator(".pv-how", { hasText: "Original" }) });
   await expect(original, "the file as 4.2 left it is kept").toHaveCount(1);
   await original.click();
-  const before = await page.evaluate(() => (window as any).game.enginePort.generation());
+  const before = await page.evaluate(() => window.game.enginePort.generation());
   await page.locator(".pv-buttons .btn", { hasText: "Open" }).click();
-  await page.waitForFunction((g) => (window as any).game.enginePort.generation() !== g, before, { timeout: 15_000 });
+  await page.waitForFunction((g) => window.game.enginePort.generation() !== g, before, { timeout: 15_000 });
   expect(await towerState(page), "the original opens to the game the 4.2 slot held").toEqual(opened);
 });

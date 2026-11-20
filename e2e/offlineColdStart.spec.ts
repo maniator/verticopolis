@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, chromium, devices, type BrowserContext, type LaunchOptions, type Page } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -149,7 +148,7 @@ async function offlineStart(
 
 /** The engine's own save, parsed: the tower and clock the WASM engine holds. */
 function engineSave(page: Page): Promise<unknown> {
-  return page.evaluate(() => JSON.parse((window as any).__vcEngine.port.serialize()));
+  return page.evaluate(() => JSON.parse(window.__vcEngine!.port.serialize()));
 }
 
 /** The engine's own clock, read from its save. */
@@ -167,7 +166,7 @@ test("after one online visit, a fresh offline browser session opens the game on 
   const context = await launch(dir, baseURL!, launchOptions, true);
   try {
     const { page, seen, audio } = await offlineStart(context);
-    const engine = await page.evaluate(() => (window as any).__vcEngine.status);
+    const engine = await page.evaluate(() => window.__vcEngine!.status);
     expect(
       { hosted: engine.hosted, lastError: engine.lastError },
       "the engine hosts the tower with no fallback",
@@ -197,17 +196,17 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
   let savedState: unknown;
   await onlineVisit(dir, baseURL!, launchOptions, async (page) => {
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.sim.money = 1e9;
       if (!g.sim.build("lobby", 1, 160).ok) throw new Error("the online lobby was refused");
-      (window as any).game.syncSim();
+      window.game.syncSim();
     });
     savedAt = await advanceClock(page);
-    fileId = await page.evaluate(async () => (await (window as any).game.saveFile("Cold start")) as string);
+    fileId = await page.evaluate(async () => (await window.game.saveFile("Cold start")) as string);
     savedState = await engineSave(page);
     // This test is about the My Towers file: another tower comes in, so the
     // offline session resumes that one and "Cold start" is a file to open.
-    await page.evaluate(() => (window as any).game.saveLoad.newGame("classic"));
+    await page.evaluate(() => window.game.saveLoad.newGame("classic"));
   });
 
   const context = await launch(dir, baseURL!, launchOptions, true);
@@ -216,29 +215,27 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
     expect(await lobbyAt(page, 160), "the offline session resumes the other tower before the load").toBe(false);
     // Load the online save on the engine.
     await page.evaluate(async (id) => {
-      const g = (window as any).game;
+      const g = window.game;
       g.setSpeed(0);
       await g.openFile(id);
-      (window as any).game.syncSim();
+      window.game.syncSim();
     }, fileId);
     expect(await lobbyAt(page, 160), "the online save's lobby loaded").toBe(true);
-    expect(await page.evaluate(() => (window as any).game.sim.clock.minutes), "the online save's clock loaded").toBe(
-      savedAt,
-    );
+    expect(await page.evaluate(() => window.game.sim.clock.minutes), "the online save's clock loaded").toBe(savedAt);
     expect(await engineSave(page), "the engine holds exactly the state saved online").toEqual(savedState);
     // Run it, issue a command, and save over the file.
     const ranTo = await advanceClock(page);
     expect(ranTo).toBeGreaterThan(savedAt);
     const resaved = await page.evaluate(async () => {
-      const g = (window as any).game;
+      const g = window.game;
       const ok = g.sim.build("lobby", 1, 200).ok;
-      (window as any).game.syncSim();
+      window.game.syncSim();
       const id = (await g.saveFile("Cold start")) as string;
       return { ok, id, minutes: g.sim.clock.minutes as number };
     });
     const resavedState = await engineSave(page);
     // As above: another tower comes in, so the reload resumes that one.
-    await page.evaluate(() => (window as any).game.saveLoad.newGame("classic"));
+    await page.evaluate(() => window.game.saveLoad.newGame("classic"));
     expect(resaved.ok, "the offline lobby was built").toBe(true);
     expect(resaved.id, "saving under the same name replaces the file").toBe(fileId);
 
@@ -248,15 +245,15 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
     await hostedGame(page);
     expect(await lobbyAt(page, 200), "the reload resumes the other tower before the load").toBe(false);
     await page.evaluate(async (id) => {
-      const g = (window as any).game;
+      const g = window.game;
       g.setSpeed(0);
       await g.openFile(id);
-      (window as any).game.syncSim();
+      window.game.syncSim();
     }, fileId);
     const reloaded = {
       lobby160: await lobbyAt(page, 160),
       lobby200: await lobbyAt(page, 200),
-      minutes: await page.evaluate(() => (window as any).game.sim.clock.minutes as number),
+      minutes: await page.evaluate(() => window.game.sim.clock.minutes as number),
     };
     expect(reloaded, "the offline save persisted across the reload").toEqual({
       lobby160: true,

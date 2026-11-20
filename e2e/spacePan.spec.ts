@@ -20,12 +20,12 @@ async function boot(page: Page): Promise<void> {
   await page.goto("/");
   await page.waitForFunction(() => {
     const canvas = document.querySelector<HTMLCanvasElement>("#view");
-    return Boolean((window as any).game?.engine && canvas && canvas.width > 0);
+    return Boolean(window.game?.engine && canvas && canvas.width > 0);
   });
   await page.evaluate(() => document.getElementById("splash")?.remove());
   // Classic builds only while the clock runs (#1936): run it, so a stray
   // build would land and the builds these taps expect do.
-  await page.evaluate(() => (window as any).game.setSpeed(1));
+  await page.evaluate(() => window.game.setSpeed(1));
 }
 
 /** What a stray build would change: the tower's rooms, the keyboard cursor
@@ -34,7 +34,7 @@ async function snapshot(
   page: Page,
 ): Promise<{ units: number; cursor: unknown; tool: unknown; tile: number; floor: number }> {
   return page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     const v = g.engine.viewState();
     return { units: g.sim.tower.units.length, cursor: g.keyboard.cursor(), tool: g.tool, tile: v.tile, floor: v.floor };
   });
@@ -43,15 +43,16 @@ async function snapshot(
 /** Count the tool picks from here on (a palette item re-picked by Space). */
 async function countToolPicks(page: Page): Promise<() => Promise<number>> {
   await page.evaluate(() => {
-    const ui = (window as any).game.ui;
+    const ui = window.game.ui;
     const pick = ui.selectTool.bind(ui);
-    (window as any).__toolPicks = 0;
-    ui.selectTool = (tool: unknown) => {
-      (window as any).__toolPicks++;
+    const w = window as Window & { __toolPicks?: number };
+    w.__toolPicks = 0;
+    ui.selectTool = (tool: Parameters<typeof pick>[0]) => {
+      w.__toolPicks!++;
       pick(tool);
     };
   });
-  return () => page.evaluate(() => (window as any).__toolPicks as number);
+  return () => page.evaluate(() => (window as Window & { __toolPicks?: number }).__toolPicks!);
 }
 
 /** Let the frame loop catch up with the input just sent. */
@@ -110,7 +111,7 @@ test("Space pressed during a mouse drag keeps the drag's tool and does nothing a
   await page.keyboard.press("ArrowUp"); // reveal the cursor
   await page.keyboard.press("ArrowDown"); // back to the ground floor, where a tap would build
   await page.evaluate(() => {
-    const kb = (window as any).game.keyboard;
+    const kb = window.game.keyboard;
     const commit = kb.commitCursor.bind(kb);
     (window as any).__commits = 0;
     kb.commitCursor = () => {

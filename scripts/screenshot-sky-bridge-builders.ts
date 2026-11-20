@@ -19,7 +19,7 @@
  *  with the build tools' own engine calls; fails closed when a tile is
  *  refused or the gap is not open air. */
 export function buildSkyBridgeTower(): void {
-  const w = window as unknown as { game: any; __vcShotSkyBridge?: unknown };
+  const w = window as Window & { __vcShotSkyBridge?: unknown };
   const g = w.game;
   g.saveLoad.newGame("modern");
   const port = g.enginePort;
@@ -29,13 +29,14 @@ export function buildSkyBridgeTower(): void {
   port.setMoney(50_000_000);
   // Two towers with open air between them: no floor bridges the gap.
   port.chooseAutoBridge(false);
-  const kind = (k: string): number => g.portCodes.kind(k);
-  const lay = (k: string, floor: number, x: number): boolean => port.buildAt(kind(k), floor, x)[0] === 1;
+  type Kind = Parameters<typeof g.portCodes.kind>[0];
+  const kind = (k: Kind): number => g.portCodes.kind(k);
+  const lay = (k: Kind, floor: number, x: number): boolean => port.buildAt(kind(k), floor, x)[0] === 1;
   const W = g.grid.width;
   const cx = Math.floor(W / 2);
   const catalog = g.getCatalog();
   const sky: number = catalog.world.lobbyInterval;
-  const office: number = catalog.facilities.find((f: { key: string }) => f.key === "office").width;
+  const office: number = catalog.facilities.find((f) => f.key === "office")!.width;
   const towers: [number, number][] = [
     [cx - 22, cx - 9],
     [cx + 9, cx + 22],
@@ -66,7 +67,7 @@ export function buildSkyBridgeTower(): void {
  *  `window.__vcShotSkyBridgeLooks`. Founded and built like
  *  {@link buildSkyBridgeTower}; fails closed when a tile is refused. */
 export function buildSkyBridgeLooksTower(): void {
-  const w = window as unknown as { game: any; __vcShotSkyBridgeLooks?: unknown };
+  const w = window as Window & { __vcShotSkyBridgeLooks?: unknown };
   const g = w.game;
   g.saveLoad.newGame("modern");
   const port = g.enginePort;
@@ -75,8 +76,9 @@ export function buildSkyBridgeLooksTower(): void {
   port.restore(JSON.stringify(save));
   port.setMoney(50_000_000);
   port.chooseAutoBridge(false);
-  const kind = (k: string): number => g.portCodes.kind(k);
-  const lay = (k: string, floor: number, x: number): boolean => port.buildAt(kind(k), floor, x)[0] === 1;
+  type Kind = Parameters<typeof g.portCodes.kind>[0];
+  const kind = (k: Kind): number => g.portCodes.kind(k);
+  const lay = (k: Kind, floor: number, x: number): boolean => port.buildAt(kind(k), floor, x)[0] === 1;
   const W = g.grid.width;
   const cx = Math.floor(W / 2);
   const sky: number = g.getCatalog().world.lobbyInterval;

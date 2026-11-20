@@ -42,7 +42,7 @@ async function openDialog(page: Page): Promise<void> {
  *  keep the shot deterministic. */
 async function highContrastUpdateNotes(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.speed = 0;
     g.engine.paused = true;
     (document.getElementById("modal") as HTMLDialogElement | null)?.close();

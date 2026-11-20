@@ -18,7 +18,7 @@
  *  The lobbies stand over a basement no transport reaches, which holds the
  *  second one up. Fails closed when a lobby is refused or the two touch. */
 export function buildFrontDoorTowers(): void {
-  const w = window as unknown as { game: any };
+  const w = window;
   const g = w.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(7302, "modern");
@@ -46,7 +46,7 @@ export function buildFrontDoorTowers(): void {
           x += 1;
           continue;
         }
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         x += u.width;
@@ -57,7 +57,8 @@ export function buildFrontDoorTowers(): void {
     if (s.tower.unitAt(1, x)) throw new Error(`the lobbies touch at ${x}`);
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx + 4, 2, 1.5);
   g.speed = 0;
   g.engine.paused = false;

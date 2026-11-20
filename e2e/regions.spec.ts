@@ -17,25 +17,25 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  */
 test("regions compose settled rooms and drain on budget", async ({ page }) => {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game?.sim && (window as any).game?.ui));
+  await page.waitForFunction(() => Boolean(window.game?.sim && window.game?.ui));
   await page.evaluate(buildToStar, 2);
   await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     document.getElementById("splash")?.remove();
     g.engine.paused = false;
   });
   await page.waitForTimeout(300);
 
   const before = await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     const e = g.engine;
-    const settled = g.sim.tower.units.filter((u: any) => u.kind !== "floor" && u.kind !== "lobby");
+    const settled = g.sim.tower.units.filter((u) => u.kind !== "floor" && u.kind !== "lobby");
     return {
       settled: settled.length,
       regions: e.regions.size,
       membership: e.regionUnits.size,
       animated: e.animatedRooms.size,
-      allMembersSettled: settled.every((u: any) => e.regionUnits.has(u.id)),
+      allMembersSettled: settled.every((u) => e.regionUnits.has(u.id)),
     };
   });
   // Structural claim of the story: room-layer textures scale with occupied
@@ -53,7 +53,7 @@ test("regions compose settled rooms and drain on budget", async ({ page }) => {
   const drain = await page.evaluate(
     () =>
       new Promise<{ start: number; steps: number[] }>((resolve) => {
-        const e = (window as any).game.engine;
+        const e = window.game.engine;
         for (const k of e.regions.keys()) e.regionDirty.add(k);
         const start = e.regionDirty.size;
         const steps: number[] = [];

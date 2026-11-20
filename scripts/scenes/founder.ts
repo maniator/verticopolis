@@ -19,13 +19,14 @@ export const FOUNDER_SCENES: Scene[] = [
         wait: 400,
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as unknown as { game: any }).game;
+            const g = window.game;
             // A fresh boot mounts the splash with founder=false; drop it and
             // re-mount the returning-Founder view (hasSave + the badge on).
             document.getElementById("splash")?.remove();
             g.onboarding.showSplash({
               hasSave: true,
               onContinue: () => {},
+              onLoadTower: () => {},
               onNewTower: () => {},
               installOffered: () => false,
               founder: () => true,
@@ -52,11 +53,12 @@ export const FOUNDER_SCENES: Scene[] = [
         wait: 400,
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as unknown as { game: any }).game;
+            const g = window.game;
             document.getElementById("splash")?.remove();
             g.onboarding.showSplash({
               hasSave: true,
               onContinue: () => {},
+              onLoadTower: () => {},
               onNewTower: () => {},
               installOffered: () => false,
               founder: () => true,

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import {
   serviceDiagnosticsFixture,
@@ -20,15 +19,14 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await page.goto("/");
     await page.waitForFunction(
       () => {
-        const w = window as any;
-        return Boolean(w.__vcEngine?.status?.hosted && w.game);
+        return Boolean(window.__vcEngine?.status.hosted && window.game);
       },
       undefined,
       { timeout: 30_000 },
     );
     await page.evaluate(() => {
       document.getElementById("splash")?.remove();
-      (window as any).game.setSpeed(0);
+      window.game.setSpeed(0);
     });
   });
   test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -37,13 +35,13 @@ test.describe("Rust service diagnostics in the real browser", () => {
    * app's real engine swap path, so the reader, card cache and panels refresh. */
   async function loadFixture(page: Page, save: string): Promise<void> {
     const status = await page.evaluate((json) => {
-      const g = (window as any).game;
+      const g = window.game;
       const answer = g.enginePort.restore(json);
       if (answer[0] !== 1) throw new Error(`Rust rejected service fixture: ${g.enginePort.lastReason()}`);
       g.followSwap();
       g.setSpeed(0);
       return {
-        wasm: g.enginePort === (window as any).__vcEngine.port,
+        wasm: g.enginePort === window.__vcEngine!.port,
         hasStructuredPort: typeof g.enginePort.serviceDiagnostics === "function",
       };
     }, save);
@@ -85,11 +83,11 @@ test.describe("Rust service diagnostics in the real browser", () => {
     page,
   }) => {
     const built = await buildInPage(page, utilizedPassengerLift, "classic");
-    const fixture = { save: built.save, id: built.shaftId, kind: "elevatorStandard" };
+    const fixture = { save: built.save, id: built.shaftId, kind: "elevatorStandard" as const };
     await loadFixture(page, fixture.save);
     const readout = await page.evaluate(
       ({ id }) => {
-        const g = (window as any).game;
+        const g = window.game;
         const slots = JSON.parse(g.enginePort.viewLayout()).records.shaftCard;
         const index = slots.indexOf("utilization");
         if (index < 0) {
@@ -126,7 +124,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
     expect(readout.util).toBeGreaterThan(0.85);
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.inspector.inspectPicked({ type: "transport", id, kind });
+        window.game.inspector.inspectPicked({ type: "transport", id, kind });
       },
       { id: fixture.id, kind: fixture.kind },
     );
@@ -138,7 +136,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await page.setViewportSize({ width: 390, height: 700 });
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.selectPicked({ type: "transport", id, kind });
+        window.game.selectPicked({ type: "transport", id, kind });
       },
       { id: fixture.id, kind: fixture.kind },
     );
@@ -157,7 +155,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
 
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+        window.game.inspector.inspectPicked({ type: "unit", id, kind });
       },
       { id: f.hotel.id, kind: f.hotel.kind },
     );
@@ -166,7 +164,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
 
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+        window.game.inspector.inspectPicked({ type: "unit", id, kind });
       },
       { id: f.connectedParking.id, kind: f.connectedParking.kind },
     );
@@ -175,7 +173,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
 
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+        window.game.inspector.inspectPicked({ type: "unit", id, kind });
       },
       { id: f.disconnectedParking.id, kind: f.disconnectedParking.kind },
     );
@@ -188,7 +186,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await loadFixture(page, f.save);
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+        window.game.inspector.inspectPicked({ type: "unit", id, kind });
       },
       { id: f.shop.id, kind: f.shop.kind },
     );
@@ -200,7 +198,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await page.setViewportSize({ width: 390, height: 700 });
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.selectPicked({ type: "unit", id, kind });
+        window.game.selectPicked({ type: "unit", id, kind });
       },
       { id: f.restaurant.id, kind: f.restaurant.kind },
     );
@@ -214,7 +212,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await loadFixture(page, f.save);
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+        window.game.inspector.inspectPicked({ type: "unit", id, kind });
       },
       { id: f.shop.id, kind: f.shop.kind },
     );
@@ -224,7 +222,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await page.setViewportSize({ width: 390, height: 700 });
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.selectPicked({ type: "unit", id, kind });
+        window.game.selectPicked({ type: "unit", id, kind });
       },
       { id: f.shop.id, kind: f.shop.kind },
     );
@@ -237,7 +235,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await loadFixture(page, f.save);
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.selectPicked({ type: "unit", id, kind });
+        window.game.selectPicked({ type: "unit", id, kind });
       },
       { id: f.housekeeping.id, kind: f.housekeeping.kind },
     );
@@ -248,7 +246,7 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await loadFixture(page, JSON.stringify(infested));
     await page.evaluate(
       ({ id, kind }) => {
-        (window as any).game.selectPicked({ type: "unit", id, kind });
+        window.game.selectPicked({ type: "unit", id, kind });
       },
       { id: f.hotel.id, kind: f.hotel.kind },
     );

@@ -29,7 +29,7 @@ async function jumpToTheJam(page: Page): Promise<void> {
   await stepTrafficUntil(page, LEVEL, 60);
   // The tap's own answer: true only once the camera went to a line and its
   // spotlight went up, so a tap that did nothing fails the scene.
-  const jumped = await page.evaluate(() => (window as any).game.jumpToTraffic() as boolean);
+  const jumped = await page.evaluate(() => window.game.jumpToTraffic() as boolean);
   if (!jumped) throw new Error("traffic-jump: the tap found no line to zoom in on");
   await page.evaluate(pgStep, 4);
 }

@@ -26,19 +26,19 @@ async function layLookBridges(page: Page): Promise<void> {
   await page.locator('.pal-item[data-tool="skyBridge"]').first().click();
   await page.locator("#sky-bridge-look-strip:not([hidden])").waitFor({ timeout: 4000 });
   const gaps = await page.evaluate(
-    () => (window as unknown as { __vcShotSkyBridgeLooks: Looks }).__vcShotSkyBridgeLooks.gaps,
+    () => (window as Window & { __vcShotSkyBridgeLooks?: Looks }).__vcShotSkyBridgeLooks!.gaps,
   );
   for (let i = 0; i < gaps.length; i++) {
     await pickLook(page, i + 1);
     await page.evaluate((x) => {
-      const w = window as unknown as { game: any; __vcShotSkyBridgeLooks: Looks };
-      const laid = w.game.build.buildSkyBridge(x, w.__vcShotSkyBridgeLooks.sky);
+      const w = window as Window & { __vcShotSkyBridgeLooks?: Looks };
+      const laid = w.game.build.buildSkyBridge(x, w.__vcShotSkyBridgeLooks!.sky);
       if (!laid.ok) throw new Error(`the bridge at ${x} was refused: ${laid.reason}`);
     }, gaps[i]);
   }
   await page.evaluate(() => {
-    const w = window as unknown as { game: any; __vcShotSkyBridgeLooks: Looks };
-    const at = w.__vcShotSkyBridgeLooks;
+    const w = window as Window & { __vcShotSkyBridgeLooks?: Looks };
+    const at = w.__vcShotSkyBridgeLooks!;
     w.game.engine.preview = null;
     w.game.engine.setCamera(at.cx + 10, at.sky, 1.1);
     w.game.reader.update();
@@ -73,8 +73,8 @@ export const SKY_BRIDGE_LOOK_SCENES: Scene[] = [
         setup: async (page) => {
           await pickLook(page, 3);
           await page.evaluate(() => {
-            const w = window as unknown as { game: any; __vcShotSkyBridgeLooks: Looks };
-            const at = w.__vcShotSkyBridgeLooks;
+            const w = window as Window & { __vcShotSkyBridgeLooks?: Looks };
+            const at = w.__vcShotSkyBridgeLooks!;
             w.game.updateBuildPreview(at.gaps[0], at.sky);
             if (!w.game.engine.preview?.valid) throw new Error("the restyle ghost did not show");
           });
@@ -87,7 +87,7 @@ export const SKY_BRIDGE_LOOK_SCENES: Scene[] = [
         clock: 21,
         setup: (page) =>
           page.evaluate(() => {
-            const w = window as unknown as { game: any };
+            const w = window;
             w.game.ui.selectTool({ type: "inspect" });
             w.game.engine.preview = null;
           }),

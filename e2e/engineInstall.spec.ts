@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { startDeployments, type Deployment, type Deployments } from "./deployments";
 import {
@@ -109,7 +108,7 @@ test("an update whose engine files come from another build fails to install and 
       await expectControlledWithEngine(page);
       await hostedGame(page);
       expect(
-        await page.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null),
+        await page.evaluate(() => window.__vcEngineBoot?.failure ?? null),
         "the first build still boots its engine",
       ).toBeNull();
     });
@@ -213,9 +212,9 @@ test("a first install whose engine files come from another build never activates
       expect(digest, `${key} holds only the first build's bytes`).toBe(mine[key]);
 
     // The page loaded the second build's glue and binary from the network; its own check refuses them.
-    await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 90_000 });
+    await page.waitForFunction(() => window.__vcEngineBoot?.failure != null, undefined, { timeout: 90_000 });
     const failure = await page.evaluate(
-      () => (window as any).__vcEngineBoot.failure as { stage: string; reason: string; package?: { kind: string } },
+      () => window.__vcEngineBoot!.failure as { stage: string; reason: string; package?: { kind: string } },
     );
     expect(failure).toMatchObject({
       stage: "load",
@@ -237,7 +236,7 @@ test("a first install whose engine files come from another build never activates
       await expectControlledWithEngine(revisit);
       await hostedGame(revisit);
       expect(
-        await revisit.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null),
+        await revisit.evaluate(() => window.__vcEngineBoot?.failure ?? null),
         "no fallback on the offline start",
       ).toBeNull();
       await context.setOffline(false);

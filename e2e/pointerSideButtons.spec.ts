@@ -1,8 +1,6 @@
 import { test, expect, type CDPSession, type Page } from "@playwright/test";
 import { expectEngineHosted, hideMapBeforeLoad } from "./helpers";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 /**
  * The mouse's side buttons on the tower canvas, with trusted input from the
  * browser itself (CDP `Input.dispatchMouseEvent`), so the events reach the
@@ -33,7 +31,7 @@ async function boot(page: Page): Promise<string[]> {
   await page.goto("/");
   await page.waitForFunction(() => {
     const canvas = document.querySelector<HTMLCanvasElement>("#view");
-    return Boolean((window as any).game?.engine && canvas && canvas.width > 0);
+    return Boolean(window.game?.engine && canvas && canvas.width > 0);
   });
   await page.evaluate(() => document.getElementById("splash")?.remove());
   return errors;
@@ -101,7 +99,7 @@ async function settle(page: Page): Promise<void> {
 
 async function cameraAt(page: Page): Promise<{ x: number; y: number }> {
   return page.evaluate(() => {
-    const pos = (window as any).game.engine.cam.pos;
+    const pos = window.game.engine.cam.pos;
     return { x: pos.x, y: pos.y };
   });
 }
@@ -161,5 +159,5 @@ test("left down, forward down, left up, forward up leaves no press held", async 
   expect(errors).toEqual([]);
   // A stuck press would turn this plain move into a pan.
   expect(await hoverPans(page, mouse)).toBe(false);
-  expect(await page.evaluate(() => (window as any).game.engine.gesture)).toBeNull();
+  expect(await page.evaluate(() => window.game.engine.gesture)).toBeNull();
 });

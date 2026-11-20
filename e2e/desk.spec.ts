@@ -12,8 +12,6 @@ import { expectEngineHosted } from "./helpers";
  * one clears that.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 test.use({ storageState: { cookies: [], origins: [] } });
 
 // Every test that reaches a tower must end with it still on the engine.
@@ -35,7 +33,7 @@ async function box(locator: Locator): Promise<Box> {
 /** Load the game and wait for its handle, leaving the title screen up. */
 async function load(page: Page, url = "/"): Promise<void> {
   await page.goto(url);
-  await page.waitForFunction(() => Boolean((window as any).game));
+  await page.waitForFunction(() => Boolean(window.game));
   await expect(page.locator("#boot-cover")).toHaveCount(0);
 }
 
@@ -128,7 +126,7 @@ test.describe("the desk on a computer", () => {
     const moved = await box(bulletin);
     expect(moved.x).toBeLessThan(before.x - 350);
     await page.reload();
-    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.waitForFunction(() => Boolean(window.game));
     await enterTower(page);
     const after = await box(bulletin);
     expect(after.x).toBeCloseTo(moved.x, 0);

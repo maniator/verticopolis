@@ -47,8 +47,7 @@ test("a TOWER save with an open emergency shows the choice, not the congratulati
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
   await page.evaluate(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const g = (window as any).game;
+    const g = window.game;
     const Sim = g.sim.constructor;
     const s = Sim.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
     s.evaluatedTower = true;
@@ -96,8 +95,7 @@ test("a TOWER save with an open emergency adopted mid-session shows the choice, 
   await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
   await page.evaluate(() => document.getElementById("splash")?.remove());
   await page.evaluate(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const g = (window as any).game;
+    const g = window.game;
     const s = g.sim.constructor.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
     s.evaluatedTower = true;
     s.events.pending = {

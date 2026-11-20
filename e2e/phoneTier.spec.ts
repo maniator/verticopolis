@@ -38,7 +38,7 @@ test("the gallery's phone tier matches the page's phone query and phone layout",
   for (const vp of VIEWPORTS) {
     await page.setViewportSize(vp);
     const page_ = await page.evaluate(() => ({
-      query: (window as any).game.mobileMq.matches as boolean,
+      query: window.game.mobileMq.matches as boolean,
       layout: getComputedStyle(document.querySelector("#topbar .brand")!).display === "none",
     }));
     seen[`${vp.width}x${vp.height}`] = { tier: isPhoneViewport(vp), ...page_ };

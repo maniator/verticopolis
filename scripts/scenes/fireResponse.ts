@@ -19,6 +19,7 @@
  */
 import { type Page } from "playwright";
 import { type Scene } from "../screenshot-env.ts";
+import type { SteppedClock } from "../screenshot-page-ops.ts";
 import { buildSecurityTower } from "../screenshot-builders.ts";
 
 /** What the engine reports about the answer to the fire, or null. */
@@ -33,7 +34,7 @@ interface FireRead {
 
 /** In-page: the engine's clock and its read of the fire response. */
 function pgReadFire(): FireRead {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const text = g.enginePort.fireResponse?.();
   return { minutes: g.renderSim.clock.minutes, fire: text === undefined ? null : JSON.parse(text) };
 }
@@ -41,20 +42,22 @@ function pgReadFire(): FireRead {
 /** In-page: run the engine `minutes` of game time in one step, then read
  *  the frame again so the overlay draws where the engine is now. */
 function pgRunEngine(minutes: number): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   g.enginePort.tick(minutes);
   g.reader.update();
 }
 
 /** In-page: light the floor 8 office nearest the lot's center. */
 function pgLightFloor8(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const port = g.enginePort;
   const center = Math.floor(g.grid.width / 2);
-  const offices = JSON.parse(port.serialize()).units.filter((u: any) => u.kind === "office" && u.floor === 8);
+  type Room = { id: number; kind: string; floor: number; x: number; width: number };
+  const units: Room[] = JSON.parse(port.serialize()).units;
+  const offices = units.filter((u) => u.kind === "office" && u.floor === 8);
   if (offices.length === 0) throw new Error("the tower has no office on floor 8 to light");
-  const mid = (u: any): number => Math.abs(u.x + u.width / 2 - center);
-  const room = offices.reduce((a: any, b: any) => (mid(b) < mid(a) ? b : a));
+  const mid = (u: Room): number => Math.abs(u.x + u.width / 2 - center);
+  const room = offices.reduce((a, b) => (mid(b) < mid(a) ? b : a));
   if (!port.startFireAt(room.id)) throw new Error(`the engine refused to light office ${room.id}`);
   g.reader.update();
 }
@@ -67,7 +70,8 @@ async function lightAndAnswer(page: Page, act: "accept" | "decline", where: stri
   // real time (frameLoop.ts): wait that out, then step one frame of the
   // page's stepped clock (speed 0, so the tower holds still).
   await page.evaluate(async () => {
-    const clock = (window as unknown as { game: any }).game.engine.engine.clock;
+    const clock: SteppedClock = window.game.engine.engine.clock;
+    if (!clock.step) throw new Error("the page has no stepped clock");
     const open = () => (document.getElementById("modal") as HTMLDialogElement | null)?.open === true;
     for (let i = 0; i < 20 && !open(); i++) {
       await new Promise((resolve) => setTimeout(resolve, 250));

@@ -39,7 +39,7 @@ test.afterEach(async () => {
 
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
   await page.evaluate(() => {
@@ -57,13 +57,13 @@ async function recentLines(page: Page): Promise<string[]> {
   return page.locator("#mb-recent-menu .mb-item:not([hidden])").allTextContents();
 }
 
-const generation = (page: Page) => page.evaluate(() => (window as any).game.enginePort.generation() as number);
+const generation = (page: Page) => page.evaluate(() => window.game.enginePort.generation() as number);
 
 /** How long the keep of the tower left may take to head Open Recent. */
 const KEEP_NOTED_MS = 20_000;
 
 async function waitForNewTower(page: Page, before: number): Promise<void> {
-  await page.waitForFunction((gen) => (window as any).game.enginePort.generation() !== gen, before, {
+  await page.waitForFunction((gen) => window.game.enginePort.generation() !== gen, before, {
     timeout: 10_000,
   });
 }
@@ -74,8 +74,8 @@ test("lists the towers saved last, newest first, opens one by mouse or by its nu
   expect(await recentLines(page)).toEqual(["No recent towers"]);
 
   await page.evaluate(async () => {
-    await (window as any).game.saveFile("Alpha");
-    await (window as any).game.saveFile("Beta");
+    await window.game.saveFile("Alpha");
+    await window.game.saveFile("Beta");
   });
   expect(await recentLines(page)).toEqual(["1Beta", "2Alpha"]);
 
@@ -116,8 +116,8 @@ test("a tower deleted from My Towers drops off the list, and the other towers st
   await boot(page);
   await page.evaluate(async () => {
     // Gone first, so the tower being played is Keep: its file can't be deleted.
-    await (window as any).game.saveFile("Gone");
-    await (window as any).game.saveFile("Keep");
+    await window.game.saveFile("Gone");
+    await window.game.saveFile("Keep");
   });
   await page.keyboard.press("Escape");
   await page.locator("#menubar .mb-title", { hasText: "File" }).click();
@@ -142,7 +142,7 @@ test("a linked folder's tower is listed by its file name, and one gone from the 
   await expect(page.locator(".fd")).toBeHidden();
   expect(await recentLines(page)).toEqual(["1Lake.vctower"]);
   // Go on in a My Towers copy, so Lake is a file to open again, not the tower being played.
-  await page.evaluate(() => (window as any).game.saveFile("Other"));
+  await page.evaluate(() => window.game.saveFile("Other"));
   expect(await recentLines(page)).toEqual(["1Other", "2Lake.vctower"]);
 
   // Moved away on the player's computer since the list was made.

@@ -33,7 +33,7 @@ async function armLobby(page: Page, picker: string, stories: number): Promise<vo
 async function frameHall(page: Page, dx: number, floor: number, zoom: number): Promise<void> {
   await page.evaluate(
     ([dx, floor, zoom]) => {
-      const w = window as unknown as { game: any; __vcShotTallLobbyAt?: { cx: number } };
+      const w = window as Window & { __vcShotTallLobbyAt?: { cx: number } };
       const at = w.__vcShotTallLobbyAt;
       if (!at) throw new Error("the tall lobby tower was not built");
       w.game.engine.setCamera(at.cx + dx, floor, zoom);

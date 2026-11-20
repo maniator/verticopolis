@@ -81,8 +81,7 @@ test.describe("app integration — main.ts + TowerEngine boot/render boundary", 
     await page.goto("/");
     await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
     await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).game;
+      const g = window.game;
       const Sim = g.sim.constructor;
       const s = Sim.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
       s.events.pending = {

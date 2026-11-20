@@ -14,7 +14,7 @@ import { type Page } from "playwright";
  */
 export async function pgShowReturningSplash(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const g = (window as unknown as { game?: any }).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     g.onboarding.showSplash({
       hasSave: true,
@@ -38,7 +38,7 @@ export async function pgShowReturningSplash(page: Page): Promise<void> {
  */
 export async function pgShowOpenWindow(page: Page, viaMenu = false): Promise<void> {
   await page.evaluate(async () => {
-    const g = (window as unknown as { game?: any }).game;
+    const g = window.game;
     await g.saveFile("Harbour Point");
     await g.saveFile("Sky Hotel");
   });

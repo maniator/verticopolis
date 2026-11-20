@@ -36,8 +36,6 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * (`npm run perf:worker -- --aa wasm --map-ab`, SPEC CAP-6).
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 /** Ceiling for opening the window on the large tower: rebuild and full paint. */
 const OPEN_CEILING_MS = 30;
 /** Ceiling for an open frame with nothing changed. */
@@ -49,10 +47,19 @@ const CLOSED_CEILING_MS = 0.005;
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
+/** The map views' internals the paint tests drive, read by name off the open
+ *  window (they are private): the clock and tiers they read, the tier marks
+ *  and the cached tier layout. */
+type MapViews = {
+  deps: { minutes: () => number; tiers: { read(): unknown } };
+  tierMarks: { rowCount: number };
+  tierLayout: unknown;
+};
+
 test("the map's cost on a large tower stays within its ceilings", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game && (window as any).overviewMap));
+  await page.waitForFunction(() => Boolean(window.game && window.overviewMap));
   await page.evaluate(() => document.getElementById("splash")?.remove());
   // The 5-star rung: 62 floors of offices across the lot, the deep basement,
   // and the metro, a few thousand rooms.
@@ -60,8 +67,8 @@ test("the map's cost on a large tower stays within its ceilings", async ({ page 
   expect(star).toBe(5);
 
   const result = await page.evaluate(() => {
-    const win = (window as any).overviewMap;
-    const g = (window as any).game;
+    const win = window.overviewMap!;
+    const g = window.game;
     const median = (xs: number[]) => {
       const s = [...xs].sort((a, b) => a - b);
       return s[Math.floor(s.length / 2)];
@@ -150,7 +157,7 @@ const HOTEL_HOUR_CEILING_MS = 0.5;
  * rooms to read. Runs in the page.
  */
 function addHotelRooms(): number {
-  const g = (window as any).game;
+  const g = window.game;
   const s = g.sim.constructor.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
   s.money = 1e9;
   let placed = 0;
@@ -164,16 +171,16 @@ function addHotelRooms(): number {
 test("the Hotel view's hourly repaint on a large tower stays within its ceilings", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game && (window as any).overviewMap));
+  await page.waitForFunction(() => Boolean(window.game && window.overviewMap));
   await page.evaluate(() => document.getElementById("splash")?.remove());
   expect(await page.evaluate(buildToStar, 5)).toBe(5);
   expect(await page.evaluate(addHotelRooms)).toBeGreaterThan(300);
   await page.locator("#overview-map-picker").selectOption("hotel");
 
   const result = await page.evaluate(() => {
-    const win = (window as any).overviewMap;
-    const g = (window as any).game;
-    const views = win.deps.views;
+    const win = window.overviewMap!;
+    const g = window.game;
+    const views: MapViews = Reflect.get(Reflect.get(win, "deps"), "views");
     const median = (xs: number[]) => {
       const s = [...xs].sort((a, b) => a - b);
       return s[Math.floor(s.length / 2)];
@@ -182,7 +189,7 @@ test("the Hotel view's hourly repaint on a large tower stays within its ceilings
     let minutes = g.reader.header.minutes;
     views.deps.minutes = () => minutes;
     win.frame();
-    const hotels = (g.reader.rooms as any[]).filter((r) => r.kind === "hotelSingle");
+    const hotels = g.reader.rooms.filter((r) => r.kind === "hotelSingle");
 
     const BATCH = 200;
     const steady: number[] = [];
@@ -247,16 +254,16 @@ const TIER_READ_CEILING_MS = 30;
 test("the Pricing view's reads on a large tower stay within their ceilings", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game && (window as any).overviewMap));
+  await page.waitForFunction(() => Boolean(window.game && window.overviewMap));
   await page.evaluate(() => document.getElementById("splash")?.remove());
   expect(await page.evaluate(buildToStar, 5)).toBe(5);
-  await page.evaluate(() => ((window as any).game.speed = 0));
+  await page.evaluate(() => (window.game.speed = 0));
   await page.locator("#overview-map-picker").selectOption("pricing");
 
   const result = await page.evaluate(() => {
-    const win = (window as any).overviewMap;
-    const g = (window as any).game;
-    const views = win.deps.views;
+    const win = window.overviewMap!;
+    const g = window.game;
+    const views: MapViews = Reflect.get(Reflect.get(win, "deps"), "views");
     const median = (xs: number[]) => {
       const s = [...xs].sort((a, b) => a - b);
       return s[Math.floor(s.length / 2)];

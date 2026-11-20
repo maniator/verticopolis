@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { startDeployments, type Deployments } from "./deployments";
 import { engineEntries, engineEntriesOf, expectEngineIs, newContext } from "./engineDeployHelpers";
@@ -64,7 +63,7 @@ async function installedFirst(page: Page): Promise<void> {
 const bootFailure = (page: Page) =>
   page.evaluate(
     () =>
-      (window as any).__vcEngineBoot?.failure as
+      window.__vcEngineBoot?.failure as
         { stage: string; reason: string; package?: { kind: string; controlled: boolean } } | null | undefined,
   );
 
@@ -125,7 +124,7 @@ test("an evicted binary with no network fails to load with its own reason, and t
     deployments.failNetwork("engine");
     const before = deployments.requests.length;
     await page.reload();
-    await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
+    await page.waitForFunction(() => window.__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
     expect(await bootFailure(page)).toMatchObject({
       stage: "load",
       package: { kind: "load-failed", controlled: true },
@@ -161,7 +160,7 @@ test("an evicted binary is never refilled with another build's bytes while the f
     deployments.engineFrom("B");
     const before = deployments.requests.length;
     await page.reload();
-    await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
+    await page.waitForFunction(() => window.__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
     expect(await bootFailure(page), "the first build's worker refuses the other build's binary").toMatchObject({
       stage: "load",
       package: { kind: "load-failed" },

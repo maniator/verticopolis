@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
 
@@ -32,13 +31,13 @@ test("the game runs on the WASM engine on boot", async ({ page }) => {
   // other specs do.
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
-    (window as any).game.setSpeed(1);
+    window.game.setSpeed(1);
   });
-  const before = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
-  await page.waitForFunction((b) => (window as any).game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
+  const before = await page.evaluate(() => window.game.sim.clock.minutes as number);
+  await page.waitForFunction((b) => window.game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
   const result = await page.evaluate(() => {
-    const g = (window as any).game;
-    const host = (window as any).__vcEngine;
+    const g = window.game;
+    const host = window.__vcEngine!;
     g.sim.money = 1e9;
     const ok = g.sim.build("lobby", 1, 160).ok;
     g.syncSim();
@@ -74,7 +73,7 @@ test("the car, extend and removal commands charge inside the WASM engine", async
   );
   await page.evaluate(() => document.getElementById("splash")?.remove());
   const result = await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     const engine = g.enginePort;
     const sim = g.sim;
     sim.money = 1e9;

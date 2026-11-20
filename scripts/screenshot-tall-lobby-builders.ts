@@ -24,11 +24,13 @@
  *  3-star tower, so escalators are unlocked). Fails closed when a lobby does
  *  not rise to the height asked or a flight is refused. */
 export function buildTallLobbyTower(): void {
-  const w = window as unknown as { game: any; __vcShotTallLobby?: any };
+  type Mode = Parameters<Window["game"]["saveLoad"]["newGame"]>[0];
+  type Opts = { mode?: Mode; ground?: number; sky?: number; split?: number; flights?: boolean };
+  const w = window as Window & { __vcShotTallLobby?: Opts };
   const g = w.game;
   const opts = w.__vcShotTallLobby ?? {};
-  const mode: string = opts.mode ?? "classic";
-  const groundHeight: number = opts.ground ?? 3;
+  const mode = opts.mode ?? "classic";
+  const groundHeight = opts.ground ?? 3;
   g.saveLoad.newGame(mode);
   const port = g.enginePort;
   if (opts.flights) {
@@ -37,12 +39,13 @@ export function buildTallLobbyTower(): void {
     port.restore(JSON.stringify(save));
   }
   port.setMoney(50_000_000);
-  const kind = (k: string): number => g.portCodes.kind(k);
+  type Kind = Parameters<typeof g.portCodes.kind>[0];
+  const kind = (k: Kind): number => g.portCodes.kind(k);
   const W = g.grid.width;
   const cx = Math.floor(W / 2);
   const left = cx - 20;
   const right = cx + 19;
-  const row = (k: string, floor: number, lo: number, hi: number): number => {
+  const row = (k: Kind, floor: number, lo: number, hi: number): number => {
     let built = 0;
     for (let x = lo; x <= hi; x++) if (port.buildAt(kind(k), floor, x)[0] === 1) built++;
     return built;
@@ -55,7 +58,7 @@ export function buildTallLobbyTower(): void {
   port.setLobbyHeight(1);
   const top = 1 + groundHeight;
   const lobbyInterval: number = g.getCatalog().world.lobbyInterval;
-  const sky: number = opts.sky ?? 0;
+  const sky = opts.sky ?? 0;
   // Floors up to the sky lobby, the sky lobby, then a few floors over it.
   // Each story must sit on the one below, so they go up in order.
   const below = sky ? lobbyInterval - 1 : top + 4;
@@ -65,7 +68,7 @@ export function buildTallLobbyTower(): void {
     // `split` stories high on the right, laid from the far end with bridging
     // off so it keeps its own height. The gap tile left between them joins
     // the left hall, and the wall between them carries the revolving door.
-    const short: number = opts.split;
+    const short = opts.split;
     const door = cx + 1;
     const bridged: boolean = port.autoBridge();
     port.chooseAutoBridge(false);

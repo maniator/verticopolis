@@ -7,7 +7,7 @@
 /** Run via page.evaluate after `buildCanonTower`. Throws when the hall is
  *  refused, so a rules change fails the capture instead of shipping a bare top. */
 export function topOutTowerWithHall(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const s = g.sim;
   const W = g.grid.width;
   const cx = Math.floor(W / 2);
@@ -29,7 +29,7 @@ export function topOutTowerWithHall(): void {
     for (let x = left + 30; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         u.label = "Apex Holdings";
@@ -39,9 +39,10 @@ export function topOutTowerWithHall(): void {
   }
   const hall = s.tower.place("weddingHall", HALL_FLOOR, cx - Math.floor(HALL_WIDTH / 2));
   if (!hall.ok) throw new Error(`crown wedding hall failed: ${hall.reason}`);
-  s.tower.getUnit(hall.unitId).state = "occupied";
+  s.tower.getUnit(hall.unitId)!.state = "occupied";
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   // Frozen so the capstone is byte-stable across regens.
   g.speed = 0;
   g.engine.paused = true;

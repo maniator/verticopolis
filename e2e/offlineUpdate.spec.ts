@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { ENGINE_REVISION_SUFFIX } from "../src/build/enginePackageBuild";
@@ -195,9 +194,9 @@ test("an update replaces the engine files in the cache, and the updated game pla
         await servedGlue(page, browserName),
         "the offline start runs the second build's glue from the cache",
       ).toContain("deployment B");
-      await page.evaluate(() => (window as any).game.setSpeed(1));
-      const minutes = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
-      await page.waitForFunction((m) => (window as any).game.sim.clock.minutes > m + 5, minutes, { timeout: 30_000 });
+      await page.evaluate(() => window.game.setSpeed(1));
+      const minutes = await page.evaluate(() => window.game.sim.clock.minutes as number);
+      await page.waitForFunction((m) => window.game.sim.clock.minutes > m + 5, minutes, { timeout: 30_000 });
       await page.waitForTimeout(4_000);
       const reached = deployments.requests.slice(served).filter((r) => !isUpdateCheck(r.path));
       expect(reached, "no request but the browser's update check reached the server").toEqual([]);

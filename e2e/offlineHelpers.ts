@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { expect, type Page } from "@playwright/test";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "@verticopolis/components/audio/audioAssets";
 
@@ -76,7 +75,7 @@ export function watch(page: Page): { errors: string[]; failed: string[] } {
 export function lobbyAt(page: Page, x: number): Promise<boolean> {
   return page.evaluate(
     (at) =>
-      (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some(
+      (JSON.parse(window.__vcEngine!.port.serialize()).units as { kind: string; x: number }[]).some(
         (u) => u.kind === "lobby" && u.x === at,
       ),
     x,
@@ -86,11 +85,11 @@ export function lobbyAt(page: Page, x: number): Promise<boolean> {
 /** Run the clock at speed 1 until the engine's clock moves past where it is
  *  now, then pause. Returns the clock it paused at. */
 export async function advanceClock(page: Page): Promise<number> {
-  await page.evaluate(() => (window as any).game.setSpeed(1));
-  const before = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
-  await page.waitForFunction((b) => (window as any).game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
+  await page.evaluate(() => window.game.setSpeed(1));
+  const before = await page.evaluate(() => window.game.sim.clock.minutes as number);
+  await page.waitForFunction((b) => window.game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
   return page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(0);
     return g.sim.clock.minutes as number;
   });
@@ -123,6 +122,27 @@ export function expectAudioFromWorker(responses: AudioResponse[]): void {
   ).toEqual([]);
 }
 
+/** A voice whose notes the sound test counts. */
+type ProbedVoice = { triggerAttackRelease(...args: unknown[]): unknown };
+
+/** The loaded Tone engine's objects the sound test reads, off the audio
+ *  facade's private `impl` (by name). Any may move in a rename, so each is
+ *  optional and the test checks they exist first. */
+type ToneProbe = {
+  started?: boolean;
+  master?: { context: { state: string } };
+  crowd?: { voices?: { ready?: boolean; laughs?: { loaded?: boolean } } };
+  sfx: (name: string) => void;
+  arp?: ProbedVoice;
+  bassVoice?: ProbedVoice;
+  hook?: ProbedVoice;
+  sfxVoices?: { bloop?: ProbedVoice };
+};
+
+/** What the sound test counts, kept on the page's window. */
+type AudioCounts = { music: number; bloop: number; cues: string[] };
+type CountingWindow = Window & { __audioCounts?: AudioCounts };
+
 /**
  * Today's sounds after the first gesture (#985, criterion 3). The audio is the
  * existing Tone engine: one lazy chunk synthesizes the music and every cue,
@@ -135,8 +155,8 @@ export function expectAudioFromWorker(responses: AudioResponse[]): void {
  */
 export async function expectSoundsAfterGesture(page: Page): Promise<void> {
   const before = await page.evaluate(() => ({
-    started: (window as any).game.audio.started,
-    muted: (window as any).game.audio.muted,
+    started: window.game.audio.started,
+    muted: window.game.audio.muted,
   }));
   expect(before, "the game starts no audio before a gesture, and is not muted").toEqual({
     started: false,
@@ -148,9 +168,16 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
   const box = await page.locator("#view").boundingBox();
   expect(box, "the tower canvas is on screen").not.toBeNull();
   await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  await page.waitForFunction(() => !!(window as any).game.audio.impl?.started, undefined, { timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const impl: ToneProbe | null = Reflect.get(window.game.audio, "impl");
+      return !!impl?.started;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
   const absentAtStart = await page.evaluate(() => {
-    const impl = (window as any).game.audio.impl;
+    const impl: ToneProbe = Reflect.get(window.game.audio, "impl");
     const probes: Record<string, unknown> = {
       "master.context": impl.master?.context,
       "crowd.voices": impl.crowd?.voices,
@@ -162,15 +189,19 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
     absentAtStart,
     "the engine objects this test observes exist (renamed in ToneAudioEngine.ts or toneCrowd.ts?)",
   ).toEqual([]);
-  await page.waitForFunction(() => (window as any).game.audio.impl.master.context.state === "running", undefined, {
-    timeout: 30_000,
-  });
+  await page.waitForFunction(
+    () => (Reflect.get(window.game.audio, "impl") as ToneProbe).master!.context.state === "running",
+    undefined,
+    {
+      timeout: 30_000,
+    },
+  );
   // The crowd's recordings decode from the cache (the layer stays tone-only,
   // and silent about it, if they never arrive, so wait for them explicitly).
   // `ready` means the talk seed decoded and was masked.
   await page.waitForFunction(
     () => {
-      const voices = (window as any).game.audio.impl.crowd?.voices;
+      const voices = (Reflect.get(window.game.audio, "impl") as ToneProbe).crowd?.voices;
       return !!voices?.ready && !!voices.laughs?.loaded;
     },
     undefined,
@@ -181,10 +212,10 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
   // the notes its voices actually trigger (the composed program's voices and
   // the bloop the build cue sounds on).
   const missing = await page.evaluate(() => {
-    const impl = (window as any).game.audio.impl;
-    const counts = { music: 0, bloop: 0, cues: [] as string[] };
+    const impl: ToneProbe = Reflect.get(window.game.audio, "impl");
+    const counts: AudioCounts = { music: 0, bloop: 0, cues: [] };
     const absent: string[] = [];
-    const spy = (voice: any, name: string, key: "music" | "bloop") => {
+    const spy = (voice: ProbedVoice | undefined, name: string, key: "music" | "bloop") => {
       if (typeof voice?.triggerAttackRelease !== "function") {
         absent.push(name);
         return;
@@ -204,23 +235,25 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
       counts.cues.push(name);
       return sfx(name);
     };
-    (window as any).__audioCounts = counts;
+    (window as CountingWindow).__audioCounts = counts;
     return absent;
   });
   expect(missing, "the engine objects this test observes exist (renamed in ToneAudioEngine.ts?)").toEqual([]);
-  await page.waitForFunction(() => (window as any).__audioCounts.music > 0, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => (window as CountingWindow).__audioCounts!.music > 0, undefined, {
+    timeout: 30_000,
+  });
 
   expect(await lobbyAt(page, 160), "no lobby at the build spot yet").toBe(false);
   await page.evaluate(async () => {
-    const g = (window as any).game;
+    const g = window.game;
     // Count only what the build itself plays.
-    Object.assign((window as any).__audioCounts, { bloop: 0, cues: [] });
+    Object.assign((window as CountingWindow).__audioCounts!, { bloop: 0, cues: [] });
     g.sim.money = 1e9;
     await g.build.tryBuild("lobby", 1, 160); // settles once the cue has played
-    (window as any).game.syncSim();
+    window.game.syncSim();
   });
   expect(await lobbyAt(page, 160), "the lobby was built").toBe(true);
-  const cue = await page.evaluate(() => ({ ...(window as any).__audioCounts }));
+  const cue = await page.evaluate(() => ({ ...(window as CountingWindow).__audioCounts! }));
   expect(cue.cues, "the build played its cue").toContain("build");
   expect(cue.cues, "no error cue").not.toContain("error");
   expect(cue.bloop, "the build cue sounded").toBeGreaterThan(0);

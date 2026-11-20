@@ -15,7 +15,7 @@ export const RAIN_SHELTERED_SHOT: Shot = {
   wait: 500,
   setup: async (page) => {
     await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       Object.defineProperty(g.engine.sim, "weather", { get: () => "rain", configurable: true });
       if (g.engine.sim.weather !== "rain") throw new Error("the rain-sheltered shot could not pin the weather to rain");
       let min = Infinity;

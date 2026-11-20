@@ -12,17 +12,15 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * opens centered again.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game));
+  await page.waitForFunction(() => Boolean(window.game));
   await page.evaluate(() => document.getElementById("splash")?.remove());
   await page.evaluate(buildToStar, 2);
-  await page.evaluate(() => (window as any).game.engine.setCamera((window as any).game.grid.width / 2, 6, 1));
+  await page.evaluate(() => window.game.engine.setCamera(window.game.grid.width / 2, 6, 1));
 }
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -92,7 +90,7 @@ test.describe("movable windows", () => {
 
     // The spot survives a reload.
     await page.reload();
-    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.waitForFunction(() => Boolean(window.game));
     await page.evaluate(() => document.getElementById("splash")?.remove());
     await expect(map).toBeVisible();
     const restored = await box(map);
@@ -124,8 +122,8 @@ test.describe("movable windows", () => {
   }) => {
     await boot(page);
     await page.evaluate(() => {
-      const g = (window as any).game;
-      const unit = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+      const g = window.game;
+      const unit = g.sim.tower.units.find((u) => u.kind === "office")!;
       g.selectPicked({ type: "unit", id: unit.id, kind: unit.kind });
     });
     const editor = page.locator("#editor");
@@ -138,7 +136,7 @@ test.describe("movable windows", () => {
     expect(moved.y).toBeCloseTo(before.y - 60, 0);
 
     // The camera moves; the card does not.
-    await page.evaluate(() => (window as any).game.engine.setCamera((window as any).game.grid.width / 2 + 10, 9, 1));
+    await page.evaluate(() => window.game.engine.setCamera(window.game.grid.width / 2 + 10, 9, 1));
     await nextFrames(page);
     const after = await box(editor);
     expect(after.x).toBeCloseTo(moved.x, 0);
@@ -147,10 +145,10 @@ test.describe("movable windows", () => {
     // Closed and reopened, the card anchors beside its room again.
     await page.locator("#editor .ed-close").click();
     await expect(editor).toHaveClass(/hidden/);
-    await page.evaluate(() => (window as any).game.engine.setCamera((window as any).game.grid.width / 2, 6, 1));
+    await page.evaluate(() => window.game.engine.setCamera(window.game.grid.width / 2, 6, 1));
     await page.evaluate(() => {
-      const g = (window as any).game;
-      const unit = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+      const g = window.game;
+      const unit = g.sim.tower.units.find((u) => u.kind === "office")!;
       g.selectPicked({ type: "unit", id: unit.id, kind: unit.kind });
     });
     await nextFrames(page);
@@ -202,8 +200,8 @@ test.describe("movable windows on a phone", () => {
     await boot(page);
     const open = () =>
       page.evaluate(() => {
-        const g = (window as any).game;
-        const unit = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+        const g = window.game;
+        const unit = g.sim.tower.units.find((u) => u.kind === "office")!;
         g.selectPicked({ type: "unit", id: unit.id, kind: unit.kind });
       });
     await open();

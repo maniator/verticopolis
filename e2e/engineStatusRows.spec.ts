@@ -61,9 +61,9 @@ test("a package load that never finishes has already sent its attempt row", asyn
 
 test("a session engages on its first accepted command, after attempt and settle", async ({ page }) => {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game?.enginePort, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!window.game?.enginePort, undefined, { timeout: 30_000 });
   await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     g.setSpeed(0);
   });
@@ -72,7 +72,7 @@ test("a session engages on its first accepted command, after attempt and settle"
 
   // A refused command and a few paused seconds do not engage.
   const refused = await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     return g.enginePort.buildAt(g.portCodes.kind("office"), 2, -50)[0] as number;
   });
   expect(refused, "the off-map office is refused").toBe(0);
@@ -81,7 +81,7 @@ test("a session engages on its first accepted command, after attempt and settle"
 
   // The first accepted command engages; a second sends nothing more.
   const accepted = await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     const lobby = g.portCodes.kind("lobby");
     return [g.enginePort.buildAt(lobby, 1, 160)[0], g.enginePort.buildAt(lobby, 1, 161)[0]] as number[];
   });

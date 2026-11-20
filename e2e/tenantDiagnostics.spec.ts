@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { lobbyDistanceFixture } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import type { Unit } from "@verticopolis/engine/model/types";
+import type { FacilityKind, Unit } from "@verticopolis/engine/model/types";
 import { buildInPage, expectEngineHosted } from "./helpers";
 
 /**
@@ -30,14 +29,14 @@ type Section = "gripe" | "wontLease" | "notice";
 
 interface Room {
   id: number;
-  kind: string;
+  kind: FacilityKind;
   sections: Section[];
 }
 
 /** The first room whose engine facts carry each section, grouped by room. */
 async function roomsWithSections(page: Page): Promise<Room[]> {
   return page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     const slots: string[] = JSON.parse(g.enginePort.viewLayout()).records.unitFacts;
     const sections = ["gripe", "wontLease", "notice"] as const;
     const at = Object.fromEntries(
@@ -48,7 +47,7 @@ async function roomsWithSections(page: Page): Promise<Room[]> {
       }),
     );
     const isSet = (facts: Float64Array, s: string): boolean => facts[at[s]] === 1;
-    const rooms = new Map<number, { id: number; kind: string; sections: string[] }>();
+    const rooms = new Map<number, { id: number; kind: FacilityKind; sections: string[] }>();
     const taken = new Set<string>();
     for (const u of g.sim.tower.units) {
       const facts = g.enginePort.unitFacts(u.id) as Float64Array;
@@ -69,10 +68,10 @@ const COPY: Record<Section, string> = { gripe: "Main gripe:", wontLease: "Won't 
 
 /** Open `room` on the desktop inspector or, on a phone, in the editor, and
  *  return the block its diagnostics print in. */
-async function open(page: Page, room: { id: number; kind: string }, phone: boolean) {
+async function open(page: Page, room: { id: number; kind: FacilityKind }, phone: boolean) {
   await page.evaluate(
     ({ id, kind, phone }) => {
-      const g = (window as any).game;
+      const g = window.game;
       if (phone) g.selectPicked({ type: "unit", id, kind });
       else g.inspector.inspectPicked({ type: "unit", id, kind });
     },
@@ -94,19 +93,17 @@ test("an imported tower's unhappy tenants explain themselves on the desktop card
   page,
 }) => {
   await page.goto("/");
-  await page.waitForFunction(
-    () => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game),
-    undefined,
-    { timeout: 30_000 },
-  );
+  await page.waitForFunction(() => Boolean(window.__vcEngine?.status?.hosted && window.game), undefined, {
+    timeout: 30_000,
+  });
   await page.evaluate((text) => {
-    const g = (window as any).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     return g.saveLoad.importGame(text);
   }, TOWER);
   await expect(page.getByText("Tower imported.")).toBeVisible();
   // Hold the clock after the import, so no tenant's state moves while it is read.
-  await page.evaluate(() => (window as any).game.setSpeed(0));
+  await page.evaluate(() => window.game.setSpeed(0));
   const unmodified = (await roomsWithSections(page)).flatMap((r) => r.sections);
   // The canary: the unmodified split-tower-4 holds tenants with a main gripe.
   expect(unmodified, "split-tower-4 must hold a tenant with a main gripe").toContain("gripe");
@@ -116,9 +113,9 @@ test("an imported tower's unhappy tenants explain themselves on the desktop card
   // the rent and the player prices the office at the top of its band, a rent
   // no fresh tenant stays for: a room the move-in gate holds.
   const held = await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     const office = g.sim.tower.units.find(
-      (u: any) => u.kind === "office" && u.state === "occupied" && !u.noRate && g.sim.tower.isFloorServed(u.floor),
+      (u) => u.kind === "office" && u.state === "occupied" && !u.noRate && g.sim.tower.isFloorServed(u.floor),
     );
     if (!office) throw new Error("split-tower-4 has no occupied office on a served floor");
     if (!g.enginePort.vacateUnit(office.id, "rent"))
@@ -150,13 +147,13 @@ test("an imported tower's unhappy tenants explain themselves on the desktop card
  *  app's history restore does, so the reader, card cache and panels refresh. */
 async function loadSave(page: Page, save: string): Promise<void> {
   const ok = await page.evaluate((json) => {
-    const g = (window as any).game;
+    const g = window.game;
     const answer = g.enginePort.restore(json);
     const RESTORED = 1;
     if (answer[0] !== RESTORED) throw new Error(`Rust rejected the fixture: ${g.enginePort.lastReason()}`);
     g.followSwap();
     g.setSpeed(0);
-    return g.enginePort === (window as any).__vcEngine.port;
+    return g.enginePort === window.__vcEngine!.port;
   }, save);
   expect(ok).toBe(true);
 }
@@ -164,12 +161,10 @@ async function loadSave(page: Page, save: string): Promise<void> {
 test("No Rate, shoppers too far, a notice and the editor's access row show on the Rust engine", async ({ page }) => {
   // Classic: Modern never holds the No Rate state, and both engines drop it on load there.
   await page.goto("/");
-  await page.waitForFunction(
-    () => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game),
-    undefined,
-    { timeout: 30_000 },
-  );
-  await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
+  await page.waitForFunction(() => Boolean(window.__vcEngine?.status?.hosted && window.game), undefined, {
+    timeout: 30_000,
+  });
+  await page.evaluate(() => window.game.onboarding.dismissSplash());
   // Built on the page's own engine; the edit is self-contained, as it runs there too.
   const f = await buildInPage(page, lobbyDistanceFixture, "classic", ({ sim, office }) => {
     const room = (kind: string, floor: number, x: number): Unit => {
@@ -200,7 +195,7 @@ test("No Rate, shoppers too far, a notice and the editor's access row show on th
   expect(access, "the engine reads one served floor and one unserved").toEqual(["Yes", "No"]);
   await loadSave(page, f.save);
 
-  const checks: ReadonlyArray<readonly [{ id: number; kind: string }, string]> = [
+  const checks: ReadonlyArray<readonly [{ id: number; kind: FacilityKind }, string]> = [
     [f.office, "No Rate: the tenant stays"],
     [f.far, "Shoppers: too far from a lobby"],
     [leaving, "Giving notice:"],
@@ -216,7 +211,7 @@ test("No Rate, shoppers too far, a notice and the editor's access row show on th
   // The phone editor (still at 390px): the access row for each security office,
   // and none for the office, whose diagnostics carry the access line instead.
   for (const [i, guard] of guards.entries()) {
-    await page.evaluate(({ id, kind }) => (window as any).game.selectPicked({ type: "unit", id, kind }), {
+    await page.evaluate(({ id, kind }) => window.game.selectPicked({ type: "unit", id, kind }), {
       id: guard.id,
       kind: guard.kind,
     });
@@ -224,7 +219,7 @@ test("No Rate, shoppers too far, a notice and the editor's access row show on th
       access[i],
     );
   }
-  await page.evaluate(({ id, kind }) => (window as any).game.selectPicked({ type: "unit", id, kind }), {
+  await page.evaluate(({ id, kind }) => window.game.selectPicked({ type: "unit", id, kind }), {
     id: f.office.id,
     kind: f.office.kind,
   });

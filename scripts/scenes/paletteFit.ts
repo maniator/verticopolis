@@ -12,7 +12,7 @@ import { type Scene } from "../screenshot-env.ts";
 /** A small Modern tower at five stars, so the palette lists every tool. Runs
  *  in the page, so it names nothing from outside. */
 function buildFullModernPalette(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   g.sim = g.sim.constructor.newGame(4400, "modern");
   const s = g.sim;
   s.money = 500_000_000;

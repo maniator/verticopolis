@@ -20,7 +20,7 @@ const MAX_MINUTES = 90;
  *  open ground between the towers, then reads the frame again so the people
  *  draw where the engine has them. Answers the minutes run, or -1. */
 function pgUntilSomeoneWalksTheStreet(max: number): number {
-  const w = window as unknown as { game: any; __vcShotSplitLot?: [number, number][] };
+  const w = window as Window & { __vcShotSplitLot?: [number, number][] };
   const g = w.game;
   const towers = w.__vcShotSplitLot;
   if (!towers) throw new Error("the split lot was not built");

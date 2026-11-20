@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
@@ -18,10 +17,7 @@ const PHONE = { width: 390, height: 844 };
 
 /** The weekday hours of a shaft's schedule: the port's slots hold a row flag, then 24 hourly car counts. */
 const weekday = (page: Page, id: number) =>
-  page.evaluate(
-    (shaft) => Array.from((window as any).game.enginePort.shaftSchedule(shaft) as Float64Array).slice(1, 25),
-    id,
-  );
+  page.evaluate((shaft) => Array.from(window.game.enginePort.shaftSchedule(shaft) as Float64Array).slice(1, 25), id);
 
 // A 75-floor tower on a software-rendered phone-sized page draws slowly, and each click waits on frames.
 test.setTimeout(120_000);
@@ -29,11 +25,11 @@ test.setTimeout(120_000);
 test("an older tower's idle elevator cars are reviewed, recovered and undone on a phone", async ({ page }) => {
   await page.setViewportSize(PHONE);
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game, undefined, {
+  await page.waitForFunction(() => !!window.game, undefined, {
     timeout: 30_000,
   });
   await page.evaluate((text) => {
-    const g = (window as any).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     g.setSpeed(0);
     return g.saveLoad.importGame(text);
@@ -45,7 +41,7 @@ test("an older tower's idle elevator cars are reviewed, recovered and undone on 
   expect(await weekday(page, SHAFT)).toEqual(Array(24).fill(3));
 
   // Tower Statistics offers the review; the dialog lists the three elevators.
-  await page.evaluate(() => (window as any).game.showStats());
+  await page.evaluate(() => window.game.showStats());
   await page.getByRole("button", { name: /Review elevator schedules/ }).click();
   const rows = page.locator(".sched-review-row");
   await expect(rows).toHaveCount(3);
@@ -67,10 +63,10 @@ test("an older tower's idle elevator cars are reviewed, recovered and undone on 
   await expect(rows).toHaveCount(2);
 
   // Undo puts the schedule back exactly, and the review lists the elevator again.
-  await page.evaluate(() => (window as any).game.undo());
+  await page.evaluate(() => window.game.undo());
   expect(await weekday(page, SHAFT)).toEqual(Array(24).fill(3));
   await modal.locator('[data-act="close"]').click();
-  await page.evaluate(() => (window as any).game.showStats());
+  await page.evaluate(() => window.game.showStats());
   await page.getByRole("button", { name: /Review elevator schedules/ }).click();
   await expect(page.locator(".sched-review-row")).toHaveCount(3);
   await expectEngineHosted(page);
@@ -91,9 +87,9 @@ test("the Schedule dialog's Auto-tune waits for measured traffic, then saves and
   page,
 }) => {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!window.game, undefined, { timeout: 30_000 });
   await page.evaluate((text) => {
-    const g = (window as any).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     g.setSpeed(0);
     return g.saveLoad.importGame(text);
@@ -101,7 +97,7 @@ test("the Schedule dialog's Auto-tune waits for measured traffic, then saves and
   await expect(page.getByText("Tower imported.")).toBeVisible();
 
   const openDialog = async () => {
-    await page.evaluate(() => (window as any).game.showStats());
+    await page.evaluate(() => window.game.showStats());
     await page.getByRole("button", { name: /Review elevator schedules/ }).click();
     await page
       .locator(".sched-review-row")
@@ -124,7 +120,7 @@ test("the Schedule dialog's Auto-tune waits for measured traffic, then saves and
   await page.evaluate(
     ({ id, weekday }) => {
       const quiet = Array(24).fill(0);
-      (window as any).game.enginePort.seedElevatorTelemetry(
+      window.game.enginePort.seedElevatorTelemetry(
         JSON.stringify({ util: [[id, 0.5]], hourly: [[id, { weekday, weekend: quiet }]], origins: [] }),
       );
     },
@@ -144,7 +140,7 @@ test("the Schedule dialog's Auto-tune waits for measured traffic, then saves and
   expect(saved[2]).toBe(1);
 
   // One undo step puts the flat schedule back.
-  await page.evaluate(() => (window as any).game.undo());
+  await page.evaluate(() => window.game.undo());
   expect(await weekday(page, SHAFT)).toEqual(Array(24).fill(3));
   await expectEngineHosted(page);
 });

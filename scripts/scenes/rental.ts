@@ -13,7 +13,7 @@ import { PHONE, type Scene } from "../screenshot-env.ts";
  *  floor, occupied and frozen. Self-contained (serialized into the browser), so
  *  it references only `window.game`, mirroring buildModernPricingTower. */
 function buildRentalTower(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(7700, "modern");
   const s = g.sim;
@@ -31,7 +31,7 @@ function buildRentalTower(): void {
   for (let x = left + 6; x + 1 <= right;) {
     const r = s.tower.place("rentalStudio", 2, x);
     if (r.ok) {
-      const u = s.tower.getUnit(r.unitId);
+      const u = s.tower.getUnit(r.unitId)!;
       u.state = "occupied";
       u.everOccupied = true;
       u.occupants = 1;
@@ -41,12 +41,12 @@ function buildRentalTower(): void {
   // Floor 3: Apartments with a deterministic 2-5 household cycle, all leased,
   // except the last one left vacant so the "LEASE" on-market shell is in frame.
   const sizes = [3, 2, 4, 5, 3, 2];
-  const placed: any[] = [];
+  const placed: (typeof s.tower.units)[number][] = [];
   let ci = 0;
   for (let x = left + 6; x + 1 <= right;) {
     const r = s.tower.place("rentalApartment", 3, x);
     if (r.ok) {
-      const u = s.tower.getUnit(r.unitId);
+      const u = s.tower.getUnit(r.unitId)!;
       u.state = "occupied";
       u.everOccupied = true;
       u.residents = sizes[ci % sizes.length];
@@ -64,7 +64,8 @@ function buildRentalTower(): void {
     last.residents = undefined;
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 2, 1.15); // frame the Studio + Apartment floors
   g.speed = 0;
   g.engine.paused = true;

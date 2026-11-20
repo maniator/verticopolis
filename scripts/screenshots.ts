@@ -322,7 +322,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       try {
         await page.waitForFunction(
           () => {
-            const w = window as any;
+            const w = window as Window & { galleryReady?: boolean; previewReady?: boolean; notFoundReady?: boolean };
             return w.galleryReady === true || w.previewReady === true || w.notFoundReady === true;
           },
           null,
@@ -365,7 +365,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       await settle(page, 800, true);
     } else {
       try {
-        await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
+        await page.waitForFunction(() => !!window.game, null, { timeout: READY_TIMEOUT_MS });
       } catch (err) {
         const original = err instanceof Error ? err.message : String(err);
         // Two look-alike causes: a boot crash on this page, or a dist built

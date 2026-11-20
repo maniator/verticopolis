@@ -13,14 +13,12 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * installed app on a phone leaves Full Screen out (owner, 2026-11-15).
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game));
+  await page.waitForFunction(() => Boolean(window.game));
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
     document.getElementById("onboard")?.remove();
@@ -95,7 +93,7 @@ test.describe("the menu bar on a desktop", () => {
     await boot(page);
     // Real engine lines: a row of offices opens one by one, each saying so.
     const opened = await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       g.setSpeed(0);
       g.sim.money = 1e9;
       const built = [] as boolean[];
@@ -122,7 +120,7 @@ test.describe("the menu bar on a desktop", () => {
       const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 8)?.closest(".log-line");
       return {
         hit: hit?.textContent ?? null,
-        newest: ((g) => g.enginePort.logText(g.reader.header.logSeq) ?? null)((window as any).game),
+        newest: ((g) => g.enginePort.logText(g.reader.header.logSeq) ?? null)(window.game),
       };
     });
     expect(top.newest).not.toBeNull();
@@ -137,7 +135,7 @@ test.describe("the menu bar on a desktop", () => {
     await log.evaluate((el) => (el.scrollTop = 120));
     const before = await lineAt();
     const added = await page.evaluate(() => {
-      const g = (window as any).game;
+      const g = window.game;
       const seq = g.reader.header.logSeq;
       for (let x = 100; x < 280; x++) g.sim.build("floor", 5, x);
       for (let x = 100; x + 9 <= 280; x += 9) g.sim.build("office", 5, x);
@@ -153,7 +151,7 @@ test.describe("the menu bar on a desktop", () => {
     page,
   }) => {
     await boot(page);
-    const modern = await page.evaluate(() => (window as any).game.reader.header.mode === "modern");
+    const modern = await page.evaluate(() => window.game.reader.header.mode === "modern");
     await page.locator("#mb-tower").click();
     await expect(page.locator("#mb-fire-rescue")).toHaveAttribute("aria-disabled", "true");
     if (modern) await expect(page.locator("#mb-exterminator")).toHaveAttribute("aria-disabled", "true");
@@ -191,7 +189,7 @@ test.describe("the menu bar on a desktop", () => {
 
   test("File > Close saves the tower, shows the title screen, and Continue brings it back paused", async ({ page }) => {
     await boot(page);
-    const name = await page.evaluate(() => (window as any).game.enginePort.towerName() as string);
+    const name = await page.evaluate(() => window.game.enginePort.towerName() as string);
     await page.locator("#mb-file").click();
     await page.locator("#mb-close").click();
     await expect(page.locator("#splash")).toBeVisible();
@@ -206,8 +204,8 @@ test.describe("the menu bar on a desktop", () => {
     await page.locator('#splash [data-splash="continue"]').click();
     await expect(page.locator("#splash")).toHaveCount(0);
     for (const menu of ["#mb-edit", "#mb-tower"]) await expect(page.locator(menu)).toBeVisible();
-    await expect.poll(() => page.evaluate(() => (window as any).game.speed)).toBe(0);
-    expect(await page.evaluate(() => (window as any).game.enginePort.towerName())).toBe(name);
+    await expect.poll(() => page.evaluate(() => window.game.speed)).toBe(0);
+    expect(await page.evaluate(() => window.game.enginePort.towerName())).toBe(name);
   });
 });
 
@@ -247,7 +245,7 @@ test.describe("the menu bar on a phone", () => {
       }
     }
     await page.goto("/");
-    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.waitForFunction(() => Boolean(window.game));
     await expect(page.locator("#splash")).toBeVisible();
     await eachMenuFits(3);
     await page.evaluate(() => {

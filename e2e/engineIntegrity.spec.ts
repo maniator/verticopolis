@@ -50,7 +50,7 @@ interface Boot {
   } | null;
 }
 
-const bootState = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot as Boot);
+const bootState = (page: Page) => page.evaluate(() => window.__vcEngineBoot as Boot);
 
 /** Count what a refused package must never reach, from before any page script. */
 async function spy(page: Page): Promise<void> {
@@ -94,7 +94,7 @@ async function expectRefused(
   file: "glue" | "wasm" | "build-record",
   opts: { oversize?: boolean } = {},
 ): Promise<NonNullable<Boot["failure"]>> {
-  await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__vcEngineBoot?.failure != null, undefined, { timeout: 30_000 });
   const state = await bootState(page);
   expect(state.failure, "the boot state names the refusal").toMatchObject({
     stage: "load",
@@ -106,7 +106,7 @@ async function expectRefused(
     instantiate: 0,
     scriptBlobs: 0,
   });
-  expect(await page.evaluate(() => !!(window as any).__vcEngine?.status?.hosted)).toBe(false);
+  expect(await page.evaluate(() => !!window.__vcEngine?.status?.hosted)).toBe(false);
   const failure = page.locator("#engine-failure");
   await expect(failure).toBeVisible();
   await expect(failure).toHaveAttribute("role", "alert");
@@ -119,7 +119,7 @@ async function expectRefused(
     /The engine files do not match this version of the game\. The engine was not started\. \((expected [0-9a-f]{12}, found ([0-9a-f]{12}|unavailable)|[a-z ]+ differs from the record)\)/,
   );
   if (served === null) await expect(failure).toContainText(/expected [0-9a-f]{12}, found unavailable/);
-  expect(await page.evaluate(() => !!(window as any).game)).toBe(false);
+  expect(await page.evaluate(() => !!window.game)).toBe(false);
   return state.failure!;
 }
 

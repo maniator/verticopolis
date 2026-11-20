@@ -20,7 +20,7 @@ async function cardUp(page: Page, vp: { width: number; height: number }): Promis
     timeout: 30_000,
   });
   await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     g.replayOnboarding();
   });

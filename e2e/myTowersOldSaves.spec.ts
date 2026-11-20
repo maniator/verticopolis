@@ -39,7 +39,7 @@ async function seed(page: Page): Promise<void> {
 /** Load the game and wait for the title screen on the Rust engine. */
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
   await expect(page.locator('[data-splash="continue"]'), "the title screen offers Continue").toBeVisible();
@@ -76,7 +76,7 @@ test("4.2's Auto-save and save slots show in the Open window as files, and the o
   // A copied slot opens as a tower.
   await page.locator(".fd-row", { hasText: "My Old Slot One" }).dblclick();
   await expect(page.locator(".fd")).toBeHidden();
-  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+  await page.waitForFunction(() => window.game.enginePort.towerName() === "Tower One", undefined, {
     timeout: 10_000,
   });
 });

@@ -1,4 +1,4 @@
-import type { SerializedGame } from "@verticopolis/engine/model/types";
+import type { SerializedGame, Transport, Unit } from "@verticopolis/engine/model/types";
 import { unfoldFloorRuns } from "@verticopolis/engine/model/floorRuns";
 
 /**
@@ -92,6 +92,18 @@ export interface ToolingHost {
 }
 
 type SaveRecord = Record<string, unknown> & { id: number };
+/** A unit's record as a harness reads it: the save's fields, with the
+ *  defaults the save leaves out filled in. */
+export type UnitRecord = SaveRecord & Unit;
+/** A shaft's record as a harness reads it. */
+export type ShaftRecord = SaveRecord & Transport;
+/** The emergency waiting on the player's choice, as the save holds it. */
+type PendingChoice = NonNullable<NonNullable<SerializedGame["events"]>["pending"]>;
+
+/** A bare placement's answer: the new id when it went in, else why not. */
+export type Placed<Id extends "unitId" | "transportId"> =
+  | ({ ok: true; reason?: undefined } & { [K in Id]: number })
+  | ({ ok: false; reason?: string } & { [K in Id]?: undefined });
 
 /** The fields that move a unit or a shaft: a patch on one is loaded before a
  *  placement runs, since it changes where a room fits. */
@@ -207,10 +219,10 @@ export class ToolingTower {
   get founder(): boolean {
     return this.port.founder();
   }
-  get pendingChoice(): unknown {
+  get pendingChoice(): PendingChoice | null {
     const top = this.patches.get("top");
-    if (top?.has("events.pending")) return top.get("events.pending");
-    return parsed(this.port.pendingChoice()) ?? null;
+    if (top?.has("events.pending")) return top.get("events.pending") as PendingChoice | null;
+    return parsed<PendingChoice>(this.port.pendingChoice()) ?? null;
   }
   /** Today's weather, which no save carries: the engine's tooling write. */
   set weather(name: string) {
@@ -431,31 +443,19 @@ export class ToolingTowerParts {
     return this.sim.port;
   }
 
-  place(kind: string, floor: number, x: number): { ok: boolean; reason?: string; unitId?: number } {
+  place(kind: string, floor: number, x: number): Placed<"unitId"> {
+    return this.sim.bareEdit(() => JSON.parse(this.port.placeBare(kind, floor, x)) as Placed<"unitId">);
+  }
+  placeTransport(kind: string, x: number, bottom: number, top: number): Placed<"transportId"> {
     return this.sim.bareEdit(
-      () => JSON.parse(this.port.placeBare(kind, floor, x)) as { ok: boolean; reason?: string; unitId?: number },
+      () => JSON.parse(this.port.placeTransportBare(kind, x, bottom, top)) as Placed<"transportId">,
     );
   }
-  placeTransport(
-    kind: string,
-    x: number,
-    bottom: number,
-    top: number,
-  ): { ok: boolean; reason?: string; transportId?: number } {
-    return this.sim.bareEdit(
-      () =>
-        JSON.parse(this.port.placeTransportBare(kind, x, bottom, top)) as {
-          ok: boolean;
-          reason?: string;
-          transportId?: number;
-        },
-    );
-  }
-  removeUnit(id: number): SaveRecord | undefined {
+  removeUnit(id: number): UnitRecord | undefined {
     const rec = this.getUnit(id);
     return rec && this.sim.bareEdit(() => this.port.removeUnit(id)) ? rec : undefined;
   }
-  removeTransport(id: number): SaveRecord | undefined {
+  removeTransport(id: number): ShaftRecord | undefined {
     const rec = this.getTransport(id);
     return rec && this.sim.bareEdit(() => this.port.removeTransport(id)) ? rec : undefined;
   }
@@ -470,28 +470,28 @@ export class ToolingTowerParts {
     return ok;
   }
 
-  get units(): SaveRecord[] {
-    return this.sim.records("unit");
+  get units(): UnitRecord[] {
+    return this.sim.records("unit") as UnitRecord[];
   }
-  get transports(): SaveRecord[] {
-    return this.sim.records("shaft");
+  get transports(): ShaftRecord[] {
+    return this.sim.records("shaft") as ShaftRecord[];
   }
-  getUnit(id: number): SaveRecord | undefined {
-    return this.sim.record("unit", this.port.unitRecord(id));
+  getUnit(id: number): UnitRecord | undefined {
+    return this.sim.record("unit", this.port.unitRecord(id)) as UnitRecord | undefined;
   }
-  getTransport(id: number): SaveRecord | undefined {
-    return this.sim.record("shaft", this.port.transportRecord(id));
+  getTransport(id: number): ShaftRecord | undefined {
+    return this.sim.record("shaft", this.port.transportRecord(id)) as ShaftRecord | undefined;
   }
   // The lookups by tile and floor read the engine's own geometry, so a
   // pending patch that moves something is loaded first.
-  unitAt(floor: number, x: number): SaveRecord | undefined {
-    return this.sim.record("unit", this.geometry().unitAt(floor, x));
+  unitAt(floor: number, x: number): UnitRecord | undefined {
+    return this.sim.record("unit", this.geometry().unitAt(floor, x)) as UnitRecord | undefined;
   }
-  roomAt(floor: number, x: number): SaveRecord | undefined {
-    return this.sim.record("unit", this.geometry().roomAt(floor, x));
+  roomAt(floor: number, x: number): UnitRecord | undefined {
+    return this.sim.record("unit", this.geometry().roomAt(floor, x)) as UnitRecord | undefined;
   }
-  transportAt(floor: number, x: number): SaveRecord | undefined {
-    return this.sim.record("shaft", this.geometry().transportAt(floor, x));
+  transportAt(floor: number, x: number): ShaftRecord | undefined {
+    return this.sim.record("shaft", this.geometry().transportAt(floor, x)) as ShaftRecord | undefined;
   }
   structureKindAt(floor: number, x: number): string | undefined {
     return this.geometry().structureKindAt(floor, x);

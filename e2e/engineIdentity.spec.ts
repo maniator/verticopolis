@@ -39,12 +39,12 @@ async function swapInBinary(page: Page, from: string, to: string): Promise<void>
 }
 
 async function openAbout(page: Page): Promise<void> {
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngineBoot, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngineBoot, undefined, {
     timeout: 30_000,
   });
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
-    (window as any).game.ui.showAbout();
+    window.game.ui.showAbout();
   });
   // About this game shows the diagnostics in the open.
   await expect(page.locator("#modal .help-diagnostics")).toBeVisible();
@@ -85,11 +85,11 @@ const short = (hash: string) => hash.slice(0, 12);
 test("the main-thread engine shows its record and the source hash BUILD.json records", async ({ page }) => {
   const record = await buildRecord(page);
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!window.__vcEngine?.status.hosted, undefined, { timeout: 30_000 });
   await openAbout(page);
   expect(await state(page)).toBe("ok");
-  const boot = await page.evaluate(() => (window as any).__vcEngineBoot);
-  expect(boot.binary).toEqual({ state: "ok", sourceHash: record.sources });
+  const boot = await page.evaluate(() => window.__vcEngineBoot);
+  expect(boot!.binary).toEqual({ state: "ok", sourceHash: record.sources });
   // The crate and source hash match, so the dialog names them once, in the
   // version line above the block; Copy diagnostics keeps both sides.
   await expect(page.locator("#modal")).toContainText(`Rust engine ${record.crate.version} (${short(record.sources)})`);
@@ -115,14 +115,14 @@ test("a binary built from other sources is refused before it runs, and the stop 
   const tampered = `${record.sources.startsWith("0") ? "1" : "0"}${record.sources.slice(1)}`;
   await swapInBinary(page, record.sources, tampered);
   await page.goto("/");
-  await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
-  const boot = await page.evaluate(() => (window as any).__vcEngineBoot);
-  expect(boot.failure).toMatchObject({
+  await page.waitForFunction(() => window.__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
+  const boot = await page.evaluate(() => window.__vcEngineBoot);
+  expect(boot!.failure).toMatchObject({
     stage: "load",
     reason: "package-mismatch",
     package: { kind: "mismatch", file: "wasm" },
   });
-  expect(boot.binary, "a refused binary is never compiled, so its section is never read").toBeUndefined();
+  expect(boot!.binary, "a refused binary is never compiled, so its section is never read").toBeUndefined();
   expect(await copyDiagnosticsFromStopScreen(page)).toContain("Reason: package-mismatch");
 });
 
@@ -130,7 +130,7 @@ test("an engine that never loads still copies the page's expected crate and the 
   const record = await buildRecord(page);
   await page.route(GLUE, (route) => route.abort("failed"));
   await page.goto("/");
-  await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
   const copied = await copyDiagnosticsFromStopScreen(page);
   expect(copied).toContain("Failed at: load");
   expect(copied).toContain(`Crate this page expects: ${record.crate.name} ${record.crate.version}`);
@@ -141,7 +141,7 @@ test("an engine that never loads still copies the page's expected crate and the 
 test("a binary that never arrives stops the game, with no source hash to report", async ({ page }) => {
   await page.route(WASM, (route) => route.fulfill({ status: 404, body: "" }));
   await page.goto("/");
-  await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
   const copied = await copyDiagnosticsFromStopScreen(page);
   expect(copied).toContain("came back with HTTP 404");
   expect(copied).not.toContain("Source hash in the engine binary");

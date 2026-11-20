@@ -33,7 +33,7 @@ export const MILESTONE_SCENES: Scene[] = [
           await assertReady(page, 200);
           await page.evaluate(topOutTowerWithHall);
           await assertReady(page, 200);
-          await page.evaluate(() => (window as any).game.ui.congratsTower());
+          await page.evaluate(() => window.game.ui.congratsTower(() => {}));
           await page.waitForSelector("#modal[open], dialog[open]", { timeout: 4000 });
         },
         clock: 11,

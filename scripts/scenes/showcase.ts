@@ -39,7 +39,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         // otherwise close the modal and leave only the splash behind.
         keepDialogs: true,
         setup: async (page) => {
-          await page.evaluate(() => (window as any).game.ui.newTowerModal({ hasSave: false, onFound: () => {} }));
+          await page.evaluate(() => window.game.ui.newTowerModal({ hasSave: false, onFound: () => {} }));
           // Fail the shot (keep the committed image) if the picker never mounts.
           await page.waitForSelector("#modal[open], dialog[open]", { timeout: 4000 });
         },
@@ -51,7 +51,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         setup: async (page) => {
           // Re-open rather than assume the previous shot's dialog survived, so
           // this shot stands on its own; openModalTemplate replaces the body.
-          await page.evaluate(() => (window as any).game.ui.newTowerModal({ hasSave: false, onFound: () => {} }));
+          await page.evaluate(() => window.game.ui.newTowerModal({ hasSave: false, onFound: () => {} }));
           await page.waitForSelector("#modal[open], dialog[open]", { timeout: 4000 });
           // Pick the Modern card through its real radio (a DOM click checks it
           // and fires change, which is what highlights the card via :checked).
@@ -213,8 +213,8 @@ export const SHOWCASE_SCENES: Scene[] = [
         frame: { floor: 10, zoom: 1.4 },
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const office = g.sim.tower.units.find((u: any) => u.kind === "office");
+            const g = window.game;
+            const office = g.sim.tower.units.find((u) => u.kind === "office");
             if (office) {
               g.selected = { type: "unit", id: office.id };
               g.engine.selectedId = office.id;
@@ -238,8 +238,8 @@ export const SHOWCASE_SCENES: Scene[] = [
         keepDialogs: true,
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
-            const office = g.sim.tower.units.find((u: any) => u.kind === "office");
+            const g = window.game;
+            const office = g.sim.tower.units.find((u) => u.kind === "office")!;
             g.selected = { type: "unit", id: office.id };
             g.refreshEditor();
           });
@@ -258,7 +258,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         name: "07-people-rush",
         setup: async (page) => {
           await page.evaluate(() => {
-            const g = (window as any).game;
+            const g = window.game;
             // Clear the office selection carried over from 17-select and the
             // editor/batch pricing shots, so the inspector editor panel isn't
             // floating over the crowd shot.
@@ -283,7 +283,7 @@ export const SHOWCASE_SCENES: Scene[] = [
     id: "construction",
     outDir: "screenshots",
     build: () => {
-      const g = (window as unknown as { game: any }).game;
+      const g = window.game;
       const Sim = g.sim.constructor;
       g.sim = Sim.newGame(99);
       const s = g.sim;
@@ -306,7 +306,8 @@ export const SHOWCASE_SCENES: Scene[] = [
           if (s.tower.units.length > before) x += s.tower.units[s.tower.units.length - 1].width;
           else x += 1;
         }
-      g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+      g.syncSim();
+      g.engine.setSim(g.renderSim);
       g.engine.setCamera(left + 18, 4, 1.4);
       g.speed = 0;
       g.engine.paused = false;
@@ -325,7 +326,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         // would otherwise yield a blank/half-drawn frame (the old shot-game.mjs
         // waited on the same currentScene guard).
         setup: async (page) => {
-          await page.waitForFunction(() => !!(window as any).game?.engine?.engine?.currentScene, null, {
+          await page.waitForFunction(() => !!window.game?.engine?.engine?.currentScene, null, {
             timeout: 8000,
           });
         },
@@ -340,7 +341,7 @@ export const SHOWCASE_SCENES: Scene[] = [
       },
       {
         name: "12-game-zoom",
-        setup: async (page) => void (await page.evaluate(() => (window as any).game.engine.zoomAt(1.6, 640, 400))),
+        setup: async (page) => void (await page.evaluate(() => window.game.engine.zoomAt(1.6, 640, 400))),
         wait: 600,
       },
       {
@@ -348,13 +349,13 @@ export const SHOWCASE_SCENES: Scene[] = [
         setup: async (page) => {
           // 23:00 the same day: pgSetClock only moves forward, so a clock
           // already past 23:00 would land a day later. Fail instead.
-          const minute = await page.evaluate(() => (window as any).game.sim.clock.minuteOfDay as number);
+          const minute = await page.evaluate(() => window.game.sim.clock.minuteOfDay as number);
           if (minute > 23 * 60)
             throw new Error(
               `the clock is already at minute ${minute} of the day, past 23:00; shorten the waits (or the speed) of the shots before it in this scene so it starts before 23:00`,
             );
           await page.evaluate(pgSetClock, 23);
-          await page.evaluate(() => (window as any).game.engine.zoomAt(1 / 1.6, 640, 400));
+          await page.evaluate(() => window.game.engine.zoomAt(1 / 1.6, 640, 400));
         },
         wait: 800,
       },
@@ -406,7 +407,7 @@ export const SHOWCASE_SCENES: Scene[] = [
           // (the hook is nullable on TowerEngine, and a silently skipped clock
           // stop would leave the backdrop advancing between runs).
           await page.evaluate(() => {
-            const engine = (window as any).game?.engine;
+            const engine = window.game?.engine;
             if (typeof engine?.onContextLost !== "function") {
               throw new Error("game.engine.onContextLost is not wired; the crash-screen scene needs the recovery hook");
             }
@@ -446,7 +447,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         name: "09-mobile",
         setup: async (page) =>
           void (await page.evaluate(() =>
-            (window as any).game.engine.setCamera(Math.floor((window as any).game.grid.width / 2), 18, 0.32),
+            window.game.engine.setCamera(Math.floor(window.game.grid.width / 2), 18, 0.32),
           )),
         clock: 12,
         wait: 1000,

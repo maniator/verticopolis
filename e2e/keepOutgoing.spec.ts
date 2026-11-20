@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -34,7 +33,7 @@ async function seed(page: Page): Promise<void> {
 
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngine?.status?.hosted, undefined, {
+  await page.waitForFunction(() => !!window.game && !!window.__vcEngine?.status?.hosted, undefined, {
     timeout: 30_000,
   });
   await expect(page.locator('[data-splash="continue"]'), "the title screen offers Continue").toBeVisible();
@@ -50,7 +49,7 @@ const rowNames = (page: Page) => page.locator(".fd-row .fd-name-cell").allTextCo
 
 /** Open the row called `name` in the Open window, and wait for its tower. */
 async function openRow(page: Page, name: string): Promise<void> {
-  const before = await page.evaluate(() => (window as any).game.enginePort.generation());
+  const before = await page.evaluate(() => window.game.enginePort.generation());
   await openWindow(page);
   await expect.poll(() => rowNames(page), { timeout: 15_000 }).toContain(name);
   await page
@@ -59,13 +58,13 @@ async function openRow(page: Page, name: string): Promise<void> {
     })
     .dblclick();
   await expect(page.locator(".fd")).toBeHidden();
-  await page.waitForFunction((g) => (window as any).game.enginePort.generation() !== g, before, { timeout: 15_000 });
+  await page.waitForFunction((g) => window.game.enginePort.generation() !== g, before, { timeout: 15_000 });
 }
 
 /** The live tower as the engine saves it, without the write's own stamp. */
 async function towerState(page: Page): Promise<Record<string, unknown>> {
   return page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(0);
     const save = JSON.parse(g.enginePort.serialize());
     delete save.savedAt;
@@ -77,12 +76,12 @@ async function towerState(page: Page): Promise<Record<string, unknown>> {
 /** Play the live tower on until its clock passes a few more minutes, then pause. */
 async function play(page: Page): Promise<void> {
   const start = await page.evaluate(() => {
-    const g = (window as any).game;
+    const g = window.game;
     g.setSpeed(3);
     return g.reader.header.minutes as number;
   });
-  await page.waitForFunction((m) => (window as any).game.reader.header.minutes > m + 30, start, { timeout: 45_000 });
-  await page.evaluate(() => (window as any).game.setSpeed(0));
+  await page.waitForFunction((m) => window.game.reader.header.minutes > m + 30, start, { timeout: 45_000 });
+  await page.evaluate(() => window.game.setSpeed(0));
 }
 
 test("opening a file keeps the tower being played, unsaved minutes and all, and it opens back the same", async ({
@@ -91,7 +90,7 @@ test("opening a file keeps the tower being played, unsaved minutes and all, and 
   await seed(page);
   await boot(page);
   await page.locator('[data-splash="continue"]').click();
-  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+  await page.waitForFunction(() => window.game.enginePort.towerName() === "Tower One", undefined, {
     timeout: 15_000,
   });
   // Minutes no save holds: before the fix they were lost with the Auto-save.
@@ -111,17 +110,17 @@ test("starting a new tower keeps a player's opened tower in its own file, played
   await seed(page);
   await boot(page);
   await page.locator('[data-splash="continue"]').click();
-  await page.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+  await page.waitForFunction(() => window.game.enginePort.towerName() === "Tower One", undefined, {
     timeout: 15_000,
   });
   // Bring in a player's tower from a file, as From a file on your computer… does; it is kept in My Towers.
-  await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), SPLIT_TOWER);
-  const name = await page.evaluate(() => (window as any).game.enginePort.towerName() as string);
-  await page.evaluate(() => (window as any).game.saveFile((window as any).game.enginePort.towerName()));
+  await page.evaluate((text) => window.game.saveLoad.importGame(text), SPLIT_TOWER);
+  const name = await page.evaluate(() => window.game.enginePort.towerName() as string);
+  await page.evaluate(() => window.game.saveFile(window.game.enginePort.towerName()!));
   await play(page);
   const left = await towerState(page);
 
-  await page.evaluate(() => (window as any).game.saveLoad.newGame("modern"));
+  await page.evaluate(() => window.game.saveLoad.newGame("modern"));
   await expect(page.locator(".toast", { hasText: `Saved "${name}" in My Towers.` })).toBeVisible();
 
   await openRow(page, name);
@@ -137,7 +136,7 @@ test("opening a file from the title screen keeps the Auto-save's tower, the one 
   await seed(first);
   await boot(first);
   await first.locator('[data-splash="continue"]').click();
-  await first.waitForFunction(() => (window as any).game.enginePort.towerName() === "Tower One", undefined, {
+  await first.waitForFunction(() => window.game.enginePort.towerName() === "Tower One", undefined, {
     timeout: 15_000,
   });
   const continued = await towerState(first);

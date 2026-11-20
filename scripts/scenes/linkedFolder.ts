@@ -20,7 +20,7 @@ import { PHONE, type Scene, type Shot } from "../screenshot-env.ts";
  *  and point the folder picker at it. `canLink` false takes the picker away,
  *  as Safari and Firefox have none. */
 async function pgStageFolder(canLink: boolean): Promise<void> {
-  const w = window as unknown as { game: any; showDirectoryPicker?: unknown };
+  const w = window as Window & { showDirectoryPicker?: unknown };
   await w.game.saveFile("Harbour Point");
   await w.game.saveFile("Sky Hotel");
   const root = await navigator.storage.getDirectory();
@@ -72,7 +72,7 @@ function pgNeedOkAgain(): void {
 }
 
 async function closeWindow(page: Page): Promise<void> {
-  await page.evaluate(() => (window as unknown as { game: any }).game.ui.closeModal?.());
+  await page.evaluate(() => window.game.ui.closeModal?.());
 }
 
 /** Open File > Open… (`open`) or File > Save As… (`saveAs`) from the menu. */

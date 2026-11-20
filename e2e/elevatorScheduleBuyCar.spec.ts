@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
@@ -20,8 +19,7 @@ const PHONE = { width: 390, height: 844 };
 /** A day's hours of a shaft's schedule: the port's slots hold a row flag, then 24 weekday counts, a flag, then 24 weekend counts. */
 const hours = (page: Page, id: number, day: "weekday" | "weekend") =>
   page.evaluate(
-    ({ shaft, from }) =>
-      Array.from((window as any).game.enginePort.shaftSchedule(shaft) as Float64Array).slice(from, from + 24),
+    ({ shaft, from }) => Array.from(window.game.enginePort.shaftSchedule(shaft) as Float64Array).slice(from, from + 24),
     { shaft: id, from: day === "weekday" ? 1 : 26 },
   );
 
@@ -31,9 +29,9 @@ test("a car bought on a scheduled shaft keeps the cut-back hours, and the dialog
   page,
 }) => {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!window.game, undefined, { timeout: 30_000 });
   await page.evaluate((text) => {
-    const g = (window as any).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     g.setSpeed(0);
     return g.saveLoad.importGame(text);
@@ -43,7 +41,7 @@ test("a car bought on a scheduled shaft keeps the cut-back hours, and the dialog
 
   // Select the shaft and buy a car from its card.
   await page.evaluate((id) => {
-    const g = (window as any).game;
+    const g = window.game;
     g.selected = { type: "transport", id };
     g.engine.selectedId = id;
     g.refreshEditor();
@@ -84,9 +82,9 @@ test("a car sold and bought back leaves a cut-back hour as it was and fills the 
   page,
 }) => {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).game, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => !!window.game, undefined, { timeout: 30_000 });
   await page.evaluate((text) => {
-    const g = (window as any).game;
+    const g = window.game;
     g.onboarding.dismissSplash();
     g.setSpeed(0);
     return g.saveLoad.importGame(text);
@@ -94,14 +92,14 @@ test("a car sold and bought back leaves a cut-back hour as it was and fills the 
   await expect(page.getByText("Tower imported.")).toBeVisible();
   // Weekdays: 17:00 runs all 5 cars and the rest 3. Weekends: 09:00 is cut back to 4 and the rest run all 5.
   await page.evaluate((id) => {
-    const port = (window as any).game.enginePort;
+    const port = window.game.enginePort;
     const slots = Float64Array.from(port.shaftSchedule(id) as Float64Array);
     for (let h = 0; h < 24; h++) {
       slots[1 + h] = h === 17 ? 5 : 3;
       slots[26 + h] = h === 9 ? 4 : 5;
     }
     port.scheduleShaft(id, slots);
-    const g = (window as any).game;
+    const g = window.game;
     g.selected = { type: "transport", id };
     g.engine.selectedId = id;
     g.refreshEditor();

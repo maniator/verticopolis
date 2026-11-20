@@ -15,7 +15,7 @@
  *  on B3 to B5 (20 tiles apart) and a platform elevator in each gap. Fails
  *  closed when a station or a platform elevator is refused. */
 export function buildMetroLineTower(): void {
-  const g = (window as unknown as { game: any }).game;
+  const g = window.game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(4800, "modern");
   const s = g.sim;
@@ -34,7 +34,7 @@ export function buildMetroLineTower(): void {
   for (const x of [cx - 65, cx - 15, cx + 35]) {
     const m = s.tower.place("metro", -4, x);
     if (!m.ok) throw new Error(`metro line station at ${x} failed: ${m.reason}`);
-    s.tower.getUnit(m.unitId).state = "occupied";
+    s.tower.getUnit(m.unitId)!.state = "occupied";
   }
   for (const x of [cx - 30, cx + 20]) {
     const t = s.tower.placeTransport("elevatorStandard", x, -3, 5);
@@ -44,7 +44,7 @@ export function buildMetroLineTower(): void {
     for (let x = left; x + 1 <= right;) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.getUnit(r.unitId);
+        const u = s.tower.getUnit(r.unitId)!;
         u.state = "occupied";
         u.everOccupied = true;
         x += u.width;
@@ -52,7 +52,8 @@ export function buildMetroLineTower(): void {
     }
   }
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, -2, 1);
   g.speed = 2;
   g.engine.paused = false;

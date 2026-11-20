@@ -41,9 +41,8 @@ test.describe("fidelity report precedence (real dialog, real top layer)", () => 
   };
 
   test("a report behind a blocking dialog says so where the player can see it, then opens", async ({ page }) => {
-    /* eslint-disable @typescript-eslint/no-explicit-any */
     await page.evaluate((report) => {
-      const ui = (window as any).game.ui;
+      const ui = window.game.ui;
       ui.showEventChoice("A fire has broken out!", "$20,000", () => {});
       ui.showImportReport(report, { onOpen: () => {} });
     }, REPORT);
@@ -64,7 +63,7 @@ test.describe("fidelity report precedence (real dialog, real top layer)", () => 
 
   test("a dropped report is readable, and a toast in its place would not have been", async ({ page }) => {
     await page.evaluate((report) => {
-      const ui = (window as any).game.ui;
+      const ui = window.game.ui;
       ui.showEventChoice("A fire has broken out!", "$20,000", () => {});
       ui.showImportReport(report, { onOpen: () => {} });
       ui.showImportReport(report, { onOpen: () => {} }); // supersedes the first
@@ -95,7 +94,7 @@ test.describe("fidelity report precedence (real dialog, real top layer)", () => 
 
   test("a report takes a dialog that owns nothing", async ({ page }) => {
     await page.evaluate((report) => {
-      const ui = (window as any).game.ui;
+      const ui = window.game.ui;
       ui.showAbout();
       ui.showImportReport(report, { onOpen: () => {} });
     }, REPORT);

@@ -12,11 +12,9 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * fire under automation, so Preview is the way in here.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 async function boot(page: Page): Promise<void> {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as any).game));
+  await page.waitForFunction(() => Boolean(window.game));
   await page.evaluate(() => {
     document.getElementById("splash")?.remove();
     document.getElementById("onboard")?.remove();
@@ -33,20 +31,20 @@ test.use({ viewport: { width: 1280, height: 800 } });
 
 test("Preview pauses the tower, a key brings it back at its speed, and OK keeps the choice", async ({ page }) => {
   await boot(page);
-  await page.evaluate(() => (window as any).game.setSpeed(1));
+  await page.evaluate(() => window.game.setSpeed(1));
   await openDialog(page);
   await expect(page.locator("#saver-pick")).toHaveValue("night");
   await page.locator("#saver-pick").selectOption("express");
   await page.locator('[data-saver="preview"]').click();
   await expect(page.locator("#screensaver")).toBeVisible();
   await expect(page.locator("#screensaver .screensaver-hint")).toContainText("Press any key");
-  await expect.poll(() => page.evaluate(() => (window as any).game.speed)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.game.speed)).toBe(0);
   // Past the grace time, a key ends it, and the dialog comes back with the
   // unsaved pick.
   await page.waitForTimeout(500);
   await page.keyboard.press("a");
   await expect(page.locator("#screensaver")).toHaveCount(0);
-  await expect.poll(() => page.evaluate(() => (window as any).game.speed)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.game.speed)).toBe(1);
   await expect(page.locator("#saver-pick")).toHaveValue("express");
   await page.locator('[data-saver="ok"]').click();
   await page.reload();

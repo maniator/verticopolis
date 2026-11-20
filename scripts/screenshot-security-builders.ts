@@ -25,10 +25,19 @@
  *  office sits in the left one; the towers' tile ranges are left on
  *  `window.__vcShotSecuritySplit`. */
 export function buildSecurityTower(): void {
-  const w = window as unknown as { game: any; __vcShotSecurity?: any };
+  type Opts = {
+    mode?: string;
+    seed?: number;
+    split?: boolean;
+    gap?: boolean;
+    ransom?: boolean;
+    hour?: number;
+    speed?: number;
+  };
+  const w = window as Window & { __vcShotSecurity?: Opts };
   const g = w.game;
   const opts = w.__vcShotSecurity ?? {};
-  const mode: string = opts.mode ?? "classic";
+  const mode = opts.mode ?? "classic";
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(opts.seed ?? 6100, mode);
   const s = g.sim;
@@ -59,7 +68,7 @@ export function buildSecurityTower(): void {
   const room = (kind: string, f: number, x: number, people: number): number => {
     const r = s.tower.place(kind, f, x);
     if (!r.ok) return 1;
-    const u = s.tower.getUnit(r.unitId);
+    const u = s.tower.getUnit(r.unitId)!;
     u.state = "occupied";
     u.everOccupied = true;
     if (people > 0) u.occupants = people;
@@ -68,7 +77,7 @@ export function buildSecurityTower(): void {
   // Floor 6: the Security office at the left of the rooms, offices after it.
   const sec = s.tower.place("security", 6, left + 6);
   if (!sec.ok) throw new Error(`the Security office did not place: ${sec.reason ?? "no reason given"}`);
-  const secWidth = s.tower.getUnit(sec.unitId).width;
+  const secWidth = s.tower.getUnit(sec.unitId)!.width;
   for (const [lo, hi] of towers) {
     for (let f = 2; f <= 12; f++) {
       // Floor 11 keeps room for a second office when the scene asks for it;
@@ -94,7 +103,8 @@ export function buildSecurityTower(): void {
   const c = s.clock;
   c.minutes = c.minutes - c.minuteOfDay + (opts.hour ?? 10) * 60;
   s.evaluateStar();
-  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
+  g.syncSim();
+  g.engine.setSim(g.renderSim);
   g.engine.setCamera(cx, 7, 1.0);
   g.speed = opts.speed ?? 0;
   g.engine.paused = false;
