@@ -21,12 +21,12 @@ call something new. The paths in the table below are hot-path surfaces, and so
 is any other production file whose changed code an entry point calls, apart
 from these, which are not hot paths even inside a listed path:
 
-- tests: `*.test.ts`, `src/tests/`, `e2e/`, the engine's `engine-rs/tests/`,
-  the `*_tests.rs` files under `engine-rs/src/` and Rust `#[cfg(test)]`
-  modules;
+- tests: `*.test.ts`, `src/tests/`, `e2e/`, the engine's `tests/`
+  (`engine-rs/tests/` before the move below), the `*_tests.rs` files under
+  its `src/` (`engine-rs/src/`) and Rust `#[cfg(test)]` modules;
 - test fixtures and helpers: `*.fixture.ts` and `src/ui/testing/`;
-- the engine's command-line tools in `engine-rs/src/bin/` (conformance, dump,
-  fuzz and TDT), and docs;
+- the engine's command-line tools in its `src/bin/` (`engine-rs/src/bin/`)
+  (conformance, dump, fuzz and TDT), and docs;
 - code that runs once per session, such as module setup, WASM instantiation or
   reading the engine identity, since no section 2 tier calls it. Only the HP-1
   trace can show that, so the gate leaves this case to the Hot-Path Auditor. A
@@ -42,12 +42,17 @@ The game is built from three repositories, and this page governs all three.
 A row's paths are in Verticopolis/web unless its surface names another
 repository. Every `engine-rs/` path on this page, in this section, the later
 sections and the cache table, is in Verticopolis/engine.
+Verticopolis/engine#115 moved the crate to that repository's root, so there
+each such path now drops its `engine-rs/` prefix (`engine-rs/src/tower.rs` is
+`src/tower.rs`), and the TypeScript layer's `src/events/` moved to
+`packages/verticopolis-engine/events/`. The engine's rows list both places, so
+a pull request from either side of the move gets the same gate.
 
 | Surface | Paths |
 | --- | --- |
-| Rust engine and its build (Verticopolis/engine) | `engine-rs/src/`, `engine-rs/Cargo.toml`, `Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh`, `scripts/layer-build.ts`, `packages/verticopolis-engine/tsconfig.build.json` |
-| WASM binding (Verticopolis/engine) | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs` |
-| The package's TypeScript layer (Verticopolis/engine) | `packages/verticopolis-engine/src/` (the binding, the host, the port, the model and the catalog reads), apart from its `testing` and `fixtures` folders; `src/events/` (`checkEvent`, which checks each drained event) |
+| Rust engine and its build (Verticopolis/engine) | `src/`, `Cargo.toml`, `engine-rs/src/`, `engine-rs/Cargo.toml`, `Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh`, `scripts/layer-build.ts`, `packages/verticopolis-engine/tsconfig.build.json` |
+| WASM binding (Verticopolis/engine) | `src/wasm.rs`, `src/wasm/`, `src/frame.rs`, `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs` |
+| The package's TypeScript layer (Verticopolis/engine) | `packages/verticopolis-engine/src/` (the binding, the host, the port, the model and the catalog reads), apart from its `testing` and `fixtures` folders; `packages/verticopolis-engine/events/`, `src/events/` before the move (`checkEvent`, which checks each drained event) |
 | Binding and hosts (Verticopolis/components) | `src/engineBinding/`, `src/wasmhost/`, `src/simport/` |
 | Rendering and audio (Verticopolis/components) | `src/render/`, `src/presentation/`, `src/catalog/`, `src/model/`, `src/events/`, `src/audio/` |
 | App build settings (which engine and code paths ship) | `vite.config.ts`, `src/build/` (the build modules it imports) |

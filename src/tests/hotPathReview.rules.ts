@@ -22,6 +22,8 @@ export const SECTIONS = [
 /** Section 1's table: every surface and its paths. Changing the gate's scope must be deliberate. */
 export const SURFACES: Record<string, string[]> = {
   "Rust engine and its build (Verticopolis/engine)": [
+    "src/",
+    "Cargo.toml",
     "engine-rs/src/",
     "engine-rs/Cargo.toml",
     "Cargo.lock",
@@ -30,8 +32,19 @@ export const SURFACES: Record<string, string[]> = {
     "scripts/layer-build.ts",
     "packages/verticopolis-engine/tsconfig.build.json",
   ],
-  "WASM binding (Verticopolis/engine)": ["engine-rs/src/wasm.rs", "engine-rs/src/wasm/", "engine-rs/src/frame.rs"],
-  "The package's TypeScript layer (Verticopolis/engine)": ["packages/verticopolis-engine/src/", "src/events/"],
+  "WASM binding (Verticopolis/engine)": [
+    "src/wasm.rs",
+    "src/wasm/",
+    "src/frame.rs",
+    "engine-rs/src/wasm.rs",
+    "engine-rs/src/wasm/",
+    "engine-rs/src/frame.rs",
+  ],
+  "The package's TypeScript layer (Verticopolis/engine)": [
+    "packages/verticopolis-engine/src/",
+    "packages/verticopolis-engine/events/",
+    "src/events/",
+  ],
   "Binding and hosts (Verticopolis/components)": ["src/engineBinding/", "src/wasmhost/", "src/simport/"],
   "Rendering and audio (Verticopolis/components)": [
     "src/render/",
@@ -55,20 +68,34 @@ export const IN_OTHER_REPO = (surface: string): boolean => /\(Verticopolis\/(eng
 
 /**
  * The code spans of section 1's not-hot-path list, in order. This pins the
- * list's wording; it is not an exclusion list (`engine-rs/src/` is here only
- * because the `*_tests.rs` files it names live there). The `engine-rs/` paths
- * are in Verticopolis/engine.
+ * list's wording; it is not an exclusion list (the engine's `src/` is here
+ * only because the `*_tests.rs` files it names live there). The paths in
+ * {@link NOT_HOT_IN_ENGINE} are in Verticopolis/engine, before and after its
+ * crate moved to the repository root.
  */
 export const NOT_HOT = [
   "*.test.ts",
   "src/tests/",
   "e2e/",
+  "tests/",
   "engine-rs/tests/",
   "*_tests.rs",
+  "src/",
   "engine-rs/src/",
   "#[cfg(test)]",
   "*.fixture.ts",
   "src/ui/testing/",
+  "src/bin/",
+  "engine-rs/src/bin/",
+];
+
+/** The entries of {@link NOT_HOT} that name Verticopolis/engine paths, which this guard cannot check on disk. */
+export const NOT_HOT_IN_ENGINE = [
+  "tests/",
+  "engine-rs/tests/",
+  "src/",
+  "engine-rs/src/",
+  "src/bin/",
   "engine-rs/src/bin/",
 ];
 

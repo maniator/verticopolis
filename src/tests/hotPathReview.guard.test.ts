@@ -7,6 +7,7 @@ import {
   AUTO_MERGE,
   FORBIDDEN,
   NOT_HOT,
+  NOT_HOT_IN_ENGINE,
   PAGE,
   PAGE_CLAUSES,
   PROMPT,
@@ -145,7 +146,7 @@ describe("hot-path review guard", () => {
       ...Object.entries(SURFACES)
         .filter(([surface]) => !IN_OTHER_REPO(surface))
         .flatMap(([, rows]) => rows),
-      ...NOT_HOT.filter((p) => p.includes("/") && !p.startsWith("engine-rs/")),
+      ...NOT_HOT.filter((p) => p.includes("/") && !NOT_HOT_IN_ENGINE.includes(p)),
     ];
     expect(paths.filter((rel) => !pathExists(rel))).toEqual([]);
   });
