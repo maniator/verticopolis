@@ -1,10 +1,11 @@
 /**
  * Resolve the ONLY= scene filter for the screenshot generator
  * (scripts/screenshots.ts). Lives under src/tests (not scripts/) so the unit
- * tier can pin the unmatched-filter contract without importing across the
- * tsconfig rootDir, the same direction the generator already depends on
- * src/tests/fixtures. Kept dependency-free and ERASABLE (type annotations
- * only, see scripts/screenshot-env.ts) so node runs it directly via native
+ * tier can pin the unmatched-filter contract without importing TypeScript
+ * from outside src/ (eslint.config.js's src-boundary rule), the same
+ * direction the generator already depends on src/tests/fixtures. Kept
+ * dependency-free and ERASABLE (type annotations only, see
+ * scripts/screenshot-env.ts) so node runs it directly via native
  * type-stripping.
  */
 

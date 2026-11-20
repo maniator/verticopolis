@@ -1,10 +1,10 @@
 /**
  * The gallery runner's overview Map check (scripts/screenshots.ts, #343).
  * Lives under src/tests (not scripts/) so the unit tier can pin it without
- * importing across the tsconfig rootDir, the same arrangement as
- * screenshotOnlyFilter.ts. Kept ERASABLE (type annotations only, see
- * scripts/screenshot-env.ts) so node runs it directly via native
- * type-stripping.
+ * importing TypeScript from outside src/ (eslint.config.js's src-boundary
+ * rule), the same arrangement as screenshotOnlyFilter.ts. Kept ERASABLE (type
+ * annotations only, see scripts/screenshot-env.ts) so node runs it directly
+ * via native type-stripping.
  */
 import type { Page } from "playwright";
 

@@ -4,8 +4,9 @@
  * step): up to 767px wide, or up to 1023 by 599. The screenshot generator
  * (scripts/screenshot-env.ts) reads it to decide which scenes present as a
  * touch device. Lives under src/tests (not scripts/) so the unit tier can
- * import it without crossing the tsconfig rootDir, like screenshotOnlyFilter.ts,
- * and stays ERASABLE (type annotations only) so node runs it directly.
+ * import it while importing no TypeScript from outside src/ (eslint.config.js's
+ * src-boundary rule), like screenshotOnlyFilter.ts, and stays ERASABLE (type
+ * annotations only) so node runs it directly.
  */
 
 export const PHONE_TIER = { maxWidth: 767, shortMaxWidth: 1023, shortMaxHeight: 599 } as const;
