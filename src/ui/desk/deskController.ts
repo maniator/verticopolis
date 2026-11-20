@@ -32,6 +32,7 @@ import {
   type DeskChange,
   type DeskWindowSpec,
 } from "@verticopolis/components/windows/desk/deskWindow";
+import { onMenuItem } from "../../game/menuBarHost";
 
 /**
  * The 1994 desk (option C, picked by the owner on 2026-11-15): on a computer,
@@ -159,7 +160,7 @@ export class DeskController {
     // Info and Tools are what the player plays with, so on the desk they never
     // close; the Window menu brings every window up (owner, 2026-11-15).
     for (const item of this.doc.querySelectorAll<HTMLElement>("[data-desk-win]")) {
-      item.addEventListener("click", () => this.show(item.dataset.deskWin as DeskWindowId));
+      onMenuItem(item.id, () => this.show(item.dataset.deskWin as DeskWindowId), this.doc);
     }
   }
 

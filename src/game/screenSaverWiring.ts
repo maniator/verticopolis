@@ -14,6 +14,7 @@ import { bulletinMarquee, expressElevators, skylineStarfield } from "../ui/scree
 import { endlessTower, nightShift, type TowerSnapshot } from "../ui/screenSaver/towerScenes";
 import { watchForSaver, type SaverTrigger } from "../ui/screenSaver/saverTriggers";
 import { isDialogOpen, isEngineStopped, isSplashUp } from "./interactionState";
+import { onMenuItem } from "./menuBarHost";
 
 /**
  * The screen saver in the game (party 2026-11-15): Options > Screen Saver…,
@@ -155,7 +156,7 @@ export function wireScreenSaver(app: GameApp): void {
     },
   });
 
-  document.getElementById(SCREEN_SAVER_ITEM_ID)?.addEventListener("click", () =>
+  onMenuItem(SCREEN_SAVER_ITEM_ID, () =>
     openScreenSaverDialog(app.ui, prefs, {
       makeScene,
       still,

@@ -10,6 +10,7 @@ import {
 import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { showInstallHelp } from "../ui/uiDialogs";
 import { isSplashUp } from "./interactionState";
+import { onMenuItem } from "./menuBarHost";
 
 /**
  * The install-affordance controller (SPEC-pwa-install). Ties the browser install
@@ -172,9 +173,8 @@ export function initInstallAffordance(app: GameApp): void {
   // promote it to crash telemetry. The offer is best-effort chrome. Each surface
   // passes its own name so the CAP-4 tap signal is attributed.
   const chip = document.getElementById("btn-install");
-  const menu = document.getElementById("btn-install-menu");
   if (chip) chip.addEventListener("click", () => void activateInstall(app, "chip").catch(() => {}));
-  if (menu) menu.addEventListener("click", () => void activateInstall(app, "menu").catch(() => {}));
+  onMenuItem("btn-install-menu", () => void activateInstall(app, "menu").catch(() => {}));
   refreshMenu();
 }
 

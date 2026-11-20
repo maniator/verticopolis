@@ -45,7 +45,8 @@ vi.mock("../ui/overviewMapPrefs", () => ({
   }),
 }));
 
-import { wireMenus, drawMenuBar } from "./menuWiring";
+import { wireMenus } from "./menuWiring";
+import { drawMenuBar } from "./menuBarHost";
 
 /** The File menu with Open Recent as index.html lays it out. */
 function mount(): void {

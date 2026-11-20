@@ -5,6 +5,7 @@ import { canLinkFolder, linkedFolder } from "../storage/linkedFolder";
 import { dropRecentTower, keepRecentTowers, recentTowers, RECENT_MAX, type RecentTower } from "../storage/recentTowers";
 import { openTowersFile } from "./fileSpaceCommands";
 import { openLinkedRow } from "./linkedFolderCommands";
+import { onMenuItem } from "./menuBarHost";
 
 /**
  * File > Open Recent (owner, 2026-11-16): the last towers opened or saved,
@@ -151,9 +152,9 @@ export async function openRecent(app: GameApp, t: RecentTower): Promise<void> {
 }
 
 /** Wire the five lines; each opens the tower it showed when the menu opened. */
-export function wireRecentMenu(app: GameApp, root: ParentNode = document): void {
+export function wireRecentMenu(app: GameApp): void {
   for (let n = 1; n <= RECENT_MAX; n++) {
-    root.querySelector(`#${RECENT_ITEM_ID(n)}`)?.addEventListener("click", () => {
+    onMenuItem(RECENT_ITEM_ID(n), () => {
       const t = shown[n - 1];
       if (t) void openRecent(app, t);
     });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { html } from "lit-html";
 import { drawFragment, mountPage } from "../testing/litTestUtils";
+import { drawMenuBar, onMenuItem } from "../../game/menuBarHost";
 
 vi.mock("../../analyticsActions", () => ({ trackAppAction: vi.fn(), trackAppActionOnce: vi.fn() }));
 
@@ -21,7 +22,7 @@ import {
 const PAGE = html`
   <div id="app">
     <div id="topbar">Info</div>
-    <div id="menubar-host"><nav id="menubar"><button id="mb-options">Options</button><div id="mb-window-menu"><button id="mb-dw-info" data-desk-win="info">Info</button><button id="mb-dw-map" data-desk-win="map">Map</button></div><button id="mb-win-map">Map</button><button id="mb-win-statusbar">Status Bar</button><button id="mb-fullscreen">Full Screen</button><button id="mb-close">Close</button><button id="mb-sound" aria-checked="true">Sound</button></nav></div>
+    <div id="menubar-host"></div>
     <div id="stage">tower</div>
     <div id="statusbar">status</div>
     <aside id="palette" class="win"><div class="win-title">Tools</div></aside>
@@ -50,6 +51,7 @@ let doc: Document;
 function page(url = "http://localhost/"): Document {
   const d = document.implementation.createHTMLDocument("Verticopolis");
   mountPage(PAGE, d);
+  drawMenuBar(d);
   Object.defineProperty(d, "location", { value: new URL(url) });
   return d;
 }
@@ -206,7 +208,7 @@ describe("DeskController", () => {
     expect(parents()).toEqual(["mb-window-menu", "mb-window-menu"]);
     screen();
     fireMediaChange();
-    expect(parents()).toEqual(["menubar", "menubar"]);
+    expect(parents()).toEqual(["mb-options-menu", "mb-options-menu"]);
   });
 
   it("stacks the tower like any window, but keeps a maximized tower under the small windows", () => {
@@ -344,7 +346,7 @@ describe("DeskController", () => {
     doc.getElementById("overview-map")!.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(mapButton().getAttribute("aria-pressed")).toBe("true");
     const about = vi.fn();
-    doc.body.append(drawFragment(html`<button id="btn-about" @click=${about}></button>`, doc));
+    onMenuItem("btn-about", about, doc);
     doc.querySelector<HTMLElement>('.desk-start-menu [data-item="btn-about"]')!.click();
     expect(about).toHaveBeenCalledTimes(1);
     expect(trackAppAction).toHaveBeenCalledWith("desk_start", "btn-about");

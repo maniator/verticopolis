@@ -1,10 +1,9 @@
 import type { GameApp } from "../main";
-import { MenuBar, type MenuBarOptions } from "@verticopolis/components/windows/menuBar";
-import { gameMenuModel } from "./menuModel";
+import type { MenuBar } from "@verticopolis/components/windows/menuBar";
+import { drawnBar, onMenuItem } from "./menuBarHost";
 import { MovableWindow, WITHIN_PARENT } from "@verticopolis/components/windows/movableWindow";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { PALETTE_COLLAPSE_BUTTON_ID, PALETTE_COLLAPSED_CLASS } from "../ui/paletteCollapse";
-import { SPONSOR_URL, sponsorOffered } from "../ui/splashTemplate";
 import { trackAppAction } from "../analytics";
 import {
   menuItemCodeOf,
@@ -131,9 +130,7 @@ function remember(storage: Store | null, key: string, open: boolean): void {
   }
 }
 
-function on(id: string, run: () => void): void {
-  document.getElementById(id)?.addEventListener("click", run);
-}
+const on = (id: string, run: () => void): void => onMenuItem(id, run);
 
 function check(id: string, checked: boolean): void {
   document.getElementById(id)?.setAttribute("aria-checked", String(checked));
@@ -159,42 +156,11 @@ function grayLike(id: string, twin: Element | null): void {
   else item.removeAttribute("aria-disabled");
 }
 
-/** A bar {@link drawMenuBar} drew, and the hooks {@link wireMenus} gives it. */
-interface DrawnBar {
-  readonly bar: MenuBar;
-  hooks: Pick<MenuBarOptions, "onTrip" | "onDismiss" | "onOpen">;
-}
-
-/** The bar drawn into each host, so the boot flow wires the one main drew. */
-const drawnBars = new WeakMap<HTMLElement, DrawnBar>();
-
-/** Draw the menu bar into index.html's `#menubar-host`, once. The game draws
- *  it before the UI is built, since the UI and the boot flow wire its items
- *  by id; until {@link wireMenus} runs, a menu opens with nothing to refresh
- *  and reports nothing. A page without the host, or a second call, draws
- *  nothing. */
-export function drawMenuBar(doc: Document = document): MenuBar | null {
-  const host = doc.getElementById("menubar-host");
-  if (!host || drawnBars.has(host)) return null;
-  const sponsorUrl = sponsorOffered() ? SPONSOR_URL : null;
-  const onSponsor = () => trackAppAction("sponsor_click", "menu");
-  const drawn: DrawnBar = {
-    hooks: {},
-    bar: new MenuBar(host, gameMenuModel({ sponsorUrl, onSponsor }), {
-      onTrip: (title, via) => drawn.hooks.onTrip?.(title, via),
-      onDismiss: (title, how, browsed) => drawn.hooks.onDismiss?.(title, how, browsed),
-      onOpen: (menu) => drawn.hooks.onOpen?.(menu),
-    }),
-  };
-  drawnBars.set(host, drawn);
-  return drawn.bar;
-}
-
 /** Wire the bar {@link drawMenuBar} drew, once; a page without it, or a
  *  second call, does nothing. */
 export function wireMenus(app: GameApp): MenuBar | null {
   const host = document.getElementById("menubar-host");
-  const drawn = host ? drawnBars.get(host) : undefined;
+  const drawn = drawnBar();
   const stage = document.getElementById("stage");
   if (!host || !drawn || !stage || host.dataset.wired) return null;
   host.dataset.wired = "1";
