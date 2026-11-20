@@ -13,7 +13,7 @@
     "engine:install": "node scripts/engine-install.ts",
     "postbuild": "npm run verify:dist",
     "preview": "vite preview --port 4173",
-    "typecheck": "tsc --noEmit && tsc -p api/tsconfig.json && tsc -p scripts/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc -p api/tsconfig.json && tsc -p scripts/tsconfig.json && tsc -p e2e/tsconfig.json",
     "watch": "tsc --watch",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",

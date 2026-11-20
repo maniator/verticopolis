@@ -50,7 +50,7 @@ async function roomsWithSections(page: Page): Promise<Room[]> {
       for (const s of sections) {
         if (taken.has(s) || !isSet(facts, s)) continue;
         taken.add(s);
-        const room = rooms.get(u.id) ?? { id: u.id, kind: u.kind, sections: [] };
+        const room = rooms.get(u.id) ?? { id: u.id, kind: u.kind, sections: [] as string[] };
         room.sections.push(s);
         rooms.set(u.id, room);
       }

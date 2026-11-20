@@ -156,7 +156,10 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
     const counts = { music: 0, bloop: 0, cues: [] as string[] };
     const absent: string[] = [];
     const spy = (voice: any, name: string, key: "music" | "bloop") => {
-      if (typeof voice?.triggerAttackRelease !== "function") return absent.push(name);
+      if (typeof voice?.triggerAttackRelease !== "function") {
+        absent.push(name);
+        return;
+      }
       const play = voice.triggerAttackRelease.bind(voice);
       voice.triggerAttackRelease = (...args: unknown[]) => {
         counts[key]++;
