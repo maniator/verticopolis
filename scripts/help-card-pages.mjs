@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * The help pages a share card is drawn for, and the record of what each card
  * was drawn from. scripts/gen-help-cards.mjs draws the cards from these pages
@@ -17,6 +18,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DOCS = join(ROOT, "help-site/src/content/docs");
 const CHANGELOG_PAGE = join(ROOT, "help-site/src/pages/changelog.astro");
 
+/** @typedef {{ slug: string; title: string; description: string }} HelpCardPage */
+/** @typedef {{ title: string; description: string }} CardRecord */
+/** @typedef {Record<string, CardRecord>} CardManifest */
+
 /** The record of what each card shows, beside the help site's config. It
  *  stays out of public/cards/ so it is not deployed as a card. */
 export const CARD_MANIFEST = join(ROOT, "help-site/share-cards.json");
@@ -24,15 +29,21 @@ export const CARD_MANIFEST = join(ROOT, "help-site/share-cards.json");
 /** The command that redraws one page's card, for a failure message. */
 export const REGENERATE = "node scripts/gen-help-cards.mjs";
 
-/** One front-matter field, unquoted. Pages use plain `key: value` lines. */
+/** One front-matter field, unquoted. Pages use plain `key: value` lines.
+ *  @param {string} text
+ *  @param {string} key
+ *  @returns {string | null} */
 function field(text, key) {
   const m = text.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
   return m ? m[1].trim().replace(/^(["'])(.*)\1$/, "$2") : null;
 }
 
-/** Every page with a card: its slug (as Starlight names it), title and description. */
+/** Every page with a card: its slug (as Starlight names it), title and description.
+ *  @returns {Promise<HelpCardPage[]>} */
 export async function helpPages() {
+  /** @type {{ slug: string; title: string | null; description: string | null }[]} */
   const pages = [];
+  /** @param {string} dir */
   async function walk(dir) {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
@@ -59,16 +70,21 @@ export async function helpPages() {
   for (const p of pages) {
     if (!p.title || !p.description) throw new Error(`${p.slug || "index"} has no title or description`);
   }
-  return pages.sort((a, b) => a.slug.localeCompare(b.slug));
+  return /** @type {HelpCardPage[]} */ (pages).sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
 /**
  * The manifest after drawing `drawn`: each card file names the title and
  * description it shows. Entries for cards not drawn this time are kept from
  * `previous`, and entries for pages that no longer exist (`pages`) are dropped.
+ * @param {HelpCardPage[]} pages
+ * @param {HelpCardPage[]} drawn
+ * @param {CardManifest} [previous]
+ * @returns {CardManifest}
  */
 export function cardManifest(pages, drawn, previous = {}) {
   const live = new Set(pages.map((p) => cardFile(p.slug)));
+  /** @type {CardManifest} */
   const next = {};
   for (const [file, entry] of Object.entries(previous)) if (live.has(file)) next[file] = entry;
   for (const p of drawn) next[cardFile(p.slug)] = { title: p.title, description: p.description };
@@ -79,8 +95,12 @@ export function cardManifest(pages, drawn, previous = {}) {
  * What is out of date between the pages and the cards' record, one line per
  * problem naming the page and the command that fixes it. Empty when every card
  * shows its page's current title and description.
+ * @param {HelpCardPage[]} pages
+ * @param {CardManifest} manifest
+ * @returns {string[]}
  */
 export function staleCards(pages, manifest) {
+  /** @type {string[]} */
   const problems = [];
   const live = new Set();
   for (const p of pages) {

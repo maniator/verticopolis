@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Mirror each backlog row's Priority onto its GitHub issue as a P1/P2/P3 label.
  *
@@ -27,16 +28,35 @@
  * (in Actions, the job's `GITHUB_REPOSITORY`, which the workflow guards).
  * `--dry-run` prints the plan and changes nothing.
  *
- * Plain dependency-free JS so the workflow runs it with no install step. The
- * pure helpers are typed in backlog-priority-labels.d.mts for the unit test.
+ * Plain dependency-free JS so the workflow runs it with no install step. Its
+ * types are JSDoc, which `npm run typecheck` checks.
  */
 import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
+/** @typedef {"P1" | "P2" | "P3"} Priority */
+
+/** One issue's relabel: the P label to add (or null) and the labels to drop
+ *  (other P labels, and `needs-triage`). The add runs before the removals.
+ *  @typedef {{ issue: number; add: Priority | null; remove: string[] }} LabelChange */
+
+/** Runs the GitHub CLI with `args` and resolves to its stdout. A failed call
+ *  rejects with a GhError.
+ *  @typedef {(args: string[]) => Promise<string>} Gh */
+
+/** A failed gh call; `rateLimited` is true when GitHub refused it because of
+ *  a rate limit.
+ *  @typedef {Error & { rateLimited: boolean }} GhError */
+
+/** @type {readonly Priority[]} */
 export const PRIORITY_LABELS = ["P1", "P2", "P3"];
 export const TRIAGE_LABEL = "needs-triage";
+
+/** @param {string} p
+ *  @returns {p is Priority} */
+const isPriority = (p) => PRIORITY_LABELS.includes(/** @type {Priority} */ (p));
 
 const HEADER = "| Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |";
 
@@ -46,11 +66,15 @@ const HEADER = "| Date | Story | GH | Epic | Type | Priority | Severity | Owner 
  *  another repository, which this job's token cannot label; backlogIssueMirror.test.ts
  *  already fails CI on any other GH value and on a malformed row. A row whose
  *  Priority is not P1/P2/P3 is reported in `errors` rather than guessed. Pipes
- *  escaped as `\|` inside Notes do not split cells, matching that test. */
+ *  escaped as `\|` inside Notes do not split cells, matching that test.
+ *  @param {string} markdown
+ *  @returns {{ priorities: Map<number, Priority>; errors: string[] }} */
 export function parseBacklogPriorities(markdown) {
   const lines = markdown.split(/\r?\n/);
   const start = lines.findIndex((l) => l.trimEnd() === HEADER);
+  /** @type {Map<number, Priority>} */
   const priorities = new Map();
+  /** @type {string[]} */
   const errors = [];
   const conflicted = new Set();
   if (start < 0) return { priorities, errors: ["curated-table header not found"] };
@@ -60,7 +84,7 @@ export function parseBacklogPriorities(markdown) {
     if (!gh) continue;
     const issue = Number(gh[1]);
     const priority = cells[6];
-    if (!PRIORITY_LABELS.includes(priority)) {
+    if (!isPriority(priority)) {
       errors.push(`#${issue}: priority ${JSON.stringify(priority)} is not P1, P2 or P3`);
       // Hold the issue back, as for rows that disagree.
       priorities.delete(issue);
@@ -82,8 +106,12 @@ export function parseBacklogPriorities(markdown) {
 
 /** The smallest change that leaves each open, row-cited issue with exactly its
  *  row's P label and no `needs-triage`. Issues not in `openIssues` (closed, or
- *  not found) are left alone, and so is every open issue no row cites. */
+ *  not found) are left alone, and so is every open issue no row cites.
+ *  @param {ReadonlyMap<number, Priority>} priorities
+ *  @param {ReadonlyMap<number, readonly string[]>} openIssues
+ *  @returns {LabelChange[]} */
 export function planLabelChanges(priorities, openIssues) {
+  /** @type {LabelChange[]} */
   const plan = [];
   for (const [issue, want] of [...priorities].sort((a, b) => a[0] - b[0])) {
     const labels = openIssues.get(issue);
@@ -95,7 +123,10 @@ export function planLabelChanges(priorities, openIssues) {
   return plan;
 }
 
-/** Row-cited issues that are not open, so the rows can be trued up. */
+/** Row-cited issues that are not open, so the rows can be trued up.
+ *  @param {ReadonlyMap<number, Priority>} priorities
+ *  @param {ReadonlyMap<number, readonly string[]>} openIssues
+ *  @returns {number[]} */
 export function citedButNotOpen(priorities, openIssues) {
   return [...priorities.keys()].filter((n) => !openIssues.has(n)).sort((a, b) => a - b);
 }
@@ -111,7 +142,8 @@ const RATE_LIMITED = /rate limit|HTTP 429|submitted too quickly|abuse detection/
  *  pagination and the HTTP plumbing. A failed call rejects with an Error whose
  *  message carries gh's stderr; `rateLimited` is set when that stderr says
  *  GitHub refused the call because of a rate limit. Each call times out after
- *  a minute. */
+ *  a minute.
+ *  @returns {Gh} */
 export function ghCli() {
   return (args) =>
     new Promise((resolvePromise, reject) => {
@@ -123,7 +155,7 @@ export function ghCli() {
         else if (err.killed)
           why = `timed out after a minute${args[0] === "api" ? " (the write may still have landed; the next run checks)" : ""}`;
         const what = args.filter((a) => !a.startsWith("-")).slice(0, 3);
-        const e = new Error(`gh ${what.join(" ")}: ${why}`);
+        const e = /** @type {GhError} */ (new Error(`gh ${what.join(" ")}: ${why}`));
         e.rateLimited = RATE_LIMITED.test(why);
         reject(e);
       });
@@ -134,6 +166,9 @@ export function ghCli() {
  *  treated as cut short. */
 const LIST_LIMIT = 10_000;
 
+/** @param {Gh} gh
+ *  @param {string[]} args
+ *  @returns {Promise<unknown[]>} */
 async function ghList(gh, args) {
   const items = JSON.parse(await gh([...args, "--limit", String(LIST_LIMIT)]));
   if (items.length >= LIST_LIMIT)
@@ -142,19 +177,40 @@ async function ghList(gh, args) {
 }
 
 /** Open issues to their label names. `gh issue list` returns issues only,
- *  never pull requests. */
+ *  never pull requests.
+ *  @param {Gh} gh
+ *  @param {string} repo */
 async function openIssueLabels(gh, repo) {
-  const issues = await ghList(gh, ["issue", "list", "--repo", repo, "--state", "open", "--json", "number,labels"]);
+  const issues = /** @type {{ number: number; labels: { name: string }[] }[]} */ (
+    await ghList(gh, ["issue", "list", "--repo", repo, "--state", "open", "--json", "number,labels"])
+  );
   return new Map(issues.map((i) => [i.number, i.labels.map((l) => l.name)]));
 }
 
+/** Whether a failed gh call was refused for rate (a GhError with the flag set).
+ *  @param {unknown} err */
+const isRateLimited = (err) => Boolean(/** @type {{ rateLimited?: unknown } | null | undefined} */ (err)?.rateLimited);
+
+/** @param {unknown} err */
 const message = (err) => (err instanceof Error ? err.message : String(err));
 
 /** One sync. `gh(args)` runs the GitHub CLI and resolves to its stdout;
  *  `pauseMs` spaces every write out so a large first run stays under GitHub's
  *  secondary rate limit. A write refused for rate waits `limitWaitMs` (GitHub
  *  asks for at least a minute) and retries once; refused again, the run stops
- *  writing. Returns what it did; `ok` is false when any row or issue failed. */
+ *  writing. Returns what it did; `ok` is false when any row or issue failed.
+ *  @param {{
+ *    markdown: string;
+ *    repo: string;
+ *    gh: Gh;
+ *    dryRun?: boolean;
+ *    pauseMs?: number;
+ *    limitWaitMs?: number;
+ *    sleep?: (ms: number) => Promise<void>;
+ *    log?: (line: string) => void;
+ *  }} options
+ *  @returns {Promise<{ ok: boolean; plan: LabelChange[]; failures: number[]; errors: string[]; stale: number[] }>}
+ *  `stale` holds the row-cited numbers that are not open issues; the CLI exits 1 on any. */
 export async function run({
   markdown,
   repo,
@@ -171,15 +227,20 @@ export async function run({
     if (errors.length === 0) log("no open backlog row cites an issue; nothing to sync");
     return { ok: errors.length === 0, plan: [], failures: [], errors, stale: [] };
   }
+  /** @param {string} why */
   const stop = (why) => {
     log(`error: ${why}`);
     return { ok: false, plan: [], failures: [], errors: [...errors, why], stale: [] };
   };
   // gh refuses to add a label the repository lacks, so a missing P label would
   // fail every issue one by one. Check once and stop with a clear reason.
+  /** @type {Priority[]} */
   let missing;
   try {
-    const labels = (await ghList(gh, ["label", "list", "--repo", repo, "--json", "name"])).map((l) => l.name);
+    const listed = /** @type {{ name: string }[]} */ (
+      await ghList(gh, ["label", "list", "--repo", repo, "--json", "name"])
+    );
+    const labels = listed.map((l) => l.name);
     missing = PRIORITY_LABELS.filter((p) => !labels.includes(p));
   } catch (err) {
     return stop(`could not list labels: ${message(err)}`);
@@ -202,16 +263,18 @@ export async function run({
     );
   const plan = planLabelChanges(priorities, open);
   log(`${priorities.size} row-cited issues, ${plan.length} to relabel${dryRun ? " (dry run)" : ""}`);
+  /** @type {number[]} */
   const failures = [];
   // Writes go through `gh api` to the REST endpoints: one request per label,
   // where `gh issue edit` spends several GraphQL requests on each edit and
   // could run a large first sync into the token's hourly budget.
+  /** @param {string[]} args */
   const write = async (args) => {
     try {
       try {
         await gh(args);
       } catch (err) {
-        if (!err?.rateLimited) throw err;
+        if (!isRateLimited(err)) throw err;
         log(`${args[3]}: rate limited; waiting, then retrying once`);
         await sleep(limitWaitMs);
         await gh(args);
@@ -221,6 +284,7 @@ export async function run({
       if (pauseMs > 0) await sleep(pauseMs);
     }
   };
+  /** @param {number} issue */
   const labelsPath = (issue) => `repos/${repo}/issues/${issue}/labels`;
   for (const c of plan) {
     log(`#${c.issue}: ${[c.add && `+${c.add}`, ...c.remove.map((l) => `-${l}`)].filter(Boolean).join(" ")}`);
@@ -242,7 +306,7 @@ export async function run({
     } catch (err) {
       failures.push(c.issue);
       log(`error: #${c.issue}: ${message(err)}`);
-      if (err?.rateLimited) {
+      if (isRateLimited(err)) {
         const skipped = plan.slice(plan.indexOf(c) + 1).map((x) => x.issue);
         failures.push(...skipped);
         log(`error: rate limited; stopping, the next run picks up ${skipped.length} skipped issue(s)`);
