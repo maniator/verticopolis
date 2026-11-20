@@ -195,7 +195,7 @@ export interface EngineBootResult {
   state: EngineBootState;
 }
 
-/** Load the WASM engine for boot. Never throws: a failure is in the state. */
+/** Load the engine for boot. Never throws: a failure is in the state. */
 export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBootResult> {
   const log = opts.log ?? console;
   const build = "wasm-only";

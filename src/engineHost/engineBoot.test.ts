@@ -28,7 +28,7 @@ describe("loadBootEngine", () => {
     expect(r).toEqual({ module: m, state: { build: "wasm-only", engine: "wasm", failure: null } });
   });
 
-  it("reports a load failure as a failure, never as the TypeScript engine", async () => {
+  it("reports a load failure as a failure", async () => {
     const log = quiet();
     const r = await loadBootEngine({ load: async () => Promise.reject(new Error("CompileError: bad magic")), log });
     expect(r).toEqual({

@@ -23,11 +23,9 @@ interface LabelSource {
 
 const pageSource = () => globalThis as LabelSource;
 
-/** The engine the current tower runs on: "wasm" while the WASM host has a
- *  tower attached, "ts" otherwise (including a WASM package that failed to
- *  load, which leaves the game on the TypeScript engine). */
-export function activeEngine(g: LabelSource = pageSource()): "ts" | "wasm" {
-  return g.__vcEngine?.status.hosted ? "wasm" : "ts";
+/** Whether the engine host has a tower attached right now. */
+export function engineHosted(g: LabelSource = pageSource()): boolean {
+  return g.__vcEngine?.status.hosted === true;
 }
 
 /** The engine's name, version and short hash, as the version lines append it.
@@ -42,7 +40,7 @@ export function engineSuffix(g: LabelSource = pageSource()): string {
 function suffixOf(g: LabelSource): string {
   // The Rust engine is the only engine (#1875). A Rust engine that stopped
   // after a trap reads `engine: "none"` until the reload, and says so.
-  const stopped = activeEngine(g) !== "wasm" && g.__vcEngineBoot?.engine === "none";
+  const stopped = !engineHosted(g) && g.__vcEngineBoot?.engine === "none";
   const version = parseEngineIdentity(g.__vcEngineBoot?.identity)?.crate.version;
   const binary = g.__vcEngineBoot?.binary;
   const hash = binary?.state === "ok" ? shortId(binary.sourceHash) : null;

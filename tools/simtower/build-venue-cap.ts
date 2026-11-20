@@ -21,7 +21,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { draftTower } from "../../src/tests/portKit/drafts";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
-import type { FacilityKind, SerializedGame } from "@verticopolis/components/shared/types";
+import type { FacilityKind, SerializedGame } from "@verticopolis/engine/model/types";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // SIMTOWER_SAVES moves the output (the smoke test writes to a scratch folder).

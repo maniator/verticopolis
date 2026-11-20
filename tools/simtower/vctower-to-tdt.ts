@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { basename, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { SerializedGame } from "@verticopolis/components/shared/types";
+import type { SerializedGame } from "@verticopolis/engine/model/types";
 import { buildTDT } from "../../src/tests/conformance/tdtWasm";
 import { decodeVctowerFile } from "../../src/storage/vctowerContainer";
 

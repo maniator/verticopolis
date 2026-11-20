@@ -1,4 +1,4 @@
-import { COMPONENT_FIXTURES } from "../packagePaths";
+import { ENGINE_FIXTURES } from "../packagePaths";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readCatalog } from "@verticopolis/engine/binding/catalog";
@@ -7,7 +7,7 @@ import { MAX_BRUSH_TILES } from "@verticopolis/engine/port/request";
 /** The Rust engine's Classic catalog as checked in (the file `catalogFor` in
  *  `src/tests/catalogFixture.ts` reads; `portReads.integration.test.ts` holds
  *  it to the engine), from the installed components package. */
-const CLASSIC_CATALOG = resolve(COMPONENT_FIXTURES, "catalog.classic.json");
+const CLASSIC_CATALOG = resolve(ENGINE_FIXTURES, "catalog.classic.json");
 
 /** Each facility kind the engine lists, with its transport flag. Every mode's
  *  catalog lists every kind (a Modern-only one carries `modernOnly`), so the

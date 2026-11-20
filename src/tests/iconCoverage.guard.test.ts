@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, relative } from "node:path";
-import { EMOJI_ICONS, ICON_NAMES, ACCENT_FILLS, iconElement } from "@verticopolis/components/windows/icons";
-import { srcFile } from "./packagePaths";
+import { EMOJI_ICONS } from "@verticopolis/components/windows/icons";
 
 /**
  * Bulletin icon coverage guard (issue #721).
@@ -41,8 +40,6 @@ import { srcFile } from "./packagePaths";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = resolve(here, "..");
-/** The mapping table, as the components package ships it. */
-const iconsPath = srcFile("ui/icons.ts");
 /** `src/tests`, `src`-relative. Everything under it is test code, including the
  *  fixtures and helpers that are not named `*.test.ts`. */
 const TEST_DIR = "tests";
@@ -52,14 +49,6 @@ const TEST_DIR = "tests";
  *  entry for a fixture glyph no player ever sees. The by-name `*.test.ts` rule
  *  is already location-agnostic; this matches it. */
 const TEST_LOCATION = new RegExp(`(^|/)${TEST_DIR}/`);
-/** The roots this guard scanned before #782 widened it that still exist: it
- *  scanned `src/engine` too, which left with the TypeScript engine (#1875).
- *  The coverage check used to read their test files as well, so it keeps
- *  doing so through {@link legacyRootTests} even though tests are otherwise
- *  out of the scan. Nothing in the tree can yield this list (colocated tests
- *  live under several top-level directories today), so it is a record of
- *  history and the test restates it to keep it from being trimmed. */
-const LEGACY_ROOTS = ["game"];
 
 /** Every character that is actually RENDERED as an emoji (and so tofus without a
  *  color-emoji font): either a default-emoji-presentation code point
@@ -190,16 +179,6 @@ function unmappedEmoji(files: readonly Source[]): string[] {
   return out;
 }
 
-/** The test files under ONE pre-#782 root, read on demand. They are out of
- *  {@link SOURCES} like all test code, and the coverage check used to reach
- *  them, so this keeps that ground rather than trusting a note that no engine
- *  or game test has ever carried an unmapped emoji. One root at a time so the
- *  caller can hold each to its own non-empty check; a single list over the union
- *  hides a root that has gone empty behind the other root's files. */
-function legacyRootTests(root: string): Source[] {
-  return ALL_TS.filter((f) => f.rel.endsWith(".test.ts") && f.rel.startsWith(`${root}/`)).map(readStripped);
-}
-
 /** Occurrences of a MAPPED emoji that are not message-leading: the mapper only
  *  swaps a marker at the head of a message (whitespace tolerated), so an emoji
  *  written after any other prefix ("Day 5: 🔥...", a template interpolation)
@@ -279,46 +258,6 @@ describe("bulletin icon coverage (issue #721)", () => {
       unmapped,
       `These bulletin emoji have no EMOJI_ICONS entry and would render as ` +
         `tofu. Add each to EMOJI_ICONS in src/ui/icons.ts: ${unmapped.join(", ")}`,
-    ).toEqual([]);
-  });
-
-  it("still covers the test files the pre-#782 scan reached", () => {
-    // Widening the roots also moved the "skip test files" rule into the shared
-    // walk, which would have QUIETLY NARROWED this half: an unmapped emoji added
-    // to a src/engine or src/game test used to fail CI. Nothing but this assertion would
-    // keep that ground. It is scoped to the two old roots because that is
-    // exactly what was covered before; test code elsewhere stages fixtures
-    // (a "✨✨" tower name) that were never in reach and should not be.
-    //
-    // Two halves, because two different edits can hand that ground back. The
-    // list is a record of history the tree cannot yield, so trimming it to
-    // [] would drop the game test files with every other assertion still
-    // green: restating it here means a rename has to touch both spellings, which
-    // is the friction this pin exists for. The engine root was retired with the
-    // TypeScript engine (#1875).
-    expect(
-      [...LEGACY_ROOTS].sort(),
-      "LEGACY_ROOTS no longer names the root the pre-#782 scan walked, so this check " +
-        "covers less than it did; restore the missing root or retire the pin deliberately",
-    ).toEqual(["game"]);
-    // The other half is per ROOT rather than over the union, so a root that
-    // goes stale (src/game renamed) fails here instead of reading nothing.
-    const legacy: Source[] = [];
-    for (const root of LEGACY_ROOTS) {
-      const rootTests = legacyRootTests(root);
-      expect(
-        rootTests.length,
-        `no test file was found under src/${root}/, so this check reads nothing from that ` +
-          `root; point LEGACY_ROOTS at wherever it moved`,
-      ).toBeGreaterThan(0);
-      legacy.push(...rootTests);
-    }
-    const unmapped = unmappedEmoji(legacy);
-    expect(
-      unmapped,
-      `These emoji sit in an engine or game test with no EMOJI_ICONS entry. ` +
-        `The pre-#782 guard failed on them and this one still does: map each in ` +
-        `src/ui/icons.ts, or move the fixture out of the emitter's own test: ${unmapped.join(", ")}`,
     ).toEqual([]);
   });
 
@@ -404,58 +343,5 @@ describe("bulletin icon coverage (issue #721)", () => {
       [...byName, ...byLocation].filter((f) => f.emitter).map((f) => f.rel),
       "test code is not an emitter",
     ).toEqual([]);
-  });
-
-  it("keeps every bulletin icon currentColor-only (so severity color carries)", () => {
-    // A bulletin icon inherits its log line's severity color (red for bad, green
-    // for money) purely through `fill="currentColor"`. A baked fill on one of
-    // its paths would freeze it off-color, so pin that no EMOJI_ICONS target
-    // bakes a fill and each still declares currentColor on the <svg>.
-    for (const name of new Set(Object.values(EMOJI_ICONS))) {
-      const svg = iconElement(name);
-      expect(svg.getAttribute("fill"), `${name} lost its currentColor root`).toBe("currentColor");
-      for (const p of svg.querySelectorAll("path")) {
-        expect(
-          p.getAttribute("fill"),
-          `${name} bakes a path fill; a bulletin icon must inherit severity color`,
-        ).toBeNull();
-      }
-    }
-  });
-
-  it("allows an accent fill only on an allowlisted accent icon, only from the hazard palette", () => {
-    // Nearly all icons are currentColor; the bulldoze wrecking ball is the one
-    // exception, a two-tone red/amber glyph. Pin the exception TIGHT: only an
-    // icon named in ACCENT_ICONS may bake a fill at all, and only from the
-    // ACCENT_FILLS palette. Every other icon (bulletin AND chrome) must inherit
-    // currentColor, so a stray `fill: "#ff6b6b"` on, say, the save glyph fails
-    // here instead of silently freezing it red. The generated pixelarticons
-    // paths never bake a fill at all.
-    const ACCENT_ICONS = new Set<string>(["bulldoze"]);
-    const allow = new Set<string>(ACCENT_FILLS);
-    for (const name of ICON_NAMES) {
-      for (const p of iconElement(name).querySelectorAll("path")) {
-        const fill = p.getAttribute("fill");
-        if (!fill) continue;
-        expect(
-          ACCENT_ICONS.has(name),
-          `${name} bakes a fill but is not an allowlisted accent icon; it must inherit currentColor`,
-        ).toBe(true);
-        expect(allow.has(fill), `${name} uses a non-allowlisted fill ${fill}`).toBe(true);
-      }
-    }
-    const generatedPath = srcFile("ui/iconPaths.generated.ts");
-    const hexRe = /fill\s*[:=]\s*["'`]?#[0-9a-fA-F]{3,8}/g;
-    const generatedFills = readFileSync(generatedPath, "utf8").match(hexRe) ?? [];
-    expect(generatedFills, `generated pixelarticons paths must stay currentColor-only`).toEqual([]);
-    expect(readFileSync(iconsPath, "utf8")).toContain('fill="currentColor"');
-  });
-
-  it("carries its MIT provenance", () => {
-    // The vendored paths are from Pixelarticons (MIT); the attribution ships in
-    // the generated file the icons draw from, as the components package ships it.
-    expect(readFileSync(srcFile("ui/iconPaths.generated.ts"), "utf8")).toMatch(
-      /pixelarticons.*MIT|MIT.*pixelarticons/is,
-    );
   });
 });

@@ -1,4 +1,4 @@
-import { COMPONENT_FIXTURES } from "./packagePaths";
+import { ENGINE_FIXTURES } from "./packagePaths";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Catalog } from "@verticopolis/engine/catalog/catalogTypes";
@@ -16,7 +16,7 @@ import type { GameMode } from "@verticopolis/engine/model/types";
  * Each read passes the binding's own shape check (`readCatalog`).
  */
 
-const FIXTURES = COMPONENT_FIXTURES;
+const FIXTURES = ENGINE_FIXTURES;
 const read = new Map<GameMode, Catalog>();
 
 /** The fixture file of `mode`'s catalog. */

@@ -3,11 +3,15 @@
 How the web game loads the Rust engine, runs it each frame and reads it back.
 The engine itself is built and published from
 [Verticopolis/engine](https://github.com/Verticopolis/engine) and described on
-the docs site; this page covers the browser side. `src/wasmhost/`,
-`src/engineBinding/`, `src/simport/` and `src/catalog/` live in
-[Verticopolis/components](https://github.com/Verticopolis/components) at the
-same paths, and the game imports them from `@verticopolis/components`.
-`src/bootstrap.ts` and `src/game/` are in this repository. The engine version
+the docs site; this page covers the browser side. The host, the binding,
+the port and the catalog ship in the engine package, and the game imports
+them from `@verticopolis/engine` (`host/*`, `binding/*`, `port/*`,
+`catalog/*`). The game's own boot files (`engineBoot`, `engineChoice`,
+`engineDiagnostics`, `engineLabel`, `engineRepair`, `slotPopulation`) are in
+`src/engineHost/`, and `src/bootstrap.ts` and `src/game/` are in this
+repository too. The renderer reads the engine through the render model of
+[Verticopolis/components](https://github.com/Verticopolis/components), which
+depends on no simulation. The engine version
 the game runs is the `@verticopolis/engine` pin in `package.json`;
 `scripts/engine-install.ts` copies its browser build into `src/public/engine/`
 on `npm install`.
