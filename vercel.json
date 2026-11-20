@@ -33,6 +33,17 @@
       "continue": true
     },
     {
+      "src": "^/help(?:/|$)",
+      "headers": { "Content-Security-Policy": "frame-ancestors 'self'" },
+      "continue": true
+    },
+    {
+      "src": "^/(.*)$",
+      "has": [{ "type": "host", "value": "help.verticopolis.com" }],
+      "headers": { "Content-Security-Policy": "frame-ancestors 'self' https://verticopolis.com" },
+      "continue": true
+    },
+    {
       "src": "^/version\\.json$",
       "headers": { "Cache-Control": "no-store" },
       "continue": true

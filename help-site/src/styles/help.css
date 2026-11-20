@@ -240,3 +240,13 @@ html.vc-help-bar-showing body {
   height: var(--vc-menubar-h);
   box-sizing: border-box;
 }
+
+/* Inside the game's Help window (src/manual/manualEmbed.ts) the window has
+   its own title bar and buttons, and the game is right there: the menu bar,
+   the game button, its note and the Help bar step aside. */
+html.vc-embedded #help-menubar-host,
+html.vc-embedded .vc-bar-links,
+html.vc-embedded #back-note,
+html.vc-embedded #vc-help-bar {
+  display: none !important;
+}

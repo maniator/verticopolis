@@ -33,6 +33,7 @@ import { siteHref } from "../../site.mjs";
   import { getCommonProps, setCommonProps, trackAppAction } from "../../../src/analytics";
   import { gameLinkDetail, helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
   import { saveManualOffline } from "../../../src/manual/manualOffline";
+  import { EMBEDDED_CLASS, gameOriginFor, pageMessage, replacedBy } from "../../../src/manual/manualEmbed";
 
   // The site's base as Astro built it: "" at the root of the manual's own
   // host, "/help" on the game's.
@@ -65,6 +66,24 @@ import { siteHref } from "../../site.mjs";
   document.addEventListener("click", noteSponsorTap);
   document.addEventListener("auxclick", noteSponsorTap);
   const fromGame = takeFromGameFlag(location, history);
+  // Inside the game's Help window (src/manual/manualEmbed.ts), once the
+  // game's marks are off the address: tell the game each page shown, for its
+  // title bar and its Back and Forward, and follow the manual's own links
+  // with location.replace so the game's history never fills with manual
+  // pages.
+  if (document.documentElement.classList.contains(EMBEDDED_CLASS)) {
+    const game = gameOriginFor(location.host, location.origin);
+    const tell = () => window.parent.postMessage(pageMessage(location, base, document.title), game);
+    tell();
+    window.addEventListener("hashchange", tell);
+    document.addEventListener("click", (e) => {
+      const link = e.target instanceof Element ? e.target.closest("a") : null;
+      const to = replacedBy(e, link, location.href, base);
+      if (!to) return;
+      e.preventDefault();
+      location.replace(to);
+    });
+  }
   for (const play of document.querySelectorAll<HTMLAnchorElement>("a[data-game-link]")) {
     // Each press on the title bar's game button or the front page's Play
     // counts as help_game_link (site.mjs gameLinkDetail), before Back to
