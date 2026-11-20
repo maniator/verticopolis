@@ -1,7 +1,8 @@
 import { render, type TemplateResult } from "lit-html";
 
 /**
- * Unit-tier test harness for lit templates (see the plan of record,
+ * Unit-tier test harness for lit templates (see the plan of record in
+ * Verticopolis/components,
  * `_bmad-output/planning-artifacts/design/ui-rendering-engine-2026-07-14/`).
  * Every template is proven at the unit tier, in happy-dom, before the slower
  * behavioral and visual tiers run. Two kinds of helpers live here:
