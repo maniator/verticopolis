@@ -50,7 +50,7 @@ export const SHOWCASE_SCENES: Scene[] = [
         keepDialogs: true,
         setup: async (page) => {
           // Re-open rather than assume the previous shot's dialog survived, so
-          // this shot stands on its own; openModalTemplate replaces the body.
+          // this shot stands on its own; openModal replaces the box's contents.
           await page.evaluate(() => window.game.ui.newTowerModal({ hasSave: false, onFound: () => {} }));
           await page.waitForSelector("#modal[open], dialog[open]", { timeout: 4000 });
           // Pick the Modern card through its real radio (a DOM click checks it
