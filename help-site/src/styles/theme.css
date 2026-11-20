@@ -8,7 +8,9 @@
      with the cards as small game windows over the skyline.
    The chrome tokens (--r-*) and the title screen's colors (--splash-*) come
    from the game's retro-tokens.css, and the skyline from its
-   splash-skyline.svg, both copied in by scripts/sync-pages.mjs. */
+   splash-skyline.svg, which scripts/sync-assets.mjs copies into src/assets so
+   the build bundles it beside the styles (the manual's own host has no copy
+   at its root, and the offline copy saves what the build bundles). */
 
 :root {
   --ts-skyline-height: clamp(10rem, 20vw, 15rem);
@@ -220,7 +222,7 @@ mobile-starlight-toc .toggle,
   height: var(--ts-skyline-height);
   /* The title screen's skyline at its own proportions, repeated across a
      wide screen instead of stretched, so the rooftops always show. */
-  background: url("/splash-skyline.svg") repeat-x center bottom / auto 100%;
+  background: url("../assets/splash-skyline.svg") repeat-x center bottom / auto 100%;
 }
 .ts-brand h1 {
   margin: 0;

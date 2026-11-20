@@ -12,7 +12,9 @@
 // A production build puts it at the root of help.verticopolis.com
 // (VC_HELP_ORIGIN, site.mjs), which vercel.json serves from dist/help/; every
 // other build keeps it under /help on the game's own host. The game's service
-// worker leaves /help/ to the network, so nothing here is precached.
+// worker leaves /help/ alone; the manual has its own (dist/help/sw.js, written
+// after the build by scripts/manual-worker.ts), which saves it for offline
+// reading.
 import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";

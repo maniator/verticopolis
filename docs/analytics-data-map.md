@@ -374,6 +374,13 @@ The help site (help.verticopolis.com) reports through the same relay:
 every page read (`detail` its path), and `help_menu_pick` a pick on its menu
 bar (`detail` the item's `data-help-item` code).
 
+`help_offline_saved` (no `detail`) is sent once per device when the manual's
+worker has saved the whole manual for offline reading
+(`src/manual/manualOffline.ts`): the page sets the `vc_manual` cookie, which
+holds only the manual's host, and sends the event when that cookie was not
+there before. Help opened offline sends nothing, since nothing can reach the
+relay then.
+
 A landing's `detail` says where the visit started (#2037, owner 2026-11-12),
 always one fixed code, never a URL or a referrer. A link the game opens carries
 `?from=game&via=CODE` (`fromGameHref` in `src/ui/fromGame.ts`), the page reads

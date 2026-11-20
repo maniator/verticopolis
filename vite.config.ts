@@ -596,12 +596,12 @@ export default defineConfig(({ command }) => ({
         // routes. Without the `/help` entry the fallback would answer a `/help`
         // navigation with the precached game shell.
         //
-        // The Help site under `/help/` is never precached (the `globIgnores`
-        // entry above), so a `/help` page always comes from the network and is
-        // never stale: it does not register the worker, so a Help-only visitor
-        // would never trigger an update of a cached copy. The trade-off is that
-        // Help is online-only, the same call made for `/gallery`; the game's
-        // own Help window works offline.
+        // The Help site under `/help/` is never precached by this worker (the
+        // `globIgnores` entry above): a Help-only visitor never registers it,
+        // so a cached copy here would never update. The manual saves itself
+        // instead, with its own worker scoped to `/help/`
+        // (src/manual/manualWorker.ts), which answers its pages from the
+        // network first and from its saved copy offline.
         // `.well-known/` joins the machine-readable files for the same reason
         // robots.txt and sitemap.xml are here: they are documents ABOUT the
         // site rather than pages of it, and answering one with the game shell

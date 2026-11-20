@@ -98,7 +98,9 @@ describe("the problem lines' Help links", () => {
     const say = vi.spyOn(ui, "sayVisibly");
     showCard().querySelector<HTMLAnchorElement>("a.help-topic")!.click();
     expect(open).not.toHaveBeenCalled();
-    expect(say).toHaveBeenCalledWith("The manual needs an internet connection. It is at help.verticopolis.com.");
+    expect(say).toHaveBeenCalledWith(
+      "The manual needs the internet the first time. Open it once while online and it works offline after that. It is at help.verticopolis.com.",
+    );
     expect(speed.now()).toBe(3);
   });
 

@@ -14,7 +14,8 @@ import type { DiagnosticsReport } from "../engineHost/engineDiagnostics";
 import { copyText } from "./copyText";
 import { announceLive } from "../game/liveRegion";
 import { isGameMode } from "@verticopolis/engine/model/types";
-import { HELP_ADDRESS, helpUrl } from "../helpAddress";
+import { HELP_ADDRESS, HELP_ORIGIN, helpUrl } from "../helpAddress";
+import { manualHost, manualSavedFor } from "../manual/manualOffline";
 import { HELP_TOPIC_PATH, isHelpTopic } from "./helpTopics";
 import type { HelpTopicSurface } from "./templates/helpTopicLink";
 import { hostHelpBar } from "./helpBarHost";
@@ -168,16 +169,24 @@ function leaveForTab(ui: UI, e: MouseEvent): void {
   ui.closeModal();
 }
 
+/** What the game says when the manual cannot open offline. */
+export const MANUAL_NOT_SAVED = `The manual needs the internet the first time. Open it once while online and it works offline after that. It is at ${HELP_ADDRESS}.`;
+
+/** Whether a manual page cannot load now: the device is offline and the
+ *  manual's worker has not saved it here (src/manual/manualOffline.ts). A
+ *  saved manual opens offline in its tab like any other time. */
+function manualOutOfReach(): boolean {
+  return !navigator.onLine && !manualSavedFor(document.cookie, manualHost(HELP_ORIGIN, location.host));
+}
+
 /** The guide: the Help site's front page in a new tab, from the Help menu's
  *  Player's Manual (`game_menu`), the title screen's How to Play (`title`),
  *  F1 with no room card up (`help_key`) and the tooling handle `ui.showHelp(source)`. `help_open` and the page's
  *  landing both report `source` (#2037). */
 export function showHelp(ui: UI, source: GameHelpSource): void {
   trackAppAction("help_open", source);
-  // The manual is online only (the service worker leaves /help to the
-  // network), so offline say so rather than open a tab that cannot load.
-  if (!navigator.onLine) {
-    ui.sayVisibly(`The manual needs an internet connection. It is at ${HELP_ADDRESS}.`);
+  if (manualOutOfReach()) {
+    ui.sayVisibly(MANUAL_NOT_SAVED);
     return;
   }
   openPageInTab(ui, "/help/", source, () => ui.sayVisibly(`The guide could not open. It is at ${HELP_ADDRESS}.`));
@@ -301,8 +310,8 @@ function openHelpTopic(ui: UI, link: HTMLAnchorElement, e?: MouseEvent): void {
   if (!isHelpTopic(topic)) return;
   e?.preventDefault();
   const path = HELP_TOPIC_PATH[topic];
-  if (!navigator.onLine) {
-    ui.sayVisibly(`The manual needs an internet connection. It is at ${HELP_ADDRESS}.`);
+  if (manualOutOfReach()) {
+    ui.sayVisibly(MANUAL_NOT_SAVED);
     return;
   }
   const surface = topicSurface(link);
@@ -363,14 +372,14 @@ function wireReportLink(ui: UI, box: HTMLElement): void {
 }
 
 /** The privacy link opens the Help site's page in a new tab and holds the
- *  pause until the player is back ({@link leaveForTab}). The Help site is
- *  online only (the service worker leaves /help to the network), so offline
- *  the link stays put and says where the page is instead. */
+ *  pause until the player is back ({@link leaveForTab}). Offline with the
+ *  manual not saved on this device, the link stays put and says where the
+ *  page is instead. */
 function wirePrivacyLink(ui: UI, box: HTMLElement): void {
   const link = box.querySelector<HTMLAnchorElement>('a[data-act="privacy"]');
   const status = box.querySelector<HTMLElement>(".help-links-status");
   link?.addEventListener("click", (e) => {
-    if (!navigator.onLine) {
+    if (manualOutOfReach()) {
       e.preventDefault();
       if (status)
         status.textContent = `The privacy page needs an internet connection. It is at ${HELP_ADDRESS}/privacy.`;

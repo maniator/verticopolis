@@ -32,6 +32,7 @@ import { siteHref } from "../../site.mjs";
   import { injectPageTelemetry } from "../../../src/telemetry";
   import { getCommonProps, setCommonProps, trackAppAction } from "../../../src/analytics";
   import { gameLinkDetail, helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
+  import { saveManualOffline } from "../../../src/manual/manualOffline";
 
   // The site's base as Astro built it: "" at the root of the manual's own
   // host, "/help" on the game's.
@@ -50,6 +51,14 @@ import { siteHref } from "../../site.mjs";
   // Every page view, landing or not, names its page, so the help pages
   // people read show up in PostHog and not only where they arrived.
   trackAppAction("help_page_view", helpPageDetail(location.pathname, base));
+  // Save the whole manual for offline reading (src/manual/manualOffline.ts),
+  // counting the first save on this device once.
+  void saveManualOffline(base, {
+    workers: window.isSecureContext && "serviceWorker" in navigator ? navigator.serviceWorker : null,
+    doc: document,
+    host: location.host,
+    track: () => trackAppAction("help_offline_saved"),
+  });
   // A tap on any link to the Sponsors page counts once as sponsor_click
   // (help-site/site.mjs sponsorTapListener); the link itself opens as before.
   const noteSponsorTap = sponsorTapListener(() => trackAppAction("sponsor_click", "help"));

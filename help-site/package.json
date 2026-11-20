@@ -6,7 +6,7 @@
   "scripts": {
     "sync": "node scripts/sync-assets.mjs",
     "dev": "node scripts/sync-assets.mjs && astro dev",
-    "build": "node scripts/sync-assets.mjs && astro build",
+    "build": "node scripts/sync-assets.mjs && astro build && node ../scripts/manual-worker.ts",
     "typecheck": "astro check"
   },
   "dependencies": {

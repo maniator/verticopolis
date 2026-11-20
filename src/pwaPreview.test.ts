@@ -28,18 +28,25 @@ async function importPwa() {
 interface BrowserSpies {
   getRegistrations: ReturnType<typeof vi.fn>;
   unregisters: ReturnType<typeof vi.fn>[];
+  manualUnregister: ReturnType<typeof vi.fn>;
   cacheDelete: ReturnType<typeof vi.fn>;
   restore: () => void;
 }
 
-/** A secure page with service worker support, two leftover registrations and
- *  a mix of Workbox and other caches. */
+/** A secure page with service worker support, two leftover game
+ *  registrations, the manual's own one under /help/, and a mix of Workbox
+ *  and other caches. */
 function browserWithLeftovers(): BrowserSpies {
   const originalSecure = Object.getOwnPropertyDescriptor(window, "isSecureContext");
   const originalSw = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
   const originalCaches = Object.getOwnPropertyDescriptor(globalThis, "caches");
   const unregisters = [vi.fn(async () => true), vi.fn(async () => true)];
-  const getRegistrations = vi.fn(async () => unregisters.map((unregister) => ({ unregister })));
+  const manualUnregister = vi.fn(async () => true);
+  const gameScope = new URL("/", window.location.href).href;
+  const getRegistrations = vi.fn(async () => [
+    ...unregisters.map((unregister) => ({ unregister, scope: gameScope })),
+    { unregister: manualUnregister, scope: new URL("/help/", window.location.href).href },
+  ]);
   const cacheDelete = vi.fn(async () => true);
   const cacheNames = ["workbox-precache-v2-https://preview.example/", "workbox-runtime", "someone-elses-cache"];
   Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
@@ -51,6 +58,7 @@ function browserWithLeftovers(): BrowserSpies {
   return {
     getRegistrations,
     unregisters,
+    manualUnregister,
     cacheDelete,
     restore: () => {
       for (const [target, key, original] of [
@@ -88,7 +96,7 @@ describe("registerPWA on a preview deployment", () => {
     }
   });
 
-  it("unregisters every leftover worker and deletes only Workbox's caches", async () => {
+  it("unregisters every leftover game worker, keeps the manual's, and deletes only Workbox's caches", async () => {
     const browser = browserWithLeftovers();
     try {
       const { registerPWA } = await importPwa();
@@ -96,6 +104,7 @@ describe("registerPWA on a preview deployment", () => {
       await vi.waitFor(() => expect(browser.cacheDelete).toHaveBeenCalledTimes(2));
       expect(browser.getRegistrations).toHaveBeenCalledTimes(1);
       for (const unregister of browser.unregisters) expect(unregister).toHaveBeenCalledTimes(1);
+      expect(browser.manualUnregister).not.toHaveBeenCalled();
       expect(browser.cacheDelete.mock.calls.map(([name]) => name)).toEqual([
         "workbox-precache-v2-https://preview.example/",
         "workbox-runtime",

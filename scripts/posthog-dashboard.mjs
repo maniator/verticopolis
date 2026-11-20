@@ -989,6 +989,15 @@ function buildInsights(ids) {
       }),
     },
     {
+      name: "Manual saved for offline",
+      description:
+        "Devices whose browser saved the whole player's manual for offline reading (app_action help_offline_saved, sent once per device and manual host by src/manual/manualOffline.ts), per day, production. A device sends it again only after its cookies are cleared.",
+      query: trends([series("app_action", "Manuals saved")], {
+        display: "ActionsLineGraph",
+        where: [inAction(["help_offline_saved"])],
+      }),
+    },
+    {
       name: "Help landings by source",
       description:
         "Manual and release notes landings (app_action page_help / page_changelog) by page and by where the visit started (detail, #2037): a place in the game (game_menu, title, mode_badge, compare, welcome, update_prompt, about, inspector or stats for a problem line's Help link, help_key for F1 with no card up), game (an older build) or direct (not opened by the game), production. One per visit; older builds send no detail.",

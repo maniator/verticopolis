@@ -76,7 +76,11 @@ test("offline, Help and About's privacy link say where the page is and open no t
   try {
     await pickFromHelp(page, "#btn-help");
     await expect(
-      page.getByText("The manual needs an internet connection. It is at help.verticopolis.com.").first(),
+      page
+        .getByText(
+          "The manual needs the internet the first time. Open it once while online and it works offline after that. It is at help.verticopolis.com.",
+        )
+        .first(),
     ).toBeVisible();
 
     await pickFromHelp(page, "#btn-about");

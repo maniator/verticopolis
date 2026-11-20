@@ -1,9 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  applyHelpHostWorker,
   applyPreviewWorker,
-  HELP_HOST_SERVICE_WORKER,
-  helpHostWorkerProblem,
   isPreviewDeploy,
   PRECACHE_CALL,
   productionWorkerProblem,
@@ -67,10 +64,9 @@ function retiringWorker(source: string) {
   return { self, fire, listeners, order, navigate };
 }
 
-describe.each([
-  ["RETIRING_SERVICE_WORKER", RETIRING_SERVICE_WORKER],
-  ["HELP_HOST_SERVICE_WORKER", HELP_HOST_SERVICE_WORKER],
-])("%s", (_name, source) => {
+describe("RETIRING_SERVICE_WORKER", () => {
+  const source = RETIRING_SERVICE_WORKER;
+
   it("handles no fetches, so it never serves a request from a cache", () => {
     const { listeners } = retiringWorker(source);
     expect([...listeners.keys()].sort()).toEqual(["activate", "install"]);
@@ -149,33 +145,6 @@ describe("applyPreviewWorker (scripts/preview-service-worker.ts)", () => {
   });
 });
 
-describe("applyHelpHostWorker (scripts/preview-service-worker.ts)", () => {
-  const HELP = "/build/dist/help";
-  const SW = "/build/dist/help/sw.js";
-  const files = (exists: boolean) => ({ exists: vi.fn(() => exists), write: vi.fn() });
-
-  it("writes the manual host's retiring worker on every build, production included", () => {
-    const io = files(true);
-    expect(applyHelpHostWorker(HELP, SW, io)).toEqual({ code: 0, message: expect.stringContaining("dist/help/sw.js") });
-    expect(io.exists).toHaveBeenCalledWith(HELP);
-    expect(io.write).toHaveBeenCalledExactlyOnceWith(SW, HELP_HOST_SERVICE_WORKER);
-  });
-
-  it("fails when the help site was not built, and writes nothing", () => {
-    const io = files(false);
-    expect(applyHelpHostWorker(HELP, SW, io)).toEqual({
-      code: 1,
-      message: expect.stringContaining("build the help site first"),
-    });
-    expect(io.write).not.toHaveBeenCalled();
-  });
-
-  it("does not carry the preview marker, which only the game's own worker is checked for", () => {
-    expect(HELP_HOST_SERVICE_WORKER).not.toContain(RETIRING_WORKER_MARKER);
-    expect(HELP_HOST_SERVICE_WORKER).not.toContain(PRECACHE_CALL);
-  });
-});
-
 describe("productionWorkerProblem (scripts/check-production-worker.ts)", () => {
   /** The shape of Workbox's generated worker, trimmed to the parts the check reads. */
   const PRECACHING_WORKER = `importScripts("sw-navigation-fallback.js");self.skipWaiting();e.precacheAndRoute([{url:"index.html",revision:"abc"}],{});`;
@@ -200,18 +169,5 @@ describe("productionWorkerProblem (scripts/check-production-worker.ts)", () => {
     expect(productionWorkerProblem("self.addEventListener('fetch', () => {});")).toMatch(/no Workbox precacheAndRoute/);
     // The bare name without the call is not enough.
     expect(productionWorkerProblem("// precacheAndRoute is gone")).toMatch(/no Workbox precacheAndRoute/);
-  });
-});
-
-describe("helpHostWorkerProblem (scripts/check-production-worker.ts)", () => {
-  it("passes the manual host's self-removing worker", () => {
-    expect(helpHostWorkerProblem(HELP_HOST_SERVICE_WORKER)).toBeNull();
-  });
-
-  it("fails a missing worker, the game's precaching one, the preview's, or an empty file", () => {
-    expect(helpHostWorkerProblem(null)).toMatch(/missing/);
-    for (const other of [`e.precacheAndRoute([{url:"index.html",revision:"abc"}],{});`, RETIRING_SERVICE_WORKER, ""]) {
-      expect(helpHostWorkerProblem(other)).toMatch(/not the manual host's self-removing worker/);
-    }
   });
 });

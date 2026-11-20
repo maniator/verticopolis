@@ -47,6 +47,6 @@ npm run build --prefix help-site
 # A preview deployment ships a worker that removes itself instead of the
 # game's precaching one, so a branch link always serves the latest push (see
 # src/build/previewDeploy.ts). Production and other builds are left as built.
-# Every build also writes dist/help/sw.js, the manual host's worker that
-# removes a game worker a browser installed there.
+# The help site's build has already written dist/help/sw.js, the manual's
+# offline worker (scripts/manual-worker.ts), on every deployment.
 node scripts/preview-service-worker.ts
