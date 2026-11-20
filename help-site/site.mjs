@@ -1,5 +1,14 @@
+// @ts-check
+
 // What the help site's config and its tests share: where it lives, its side
 // menu, and the script that sends an old /help#section link to its new page.
+
+/**
+ * One row of the help site's sidebar: a link, a page by slug, or a group.
+ * @typedef {{ label: string; link: string; attrs?: Record<string, string> }
+ *   | { slug: string }
+ *   | { label: string; items: SidebarEntry[] }} SidebarEntry
+ */
 
 /** The manual's own host, help.verticopolis.com, in a production build
  *  (scripts/vercel-build.sh sets VC_HELP_ORIGIN there), or empty in every
@@ -23,6 +32,10 @@ export const GAME_ORIGIN = HELP_ORIGIN ? "https://verticopolis.com" : "";
  * Any other link (another site, a #section, a relative path) is left alone.
  * The Markdown keeps writing /help/... because the game's own Help window
  * reads the same files.
+ * @param {string} href
+ * @param {string} [base]
+ * @param {string} [gameOrigin]
+ * @returns {string}
  */
 export function siteHref(href, base = HELP_BASE, gameOrigin = GAME_ORIGIN) {
   if (!href.startsWith("/") || href.startsWith("//")) return href;
@@ -48,7 +61,9 @@ export const SPONSOR_URL = "https://github.com/sponsors/maniator";
  *  title, description, canonical link, og:title, og:type, og:site_name,
  *  og:locale and twitter:card itself, and the Head override
  *  (src/components/Head.astro) writes each page's own card and its alt text
- *  ({@link cardUrl}, {@link cardAlt}). */
+ *  ({@link cardUrl}, {@link cardAlt}).
+ *  @type {{ tag: "meta" | "link"; attrs: Record<string, string> }[]}
+ */
 export const sharedHead = [
   { tag: "meta", attrs: { name: "robots", content: "index, follow, max-image-preview:large" } },
   { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
@@ -60,7 +75,9 @@ export const sharedHead = [
 /** Starlight's sidebar. A `slug` entry takes its label from the page's title.
  *  Starlight puts the site's base (/help) in front of every `link` that starts
  *  with a slash, so the release notes page (src/pages/changelog.astro) is
- *  "/changelog/". */
+ *  "/changelog/".
+ *  @type {SidebarEntry[]}
+ */
 export const sidebar = [
   { label: "How to Play", link: "/" },
   {
@@ -133,6 +150,7 @@ export const sidebar = [
  * Where each section of the old one-page /help went (its `/help#id` anchor,
  * as the game and old links name it). "going-further" and "about" stay on the
  * front page, which links to everything they covered.
+ * @type {Record<string, string>}
  */
 export const OLD_ANCHORS = {
   basics: "first-tower",
@@ -148,6 +166,8 @@ export const OLD_ANCHORS = {
  * in every page's head, sends an old link to the new page before anything
  * draws, keeping the query (the game's ?from=game mark). `helpIds` maps an old
  * section id to its page's slug ({@link OLD_ANCHORS}).
+ * @param {Record<string, string>} helpIds
+ * @returns {string}
  */
 export function oldAnchorRedirects(helpIds) {
   const map = JSON.stringify(helpIds);
@@ -181,6 +201,8 @@ export const HELP_SCHEME_COOKIE = "vc_scheme";
  * one. It sets `data-scheme` on `<html>`, which the game's retro-tokens.css
  * and src/styles/help-schemes.css key on. Blocked storage or cookies only lose
  * the memory.
+ * @param {boolean} [readCookie]
+ * @returns {string}
  */
 export function schemeBootScript(readCookie = Boolean(HELP_ORIGIN)) {
   const known = JSON.stringify(HELP_SCHEMES);
@@ -197,6 +219,8 @@ export function schemeBootScript(readCookie = Boolean(HELP_ORIGIN)) {
  * listener can count it as a `sponsor_click` app action (detail "help"). It
  * matches the sidebar's "Sponsor Verticopolis" entry and any page text that
  * links the same address, with or without a trailing slash or query.
+ * @param {string} href
+ * @returns {boolean}
  */
 export function isSponsorLink(href) {
   try {
@@ -216,11 +240,14 @@ const MIDDLE_BUTTON = 1;
  * `track` once for a click, keyboard Enter or middle-click on any link to the
  * Sponsors page (the sidebar entry or a page's own text), and never for a
  * right-click or any other link. The link itself opens as before.
+ * @param {() => void} track
+ * @returns {(e: MouseEvent) => void}
  */
 export function sponsorTapListener(track) {
   return (e) => {
     if (e.type === "auxclick" && e.button !== MIDDLE_BUTTON) return;
-    const link = e.target?.closest?.("a[href]");
+    const target = /** @type {Element | null} */ (e.target);
+    const link = /** @type {HTMLAnchorElement | null | undefined} */ (target?.closest?.("a[href]"));
     if (link && isSponsorLink(link.href)) track();
   };
 }
@@ -230,8 +257,14 @@ export function sponsorTapListener(track) {
  * notes, `page_help` on any other page, or null for a step from one help page
  * to another (a referrer under the site's base on the same host), so a visit counts once
  * however many pages it reads, as the old one-page /help did.
+ * @param {string} pathname
+ * @param {string} referrer
+ * @param {string} origin
+ * @param {string} [base]
+ * @returns {"page_help" | "page_changelog" | null}
  */
 export function landingAction(pathname, referrer, origin, base = HELP_BASE) {
+  /** @type {string | null} */
   let from = null;
   try {
     const ref = new URL(referrer);
@@ -239,7 +272,7 @@ export function landingAction(pathname, referrer, origin, base = HELP_BASE) {
   } catch {
     // No referrer, or not a URL: a landing.
   }
-  const inSite = (path) => path === base || path.startsWith(base + "/");
+  const inSite = (/** @type {string} */ path) => path === base || path.startsWith(base + "/");
   if (from !== null && inSite(from)) return null;
   return /^\/changelog\/?$/.test(pathname.slice(base.length)) ? "page_changelog" : "page_help";
 }
@@ -260,6 +293,9 @@ const MAX_PAGE_DETAIL = 80;
  * help 404 page would let such a slug through, so check it against the built
  * page list first. Only the path is read: the query (the game's ?from=game
  * mark) and the hash stay out of it.
+ * @param {string} pathname
+ * @param {string} [base]
+ * @returns {string}
  */
 export function helpPageDetail(pathname, base = HELP_BASE) {
   const inSite = pathname === base || pathname.startsWith(base + "/");
@@ -276,6 +312,9 @@ export function helpPageDetail(pathname, base = HELP_BASE) {
  * `back` in a tab the game opened (Back to game closes the tab) and `play`
  * otherwise (it loads the game). `inFrontPage` is whether the link sits in
  * the front page's title screen.
+ * @param {boolean} inFrontPage
+ * @param {boolean} fromGame
+ * @returns {string}
  */
 export function gameLinkDetail(inFrontPage, fromGame) {
   return `${inFrontPage ? "front" : "bar"}_${fromGame ? "back" : "play"}`;
@@ -287,7 +326,9 @@ export const SITE_ORIGIN = HELP_ORIGIN || "https://verticopolis.com";
 
 /** The section folders and the names a breadcrumb shows for them. Only a
  *  folder with an index page of its own (rooms) gets a crumb, since every
- *  crumb but the last has to link somewhere. */
+ *  crumb but the last has to link somewhere.
+ *  @type {Record<string, string>}
+ */
 const SECTION_NAMES = {
   rooms: "Rooms",
   building: "Building",
@@ -297,17 +338,26 @@ const SECTION_NAMES = {
 
 /** A page's share card file, in help-site/public/cards/: the page's slug with
  *  its slashes as dashes, and `index` for the front page. The cards are drawn
- *  by scripts/gen-help-cards.mjs and committed. */
+ *  by scripts/gen-help-cards.mjs and committed.
+ *  @param {string} slug
+ *  @returns {string}
+ */
 export function cardFile(slug) {
   return `${slug ? slug.replace(/\//g, "-") : "index"}.png`;
 }
 
-/** The full URL of a page's share card, for og:image and twitter:image. */
+/** The full URL of a page's share card, for og:image and twitter:image.
+ *  @param {string} slug
+ *  @returns {string}
+ */
 export function cardUrl(slug) {
   return `${SITE_ORIGIN}${HELP_BASE}/cards/${cardFile(slug)}`;
 }
 
-/** A page's share card alt text: what the picture shows. */
+/** A page's share card alt text: what the picture shows.
+ *  @param {string} title
+ *  @returns {string}
+ */
 export function cardAlt(title) {
   return `${title}, from the Verticopolis player's manual, over an art-deco skyline at dusk.`;
 }
@@ -320,9 +370,11 @@ export function cardAlt(title) {
  * is about. `slug` is the page's Starlight id ("" for the home page,
  * "rooms/hotels" for a room page); `hasIndex` says which section folders
  * have a page of their own.
+ * @param {{ slug: string; title: string; description: string; hasIndex?: string[] }} page
+ * @returns {Record<string, unknown>}
  */
 export function pageJsonLd({ slug, title, description, hasIndex = ["rooms"] }) {
-  const url = (path) => `${SITE_ORIGIN}${HELP_BASE}/${path ? `${path}/` : ""}`;
+  const url = (/** @type {string} */ path) => `${SITE_ORIGIN}${HELP_BASE}/${path ? `${path}/` : ""}`;
   const crumbs = [{ name: "Help", item: url("") }];
   const parts = slug ? slug.split("/") : [];
   if (parts.length > 1) {

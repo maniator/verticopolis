@@ -1,3 +1,4 @@
+// @ts-check
 // Copies the game's own logo and favicon into the help site before a build,
 // so the site and the game share one copy in the repository. The pages
 // themselves are not copied: src/content/docs/ is their only home, and the

@@ -1,3 +1,4 @@
+// @ts-check
 // Checks every link between help pages in the built site (dist/help): each
 // page a link names exists, and each #section it names is an id on that page.
 // Run after `astro build`: node help-site/scripts/check-links.mjs. With
@@ -8,7 +9,11 @@ import { join, relative, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** The path a built page is served at: `rooms/venues/index.html` →
- *  `/help/rooms/venues/`, or `/rooms/venues/` when `base` is the root (""). */
+ *  `/help/rooms/venues/`, or `/rooms/venues/` when `base` is the root ("").
+ *  @param {string} file
+ *  @param {string} [base]
+ *  @returns {string}
+ */
 export function servedPath(file, base = "/help") {
   return (
     base +
@@ -20,15 +25,23 @@ export function servedPath(file, base = "/help") {
   );
 }
 
-/** Every id on a page. */
+/** Every id on a page.
+ *  @param {string} html
+ *  @returns {Set<string>}
+ */
 function idsOf(html) {
   return new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
 }
 
 /** Links that point at a missing help page or a missing section, as
- *  "from → to" lines. `pages` maps each served path to its HTML. */
+ *  "from → to" lines. `pages` maps each served path to its HTML.
+ *  @param {Map<string, string>} pages
+ *  @param {string} [base]
+ *  @returns {string[]}
+ */
 export function brokenLinks(pages, base = "/help") {
   const ids = new Map([...pages].map(([path, html]) => [path, idsOf(html)]));
+  /** @type {string[]} */
   const broken = [];
   for (const [from, html] of pages) {
     for (const [, href] of html.matchAll(/\shref="([^"]+)"/g)) {
@@ -47,6 +60,10 @@ export function brokenLinks(pages, base = "/help") {
   return broken;
 }
 
+/**
+ * @param {string} dir
+ * @returns {string[]}
+ */
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {
     const full = join(dir, name);
