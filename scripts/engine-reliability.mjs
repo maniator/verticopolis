@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * The governed definition of the engine reliability rate: the Reliability row
  * of #945, as the 3.0 web release plan restates it (section 4.1 of
@@ -110,6 +111,42 @@ import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { lit, parseWindow, rowsToObjects, runQuery } from "./posthog-report.mjs";
 
+/** @typedef {import("./posthog-report.mjs").QueryJson} QueryJson */
+
+/** One page life, normalized from the query's row.
+ *  @typedef {object} PageLife
+ *  @property {string} session
+ *  @property {string} pageLife
+ *  @property {string} version
+ *  @property {string} sha
+ *  @property {string} build
+ *  @property {string} requested
+ *  @property {string} stage `stage` (A4): `none` when absent.
+ *  @property {string} assignedArm `assigned_arm` (A4): the randomized arm, never rewritten; `none` when absent.
+ *  @property {string} selectedBy `selected_by` (A4): which policy rule chose the engine; `default` when absent.
+ *  @property {boolean} safetySuppressed
+ *  @property {boolean} sizeGated
+ *  @property {number} fallbacks
+ *  @property {number} settleFallbacks The `fallbacks` the settle row sent: above 0 when the first tower already fell back.
+ *  @property {string[]} reasons
+ *  @property {boolean} writerLatched
+ *  @property {boolean} settled Sent a `settle` row; a row from before the `attempt` row existed always settled.
+ *  @property {boolean} attempted Sent an `attempt` row (proposed for #1090).
+ *  @property {boolean} engaged Sent an `engaged` row (proposed for #1090).
+ *  @property {string} engagedEngine `engine` on the `engaged` row; `none` when absent.
+ *  @property {string} engagedBy
+ *  @property {string} firstSeen
+ */
+
+/** What narrows the count; an absent list counts everything (see `summarizeReliability`).
+ *  @typedef {{ hosts?: string[]; shas?: string[] | null; versions?: string[] | null; builds?: string[] | null; arms?: string[] | null }} ReliabilityOptions */
+
+/** One row of a by-build, by-arm or by-stage table.
+ *  @typedef {{ sessions: number; faults: number; pageLives: number; faultPageLives: number; upper95: number | null }} GroupRow */
+
+/** What the Markdown header names: the window, the hosts and the filters.
+ *  @typedef {{ windowLabel: string; until: string; hosts: string[]; builds: string; arms: string; truncated: boolean }} ReportMeta */
+
 /** The event the game sends. */
 export const EVENT = "engine_status";
 
@@ -167,7 +204,9 @@ const SAFE_VALUE = /^[A-Za-z0-9._+-]{1,64}$/;
  *  `parseWindow` integer. Booleans compare with `= true` and are coalesced, as
  *  the `session_lengths` view does with `final`, so a missing key reads false.
  *  The session is named `session_id`, as in the view (the events table has a
- *  `session` of its own). */
+ *  `session` of its own).
+ *  @param {number} hours
+ *  @returns {string} */
 export function buildPageLivesQuery(hours) {
   return [
     "SELECT",
@@ -204,13 +243,17 @@ export function buildPageLivesQuery(hours) {
   ].join("\n");
 }
 
+/** @param {unknown} v */
 const truthy = (v) => v === true || v === 1 || v === "true" || v === "1";
 
+/** @param {number} n */
 const isCount = (n) => Number.isSafeInteger(n) && n >= 0;
 
 /** A fallback count: 0 when absent, NaN when it is not a whole number of zero
  *  or more, which no build sends, so the page life is left out as
- *  unrecognized. */
+ *  unrecognized.
+ *  @param {unknown} v
+ *  @returns {number} */
 function count(v) {
   if (v == null || v === "") return 0;
   const n = Number(v);
@@ -218,7 +261,10 @@ function count(v) {
 }
 
 /** One printable value: `missing` when absent, `unrecognized` when it is not
- *  the shape of a code, a version or a commit. */
+ *  the shape of a code, a version or a commit.
+ *  @param {unknown} v
+ *  @param {string} missing
+ *  @returns {string} */
 function value(v, missing) {
   if (v == null || v === "") return missing;
   const s = String(v);
@@ -226,7 +272,9 @@ function value(v, missing) {
 }
 
 /** Normalize the query's rows into page lives. Unknown or missing values keep
- *  a readable placeholder rather than dropping the row. */
+ *  a readable placeholder rather than dropping the row.
+ *  @param {Record<string, unknown>[]} rows
+ *  @returns {PageLife[]} */
 export function pageLivesFromRows(rows) {
   return rows.map((r) => ({
     session: String(r.session_id ?? ""),
@@ -245,8 +293,8 @@ export function pageLivesFromRows(rows) {
     reasons: [
       ...new Set(
         (Array.isArray(r.reasons) ? r.reasons : [])
-          .filter((x) => typeof x === "string" && x !== "" && x !== "none")
-          .map((x) => value(x, "unknown")),
+          .filter((/** @type {unknown} */ x) => typeof x === "string" && x !== "" && x !== "none")
+          .map((/** @type {string} */ x) => value(x, "unknown")),
       ),
     ],
     writerLatched: truthy(r.writer_latched),
@@ -263,11 +311,16 @@ export function pageLivesFromRows(rows) {
 /** The exact one-sided upper confidence bound on a binomial rate (Clopper-
  *  Pearson): the rate p at which seeing `k` or fewer of `n` has probability
  *  1 - `confidence`. Bisection over the CDF, summed in log space so a large n
- *  cannot underflow. Null when there is no sample. */
+ *  cannot underflow. Null when there is no sample.
+ *  @param {number} k
+ *  @param {number} n
+ *  @param {number} [confidence]
+ *  @returns {number | null} */
 export function upperBound(k, n, confidence = 0.95) {
   if (!(n > 0)) return null;
   if (k >= n) return 1;
   const alpha = 1 - confidence;
+  /** @param {number} p */
   const cdf = (p) => {
     const lp = Math.log(p);
     const lq = Math.log1p(-p);
@@ -295,7 +348,10 @@ export function upperBound(k, n, confidence = 0.95) {
 
 /** Whether a page life's commit is one of `shas`: one is a prefix of the
  *  other, so short commits of different lengths still match. Both sides are
- *  checked commits, so a forged one-letter commit matches nothing. */
+ *  checked commits, so a forged one-letter commit matches nothing.
+ *  @param {string} sha
+ *  @param {string[]} shas
+ *  @returns {boolean} */
 export const shaMatches = (sha, shas) =>
   SHA.test(sha) && shas.some((s) => SHA.test(s) && (sha.startsWith(s) || s.startsWith(sha)));
 
@@ -306,7 +362,9 @@ export const ASSIGNED_ARMS = ["none", "wasm", "ts", "unassigned"];
 export const SELECTIONS = ["default", "cohort", "setting", "url", "safety-build", "safety-device"];
 export const ENGAGED_BY = ["none", "command", "play"];
 
-/** Whether every value a page life carries is one the game can send. */
+/** Whether every value a page life carries is one the game can send.
+ *  @param {PageLife} pl
+ *  @returns {boolean} */
 export const recognized = (pl) =>
   REQUESTS.includes(pl.requested) &&
   STAGES.includes(pl.stage) &&
@@ -333,31 +391,38 @@ const SAFETY_SELECTIONS = ["safety-build", "safety-device"];
 const NON_ENGINE_REASONS = ["package-mismatch", "unverifiable", "marker-blocked"];
 
 /** Whether a safety suppression moved the page life to TypeScript (old rows
- *  only): the flag, or a safety selection. */
+ *  only): the flag, or a safety selection.
+ *  @param {PageLife} pl */
 const isSuppressed = (pl) => pl.safetySuppressed || SAFETY_SELECTIONS.includes(pl.selectedBy);
 
 /** Whether a suppressed page life carries an engine-fault reason: the boot
  *  that detected a crash loop reported `unclean-exit` on a page life that then
  *  ran TypeScript, so the fault belongs to the engine. A fallback whose reason
- *  rows were lost counts too. */
+ *  rows were lost counts too.
+ *  @param {PageLife} pl */
 const suppressedFault = (pl) =>
   isSuppressed(pl) &&
   ((pl.fallbacks > 0 && pl.reasons.length === 0) || pl.reasons.some((r) => !NON_ENGINE_REASONS.includes(r)));
 
 /** The arm a page life is counted under: `override` when a setting or the
- *  URL chose its engine, its assigned arm otherwise. */
+ *  URL chose its engine, its assigned arm otherwise.
+ *  @param {PageLife} pl
+ *  @returns {string} */
 export const armOf = (pl) => (OVERRIDE_SELECTIONS.includes(pl.selectedBy) ? "override" : pl.assignedArm);
 
 /** Count page lives by the rules in the module comment. `opts.hosts`,
  *  `opts.shas`, `opts.versions`, `opts.builds` and `opts.arms` narrow what
  *  counts. An absent list counts everything, except `hosts`, which defaults to
- *  `wasm`, and `arms`, which leaves out `override` and `unassigned`. */
+ *  `wasm`, and `arms`, which leaves out `override` and `unassigned`.
+ *  @param {PageLife[]} pageLives
+ *  @param {ReliabilityOptions} [opts] */
 export function summarizeReliability(pageLives, opts = {}) {
   const hosts = opts.hosts ?? DEFAULT_HOSTS;
   const shas = opts.shas ?? null;
   const versions = opts.versions ?? null;
   const builds = opts.builds ?? null;
   const arms = opts.arms ?? null;
+  /** @param {PageLife} pl */
   const inScope = (pl) =>
     hosts.includes(pl.requested) &&
     (!shas || shaMatches(pl.sha, shas)) &&
@@ -365,10 +430,16 @@ export function summarizeReliability(pageLives, opts = {}) {
     (!builds || builds.includes(pl.build)) &&
     (arms ? arms.includes(armOf(pl)) : !EXCLUDED_ARMS.includes(armOf(pl)));
 
+  /** @typedef {{ sessions: Set<string>; faults: Set<string>; pageLives: number; faultPageLives: number }} Bucket */
+  /** @type {Map<string, { ran: boolean; fault: boolean; mismatch: boolean; unverifiable: boolean; latched: boolean }>} */
   const sessions = new Map();
+  /** @type {Map<string, Bucket>} */
   const byBuild = new Map();
+  /** @type {Map<string, Bucket>} */
   const byArm = new Map();
+  /** @type {Map<string, Bucket>} */
   const byStage = new Map();
+  /** @type {Map<string, number>} */
   const reasons = new Map();
   const totals = {
     unsettledPageLives: 0,
@@ -387,9 +458,12 @@ export function summarizeReliability(pageLives, opts = {}) {
     totalFallbacks: 0,
     maxFallbacks: 0,
   };
+  /** @param {Map<string, Bucket>} map @param {string} key
+   *  @returns {Bucket} */
   const bucket = (map, key) => {
-    if (!map.has(key)) map.set(key, { sessions: new Set(), faults: new Set(), pageLives: 0, faultPageLives: 0 });
-    return map.get(key);
+    let b = map.get(key);
+    if (!b) map.set(key, (b = { sessions: new Set(), faults: new Set(), pageLives: 0, faultPageLives: 0 }));
+    return b;
   };
 
   for (const pl of pageLives) {
@@ -472,16 +546,23 @@ export function summarizeReliability(pageLives, opts = {}) {
   const all = [...sessions.values()];
   const n = all.filter((s) => s.ran).length;
   const faults = all.filter((s) => s.fault).length;
+  /** @template {string} K
+   *  @param {Map<string, Bucket>} map
+   *  @param {K} name
+   *  @returns {(GroupRow & Record<K, string>)[]} */
   const rows = (map, name) =>
     [...map.entries()]
-      .map(([key, b]) => ({
-        [name]: key,
-        sessions: b.sessions.size,
-        faults: b.faults.size,
-        pageLives: b.pageLives,
-        faultPageLives: b.faultPageLives,
-        upper95: upperBound(b.faults.size, b.sessions.size),
-      }))
+      .map(
+        ([key, b]) =>
+          /** @type {GroupRow & Record<K, string>} */ ({
+            [name]: key,
+            sessions: b.sessions.size,
+            faults: b.faults.size,
+            pageLives: b.pageLives,
+            faultPageLives: b.faultPageLives,
+            upper95: upperBound(b.faults.size, b.sessions.size),
+          }),
+      )
       .sort((a, b) => a[name].localeCompare(b[name]));
   return {
     n,
@@ -501,12 +582,21 @@ export function summarizeReliability(pageLives, opts = {}) {
   };
 }
 
+/** @typedef {ReturnType<typeof summarizeReliability>} ReliabilitySummary */
+
+/** @param {number | null} x */
 const pct = (x) => (x == null ? "n/a" : `${(x * 100).toFixed(3)}%`);
 /** A value from a row or the command line, in a code span so Markdown never
- *  reads it as markup. */
+ *  reads it as markup.
+ *  @param {string} v */
 const code = (v) => `\`${v}\``;
 
-/** One group table (by build or by arm). */
+/** One group table (by build or by arm).
+ *  @template {string} K
+ *  @param {string} title
+ *  @param {string} label
+ *  @param {K} key
+ *  @param {(GroupRow & Record<K, string>)[]} rows */
 function groupTable(title, label, key, rows) {
   return [
     "",
@@ -524,7 +614,10 @@ function groupTable(title, label, key, rows) {
 /** The report as Markdown. The window and the lower-bound caveat lead, above
  *  every figure (CLAUDE.md: a published snapshot says so at the top). Every
  *  value printed from a row has passed `pageLivesFromRows`, so it is a code, a
- *  version, a commit or a placeholder. */
+ *  version, a commit or a placeholder.
+ *  @param {ReliabilitySummary} summary
+ *  @param {ReportMeta} meta
+ *  @returns {string} */
 export function renderReliabilityMarkdown(summary, meta) {
   const lines = [
     "# Engine reliability",
@@ -576,7 +669,8 @@ export function renderReliabilityMarkdown(summary, meta) {
 /** The flags the script takes; any other is an error. */
 const FLAGS = ["window", "hosts", "shas", "versions", "builds", "arms"];
 
-/** What each list flag may hold: a closed list, or the shape of the value. */
+/** What each list flag may hold: a closed list, or the shape of the value.
+ *  @type {Record<string, (v: string) => boolean>} */
 const FLAG_VALUES = {
   hosts: (v) => HOSTS.includes(v),
   builds: (v) => BUILDS.includes(v),
@@ -584,6 +678,7 @@ const FLAG_VALUES = {
   versions: (v) => VERSION.test(v),
   arms: (v) => SAFE_VALUE.test(v),
 };
+/** @type {Record<string, string>} */
 const FLAG_HELP = {
   hosts: HOSTS.join(", "),
   builds: BUILDS.join(", "),
@@ -597,8 +692,10 @@ const FLAG_HELP = {
  *  value should be), an empty list, and a value the flag cannot hold (a host
  *  that is not a WASM host, a bundle kind, commit or version of the wrong
  *  shape), so a bad dispatch fails loudly instead of counting the wrong page
- *  lives. An arm can only be checked for its shape until A4 names the arms. */
+ *  lives. An arm can only be checked for its shape until A4 names the arms.
+ *  @param {string[]} argv */
 export function parseArgs(argv) {
+  /** @type {Map<string, string>} */
   const raw = new Map();
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -607,6 +704,7 @@ export function parseArgs(argv) {
     const name = a.slice(2, eq === -1 ? undefined : eq);
     if (!FLAGS.includes(name))
       throw new Error(`unknown flag --${name} (the flags are ${FLAGS.map((f) => `--${f}`).join(", ")})`);
+    /** @type {string | undefined} */
     let v;
     if (eq !== -1) v = a.slice(eq + 1);
     else {
@@ -617,10 +715,12 @@ export function parseArgs(argv) {
     if (raw.has(name)) throw new Error(`--${name} is given twice`);
     raw.set(name, v);
   }
+  /** @param {string} name
+   *  @returns {string[] | null} */
   const list = (name) => {
-    if (!raw.has(name)) return null;
-    const items = raw
-      .get(name)
+    const given = raw.get(name);
+    if (given === undefined) return null;
+    const items = given
       .split(",")
       .map((x) => x.trim())
       .filter(Boolean);
@@ -639,12 +739,15 @@ export function parseArgs(argv) {
 /** The rows of a query response, or a thrown error when the body is not the
  *  `{results, columns}` shape, so a broken response never prints as an empty
  *  window. `truncated` is true when the page is full or the API says there is
- *  more. */
+ *  more.
+ *  @param {unknown} json
+ *  @returns {{ rows: Record<string, unknown>[]; truncated: boolean }} */
 export function responseRows(json) {
-  if (!Array.isArray(json?.results) || !Array.isArray(json?.columns))
+  const body = /** @type {QueryJson | null | undefined} */ (json);
+  if (!body || !Array.isArray(body.results) || !Array.isArray(body.columns))
     throw new Error("the query returned no results table");
-  const rows = rowsToObjects(json);
-  return { rows, truncated: rows.length >= ROW_LIMIT || json.hasMore === true };
+  const rows = rowsToObjects(body);
+  return { rows, truncated: rows.length >= ROW_LIMIT || body.hasMore === true };
 }
 
 async function main() {
@@ -652,7 +755,7 @@ async function main() {
   try {
     args = parseArgs(process.argv.slice(2));
   } catch (err) {
-    console.error(err.message);
+    console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
   if (!process.env.POSTHOG_PERSONAL_API_KEY) {
@@ -670,6 +773,7 @@ async function main() {
   const { rows, truncated } = responseRows(res.json);
   const lives = pageLivesFromRows(rows);
   const summary = summarizeReliability(lives, opts);
+  /** @param {string[]} xs */
   const each = (xs) => xs.map(code).join(", ");
   const builds =
     [

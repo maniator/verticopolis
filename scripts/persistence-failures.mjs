@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * The governed definition of the persistence failure measures: the
  * `autosave_failed`, `load_failed` and `import_failed` `app_action` codes
@@ -64,6 +65,15 @@ import { pathToFileURL } from "node:url";
 import { parseWindow, rowsToObjects, runQuery } from "./posthog-report.mjs";
 import { upperBound } from "./engine-reliability.mjs";
 
+/** Events and distinct sessions for one `action` or `action:detail` key.
+ *  @typedef {{ events: number; sessions: number }} Tally */
+/** The presence probe and the autosave session count.
+ *  @typedef {{ liveEvents: number; exportLiveEvents: number; autosaveSessions: number }} PersistencePresence */
+/** One rate, or why there is none.
+ *  @typedef {{ status: "insufficient" | "unavailable" | "not-measurable" | "bound" | "rate"; text: string }} PersistenceRate */
+/** One row of the section's table.
+ *  @typedef {{ measure: string; failures: number | null; sessions: number | null; attempts: number | null; rate: PersistenceRate }} PersistenceMeasure */
+
 /** The first app version whose builds send the three failure codes. */
 export const PERSISTENCE_FAILURE_SINCE = "2.78.4";
 
@@ -79,7 +89,8 @@ export const EXPORT_FAILURE_SINCE = "2.78.10";
 export const ACTIONS = ["import_save", "import_tdt", "import_failed", "load_slot", "load_failed", "autosave_failed"];
 
 /** The `detail` values the game sends for each action that carries one. A row
- *  with another detail is left out, so a forged value is never counted. */
+ *  with another detail is left out, so a forged value is never counted.
+ *  @type {Record<string, string[]>} */
 export const DETAILS = {
   import_failed: ["save", "tdt"],
   autosave_failed: ["timer", "swap", "manual", "file"],
@@ -97,7 +108,8 @@ export const ROW_LIMIT = 500;
 
 /** The version gate as one condition, shared by both queries: a plain
  *  `major.minor.patch` at or above `since` (a prerelease or forged value is
- *  left out). */
+ *  left out).
+ *  @param {string} since */
 function versionExpr(since) {
   const parts = since.split(".").map(Number);
   if (parts.length !== 3 || parts.some((n) => !Number.isSafeInteger(n) || n < 0))
@@ -105,12 +117,17 @@ function versionExpr(since) {
   return `(match(properties.version, '^[0-9]+\\\\.[0-9]+\\\\.[0-9]+$') AND arrayMap(x -> toInt(x), splitByChar('.', properties.version)) >= [${parts.join(", ")}])`;
 }
 
+/** @param {string[]} list */
 const inList = (list) => list.map((a) => `'${a}'`).join(", ");
 
 /** HogQL: one row per action and detail, production only. The six persistence
  *  codes count from the first version that sends them, the export codes from
  *  `EXPORT_FAILURE_SINCE`, each behind its own gate. `uniq(distinct_id)` counts
- *  sessions (a tab); read it per row, never summed across rows. */
+ *  sessions (a tab); read it per row, never summed across rows.
+ *  @param {number} hours
+ *  @param {string} [since]
+ *  @param {string} [exportSince]
+ *  @returns {string} */
 export function buildPersistenceQuery(hours, since = PERSISTENCE_FAILURE_SINCE, exportSince = EXPORT_FAILURE_SINCE) {
   return [
     "SELECT",
@@ -136,7 +153,11 @@ export function buildPersistenceQuery(hours, since = PERSISTENCE_FAILURE_SINCE, 
  *  with none reads Not measurable; `exportLiveEvents` is the same count for
  *  builds that send `export_failed`, so the export rows read Not measurable on
  *  their own; `autosave_sessions` is the sessions with an `autosave_failed`
- *  under either detail, counted once. */
+ *  under either detail, counted once.
+ *  @param {number} hours
+ *  @param {string} [since]
+ *  @param {string} [exportSince]
+ *  @returns {string} */
 export function buildPresenceQuery(hours, since = PERSISTENCE_FAILURE_SINCE, exportSince = EXPORT_FAILURE_SINCE) {
   return [
     "SELECT",
@@ -151,6 +172,7 @@ export function buildPresenceQuery(hours, since = PERSISTENCE_FAILURE_SINCE, exp
   ].join("\n");
 }
 
+/** @param {unknown} v */
 const num = (v) => {
   const n = Number(v);
   return Number.isSafeInteger(n) && n >= 0 ? n : 0;
@@ -158,8 +180,11 @@ const num = (v) => {
 
 /** Normalize the query's rows into `{ events, sessions }` per `action` or
  *  `action:detail` key. An action, or a detail outside the closed lists, is
- *  left out. */
+ *  left out.
+ *  @param {Record<string, unknown>[]} rows
+ *  @returns {Map<string, Tally>} */
 export function tallyRows(rows) {
+  /** @type {Map<string, Tally>} */
   const tally = new Map();
   for (const r of rows) {
     const action = String(r.action ?? "");
@@ -177,7 +202,9 @@ export function tallyRows(rows) {
   return tally;
 }
 
-/** The presence row as numbers; a missing or malformed row reads as no presence. */
+/** The presence row as numbers; a missing or malformed row reads as no presence.
+ *  @param {Record<string, unknown>[]} rows
+ *  @returns {PersistencePresence} */
 export function presenceFromRows(rows) {
   const r = rows[0] ?? {};
   return {
@@ -187,14 +214,21 @@ export function presenceFromRows(rows) {
   };
 }
 
+/** @param {Map<string, Tally>} tally @param {string} key
+ *  @returns {Tally} */
 const at = (tally, key) => tally.get(key) ?? { events: 0, sessions: 0 };
 
-/** One rate: failures over attempts, or why it is unavailable. */
+/** One rate: failures over attempts, or why it is unavailable.
+ *  @param {number} failures
+ *  @param {number} attempts
+ *  @returns {PersistenceRate} */
 export function rateOf(failures, attempts) {
   if (!(attempts > 0)) return { status: "insufficient", text: "Insufficient evidence: no attempts in the window" };
   if (failures > attempts)
     return { status: "unavailable", text: "Unavailable: more failures than attempts, so attempt rows were lost" };
-  const bound = upperBound(failures, attempts);
+  // Never null: attempts is above zero here.
+  const bound = /** @type {number} */ (upperBound(failures, attempts));
+  /** @param {number} x */
   const pct = (x) => `${(x * 100).toFixed(2)}%`;
   return failures === 0
     ? { status: "bound", text: `0 of ${attempts} attempts; 95% upper bound ${pct(bound)}` }
@@ -204,11 +238,13 @@ export function rateOf(failures, attempts) {
       };
 }
 
+/** @type {PersistenceRate} */
 const EXPORT_RATE_UNAVAILABLE = {
   status: "unavailable",
   text: "Unavailable: the attempts are sent at the click, so they include a cancelled report and a dropped click; a ratio would understate the failure rate",
 };
 
+/** @type {PersistenceRate} */
 const NOT_MEASURABLE = {
   status: "not-measurable",
   text: "Not measurable: no build that sends these codes ran in the window",
@@ -217,12 +253,22 @@ const NOT_MEASURABLE = {
 /** The measures, each with its count and its rate or the reason there is none.
  *  `presence.liveEvents` of zero means no build that sends the codes ran, so nothing
  *  is counted: every cell reads Not measurable, never zero. The export measures
- *  follow `presence.exportLiveEvents` the same way, since their builds are later. */
+ *  follow `presence.exportLiveEvents` the same way, since their builds are later.
+ *  @param {Map<string, Tally>} tally
+ *  @param {PersistencePresence} presence
+ *  @returns {PersistenceMeasure[]} */
 export function summarizePersistence(tally, presence) {
+  /** @param {string} name
+   *  @param {number | null} failures
+   *  @param {number | null} sessions
+   *  @param {number | null} attempts
+   *  @param {PersistenceRate} rate
+   *  @returns {PersistenceMeasure} */
   const measure = (name, failures, sessions, attempts, rate, live = presence.liveEvents) =>
     live > 0
       ? { measure: name, failures, sessions, attempts, rate }
       : { measure: name, failures: null, sessions: null, attempts: null, rate: NOT_MEASURABLE };
+  /** @param {string} name @param {Tally} failure @param {number} attempts */
   const exportMeasure = (name, failure, attempts) =>
     measure(name, failure.events, failure.sessions, attempts, EXPORT_RATE_UNAVAILABLE, presence.exportLiveEvents);
   const importSave = at(tally, "import_save").events;
@@ -268,8 +314,12 @@ export function summarizePersistence(tally, presence) {
   ];
 }
 
-/** The Markdown section, with the counts-versus-rates reading rules at the top. */
+/** The Markdown section, with the counts-versus-rates reading rules at the top.
+ *  @param {PersistenceMeasure[]} measures
+ *  @param {{ windowLabel: string; truncated: boolean }} meta
+ *  @returns {string} */
 export function renderPersistenceMarkdown(measures, meta) {
+  /** @param {number | null} n */
   const cell = (n) => (n === null ? "n/a" : String(n));
   const lines = [
     "## Persistence failures (counts, and rates only where attempts are known)",
@@ -286,7 +336,10 @@ export function renderPersistenceMarkdown(measures, meta) {
   return lines.join("\n");
 }
 
-/** Run both queries and render the section; a failed query says so rather than printing zeros. */
+/** Run both queries and render the section; a failed query says so rather than printing zeros.
+ *  @param {number} hours
+ *  @param {string} windowLabel
+ *  @returns {Promise<string>} */
 export async function persistenceSection(hours, windowLabel) {
   const [counts, probe] = [await runQuery(buildPersistenceQuery(hours)), await runQuery(buildPresenceQuery(hours))];
   for (const res of [counts, probe]) {
@@ -296,7 +349,7 @@ export async function persistenceSection(hours, windowLabel) {
       return "## Persistence failures\n\n> **Unavailable:** the query returned no results table.";
   }
   const rows = rowsToObjects(counts.json);
-  const truncated = rows.length >= ROW_LIMIT || counts.json.hasMore === true;
+  const truncated = rows.length >= ROW_LIMIT || counts.json?.hasMore === true;
   return renderPersistenceMarkdown(summarizePersistence(tallyRows(rows), presenceFromRows(rowsToObjects(probe.json))), {
     windowLabel,
     truncated,

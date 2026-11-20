@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * PostHog rollup for Verticopolis custom events (the S5 report re-target).
  *
@@ -38,7 +39,33 @@ const HOST = (process.env.POSTHOG_HOST || "https://us.posthog.com").replace(/\/+
 const PROJECT_ID = process.env.POSTHOG_PROJECT_ID || "524085";
 const KEY = process.env.POSTHOG_PERSONAL_API_KEY;
 
-/** Read a `--name value` or `--name=value` CLI argument. */
+/** The JSON a HogQL query answers with: rows of cells under named columns, or
+ *  an error body. Every field is optional because the script tolerates shape drift.
+ *  @typedef {{ results?: unknown[][]; columns?: string[]; hasMore?: boolean; detail?: string; error?: { message?: string }; raw?: string; [key: string]: unknown }} QueryJson */
+/** A tagged query result: `ok` plus either the raw PostHog JSON or a hint.
+ *  @typedef {{ ok: boolean; status?: number; hint?: string; json?: QueryJson | null }} QueryResult */
+/** One depth row: the percentiles of a numeric property, or a skip/empty flag.
+ *  @typedef {{ skipped: boolean; empty?: boolean; hint?: string; n?: number; p50?: number; p90?: number; p95?: number; max?: number }} DepthRow */
+/** One breakdown group: its key, events and distinct sessions.
+ *  @typedef {{ key: string; events: number; sessions: number }} BreakdownRow */
+/** One table of a report section: rows, or a skip with its hint.
+ *  @typedef {{ ok: boolean; hint?: string; rows: BreakdownRow[] | null; caption?: string; header: string }} ReportTable */
+/** One Depth line: its label, the unit its samples count and the row.
+ *  @typedef {{ label: string; unit?: string; row: DepthRow }} DepthLine */
+/** Everything the HTML and markdown renderers draw.
+ *  @typedef {{
+ *    window: { since: string; until: string; label: string };
+ *    generated: string;
+ *    kpis: [string, number][];
+ *    highlights: [string, string][];
+ *    depth: DepthLine[];
+ *    sections: { title: string; tables: ReportTable[] }[];
+ *  }} ReportModel */
+
+/** Read a `--name value` or `--name=value` CLI argument.
+ *  @param {string} name
+ *  @param {string} fallback
+ *  @returns {string} */
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
   if (i !== -1 && i + 1 < process.argv.length) return process.argv[i + 1];
@@ -46,6 +73,7 @@ function arg(name, fallback) {
   return inline ? inline.slice(name.length + 3) : fallback;
 }
 
+/** @param {number} n @param {string} unit */
 const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
 
 // Parse the look-back window. A plain number is days ("30", "0.5"); a unit
@@ -58,7 +86,10 @@ const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
 // swapped bad values for the 30-day default, which turned a "0.5" request
 // into a month of data with no warning. Only the interpolated INTERVAL count
 // must stay a guarded integer, and Math.round keeps it one.
+/** @param {unknown} v
+ *  @returns {{ hours: number; label: string }} */
 function parseWindow(v) {
+  /** @param {string} why */
   const bad = (why) =>
     new Error(
       `Invalid look-back window "${v}": ${why}. Use days ("30", "0.5") or a unit suffix ("12h", "3d"); minimum 1 hour, maximum 365 days.`,
@@ -79,6 +110,7 @@ function parseWindow(v) {
 // Called from main(), never at module load, so importing the pure helpers
 // (as the unit tests do) can never parse the host process's argv or exit it.
 function resolveWindow() {
+  /** @param {string} name */
   const flagged = (name) => process.argv.some((a) => a === `--${name}` || a.startsWith(`--${name}=`));
   let raw = "30";
   if (flagged("window")) raw = arg("window", "");
@@ -86,7 +118,7 @@ function resolveWindow() {
   try {
     return parseWindow(raw);
   } catch (err) {
-    console.error(err.message);
+    console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
 }
@@ -99,7 +131,9 @@ const DEMO = process.argv.includes("--demo");
  *  this script queries is a hardcoded constant, so this is hygiene rather than a
  *  live injection surface, but it keeps the query builders honest if the
  *  vocabulary ever grows. Backslash first so it does not double-escape the
- *  quotes it then adds. */
+ *  quotes it then adds.
+ *  @param {unknown} s
+ *  @returns {string} */
 function lit(s) {
   return `'${String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 }
@@ -122,10 +156,14 @@ function requireEnv() {
 // The production + window guard every query shares. `hours` is a parseWindow
 // integer, so interpolating it into the INTERVAL is safe. Hour granularity so
 // sub-day windows ("12h", "0.5") query exactly what was asked for.
+/** @param {number} hours */
 const SCOPE = (hours) => `properties.environment = 'production' AND timestamp >= now() - INTERVAL ${hours} HOUR`;
 
 /** HogQL for the top-line event totals: one row per event with its count and the
- *  number of distinct play sessions (distinct_id) that fired it. */
+ *  number of distinct play sessions (distinct_id) that fired it.
+ *  @param {string[]} events
+ *  @param {number} hours
+ *  @returns {string} */
 function buildTotalsQuery(events, hours) {
   const list = events.map(lit).join(", ");
   return (
@@ -140,7 +178,11 @@ function buildTotalsQuery(events, hours) {
  *  ClickHouse `quantile()`, which is approximate, so read them as close estimates
  *  rather than exact order statistics. (Deliberately not naming the sampling
  *  algorithm: what matters here is that the values are approximate, and pinning a
- *  specific implementation is a claim this comment would then have to keep true.) */
+ *  specific implementation is a claim this comment would then have to keep true.)
+ *  @param {string} event
+ *  @param {string} prop
+ *  @param {number} hours
+ *  @returns {string} */
 function buildDepthQuery(event, prop, hours) {
   const val = `toFloat(properties.${prop})`;
   return (
@@ -206,7 +248,11 @@ function buildDepthQuery(event, prop, hours) {
  *  The once-per-session events (`session_builds`, `session_peak_floors`,
  *  `session_fps`) write one row per page life and stay on the plain builder,
  *  which is right for them: they are not cumulative, so there is nothing to
- *  collapse and their `n` is already a count of measurements. */
+ *  collapse and their `n` is already a count of measurements.
+ *  @param {string} event
+ *  @param {string} prop
+ *  @param {number} hours
+ *  @returns {string} */
 function buildSessionDepthQuery(event, prop, hours) {
   const val = `toFloat(properties.${prop})`;
   return (
@@ -220,7 +266,12 @@ function buildSessionDepthQuery(event, prop, hours) {
 
 /** HogQL for one event grouped by a property: events and distinct sessions per
  *  group, most frequent first. The per-session column is the payoff over the
- *  Vercel path, which had no session id to count. */
+ *  Vercel path, which had no session id to count.
+ *  @param {string} event
+ *  @param {string} prop
+ *  @param {number} hours
+ *  @param {number} [limit]
+ *  @returns {string} */
 function buildBreakdownQuery(event, prop, hours, limit = 100) {
   return (
     `SELECT properties.${prop} AS k, count() AS events, count(DISTINCT distinct_id) AS sessions ` +
@@ -232,7 +283,11 @@ function buildBreakdownQuery(event, prop, hours, limit = 100) {
 /** HogQL count of one event narrowed by an extra boolean expression, returning
  *  events and distinct sessions like the totals query. `where` is a TRUSTED,
  *  hardcoded HogQL fragment (never user input), e.g. `toFloat(properties.fires)
- *  > 0` to count the session_emergencies rows that saw at least one fire. */
+ *  > 0` to count the session_emergencies rows that saw at least one fire.
+ *  @param {string} event
+ *  @param {string} where
+ *  @param {number} hours
+ *  @returns {string} */
 function buildFilteredCountQuery(event, where, hours) {
   return (
     `SELECT count() AS events, count(DISTINCT distinct_id) AS sessions ` +
@@ -241,6 +296,7 @@ function buildFilteredCountQuery(event, where, hours) {
 }
 
 // What a failed query's HTTP status most likely means.
+/** @type {Record<number, string>} */
 const HTTP_HINTS = {
   401: "unauthorized (check POSTHOG_PERSONAL_API_KEY)",
   403: "forbidden (key lacks query:read on this project)",
@@ -248,9 +304,15 @@ const HTTP_HINTS = {
 };
 
 /** POST a HogQL query. Never throws: returns a tagged result so a caller can
- *  render a skipped section instead of aborting the whole report. */
+ *  render a skipped section instead of aborting the whole report. `scripts/engine-reliability.mjs`
+ *  and `scripts/reliability-coverage.mjs` reuse it.
+ *  @param {string} query
+ *  @returns {Promise<QueryResult>} */
 async function runQuery(query) {
-  let res, text;
+  /** @type {Response} */
+  let res;
+  /** @type {string} */
+  let text;
   try {
     res = await fetch(`${HOST}/api/projects/${PROJECT_ID}/query`, {
       method: "POST",
@@ -259,9 +321,15 @@ async function runQuery(query) {
     });
     text = await res.text();
   } catch (err) {
-    return { ok: false, status: 0, hint: `network error: ${err.message}`, json: null };
+    return {
+      ok: false,
+      status: 0,
+      hint: `network error: ${err instanceof Error ? err.message : String(err)}`,
+      json: null,
+    };
   }
-  let json = null;
+  /** @type {QueryJson} */
+  let json;
   try {
     json = JSON.parse(text);
   } catch {
@@ -276,12 +344,16 @@ async function runQuery(query) {
 
 /** Normalize a HogQL response `{results: [[...]], columns: [...]}` into an array
  *  of plain objects keyed by column name, tolerant of shape drift (a missing
- *  results/columns pair yields []). */
+ *  results/columns pair yields []).
+ *  @param {unknown} json
+ *  @returns {Record<string, unknown>[]} */
 function rowsToObjects(json) {
-  const results = Array.isArray(json?.results) ? json.results : null;
-  const columns = Array.isArray(json?.columns) ? json.columns : null;
+  const body = /** @type {QueryJson | null | undefined} */ (json);
+  const results = Array.isArray(body?.results) ? body.results : null;
+  const columns = Array.isArray(body?.columns) ? body.columns : null;
   if (!results || !columns) return [];
   return results.map((row) => {
+    /** @type {Record<string, unknown>} */
     const obj = {};
     columns.forEach((c, i) => {
       obj[c] = row[i];
@@ -291,13 +363,18 @@ function rowsToObjects(json) {
 }
 
 /** Fold the totals rows into a lookup of `{ event: { events, sessions } }`, so a
- *  missing event reads as zero rather than undefined. */
+ *  missing event reads as zero rather than undefined.
+ *  @param {QueryResult} res
+ *  @param {string[]} events
+ *  @returns {Record<string, { events: number; sessions: number }>} */
 function totalsByEvent(res, events) {
+  /** @type {Record<string, { events: number; sessions: number }>} */
   const out = {};
   for (const e of events) out[e] = { events: 0, sessions: 0 };
   if (!res.ok) return out;
   for (const r of rowsToObjects(res.json)) {
-    if (r.event in out) out[r.event] = { events: Number(r.events) || 0, sessions: Number(r.sessions) || 0 };
+    const event = String(r.event);
+    if (event in out) out[event] = { events: Number(r.events) || 0, sessions: Number(r.sessions) || 0 };
   }
   return out;
 }
@@ -306,13 +383,15 @@ function totalsByEvent(res, events) {
  *  null when the query was skipped or the window is empty. The percentiles come
  *  from HogQL `quantile`, ClickHouse's approximate implementation, so they are
  *  close estimates rather than exact order statistics; there is no per-row flag
- *  for that because it is true of every row. */
+ *  for that because it is true of every row.
+ *  @param {QueryResult} res
+ *  @returns {DepthRow} */
 function depthRow(res) {
   if (!res.ok) return { skipped: true, hint: res.hint };
   const rows = rowsToObjects(res.json);
   const r = rows[0];
   const n = r ? Number(r.n) || 0 : 0;
-  if (!n) return { skipped: false, empty: true };
+  if (!r || !n) return { skipped: false, empty: true };
   return {
     skipped: false,
     empty: false,
@@ -325,7 +404,9 @@ function depthRow(res) {
 }
 
 /** Normalize a breakdown result into sorted rows, mirroring the Vercel report's
- *  "(none)" (real empty value) vs a present key distinction. */
+ *  "(none)" (real empty value) vs a present key distinction.
+ *  @param {QueryResult} res
+ *  @returns {BreakdownRow[] | null} */
 function breakdownRows(res) {
   if (!res.ok) return null;
   return rowsToObjects(res.json)
@@ -338,16 +419,22 @@ function breakdownRows(res) {
 }
 
 /** Pull the single `{ events, sessions }` row from a filtered-count query, zeroed
- *  when the query was skipped or the window is empty. */
+ *  when the query was skipped or the window is empty.
+ *  @param {QueryResult} res
+ *  @returns {{ events: number; sessions: number; skipped?: boolean; hint?: string }} */
 function countRow(res) {
   if (!res.ok) return { events: 0, sessions: 0, skipped: true, hint: res.hint };
   const r = rowsToObjects(res.json)[0];
   return { events: Number(r?.events) || 0, sessions: Number(r?.sessions) || 0 };
 }
 
+/** @param {unknown} n */
 const fmt = (n) => (n == null || Number.isNaN(n) ? "n/a" : Number(n).toLocaleString("en-US"));
+/** @param {unknown} n */
 const rnd = (n) => (n == null || Number.isNaN(n) ? null : Math.round(Number(n)));
+/** @param {number} num @param {number} den */
 const pct = (num, den) => (den ? `${((num / den) * 100).toFixed(1)}%` : "n/a");
+/** @param {unknown} s */
 const mdCell = (s) => String(s).replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
 
 // Self-contained styles for the HTML report. Mirrors the retro Windows 3.1 look
@@ -393,14 +480,16 @@ td.empty-cell { color:var(--muted); }
 footer { color:var(--muted); font-size:11px; text-align:center; margin-top:20px; padding:10px; box-shadow:var(--bevel-in); background:var(--face); }
 `;
 
+/** @type {Record<string, string>} */
+const HTML_ENTITIES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
+/** @param {unknown} s */
 function escapeHtml(s) {
-  return String(s).replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
-  );
+  return String(s).replace(/[&<>"']/g, (c) => HTML_ENTITIES[c]);
 }
 
-/** One breakdown table as HTML, or an empty/skipped note. */
+/** One breakdown table as HTML, or an empty/skipped note.
+ *  @param {ReportTable} t */
 function htmlTable(t) {
   const cap = t.caption ? `<h3>${escapeHtml(t.caption)}</h3>` : "";
   const rows = t.rows;
@@ -425,7 +514,8 @@ function htmlTable(t) {
  *  others fire once per PAGE LIFE, so a session that reloaded contributes several
  *  partial rows to them and their distributions lean low for that cohort. Fixing
  *  that means summing or re-deriving each of those per session, which is its own
- *  change; naming the unit is the honest interim. */
+ *  change; naming the unit is the honest interim.
+ *  @param {DepthLine[]} depth */
 function htmlDepth(depth) {
   if (!depth || !depth.length) return "";
   const rows = depth
@@ -442,7 +532,8 @@ function htmlDepth(depth) {
   return `<section><h2>Depth</h2><div class="scroll"><table><thead><tr><th>Metric</th><th class="n">Samples</th><th class="n">p50</th><th class="n">p90</th><th class="n">p95</th><th class="n">Max</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note">Percentiles come from the raw values with no histogram approximation, using HogQL <code>quantile</code> (ClickHouse's approximate implementation, so read them as close estimates). The Samples column names its own unit: <em>sessions</em> where a repeating cumulative event was collapsed to one value per session, <em>page lives</em> otherwise. Those rows fire once per page life, so a session that reloaded (about 14%) contributes several partial rows and their distributions lean low.</p></section>`;
 }
 
-/** The full self-contained HTML report. */
+/** The full self-contained HTML report.
+ *  @param {ReportModel} m */
 function renderHtml(m) {
   const kpis = m.kpis
     .map(
@@ -474,7 +565,9 @@ ${sections}
 /** The Depth block for the markdown report / job summary. Kept in step with
  *  {@link htmlDepth}: the workflow renders this one inline into the run summary,
  *  so it is the copy most people read, and it carries the same unit column and
- *  the same caveats rather than a rosier older wording. */
+ *  the same caveats rather than a rosier older wording.
+ *  @param {DepthLine[]} depth
+ *  @returns {string[]} */
 function markdownDepth(depth) {
   if (!depth || !depth.length) return [];
   const lines = [
@@ -503,7 +596,8 @@ function markdownDepth(depth) {
   return lines;
 }
 
-/** One breakdown table as markdown rows, or a skipped-section note. */
+/** One breakdown table as markdown rows, or a skipped-section note.
+ *  @param {ReportTable} t */
 function renderRows(t) {
   if (t.ok && t.rows && t.rows.length) {
     const lines = [`| ${t.header} | Events | Sessions |`, "| --- | ---: | ---: |"];
@@ -514,7 +608,8 @@ function renderRows(t) {
   return `_Skipped: ${t.hint}._`;
 }
 
-/** The report as GitHub-flavored markdown, from the same model as the HTML. */
+/** The report as GitHub-flavored markdown, from the same model as the HTML.
+ *  @param {ReportModel} m */
 function renderMarkdown(m) {
   const lines = [
     `# Verticopolis analytics report (PostHog)`,
@@ -542,12 +637,15 @@ function renderMarkdown(m) {
 }
 
 /** Built-in sample results for --demo, shaped exactly like the normalized query
- *  output, so the same model and renderers exercise a populated report. */
+ *  output, so the same model and renderers exercise a populated report.
+ *  @returns {ReportModel} */
 function demoModel() {
+  /** @param {[string, number, number][]} pairs */
   const rows = (pairs) => ({
-    ok: true,
     rows: pairs.map(([key, events, sessions]) => ({ key: String(key), events, sessions })),
   });
+  /** @param {number} n @param {number} p50 @param {number} p90 @param {number} p95 @param {number} max
+   *  @returns {DepthRow} */
   const depth = (n, p50, p90, p95, max) => ({ skipped: false, empty: false, n, p50, p90, p95, max });
   return {
     window: { since: "sample", until: "sample", label: "sample" },
@@ -726,7 +824,9 @@ async function main() {
     "session_emergencies",
     "$exception",
   ];
+  /** @type {Record<string, unknown>} */
   const raw = {};
+  /** @param {string} label @param {string} query */
   const q = async (label, query) => {
     const r = await runQuery(query);
     raw[label] = r.ok ? (r.json?.results ?? r.json) : { status: r.status, hint: r.hint };
@@ -750,6 +850,7 @@ async function main() {
     // From the release after 4.13.1; mixes machines and tower sizes, so read it by version, not alone.
     { label: "Engine ms per game hour (per page life)", event: "session_sim_cost", prop: "ms_per_game_hour" },
   ];
+  /** @type {DepthLine[]} */
   const depth = [];
   for (const d of depthSpecs) {
     const build = d.perSession ? buildSessionDepthQuery : buildDepthQuery;
@@ -758,6 +859,7 @@ async function main() {
   }
 
   // Breakdowns: each returns events + distinct sessions per group.
+  /** @param {string} label @param {string} event @param {string} prop */
   const bd = async (label, event, prop) => {
     const r = await q(label, buildBreakdownQuery(event, prop, WINDOW.hours));
     return { ok: r.ok, hint: r.hint, rows: breakdownRows(r) };
@@ -798,6 +900,7 @@ async function main() {
   const founded = totals.new_game_started.events + totals.game_started.events;
 
   const fpsP50 = depth.find((d) => d.label === "Fps p50 (per page life)")?.row;
+  /** @type {ReportModel} */
   const model = {
     window: { since, until: stamp, label: WINDOW.label },
     generated: new Date().toISOString(),
@@ -844,7 +947,7 @@ async function main() {
       // work the re-emission fallback is doing, which is why session_end re-fires.
       [
         "Sessions with any pagehide row",
-        finalRows.skipped || finalRows.empty ? "n/a" : pct(finalRows.sessions, totals.session_end.sessions),
+        finalRows.skipped ? "n/a" : pct(finalRows.sessions, totals.session_end.sessions),
       ],
       // The numerator changed meaning on 2026-09-14: `crash` is capped and deduped
       // per page life, so this is distinct crash SHAPES per page life over boots,
@@ -946,7 +1049,9 @@ async function main() {
 }
 
 /** Render the model to the HTML file, the job summary, and stdout. Shared by the
- *  live and --demo paths so both exercise the same output surface. */
+ *  live and --demo paths so both exercise the same output surface.
+ *  @param {ReportModel} model
+ *  @param {unknown} raw */
 function writeAll(model, raw) {
   const htmlPath = join(OUT_DIR, `posthog-report-${model.window.until}.html`);
   writeFileSync(htmlPath, renderHtml(model));

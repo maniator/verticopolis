@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * The governed definition of two reliability reading aids (#1623): how much
  * traffic the engine report never saw, and what became of a session whose
@@ -34,12 +35,24 @@
 import { rowsToObjects, runQuery } from "./posthog-report.mjs";
 import { EVENT, ROW_LIMIT } from "./engine-reliability.mjs";
 
+/** What became of one trapped session.
+ *  @typedef {"recovered" | "stopped" | "reloaded" | "unknown"} TrapOutcome */
+/** Trapped sessions, and how many reached each outcome.
+ *  @typedef {{ trapped: number } & Record<TrapOutcome, number>} TrapSummary */
+/** The coverage cross-checks.
+ *  @typedef {{ boots: number; engineSessions: number; engineNoEnd: number }} Coverage */
+/** The settle and attempt flags of one engine-report page life.
+ *  @typedef {{ settled: boolean; attempted: boolean }} LifeFlags */
+
+/** @param {unknown} v */
 const num = (v) => {
   const n = Number(v);
   return Number.isSafeInteger(n) && n >= 0 ? n : 0;
 };
 
-/** The window predicate every query shares. `hours` is a `parseWindow` integer. */
+/** The window predicate every query shares. `hours` is a `parseWindow` integer.
+ *  @param {number} hours
+ *  @param {string} [alias] */
 function windowGate(hours, alias = "") {
   if (!Number.isSafeInteger(hours) || hours < 1) throw new Error(`bad window: ${hours}`);
   const p = alias ? `${alias}.` : "";
@@ -47,7 +60,9 @@ function windowGate(hours, alias = "") {
 }
 
 /** HogQL: boot rows, sessions with engine rows, and those with no `session_end`
- *  in the window. One row, no grouping. */
+ *  in the window. One row, no grouping.
+ *  @param {number} hours
+ *  @returns {string} */
 export function buildCoverageQuery(hours) {
   const gate = windowGate(hours);
   return [
@@ -61,13 +76,17 @@ export function buildCoverageQuery(hours) {
   ].join("\n");
 }
 
-/** The coverage row as numbers; a missing or malformed row reads as zeros. */
+/** The coverage row as numbers; a missing or malformed row reads as zeros.
+ *  @param {Record<string, unknown>[]} rows
+ *  @returns {Coverage} */
 export function coverageFromRows(rows) {
   const r = rows[0] ?? {};
   return { boots: num(r.boots), engineSessions: num(r.engine_sessions), engineNoEnd: num(r.engine_no_end) };
 }
 
-/** HogQL: how many sessions sent a `crash-reload` row. One row. */
+/** HogQL: how many sessions sent a `crash-reload` row. One row.
+ *  @param {number} hours
+ *  @returns {string} */
 export function buildTrapCountQuery(hours) {
   return [
     "SELECT uniqIf(distinct_id, properties.trigger = 'crash-reload') AS trap_sessions",
@@ -78,7 +97,9 @@ export function buildTrapCountQuery(hours) {
 }
 
 /** HogQL: for each session that trapped, what its later rows say. A session
- *  with no later row at all is not returned (it is the unknown remainder). */
+ *  with no later row at all is not returned (it is the unknown remainder).
+ *  @param {number} hours
+ *  @returns {string} */
 export function buildTrapOutcomeQuery(hours) {
   const gate = windowGate(hours);
   const outer = windowGate(hours, "e");
@@ -106,7 +127,9 @@ export function buildTrapOutcomeQuery(hours) {
 }
 
 /** One trapped session's outcome from its later rows. Order matters: a later
- *  trap stops the game, whatever else ran. */
+ *  trap stops the game, whatever else ran.
+ *  @param {Record<string, unknown>} row
+ *  @returns {TrapOutcome} */
 export function classifyTrap(row) {
   if (num(row.later_trap_fallbacks) > 0) return "stopped";
   if (num(row.later_clean_settles) > 0 && num(row.later_traps) === 0) return "recovered";
@@ -115,8 +138,12 @@ export function classifyTrap(row) {
 }
 
 /** Sessions per outcome. `trapped` is the count of sessions with a trap row;
- *  those with no later row are unknown too. */
+ *  those with no later row are unknown too.
+ *  @param {unknown} trapped
+ *  @param {Record<string, unknown>[]} outcomeRows
+ *  @returns {TrapSummary} */
 export function summarizeTraps(trapped, outcomeRows) {
+  /** @type {TrapSummary} */
   const t = { trapped: num(trapped), recovered: 0, stopped: 0, reloaded: 0, unknown: 0 };
   for (const row of outcomeRows) t[classifyTrap(row)]++;
   const seen = t.recovered + t.stopped + t.reloaded + t.unknown;
@@ -125,11 +152,15 @@ export function summarizeTraps(trapped, outcomeRows) {
 }
 
 /** A count that is zero reads "none seen", never a bare 0, so an empty window
- *  is not read as a clean one. */
+ *  is not read as a clean one.
+ *  @param {number} n */
 const seen = (n) => (n === 0 ? "none seen" : String(n));
 
 /** The section's markdown. `lives` are the engine report's page lives (before
- *  its filters), which hold the settle and attempt flags. */
+ *  its filters), which hold the settle and attempt flags.
+ *  @param {{ coverage: Coverage; traps: TrapSummary; lives: LifeFlags[] }} input
+ *  @param {{ windowLabel: string; truncated: boolean }} meta
+ *  @returns {string} */
 export function renderCoverageMarkdown({ coverage, traps, lives }, meta) {
   const settled = lives.filter((l) => l.settled).length;
   const attemptOnly = lives.filter((l) => l.attempted && !l.settled).length;
@@ -167,7 +198,11 @@ export function renderCoverageMarkdown({ coverage, traps, lives }, meta) {
   return out.join("\n");
 }
 
-/** Run the three queries and render; a failed query says so rather than printing zeros. */
+/** Run the three queries and render; a failed query says so rather than printing zeros.
+ *  @param {number} hours
+ *  @param {string} windowLabel
+ *  @param {LifeFlags[]} lives
+ *  @returns {Promise<string>} */
 export async function coverageSection(hours, windowLabel, lives) {
   const [cov, trapCount, outcomes] = [
     await runQuery(buildCoverageQuery(hours)),
@@ -181,7 +216,7 @@ export async function coverageSection(hours, windowLabel, lives) {
       return "## Telemetry coverage and trap recovery\n\n> **Unavailable:** the query returned no results table.";
   }
   const outcomeRows = rowsToObjects(outcomes.json);
-  const truncated = outcomeRows.length >= ROW_LIMIT || outcomes.json.hasMore === true;
+  const truncated = outcomeRows.length >= ROW_LIMIT || outcomes.json?.hasMore === true;
   const trapped = rowsToObjects(trapCount.json)[0]?.trap_sessions;
   return renderCoverageMarkdown(
     { coverage: coverageFromRows(rowsToObjects(cov.json)), traps: summarizeTraps(trapped, outcomeRows), lives },

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * Add the repository's new tiles to the "Verticopolis | Gameplay Overview"
  * PostHog dashboard, without touching anything already on it. The dashboard is
@@ -55,18 +56,42 @@ const KEY = process.env.POSTHOG_PERSONAL_API_KEY;
 const DRY_RUN = process.argv.includes("--dry-run");
 const UPDATE_VIEW = process.argv.includes("--update-view");
 
+/** An event-property filter.
+ *  @typedef {{ key: string; operator: string; type: string; value: string[] }} PropertyFilter */
+/** One insight definition from `buildInsights`.
+ *  @typedef {object} InsightSpec
+ *  @property {string} name
+ *  @property {string} [description]
+ *  @property {unknown} query
+ *  @property {boolean} [overview] True for a tile the run may add to the live dashboard.
+ *  @property {string} [shortId] The short id of the insight an earlier run added for this spec.
+ *  @property {number} [height] Desktop grid rows the tile takes when added (default 5).
+ */
+/** A desktop grid box.
+ *  @typedef {{ x: number; y: number; w: number; h: number }} GridBox */
+/** A dashboard tile as the PostHog API returns it (only the fields read here).
+ *  @typedef {{ deleted?: boolean; insight?: { name?: string; deleted?: boolean } | null; layouts?: { sm?: GridBox } }} DashboardTile */
+/** What a run adds, and what it leaves alone and why.
+ *  @typedef {{ add: { spec: InsightSpec; layout: GridBox }[]; added: string[]; onDashboard: string[]; elsewhere: string[] }} AdditionPlan */
+/** What a run does once it has planned (see `runSteps`).
+ *  @typedef {{ tiles: boolean; action: boolean; view: boolean }} RunSteps */
+
 /** The live dashboard's name. The owner renamed it from "Verticopolis: Gameplay
  *  Analytics" in PostHog, and the run finds the dashboard by this name, so it
  *  has to match or the run creates a second dashboard. */
 const DASHBOARD_NAME = "Verticopolis | Gameplay Overview";
-/** The one filter every insight carries: production only. */
+/** The one filter every insight carries: production only.
+ *  @type {PropertyFilter[]} */
 const PROD_ONLY = [{ key: "environment", operator: "exact", type: "event", value: ["production"] }];
 const LAST_30D = { date_from: "-30d" };
 
 /** A trends insight source (event counts / breakdowns / percentiles over time).
  *  `where` adds event-property filters on top of the production filter, e.g.
- *  restricting `app_action` to a subset of action names. */
+ *  restricting `app_action` to a subset of action names.
+ *  @param {object[]} series
+ *  @param {{ breakdown?: string | string[]; display?: string; breakdownLimit?: number; where?: PropertyFilter[] }} [options] */
 function trends(series, { breakdown, display = "ActionsLineGraph", breakdownLimit, where } = {}) {
+  /** @type {{ kind: string; series: object[]; dateRange: object; interval: string; properties: PropertyFilter[]; trendsFilter: object; breakdownFilter?: { breakdowns: { property: string; type: string }[]; breakdown_limit?: number } }} */
   const source = {
     kind: "TrendsQuery",
     series,
@@ -87,14 +112,21 @@ function trends(series, { breakdown, display = "ActionsLineGraph", breakdownLimi
 
 /** An event-property filter for a `where` clause (a subset of `action` values).
  *  Works for any event carrying an `action` property (app_action and the #611
- *  economy_action alike). */
+ *  economy_action alike).
+ *  @param {string[]} values
+ *  @returns {PropertyFilter} */
 function inAction(values) {
   return { key: "action", operator: "exact", type: "event", value: values };
 }
 
 /** One event series node. `math` may be a count math ("total"/"dau") or a
- *  property percentile ("median"/"p90"/"p95") paired with `prop`. */
+ *  property percentile ("median"/"p90"/"p95") paired with `prop`.
+ *  @param {string} event
+ *  @param {string} name
+ *  @param {string} [math]
+ *  @param {string} [prop] */
 function series(event, name, math = "total", prop) {
+  /** @type {{ kind: string; event: string; name: string; math: string; math_property?: string }} */
   const node = { kind: "EventsNode", event, name, math };
   if (prop) node.math_property = prop;
   return node;
@@ -171,8 +203,11 @@ const SESSION_LENGTHS_SQL = [
 
 /** A SQL insight source, for the questions the trends builder cannot express.
  *  `display` picks the visualization; `chartSettings` maps result columns onto the
- *  axes for a graph (a table or a single number needs neither). */
+ *  axes for a graph (a table or a single number needs neither).
+ *  @param {string} query
+ *  @param {{ display?: string; chartSettings?: object }} [options] */
 function hogql(query, { display = "ActionsTable", chartSettings } = {}) {
+  /** @type {{ kind: string; source: { kind: string; query: string }; display: string; chartSettings?: object }} */
   const node = { kind: "DataVisualizationNode", source: { kind: "HogQLQuery", query }, display };
   if (chartSettings) node.chartSettings = chartSettings;
   return node;
@@ -241,14 +276,19 @@ const NEW_GAME_ACTION = {
 };
 
 /** One action series node, for a tile that counts an action rather than a
- *  single event name. */
+ *  single event name.
+ *  @param {number | null} id
+ *  @param {string} name
+ *  @param {string} [math] */
 function actionSeries(id, name, math = "total") {
   return { kind: "ActionsNode", id, name, math };
 }
 
 /** The reviewed insight definitions. Only those marked `overview: true` are
  *  added to the live dashboard (see the header); the rest record the definitions
- *  of insights that already exist in PostHog. */
+ *  of insights that already exist in PostHog.
+ *  @param {{ newGame: number | null }} ids
+ *  @returns {InsightSpec[]} */
 function buildInsights(ids) {
   return [
     {
@@ -1297,8 +1337,15 @@ function buildInsights(ids) {
   ];
 }
 
+/** @param {string} path */
 const api = (path) => `${HOST}/api/projects/${PROJECT_ID}${path}`;
 
+/** One API call. Resolves to the parsed body, which follows PostHog's own
+ *  shapes and is read loosely, or null on a 204.
+ *  @param {string} method
+ *  @param {string} path
+ *  @param {object} [body]
+ *  @returns {Promise<any>} */
 async function req(method, path, body) {
   const res = await fetch(api(path), {
     method,
@@ -1322,7 +1369,10 @@ async function req(method, path, body) {
  *  lands right back on the duplicate this exists to prevent. Failing loudly is
  *  the safe direction: the caller aborts instead of quietly forking the tiles. */
 const MAX_LIST_PAGES = 25;
+/** @param {string} path
+ *  @returns {Promise<any[]>} */
 async function listAll(path) {
+  /** @type {any[]} */
   const out = [];
   let next = `${path}${path.includes("?") ? "&" : "?"}limit=200`;
   for (let page = 0; ; page++) {
@@ -1349,7 +1399,8 @@ async function listAll(path) {
   }
 }
 
-/** Find a saved insight by exact name, or return null. */
+/** Find a saved insight by exact name, or return null.
+ *  @param {string} name */
 async function findInsight(name) {
   // `search` is fuzzy and ranked, so the exact-name match is not guaranteed to be
   // the FIRST hit. Reading one row and then filtering for the exact name meant a
@@ -1357,7 +1408,8 @@ async function findInsight(name) {
   // the run created a second copy of it instead of updating. Insights are the one
   // object this script makes dozens of, so that is where a duplicate hurts most.
   const page = (await req("GET", `/insights/?limit=100&search=${encodeURIComponent(name)}`)) || {};
-  const hit = (page.results || []).find((i) => i.name === name && !i.deleted) || null;
+  const results = /** @type {{ name?: string; deleted?: boolean }[]} */ (page.results || []);
+  const hit = results.find((i) => i.name === name && !i.deleted) || null;
   // A truncated page is indistinguishable from "no such insight", and the caller
   // answers that by CREATING one, which forks the tile. So when the exact name is
   // not on this page and the API says there are more, refuse rather than guess.
@@ -1373,9 +1425,12 @@ async function findInsight(name) {
  *  is missing. A view is referenced BY NAME from HogQL, so it has to exist before
  *  an insight that selects from it runs. An existing view is left as it is unless
  *  the run passes --update-view: the live dashboard is hand-curated, and its
- *  session tiles read this view, so a run never changes their numbers on its own. */
+ *  session tiles read this view, so a run never changes their numbers on its own.
+ *  @param {{ name: string; description: string; query: string }} spec
+ *  @returns {Promise<string>} */
 async function ensureView(spec) {
   const existing = (await listAll(`/warehouse_saved_queries/`)).find((v) => v.name === spec.name && !v.deleted) || null;
+  /** @type {{ name: string; description: string; query: { kind: string; query: string }; edited_history_id?: unknown }} */
   const body = { name: spec.name, description: spec.description, query: { kind: "HogQLQuery", query: spec.query } };
   if (existing && !UPDATE_VIEW) return "exists, left as is (pass --update-view to rewrite it)";
   if (DRY_RUN) return existing ? "would be rewritten (--update-view)" : "would be created";
@@ -1394,7 +1449,9 @@ async function ensureView(spec) {
 /** Find the action the new-tower tiles count, by exact name, and create it when
  *  it is missing. An existing action is never changed. Returns its id, which
  *  `buildInsights` needs for those tiles' series (null in a dry run that would
- *  create it). */
+ *  create it).
+ *  @param {{ name: string; description: string; steps: { event: string }[] }} spec
+ *  @returns {Promise<{ id: number | null; outcome: string }>} */
 async function ensureAction(spec) {
   const existing = (await listAll(`/actions/`)).find((a) => a.name === spec.name && !a.deleted) || null;
   if (existing) {
@@ -1416,7 +1473,9 @@ async function ensureAction(spec) {
 const DEFAULT_TILE_HEIGHT = 5;
 
 /** The row just below the lowest tile that has a desktop (`sm`) box. Tiles with
- *  no box yet are left where PostHog puts them. */
+ *  no box yet are left where PostHog puts them.
+ *  @param {DashboardTile[]} tiles
+ *  @returns {number} */
 function bottomRow(tiles) {
   let bottom = 0;
   for (const tile of tiles) {
@@ -1427,12 +1486,15 @@ function bottomRow(tiles) {
   return bottom;
 }
 
-/** The names of the live insight tiles on a dashboard. */
+/** The names of the live insight tiles on a dashboard.
+ *  @param {DashboardTile[]} tiles
+ *  @returns {Set<string>} */
 function tileNames(tiles) {
+  /** @type {Set<string>} */
   const names = new Set();
   for (const tile of tiles) {
     const name = tile?.insight?.name;
-    if (name && !tile.deleted && !tile.insight.deleted) names.add(name);
+    if (name && !tile.deleted && !tile.insight?.deleted) names.add(name);
   }
   return names;
 }
@@ -1451,13 +1513,16 @@ function tileNames(tiles) {
  *  tiles in the desktop order, so they land at the end there as well.
  *
  *  `existingElsewhere` is the set of candidate names found outside the
- *  dashboard. Returns `{ add: [{ spec, layout }], added, onDashboard, elsewhere }`. */
+ *  dashboard. Returns `{ add: [{ spec, layout }], added, onDashboard, elsewhere }`.
+ *  @param {InsightSpec[]} specs
+ *  @param {DashboardTile[]} dashboardTiles
+ *  @param {Set<string>} existingElsewhere
+ *  @returns {AdditionPlan} */
 function planAdditions(specs, dashboardTiles, existingElsewhere) {
   const present = tileNames(dashboardTiles);
-  const add = [];
-  const added = [];
-  const onDashboard = [];
-  const elsewhere = [];
+  /** @type {AdditionPlan} */
+  const plan = { add: [], added: [], onDashboard: [], elsewhere: [] };
+  const { add, added, onDashboard, elsewhere } = plan;
   let y = bottomRow(dashboardTiles);
   for (const spec of specs) {
     if (!spec.overview) continue;
@@ -1473,10 +1538,11 @@ function planAdditions(specs, dashboardTiles, existingElsewhere) {
       y += h;
     }
   }
-  return { add, added, onDashboard, elsewhere };
+  return plan;
 }
 
-/** Whether a tile's query counts through an action (and so needs its id). */
+/** Whether a tile's query counts through an action (and so needs its id).
+ *  @param {InsightSpec} spec */
 function usesAction(spec) {
   return JSON.stringify(spec.query).includes('"ActionsNode"');
 }
@@ -1485,7 +1551,10 @@ function usesAction(spec) {
  *  also needs the action and the view to exist. `view`: the saved view gets
  *  checked, because new tiles read it or because --update-view asked for a
  *  rewrite; the flag works on its own, so a run with no tiles to add can still
- *  rewrite the view, and it writes no tile while doing so. */
+ *  rewrite the view, and it writes no tile while doing so.
+ *  @param {AdditionPlan} plan
+ *  @param {boolean} updateView
+ *  @returns {RunSteps} */
 function runSteps(plan, updateView) {
   const tiles = plan.add.length > 0;
   return { tiles, action: tiles, view: tiles || Boolean(updateView) };
@@ -1524,6 +1593,7 @@ async function main() {
   // Plan first, so a run with nothing to add makes no write at all.
   const candidates = buildInsights({ newGame: null });
   const onDashboardNames = tileNames(tiles);
+  /** @type {Set<string>} */
   const existingElsewhere = new Set();
   for (const spec of candidates) {
     if (!spec.overview || spec.shortId || onDashboardNames.has(spec.name)) continue;
@@ -1544,6 +1614,7 @@ async function main() {
 
   // Make sure what the new tiles read exists. With nothing to add, only
   // --update-view gets here, and it touches the view alone, never a tile.
+  /** @type {{ id: number | null; outcome: string } | null} */
   let action = null;
   if (steps.action) {
     action = await ensureAction(NEW_GAME_ACTION);
@@ -1551,14 +1622,17 @@ async function main() {
   }
   console.log(`${tag}Saved view "${SESSION_LENGTHS_VIEW.name}": ${await ensureView(SESSION_LENGTHS_VIEW)}`);
   if (DRY_RUN || !steps.tiles) return;
-  const withAction = new Map(buildInsights({ newGame: action.id }).map((s) => [s.name, s]));
+  // Set above: a run with tiles to add always ensures the action.
+  const actionId = action?.id ?? null;
+  const withAction = new Map(buildInsights({ newGame: actionId }).map((s) => [s.name, s]));
   for (const entry of plan.add) entry.spec = withAction.get(entry.spec.name) ?? entry.spec;
 
-  const missingAction = plan.add.find(({ spec }) => usesAction(spec) && action.id == null);
+  const missingAction = plan.add.find(({ spec }) => usesAction(spec) && actionId == null);
   if (missingAction)
     throw new Error(`"${missingAction.spec.name}" needs the action, which has no id; nothing was added`);
 
   // Create every insight on the dashboard, then place the new tiles in one write.
+  /** @type {{ id: unknown; shortId: unknown; name: string; layout: GridBox }[]} */
   const created = [];
   for (const { spec, layout } of plan.add) {
     const insight = await req("POST", `/insights/`, {
@@ -1570,9 +1644,11 @@ async function main() {
     created.push({ id: insight?.id, shortId: insight?.short_id, name: spec.name, layout });
   }
   const after = await req("GET", `/dashboards/${dashboard.id}/`);
+  /** @type {{ id: unknown; layouts: { sm: GridBox } }[]} */
   const placed = [];
+  const afterTiles = /** @type {{ id: unknown; insight?: { id?: unknown } | null }[]} */ (after?.tiles || []);
   for (const c of created) {
-    const tile = (after?.tiles || []).find((t) => t?.insight?.id === c.id);
+    const tile = afterTiles.find((t) => t?.insight?.id === c.id);
     if (tile) placed.push({ id: tile.id, layouts: { sm: c.layout } });
     else console.warn(`  WARNING: could not find the new tile for "${c.name}"; PostHog will place it`);
   }
