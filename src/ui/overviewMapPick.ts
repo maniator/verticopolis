@@ -36,6 +36,8 @@ export interface MapPickShaft {
   readonly width: number;
   readonly bottom: number;
   readonly top: number;
+  /** Floors between `bottom` and `top` it does not stop at (an express skips most). */
+  readonly skipFloors?: ReadonlyArray<number>;
 }
 
 /** What the tap opens: the same shape the world's own pick gives. */
@@ -118,16 +120,21 @@ export function mapFloorAt(layout: MapLayout, y: number): number {
   return Math.ceil(mapYToLine(layout, y));
 }
 
-/** The passenger shaft serving the tapped floor that stands nearest the tap
- *  across the floor; the first in the shafts' order wins a tie. A Traffic color covers
- *  the whole floor, so any distance across it counts. */
+/** Whether a shaft stops at `floor`: within its span and not one it skips. */
+function stopsAt(shaft: MapPickShaft, floor: number): boolean {
+  return floor >= shaft.bottom && floor <= shaft.top && !(shaft.skipFloors?.includes(floor) ?? false);
+}
+
+/** The passenger shaft stopping at the tapped floor that stands nearest the
+ *  tap across the floor; the first in the shafts' order wins a tie. A Traffic
+ *  color covers the whole floor, so any distance across it counts. */
 function pickShaft(input: MapPickInput): MapPicked | null {
   const floor = mapFloorAt(input.layout, input.y);
   let best: MapPickShaft | null = null;
   let bestDistance = Infinity;
   for (const shaft of input.shafts) {
     // A service elevator carries staff only, so it never eases a jam.
-    if (shaft.kind === "elevatorService" || floor < shaft.bottom || floor > shaft.top) continue;
+    if (shaft.kind === "elevatorService" || !stopsAt(shaft, floor)) continue;
     const d = gap(input.x, tileToMapX(input.layout, shaft.x), Math.max(0, shaft.width) * input.layout.pxPerTile);
     if (d < bestDistance) {
       best = shaft;

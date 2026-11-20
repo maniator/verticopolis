@@ -71,6 +71,32 @@ describe("mapPick: Traffic", () => {
   });
 });
 
+describe("mapPick: Traffic and skipped stops", () => {
+  // An express from floor 1 to 9 that stops only at 1 and 9, standing right
+  // under the tap, and a standard elevator far across the floor.
+  const express: MapPickShaft = {
+    id: 20,
+    kind: "elevatorExpress",
+    x: 40,
+    width: 4,
+    bottom: 1,
+    top: 9,
+    skipFloors: [2, 3, 4, 5, 6, 7, 8],
+  };
+  const far: MapPickShaft = { id: 21, kind: "elevatorStandard", x: 90, width: 4, bottom: 1, top: 9 };
+  const pickShafts = (shafts: MapPickShaft[], floor: number) =>
+    mapPick({ view: "traffic", layout, x: 41, y: floorY(floor), reach: 3, rooms: [], shafts, floorsOf: () => 1 });
+
+  it("passes over a shaft that skips the tapped floor for one that stops there", () => {
+    expect(pickShafts([express, far], 5)).toEqual({ type: "transport", id: 21, kind: "elevatorStandard" });
+    expect(pickShafts([express, far], 9)).toEqual({ type: "transport", id: 20, kind: "elevatorExpress" });
+  });
+
+  it("opens nothing when the only shaft on the floor skips it", () => {
+    expect(pickShafts([express], 5)).toBeNull();
+  });
+});
+
 describe("mapFloorAt and tapReach", () => {
   it("reads the floor a map y falls on", () => {
     expect(mapFloorAt(layout, (10 - 5) * 10 + 0.5)).toBe(5);
