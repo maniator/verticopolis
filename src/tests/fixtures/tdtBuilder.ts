@@ -2,7 +2,6 @@ import {
   TDT_ELEVATOR_HEADER_SIZE,
   TDT_ELEVATOR_SLOTS,
   builtShaftPayloadSize,
-  builtShaftPayloadSizeFor,
   expressPayloadSize,
   TDT_CLINIC_LIST_SIZE,
   TDT_FINANCE_SIZE,
@@ -22,12 +21,14 @@ import {
 } from "./tdtLayout";
 
 /**
- * Declarative synthetic `.TDT` byte-buffer builder for the importer tests.
+ * A synthetic `.TDT` file for the game's tests that open one (the import
+ * dialogs, the saved view, painting an imported tower). The engine tests the
+ * codec itself, with its own builder; this one writes only the layout the
+ * game's tests need, the way the 1994 game writes it.
  *
- * Layout facts come from `docs/tdt/tdt-format.md` in Verticopolis/engine, the
- * same single source of truth the parser reads, so the fixture and the parser can only drift if
- * the doc does. Every buffer is synthesized from scratch: NEVER commit bytes
- * from a real (copyrighted) SimTower save.
+ * Layout facts come from `docs/tdt/tdt-format.md` in Verticopolis/engine.
+ * Every buffer is synthesized from scratch: NEVER commit bytes from a real
+ * (copyrighted) SimTower save.
  */
 
 /** The elevator header's `type` byte for an express shaft. */
@@ -37,52 +38,33 @@ export interface TenantSpec {
   /** Extents in tiles (half-open), exactly as stored. */
   left: number;
   right: number;
-  /** Tenant type ID (doc §5); negative ⇒ under construction. */
+  /** Tenant type ID; negative means under construction. */
   type: number;
-  /** Status/flags byte (bit-mapped for hotels; nonzero ⇒ tenanted). */
+  /** Status byte (bit-mapped for hotels; nonzero means tenanted). */
   status?: number;
-  /** Rent/lease byte at offset 16 (0 Very Low … 3 High, 4 No Rate). */
+  /** Rent byte at offset 16 (0 Very Low to 3 High, 4 No Rate). */
   rentRate?: number;
-  /** Retail variant ordinal, written to unit-record **byte 6** (where the real
-   *  game stores the variety and where the importer reads it). Matches
-   *  `TdtTenant.variant`. To set the byte-17 slot instead, use {@link byte17}. */
-  variant?: number;
-  /** Decoy value for the old (wrong) variant offset, byte 17 (== `TdtTenant.subtype`).
-   *  Lets a test prove the importer reads the variant from byte 6 and ignores
-   *  byte 17. Defaults to 0 (like a real save). */
-  byte17?: number;
 }
 
 export interface FloorSpec {
-  /** TDT floor index 0–119. */
+  /** TDT floor index 0 to 119. */
   index: number;
   /** Built extent (defaults to hugging the tenants, or 0/0 when none). */
   leftEdge?: number;
   rightEdge?: number;
   tenants?: TenantSpec[];
-  /** Override the record's tenant-count word (for forging absurd counts). */
-  forgeTenantCount?: number;
 }
 
 export interface ElevatorSpec {
   /** 0 = express, 1 = standard, 2 = service. */
   type: 0 | 1 | 2;
-  /** Cars in the shaft, 1–8. */
+  /** Cars in the shaft, 1 to 8. */
   cars: number;
   /** Horizontal position in tiles. */
   x: number;
-  /** TDT floor indexes (0–119). */
+  /** TDT floor indexes (0 to 119); the shaft stops at every floor between. */
   bottomFloor: number;
   topFloor: number;
-  /** TDT floor indexes the shaft stops at. Defaults to every floor in
-   *  [bottomFloor, topFloor]. */
-  serviced?: number[];
-  /** Home floor (TDT index) per car; defaults to bottomFloor. */
-  carHomes?: number[];
-  /** Per-floor entries to write in this shaft's payload, whatever its span
-   *  or stops say. Reproduces the express shafts of a real 1997 100-floor save,
-   *  whose payload no documented layout predicts. */
-  payloadFloors?: number;
 }
 
 export interface StairSpec {
@@ -96,63 +78,22 @@ export interface StairSpec {
 
 export interface TdtSpec {
   level?: number;
-  /** Stored funds (display dollars ÷ 100). Signed. */
+  /** Stored funds (display dollars divided by 100). Signed. */
   balance?: number;
   frameTime?: number;
   currentDay?: number;
-  /** Saved view-scroll words at 0x26/0x28 (doc §1); default 0/0 = no view. */
+  /** Saved view-scroll words at 0x26/0x28; default 0/0 = no view. */
   viewX?: number;
   viewY?: number;
   floors?: FloorSpec[];
   /** People records appended to the tail (default 0). */
   peopleCount?: number;
-  /** Write the 512-slot retail table into the tail (default true). */
-  includeRetail?: boolean;
-  /** Occupied retail rows to mark (floor ≥ 0), capped at the slot count. */
+  /** Occupied retail rows to mark, capped at the slot count. */
   retailRows?: number;
-  /** Write the elevator/finance/parking/stairs blocks (default true).
-   *  false truncates the tail after the retail table; the importer then
-   *  falls back to synthesizing a transport layout. */
-  includeTransports?: boolean;
-  elevators?: (ElevatorSpec | null)[];
-  /** Size each built shaft's payload the way Verticopolis 2.9.0 and earlier did,
-   *  one entry per SERVICED floor rather than per spanned floor. Only for
-   *  testing the reader's fallback for those files; never for anything else. */
-  legacyServicedPayload?: boolean;
-  /** Size EVERY shaft by its spanned floors, express included: the generation-1
-   *  layout Verticopolis 2.12.x wrote, before an express was measured to be
-   *  sized by its eligible floors (#740, #1497). Like `legacyServicedPayload`,
-   *  this deliberately encodes a superseded layout so the reader's fallback can
-   *  be tested. */
-  spannedExpressPayload?: boolean;
-  /** Lay out the blocks after the elevators the way our generation 1 and 2
-   *  exports did (a finance block, the parking block, no statistics or clinic
-   *  list). Only for files that claim one of those generations. */
-  generationOneBlocks?: boolean;
-  /** Size an express shaft by the floors it stops at, the reading of the game's
-   *  layout before the eligible-floor rule. Only for the reader's fallback. */
-  stoppedExpressPayload?: boolean;
+  elevators?: ElevatorSpec[];
   stairs?: StairSpec[];
-  /** Fill every built shaft's payload with `0xFF`, as the unused queue slots of
-   *  a real save's payload are, instead of zeros. A misaligned walk then fails
-   *  loudly on a `0xFF` header byte; over zero fill it reads empty slot headers
-   *  and loses the table without a sound. */
-  ffPayload?: boolean;
   /** The parking block's connected-stall count (default 0). */
   parkingConnected?: number;
-  /** Zero bytes appended after the stairs table. Real saves carry a trailing
-   *  routing region there (ours a fixed 25,600-byte one), and a reader that
-   *  mis-sizes a payload lands IN that slack instead of running off the end, so
-   *  a fixture without it cannot reproduce the silent-shift failures, only the
-   *  loud truncation ones. */
-  trailingBytes?: number;
-  /** Like {@link trailingBytes} but `0xFF`-filled, which is what our exporter
-   *  actually writes for the trailing routing region (doc §11). Use this when a
-   *  test depends on that region's CONTENT or on where it begins. */
-  routingTailBytes?: number;
-  /** Wrong magic / truncation knobs for the hostile-file tests. */
-  magic?: number;
-  truncateAt?: number;
 }
 
 /** Build a complete synthetic `.TDT` byte buffer from the spec. */
@@ -172,27 +113,27 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     for (let i = 0; i < n; i++) chunks.push(0);
   };
 
-  // ---- Header (fixed offsets, doc §1) -------------------------------------
-  u16(spec.magic ?? TDT_MAGIC); // 0x00 magic
-  u16(spec.level ?? 1); // 0x02 level
-  i32(spec.balance ?? 20000); // 0x04 balance (stored ×1/100)
-  i32(0); // 0x08 otherIncome
-  i32(0); // 0x0C constructionCosts
-  i32(0); // 0x10 lastQuarterMoney
-  u16(spec.frameTime ?? 0); // 0x14 tick
-  i32(spec.currentDay ?? 0); // 0x16 currentDay
-  pad(0x26 - chunks.length); // lobbyHeight + undocumented words up to the view
+  // The header, at fixed offsets.
+  u16(TDT_MAGIC);
+  u16(spec.level ?? 1);
+  i32(spec.balance ?? 20000); // stored as display dollars / 100
+  i32(0); // otherIncome
+  i32(0); // constructionCosts
+  i32(0); // lastQuarterMoney
+  u16(spec.frameTime ?? 0);
+  i32(spec.currentDay ?? 0);
+  pad(0x26 - chunks.length);
   u16(spec.viewX ?? 0); // 0x26 saved view-scroll X
   u16(spec.viewY ?? 0); // 0x28 saved view-scroll Y
-  pad(TDT_HEADER_SIZE - chunks.length); // remaining documented counts + undocumented block
+  pad(TDT_HEADER_SIZE - chunks.length);
 
-  // ---- Floor map: 120 records ---------------------------------------------
+  // The floor map: 120 records.
   for (let index = 0; index < TDT_FLOOR_COUNT; index++) {
     const f = floorsByIndex.get(index);
     const tenants = f?.tenants ?? [];
     const left = f?.leftEdge ?? (tenants.length ? Math.min(...tenants.map((t) => t.left)) : 0);
     const right = f?.rightEdge ?? (tenants.length ? Math.max(...tenants.map((t) => t.right)) : 0);
-    u16(f?.forgeTenantCount ?? tenants.length);
+    u16(tenants.length);
     u16(left);
     u16(right);
     for (const t of tenants) {
@@ -200,101 +141,55 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
       u16(t.right);
       u8(t.type); // i8 written via two's complement
       u8(t.status ?? 0);
-      u8(t.variant ?? 0); // byte 6: retail variant (where the real game stores it)
-      pad(9); // reserved bytes 7–15
-      u8(t.rentRate ?? 2); // byte 16: Average; imports as the default price
-      u8(t.byte17 ?? 0); // byte 17 (unused; the variant lives at byte 6)
+      pad(10); // byte 6 (a shop's style) and the reserved bytes 7 to 15
+      u8(t.rentRate ?? 2); // byte 16: Average
+      u8(0); // byte 17
     }
-    pad(TDT_FLOOR_INDEX_ENTRIES * 2); // per-floor remap table
+    pad(TDT_FLOOR_INDEX_ENTRIES * 2);
   }
 
-  // ---- Tail: people + retail ------------------------------------------------
+  // The tail: people, then the retail table.
   const peopleCount = spec.peopleCount ?? 0;
   i32(peopleCount);
   pad(peopleCount * TDT_PERSON_RECORD_SIZE);
-  if (spec.includeRetail === false) return finish(chunks, spec);
   const occupied = Math.min(spec.retailRows ?? 0, TDT_RETAIL_SLOTS);
   for (let slot = 0; slot < TDT_RETAIL_SLOTS; slot++) {
-    // Byte 0: the row's floor; 0xFF marks an empty slot.
-    u8(slot < occupied ? 10 : 0xff);
+    u8(slot < occupied ? 10 : 0xff); // the row's floor; 0xFF marks an empty slot
     pad(TDT_RETAIL_RECORD_SIZE - 1);
   }
-  if (spec.includeTransports === false) return finish(chunks, spec);
 
-  // ---- Elevator table: 24 entries -------------------------------------------
-  const payloadPad = (n: number) => {
-    for (let i = 0; i < n; i++) chunks.push(spec.ffPayload ? 0xff : 0);
-  };
+  // The elevator table: 24 slots, each payload sized the way the game sizes it.
   const elevators = (spec.elevators ?? []).slice(0, TDT_ELEVATOR_SLOTS);
   for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
     const e = elevators[slot];
     if (!e) {
-      pad(TDT_ELEVATOR_HEADER_SIZE); // empty slot: header only, all zeroes (used = 0)
+      pad(TDT_ELEVATOR_HEADER_SIZE);
       continue;
     }
     u8(1); // used
     u8(e.type);
-    u8([42, 21, 10][e.type]); // car capacity (informational; not imported)
+    u8([42, 21, 10][e.type]); // car capacity
     u8(e.cars);
     pad(56); // schedule block
     u8(1); // visible
-    u8(0); // reserved
+    u8(0);
     u16(e.x);
     u8(e.topFloor);
     u8(e.bottomFloor);
-    const serviced = new Set(
-      e.serviced ?? Array.from({ length: e.topFloor - e.bottomFloor + 1 }, (_, i) => e.bottomFloor + i),
+    for (let fl = 0; fl < TDT_FLOOR_COUNT; fl++) u8(fl >= e.bottomFloor && fl <= e.topFloor ? 1 : 0);
+    for (let c = 0; c < 8; c++) u8(e.bottomFloor); // car homes
+    pad(
+      e.type === EXPRESS_TYPE
+        ? expressPayloadSize(e.bottomFloor, e.topFloor)
+        : builtShaftPayloadSize(e.bottomFloor, e.topFloor),
     );
-    for (let fl = 0; fl < TDT_FLOOR_COUNT; fl++) u8(serviced.has(fl) ? 1 : 0);
-    for (let c = 0; c < 8; c++) u8(e.carHomes?.[c] ?? e.bottomFloor);
-    // Built-shaft payload (live passenger state); zero-filled, sized by the same
-    // shared helper the writer and the reader's skip use, so a fixture can never
-    // quietly encode a different rule than the code under test. An inverted spec
-    // span throws there rather than padding a negative (silently zero) length,
-    // which would hand the suite a file with a header and no payload.
-    //
-    // `legacyServicedPayload` reproduces what Verticopolis 2.9.0 and earlier
-    // wrote instead: one per-floor entry per SERVICED floor. It exists so the
-    // reader's fallback for those files can be tested against a real one, and it
-    // is the ONLY thing in this fixture that deliberately encodes a superseded
-    // layout; leave it off for anything else.
-    // Size by the spec's layout, but validate the SPAN either way: the legacy
-    // sizing is driven by the stop count, so on its own it would happily accept
-    // an inverted or fractional span and emit a fixture whose header and payload
-    // disagree, which is exactly the loud early failure this call exists to give.
-    const spannedSize = builtShaftPayloadSize(e.bottomFloor, e.topFloor);
-    if (e.payloadFloors !== undefined) {
-      payloadPad(builtShaftPayloadSize(1, e.payloadFloors));
-    } else if (spec.legacyServicedPayload) {
-      payloadPad(builtShaftPayloadSize(1, Math.max(1, serviced.size)));
-    } else if (spec.spannedExpressPayload) {
-      payloadPad(spannedSize); // generation 1: every kind by span, express included
-    } else if (e.type === EXPRESS_TYPE && !spec.stoppedExpressPayload) {
-      payloadPad(expressPayloadSize(e.bottomFloor, e.topFloor)); // what the game writes
-    } else {
-      // Count the stops the bitmap LOOP writes, not the spec's raw set: a spec
-      // entry outside 0..119 (or outside the span) never reaches the file, so
-      // sizing off it would emit a payload the header does not justify and hand
-      // the suite a fixture that disagrees with every reader.
-      let written = 0;
-      for (const f of serviced) if (f >= 0 && f < TDT_FLOOR_COUNT && f >= e.bottomFloor && f <= e.topFloor) written++;
-      payloadPad(builtShaftPayloadSizeFor(e.type, e.bottomFloor, e.topFloor, written));
-    }
   }
 
-  // ---- Finance + parking + stairs -------------------------------------------
-  if (spec.generationOneBlocks) {
-    // What our writer wrote before generation 3: a finance block, the parking
-    // block, and the table 160 bytes short of where the game keeps it.
-    pad(TDT_FINANCE_SIZE);
-    u16(spec.parkingConnected ?? 0);
-    pad(TDT_PARKING_SIZE - 2);
-  } else {
-    pad(TDT_STATS_SIZE + TDT_FINANCE_SIZE + TDT_UNKNOWN_FLAGS_SIZE + TDT_UNKNOWN_BYTES_SIZE);
-    u16(spec.parkingConnected ?? 0);
-    pad(TDT_PARKING_SIZE - 2);
-    pad(TDT_CLINIC_LIST_SIZE);
-  }
+  // Statistics, finance, two undecoded blocks, parking, the clinic list, stairs.
+  pad(TDT_STATS_SIZE + TDT_FINANCE_SIZE + TDT_UNKNOWN_FLAGS_SIZE + TDT_UNKNOWN_BYTES_SIZE);
+  u16(spec.parkingConnected ?? 0);
+  pad(TDT_PARKING_SIZE - 2);
+  pad(TDT_CLINIC_LIST_SIZE);
   const stairs = (spec.stairs ?? []).slice(0, TDT_STAIR_SLOTS);
   for (let slot = 0; slot < TDT_STAIR_SLOTS; slot++) {
     const s = stairs[slot];
@@ -306,19 +201,9 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     u8(s.type);
     u16(s.x);
     u16(s.floor);
-    u16(0); // people up (live state)
-    u16(0); // people down
+    pad(4); // people up and down (live state)
   }
-
-  if (spec.trailingBytes) pad(spec.trailingBytes);
-  for (let i = 0; i < (spec.routingTailBytes ?? 0); i++) u8(0xff);
-
-  return finish(chunks, spec);
-}
-
-function finish(chunks: number[], spec: TdtSpec): Uint8Array {
-  const bytes = new Uint8Array(chunks);
-  return spec.truncateAt !== undefined ? bytes.slice(0, spec.truncateAt) : bytes;
+  return new Uint8Array(chunks);
 }
 
 /** A playable mid-size tower exercising the DECODE path end to end: ground

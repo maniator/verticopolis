@@ -1,7 +1,7 @@
 /**
  * The byte layout of a `.TDT` file as the test builder writes it
  * (`docs/tdt/tdt-format.md` in Verticopolis/engine, beside the codec, `src/tdt/format.rs`).
- * The builder and the tests that cut or pad a buffer share these sizes.
+ * Only the game's test builder (`tdtBuilder.ts`) reads them.
  */
 
 export const TDT_MAGIC = 0x2400;
@@ -14,7 +14,6 @@ export const TDT_DEFAULT_VIEW_X = 1105;
 export const TDT_DEFAULT_VIEW_Y = 3491;
 const TDT_ELEVATOR_PER_FLOOR_SIZE = 324;
 export const TDT_FLOOR_INDEX_ENTRIES = 94;
-export const TDT_MAX_FILE_BYTES = 4 * 1024 * 1024;
 export const TDT_PERSON_RECORD_SIZE = 16;
 export const TDT_RETAIL_SLOTS = 512;
 export const TDT_RETAIL_RECORD_SIZE = 18;
@@ -30,16 +29,10 @@ export const TDT_PARKING_SIZE = 2 + 512 * 2;
 export const TDT_CLINIC_LIST_SIZE = 2 + 10 * 2;
 export const TDT_STAIR_SLOTS = 64;
 export const TDT_STAIR_RECORD_SIZE = 10;
-/** The trailer our writer stamps: magic plus a u16 generation. */
-export const TDT_STAMP_MAGIC = "VCTDT";
-/** The first generation: every shaft sized by its span, express included. */
-export const TDT_STAMP_SPANNED_GENERATION = 1;
-export const TDT_STAMP_SIZE = TDT_STAMP_MAGIC.length + 2;
 
 const BUILT_FIXED = 3140;
 const PER_FLOOR = TDT_ELEVATOR_PER_FLOOR_SIZE;
 const CAR_BLOCK = 348;
-const EXPRESS = 0;
 
 /** What a built shaft appends after its header: the fixed block, an entry per
  *  floor of the span and the car block. */
@@ -67,17 +60,4 @@ function expressEligibleFloors(bottomFloor: number, topFloor: number): number {
 export function expressPayloadSize(bottomFloor: number, topFloor: number): number {
   builtShaftPayloadSize(bottomFloor, topFloor);
   return builtShaftPayloadSize(1, Math.max(1, expressEligibleFloors(bottomFloor, topFloor)));
-}
-
-/** The same, sized the way an older 1994-game reading had it: an express shaft
- *  by the floors it stops at (at least one) rather than the floors it spans.
- *  Kept to build the older files the reader still has to read. */
-export function builtShaftPayloadSizeFor(
-  type: number,
-  bottomFloor: number,
-  topFloor: number,
-  servicedCount: number,
-): number {
-  const spanned = builtShaftPayloadSize(bottomFloor, topFloor);
-  return type === EXPRESS ? builtShaftPayloadSize(1, Math.max(1, servicedCount)) : spanned;
 }
