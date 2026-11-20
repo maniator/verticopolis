@@ -47,6 +47,7 @@ import { GITHUB_ISSUES, SPONSOR_URL, siteHref } from "../../site.mjs";
 <script>
   import { wireHelpMenu, type HelpTheme } from "../../../src/ui/helpSiteMenu";
   import { backToOpenGame, takeFromGameFlag } from "../../../src/ui/fromGame";
+  import { openStarlightSearch } from "../../../src/ui/starlightSearch";
   import { trackAppAction } from "../../../src/analytics";
 
   const root = document.getElementById("help-menubar");
@@ -58,11 +59,7 @@ import { GITHUB_ISSUES, SPONSOR_URL, siteHref } from "../../site.mjs";
       fromGame: takeFromGameFlag(location, history),
       backToGame: (e) => backToOpenGame(e),
       print: () => window.print(),
-      // Starlight's search closes on any click outside its box, and the menu
-      // item's own click is still on its way up to the window, so open it on
-      // the next tick, once that click is done.
-      openSearch: () =>
-        setTimeout(() => document.querySelector<HTMLButtonElement>("site-search button[data-open-modal]")?.click()),
+      openSearch: () => openStarlightSearch(),
       copyLink: (url) => navigator.clipboard.writeText(url),
       pageUrl: () => location.origin + location.pathname,
       theme: () => {
