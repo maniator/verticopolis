@@ -340,11 +340,12 @@ function buildInsights(ids) {
       },
     },
     {
-      // #2392: the per-tower count of the funnel above. Not on the dashboard
-      // yet: set `overview: true` once real rows from the first release that
-      // sends tower_n have checked it. Its rules are in docs/analytics-measurement-status.md,
+      // #2392: the per-tower count of the funnel above. Checked against real
+      // rows on 2026-11-20 (the towers founded 2026-11-18 and 11-19), so it
+      // goes on the dashboard. Its rules are in docs/analytics-measurement-status.md,
       // row 30.
       name: "First-tower funnel per tower (24h)",
+      overview: true,
       description:
         "Towers founded in the last 30 days (at least 24 hours ago), and how many of them laid a first build, and then reached 2 stars, within 24 hours of founding (in that order, like a funnel), production. A tower is one page life's tower_n (#2392), so a tab's second tower never finishes its first tower's funnel and an opened tower's stars finish none. A tower that climbs after a reload, or after it is opened again, is not counted. Rows from the first release that sends tower_n only; before it, the First-tower funnel tile counts per tab. Its windows are fixed in the SQL and do not follow the dashboard date filter.",
       query: hogql(
