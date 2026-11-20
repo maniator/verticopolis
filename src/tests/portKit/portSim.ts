@@ -30,7 +30,7 @@ export {
  * The engine is the authority. A test acts on it through port commands
  * ({@link PortSim.build}, {@link PortSim.buildTransport}, `tick`) and the
  * tooling-only members ({@link PortSim.startFireAt}, `setMoney`,
- * `setUnitState`, `setCustomersIn`), and reads it through {@link PortSim.state}, a read-only view
+ * `setUnitState`), and reads it through {@link PortSim.state}, a read-only view
  * of the engine's own save. A fixture's raw tower edits (`tower.place`, a
  * unit's state, the star) go through {@link PortSim.setup} or a
  * {@link draftTower}: a tooling tower (`src/game/toolingTower.ts`) on an
@@ -76,8 +76,6 @@ export class PortSim {
   private leaf: Leaf;
   private cached: Snapshot | undefined;
   private ticked = false;
-  /** A write the save does not carry, which a later `setup` would drop. */
-  private unsavedWrite = false;
 
   private readonly codes: PortCodes;
 
@@ -141,10 +139,6 @@ export class PortSim {
         "PortSim.setup runs before the engine's first tick; a mid-run write needs a tooling-only member on the engine",
       );
     }
-    if (this.unsavedWrite)
-      throw new Error(
-        "PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn; call setup first",
-      );
     const draft = draftFromSave(this.leaf.port.serialize());
     const out = edit(draft);
     const answer = this.leaf.port.loadSave(draft.saveText());
@@ -210,19 +204,6 @@ export class PortSim {
       throw new Error(
         `PortSim.setUnitState: the engine refused unit ${id} ${state}${occupants === undefined ? "" : ` x${occupants}`}`,
       );
-    this.changed();
-  }
-
-  /** Set a unit's live customer tally (`customersIn`), which lives outside
-   *  the save: how a test fills a venue to capacity. The unit's kind and its
-   *  venue cap are not checked, so any count from 0 to
-   *  `Number.MAX_SAFE_INTEGER` is taken; anything else throws. An attendance
-   *  venue's occupants follow the tally. A later `setup` throws, since its
-   *  reload would drop the stamp. */
-  setCustomersIn(id: number, count: number): void {
-    if (!this.leaf.setCustomersIn(id, count))
-      throw new Error(`PortSim.setCustomersIn: the engine refused unit ${id} customers ${count}`);
-    this.unsavedWrite = true;
     this.changed();
   }
 

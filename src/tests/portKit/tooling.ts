@@ -5,7 +5,6 @@ import type { UnitState } from "@verticopolis/engine/model/types";
  *  can refuse answers false, changing nothing. */
 export interface ToolingSetters {
   setUnitState(id: number, state: UnitState, occupants?: number): boolean;
-  setCustomersIn(id: number, count: number): boolean;
   startFireAt(id: number): boolean;
 }
 
@@ -13,7 +12,6 @@ export interface ToolingSetters {
 export function rustTooling(engine: WasmEngine): ToolingSetters {
   return {
     setUnitState: (id, state, occupants) => engine.setUnitState(id, state, occupants),
-    setCustomersIn: (id, count) => engine.setCustomersIn(id, count),
     startFireAt: (id) => engine.startFireAt(id),
   };
 }
