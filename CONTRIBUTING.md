@@ -56,7 +56,7 @@ always run everything. Every required check still reports a result on a
 skipped lane.
 
 ```bash
-npm run typecheck   # tsc --noEmit, then the api/ project, then scripts/ and tools/
+npm run typecheck   # tsc --noEmit, then the api/ project, then scripts/ and tools/, then e2e/ and the Vite and Playwright configs
 npm run lint        # eslint src api
 npm test            # vitest run (Tier-1 unit tests)
 npm run build       # production build must succeed
@@ -819,7 +819,7 @@ alone.
 | `help-site/` | The player manual (Astro + Starlight), served at help.verticopolis.com. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures, integration suites (`*.integration.test.ts`) and the repository-wide guard tests; unit tests colocate next to their source. |
-| `e2e/` | Tier-2 Playwright end-to-end specs. |
+| `e2e/` | Tier-2 Playwright end-to-end specs. `e2e/tsconfig.json` type-checks them with `vite.config.ts` and `playwright.config.ts` under `npm run typecheck`. |
 | `docs/` | Contributor docs: the architecture pages (`docs/architecture/`, start at its [README](./docs/architecture/README.md)), `screenshots.md`, and the performance and analytics references. |
 | `.github/workflows/` | CI and release automation. What runs on a pull request and why: [`docs/ci/pipeline.md`](./docs/ci/pipeline.md). |
 

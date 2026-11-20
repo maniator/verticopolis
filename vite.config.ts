@@ -634,6 +634,7 @@ export default defineConfig(({ command }) => ({
           // module ids, but be defensive so the split still holds if a build
           // (e.g. Windows) surfaces backslashes.
           if (id.replace(/\\/g, "/").includes("node_modules/excalibur")) return "vendor-excalibur";
+          return undefined;
         },
       },
     },
