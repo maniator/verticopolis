@@ -816,7 +816,7 @@ alone.
 | `src/storage/` | Save/load, the `VCZ1:` storage container, `.vctower` file handling. Who owns what, and every path: [`docs/architecture/save-paths.md`](./docs/architecture/save-paths.md). |
 | `api/` | Vercel serverless functions, with their own `tsconfig.json` (typecheck and lint cover them). |
 | `scripts/`, `tools/` | Build, release, screenshot and perf scripts, and the SimTower harness in `tools/simtower/`. `scripts/tsconfig.json` type-checks both under `npm run typecheck`; lint does not cover them yet. |
-| `help-site/` | The player manual (Astro + Starlight), served at help.verticopolis.com. Its own npm project: `npm run typecheck --prefix help-site` type-checks its TypeScript after `npm ci` in both, and the Help site workflow runs it. |
+| `help-site/` | The player manual (Astro + Starlight), served at help.verticopolis.com. Its own npm project: `npm run typecheck --prefix help-site` (`astro check`) type-checks its TypeScript and its `.astro` components after `npm ci` in both, and the Help site workflow runs it. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures, integration suites (`*.integration.test.ts`) and the repository-wide guard tests; unit tests colocate next to their source. |
 | `e2e/` | Tier-2 Playwright end-to-end specs. `e2e/tsconfig.json` type-checks them with `vite.config.ts` and `playwright.config.ts` under `npm run typecheck`. |

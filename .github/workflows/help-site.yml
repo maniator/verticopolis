@@ -56,8 +56,8 @@ jobs:
       - name: Site dependencies
         run: npm ci --prefix help-site --no-audit --no-fund
 
-      # The site's TypeScript (src/**/*.ts) with Astro's generated content
-      # types, on the game's tsc.
+      # The site's TypeScript: src/**/*.ts and the .astro components, their
+      # scripts included, with astro check.
       - name: Type-check the site
         run: npm run typecheck --prefix help-site
 
