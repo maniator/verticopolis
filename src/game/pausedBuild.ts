@@ -7,7 +7,7 @@ import { catalogOf } from "./portAccess";
 /**
  * Building while paused (#1936). The 1994 game refuses new construction while
  * its clock is stopped, so Classic does too; Modern lets the player lay out a
- * block at speed 0, a deliberate divergence (PARITY.md). The engine states the
+ * block at speed 0, a deliberate divergence (docs/parity.md in Verticopolis/engine). The engine states the
  * rule in its catalog (`rules.buildsWhilePaused`) and has no paused state of
  * its own: pause belongs to the host, so the host's build tools (pointer,
  * touch, keyboard) ask here before they place anything. The engine command

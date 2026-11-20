@@ -53,7 +53,8 @@ sprite is drawn in code.
 
 Where a Classic tower differs from the original, on purpose or not yet, is on
 [Differences from the 1994 game](https://help.verticopolis.com/differences/);
-the developer's checklist is [PARITY.md](PARITY.md).
+the developer's checklist is
+[`docs/parity.md`](https://github.com/Verticopolis/engine/blob/main/docs/parity.md) in Verticopolis/engine.
 
 ## Quick start
 

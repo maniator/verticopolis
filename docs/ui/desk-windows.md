@@ -3,7 +3,8 @@
 On a computer (a window at least 1024 by 600 whose main pointer is a mouse or trackpad, touchscreen laptops included, tablets with a pen or a keyboard trackpad left out; `?desk=on` turns it on on any screen 768 wide or more, such as a phone in its browser's desktop mode) the game runs as a
 1994 desktop: each part of the game is its own window on a teal desk with a
 taskbar. Phones, tablets, small windows and the title screen keep the
-ordinary layout. The code is `src/ui/desk/`; the numbers below live in
+ordinary layout. The code is `src/ui/desk/` here and `windows/desk/*` from
+`@verticopolis/components`; the numbers below live in the components'
 `src/ui/desk/deskGeometry.ts` and its tests.
 
 | Window | Moves | Resizes | Minimize | Maximize | Close | Starts at |

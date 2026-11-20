@@ -190,7 +190,8 @@ the zeroed-header-count export bug was found).
   evaluation, `Quality = 300 - total stress / tenants`, not our bytes: a truly
   empty tower renders, and any seeded population renders fine). It bites only
   synthetic all-vacant fixtures, never a real save. Party-ruled won't-fix
-  2026-07-20 (issue #510). See PARITY.md.
+  2026-07-20 (issue #510). See the engine's
+  [parity checklist](https://github.com/Verticopolis/engine/blob/main/docs/parity.md).
 - The game is 16-bit Windows 3.1 (`STOWER.EXE` on the disc is a Director autorun
   shell, not the game). It renders through the disc's WinG runtime.
 - Runs in a Wine **virtual desktop** so WSLg routes mouse input to the window.

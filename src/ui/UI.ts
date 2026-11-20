@@ -305,7 +305,7 @@ export class UI {
     }
   }
 
-  /** The one way to build a title-bar ✕ (see docs/design-system.md): every
+  /** The one way to build a title-bar ✕ (see docs/ui/windows-in-code.md): every
    * dismissible window's close button comes from here so they can't drift.
    * @internal friend-module access (uiPanels inspector card). */
   titleBarClose(className: string, onClick: () => void): HTMLButtonElement {
