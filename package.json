@@ -86,6 +86,10 @@
     "workbox-build": {
       "glob": "^14.0.6"
     },
-    "uri-js": "npm:fast-uri@^3.1.9"
+    "uri-js": "npm:fast-uri@^3.1.9",
+    "filelist": {
+      ".": "^2.0.2",
+      "minimatch": "^11.0.5"
+    }
   }
 }
