@@ -27,8 +27,11 @@ export const SURFACES: Record<string, string[]> = {
     "Cargo.lock",
     "scripts/wasm-build.ts",
     "scripts/build-engine-wasm.sh",
+    "scripts/layer-build.ts",
+    "packages/verticopolis-engine/tsconfig.build.json",
   ],
   "WASM binding (Verticopolis/engine)": ["engine-rs/src/wasm.rs", "engine-rs/src/wasm/", "engine-rs/src/frame.rs"],
+  "The package's TypeScript layer (Verticopolis/engine)": ["packages/verticopolis-engine/src/", "src/events/"],
   "Binding and hosts (Verticopolis/components)": ["src/engineBinding/", "src/wasmhost/", "src/simport/"],
   "Rendering and audio (Verticopolis/components)": [
     "src/render/",
