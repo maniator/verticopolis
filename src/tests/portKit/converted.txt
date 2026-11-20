@@ -3,12 +3,6 @@
 # parity projects leave them out (they host nothing, since the suite starts its
 # engine itself), and `npm run test:port` runs them with the engine required. src/tests/portKit/converted.guard.test.ts keeps this list
 # and the files that use the kit in step.
-src/tests/integration/fire.integration.test.ts
-src/tests/integration/trafficTeeth.integration.test.ts
 src/tests/integration/onboarding.integration.test.ts
-src/tests/integration/storageEngineSave.integration.test.ts
-src/tests/integration/traffic.integration.test.ts
-src/tests/integration/heatmap.integration.test.ts
-src/tests/integration/venueOccupancy.integration.test.ts
 src/tests/integration/towerCallItems.integration.test.ts
 src/tests/portKit/portSim.integration.test.ts

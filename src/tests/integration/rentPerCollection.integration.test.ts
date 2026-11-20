@@ -24,8 +24,7 @@ const RENTAL_LINE = /^Monthly rent collected: \$([\d,]+) \((\d+) rentals?\)\.$/;
 
 type Save = { minutes: number; units: Record<string, unknown>[]; log: { text: string }[]; periodMarks?: unknown };
 /** The tooling build's raw clock move, which the test engine carries and the
- *  game's port does not declare (as `wasmHostLogText.integration.test.ts`
- *  uses it). */
+ *  game's port does not declare. */
 type ClockedEngine = EnginePort & { advanceClock(minutes: number): void };
 const saveOf = (engine: EnginePort): Save => JSON.parse(engine.serialize()) as Save;
 

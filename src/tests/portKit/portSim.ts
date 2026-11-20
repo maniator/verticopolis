@@ -1,7 +1,5 @@
 import { afterEach, describe } from "vitest";
-import type { Person } from "@verticopolis/engine/model/engineTypes";
 import type { FacilityKind, UnitState } from "@verticopolis/engine/model/types";
-import type { HeatCell, HeatmapMode } from "@verticopolis/engine/model/engineTypes";
 import type { EnginePort } from "@verticopolis/engine/port/enginePort";
 import type { StatsReport } from "@verticopolis/engine/port/panels";
 import { PortCodes } from "@verticopolis/engine/port/portCodes";
@@ -31,8 +29,8 @@ export {
  *
  * The engine is the authority. A test acts on it through port commands
  * ({@link PortSim.build}, {@link PortSim.buildTransport}, `tick`) and the
- * tooling-only members ({@link PortSim.startFire}, `bombThreat`,
- * `setMoney`), and reads it through {@link PortSim.state}, a read-only view
+ * tooling-only members ({@link PortSim.startFireAt}, `setMoney`,
+ * `setUnitState`), and reads it through {@link PortSim.state}, a read-only view
  * of the engine's own save. A fixture's raw tower edits (`tower.place`, a
  * unit's state, the star) go through {@link PortSim.setup} or a
  * {@link draftTower}: a tooling tower (`src/game/toolingTower.ts`) on an
@@ -45,14 +43,7 @@ export {
 interface Leaf extends ToolingSetters {
   readonly port: EnginePort;
   /** The tooling-only members (binding tier 3); the setters are {@link ToolingSetters}. */
-  startFire(): void;
-  bombThreat(): void;
-  evaluateStar(): void;
   setMoney(amount: number): void;
-  /** The live crowd as the conformance view writes it. */
-  crowdView(): { people: Person[] };
-  /** The hourly utilization average the engine holds for a shaft, if any. */
-  elevatorUtilization(id: number): number | undefined;
   free(): void;
 }
 
@@ -60,16 +51,8 @@ function makeLeaf(save: string): Leaf {
   const engine: WasmEngine = wasm().Engine.fromSave(save);
   return {
     port: engine as unknown as EnginePort,
-    startFire: () => engine.startFire(),
-    bombThreat: () => engine.bombThreat(),
-    evaluateStar: () => engine.evaluateStar(),
     setMoney: (amount) => engine.setMoney(amount),
     ...rustTooling(engine),
-    crowdView: () => JSON.parse(engine.crowdView()) as { people: Person[] },
-    elevatorUtilization: (id) =>
-      (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(
-        ([shaft]) => shaft === id,
-      )?.[1],
     free: () => engine.free(),
   };
 }
@@ -89,41 +72,10 @@ export interface CommandResult {
   readonly delta: number;
 }
 
-/** A batch price target: a price, the unit's default, or No Rate. */
-export type BatchTarget = number | "default" | "noRate";
-
-/** A batch's counts, by the layout's slot names. */
-export interface BatchResult {
-  readonly matched: number;
-  readonly eligible: number;
-  readonly changed: number;
-  readonly skippedSold: number;
-  readonly skippedCustom: number;
-  readonly customOverwritten: number;
-  readonly clampedLow: number;
-  readonly clampedHigh: number;
-}
-
-/** The port's number for a batch target: NaN is the default, -1 No Rate. */
-function batchCode(target: BatchTarget): number {
-  if (target === "default") return NaN;
-  return target === "noRate" ? -1 : target;
-}
-
-function batchResult(slots: readonly string[], rec: Float64Array): BatchResult {
-  const out: Record<string, number> = {};
-  slots.forEach((name, i) => {
-    if (name !== "status" && name !== "ok" && name !== "delta") out[name] = rec[i];
-  });
-  return out as unknown as BatchResult;
-}
-
 export class PortSim {
   private leaf: Leaf;
   private cached: Snapshot | undefined;
   private ticked = false;
-  /** A write the save does not carry, which a later `setup` would drop. */
-  private unsavedWrite = false;
 
   private readonly codes: PortCodes;
 
@@ -161,89 +113,10 @@ export class PortSim {
     return this.leaf.port.viewFrame(true)[at];
   }
 
-  /** The analytics-only emergency tallies (#611). */
-  emergencyCounts(): { fires: number; firesGutRooms: number; bombs: number } {
-    return {
-      fires: this.frameSlot("firesStarted"),
-      firesGutRooms: this.frameSlot("firesGutRooms"),
-      bombs: this.frameSlot("bombsDetonated"),
-    };
-  }
-
   /** The stats screen as the engine answers it (`statsSheet`): the HUD strip,
    *  the ledger averages, the next star, the milestones, the elevator rows. */
   statsReport(): StatsReport {
     return statsReport(this.leaf.port.statsSheet(), new PortCodes(this.leaf.port));
-  }
-
-  /** A unit's card as the engine answers it (`unitCard`), by the layout's slot
-   *  names: `served`, `reachable`, `satisfaction`, `rent` and the rest. An empty
-   *  object for an id the engine does not know. */
-  unitCard(id: number): Readonly<Record<string, number>> {
-    const rec = this.leaf.port.unitCard(id);
-    const names = new PortCodes(this.leaf.port).fields("unitCard");
-    return Object.fromEntries(Array.from(rec, (v, i) => [names[i], v]));
-  }
-
-  /** The hourly utilization average the engine holds for a shaft, or
-   *  undefined when it holds none (a shaft it never sampled or has dropped). */
-  elevatorUtilization(id: number): number | undefined {
-    return this.leaf.elevatorUtilization(id);
-  }
-
-  /** The overlay cells for `mode`, decoded from the port's `heatCells`
-   *  record by the `heatCell` slot names of the port's own layout. */
-  heatCells(mode: HeatmapMode): HeatCell[] {
-    const layout = JSON.parse(this.leaf.port.viewLayout()) as {
-      heatModes: HeatmapMode[];
-      heatTints: string[];
-      records: Record<string, string[]>;
-    };
-    const modeIndex = layout.heatModes.indexOf(mode);
-    if (modeIndex < 0) throw new Error(`PortSim.heatCells: the engine's layout has no heat mode "${mode}"`);
-    const slots = layout.records.heatCell ?? [];
-    const slot = (name: string): number => {
-      const at = slots.indexOf(name);
-      if (at < 0) throw new Error(`PortSim.heatCells: the engine's heatCell record has no "${name}" slot`);
-      return at;
-    };
-    const [floor, minX, maxX, severity, tint] = ["floor", "minX", "maxX", "severity", "tint"].map(slot);
-    const r = this.leaf.port.heatCells(modeIndex);
-    if (r.length % slots.length !== 0)
-      throw new Error(`PortSim.heatCells: ${r.length} values is not a whole number of ${slots.length}-slot cells`);
-    const cells: HeatCell[] = [];
-    for (let i = 0; i < r.length; i += slots.length) {
-      const cell: HeatCell = { floor: r[i + floor], minX: r[i + minX], maxX: r[i + maxX], severity: r[i + severity] };
-      const code = r[i + tint];
-      if (!Number.isInteger(code) || code < 0 || code >= layout.heatTints.length)
-        throw new Error(`PortSim.heatCells: tint code ${code} is not in the layout's heatTints`);
-      if (code > 0) cell.tint = layout.heatTints[code] as HeatCell["tint"];
-      cells.push(cell);
-    }
-    return cells;
-  }
-
-  /** The mean congestion over populated floors (the lobby left out). */
-  congestion(): number {
-    return this.leaf.port.congestion();
-  }
-
-  /** The raw congestion ratio of one floor, as the engine reports it. */
-  floorCongestion(floor: number): number {
-    return this.leaf.port.floorCongestion(floor);
-  }
-
-  /** The ids of the transports behind one floor's reading, as the engine
-   *  reports them. */
-  congestionCause(floor: number): number[] {
-    return Array.from(this.leaf.port.congestionCause(floor));
-  }
-
-  /** The busiest floor's raw ratio and which floor it is (undefined when no
-   *  floor has a reading). */
-  hotspot(): { ratio: number; floor: number | undefined } {
-    const [ratio, floor] = this.leaf.port.hotspot();
-    return { ratio, floor: Number.isNaN(floor) ? undefined : floor };
   }
 
   /** The engine's save text. */
@@ -266,10 +139,6 @@ export class PortSim {
         "PortSim.setup runs before the engine's first tick; a mid-run write needs a tooling-only member on the engine",
       );
     }
-    if (this.unsavedWrite)
-      throw new Error(
-        "PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn; call setup first",
-      );
     const draft = draftFromSave(this.leaf.port.serialize());
     const out = edit(draft);
     const answer = this.leaf.port.loadSave(draft.saveText());
@@ -312,88 +181,10 @@ export class PortSim {
     return must(this.buildTransport(kind, x, bottom, top), `buildTransport ${kind} at ${x} (${bottom}-${top})`);
   }
 
-  /** Extend shaft `id` up or down to `targetFloor`. */
-  extendShaft(id: number, up: boolean, targetFloor: number): CommandResult {
-    return this.result(this.leaf.port.extendShaft(id, up, targetFloor));
-  }
-
-  /** Demolish unit `id` through the port; whether it was done. */
-  demolish(id: number, bulldoze = false): boolean {
-    return this.result(this.leaf.port.demolish(id, bulldoze)).ok;
-  }
-
-  /** Price one unit one rung up (1) or down (-1); the rent after, or null
-   *  when the engine refused. */
-  stepRent(id: number, dir: number): number | null {
-    const rec = this.leaf.port.stepRent(id, dir);
-    this.changed();
-    return rec[0] === 1 ? rec[2] : null;
-  }
-
-  /** Price one unit at `target`; the rent after, or null when refused. */
-  setRent(id: number, target: number): number | null {
-    const rec = this.leaf.port.setRent(id, target);
-    this.changed();
-    return rec[0] === 1 ? rec[2] : null;
-  }
-
-  /** Take a unit off the market (Classic's No Rate); whether it was done. */
-  noRate(id: number): boolean {
-    return this.result(this.leaf.port.noRate(id)).ok;
-  }
-
-  /** Apply a price target to every unit of `kind`; null when the engine
-   *  refused (an unpriced kind, or No Rate in Modern). */
-  rentBatch(
-    kind: FacilityKind,
-    target: BatchTarget,
-    options: { onlyDefaultPriced?: boolean } = {},
-  ): BatchResult | null {
-    const rec = this.leaf.port.rentBatch(this.codes.kind(kind), batchCode(target), options.onlyDefaultPriced === true);
-    this.changed();
-    return rec[0] === 1 ? batchResult(this.codes.fields("rentBatch"), rec) : null;
-  }
-
-  /** What {@link rentBatch} would do, with nothing written; null when refused. */
-  quoteRentBatch(
-    kind: FacilityKind,
-    target: BatchTarget,
-    options: { onlyDefaultPriced?: boolean } = {},
-  ): BatchResult | null {
-    const rec = this.leaf.port.quoteRentBatch(
-      this.codes.kind(kind),
-      batchCode(target),
-      options.onlyDefaultPriced === true,
-    );
-    return rec[0] === 1 ? batchResult(this.codes.fields("quoteRentBatch"), rec) : null;
-  }
-
-  evaluateStar(): void {
-    this.leaf.evaluateStar();
-    this.changed();
-  }
-
-  /** Sell what stands at a cell (a floor or lobby tile included). */
-  sellAt(floor: number, x: number): boolean {
-    const unit = this.state.tower.unitAt(floor, x);
-    const rec = unit ? this.leaf.port.demolish(unit.id, false) : this.leaf.port.demolishTile(floor, x, false);
-    return this.result(rec).ok;
-  }
-
-  startFire(): void {
-    this.leaf.startFire();
-    this.changed();
-  }
-
   /** Start a fire in room `id` as the daily roll's outbreak does, with the
    *  paid-rescue offer, drawing nothing from the random stream. */
   startFireAt(id: number): void {
     if (!this.leaf.startFireAt(id)) throw new Error(`PortSim.startFireAt: the engine refused ${id}`);
-    this.changed();
-  }
-
-  bombThreat(): void {
-    this.leaf.bombThreat();
     this.changed();
   }
 
@@ -414,25 +205,6 @@ export class PortSim {
         `PortSim.setUnitState: the engine refused unit ${id} ${state}${occupants === undefined ? "" : ` x${occupants}`}`,
       );
     this.changed();
-  }
-
-  /** Set a unit's live customer tally (`customersIn`), which lives outside
-   *  the save: how a test fills a venue to capacity. The unit's kind and its
-   *  venue cap are not checked, so any count from 0 to
-   *  `Number.MAX_SAFE_INTEGER` is taken; anything else throws. An attendance
-   *  venue's occupants follow the tally. A later `setup` throws, since its
-   *  reload would drop the stamp. */
-  setCustomersIn(id: number, count: number): void {
-    if (!this.leaf.setCustomersIn(id, count))
-      throw new Error(`PortSim.setCustomersIn: the engine refused unit ${id} customers ${count}`);
-    this.unsavedWrite = true;
-    this.changed();
-  }
-
-  /** The live crowd: a copy of each person as the
-   *  conformance crowd view writes it (an unset optional field is absent). */
-  people(): Person[] {
-    return this.leaf.crowdView().people;
   }
 
   /** Free the engine. The kit calls it after each test. */
