@@ -29,13 +29,13 @@ import { CARD_TEXT_WRITER, writeAfterPassingRun } from "../goldens/updateGate";
  * shipped Rust-backed card prints for every room and shaft of a saved tower,
  * against the lines the TypeScript reference card printed for the same tower,
  * pinned in the card-text golden (`src/tests/goldens/cardText.ts`, #1806), room
- * by room, in card order. The facts tests (`conformanceWasmDiagnostics`) only
- * check lines a fact section names, so a line the reference drew with no fact
- * behind it (the shoppers-too-far line) slipped through; this compares the
- * text itself. A comparison as a set missed that the Rust card put a venue's
- * business block above its notice (the every-kind case puts a shop on notice,
- * a state only a save can hold, since play gives notice to lease tenants
- * alone).
+ * by room, in card order. The engine's facts tests (its
+ * `conformanceWasmDiagnostics` glue suite) only check lines a fact section
+ * names, so a line the reference drew with no fact behind it (the
+ * shoppers-too-far line) slipped through; this compares the text itself. A
+ * comparison as a set missed that the Rust card put a venue's business block
+ * above its notice (the every-kind case puts a shop on notice, a state only a
+ * save can hold, since play gives notice to lease tenants alone).
  *
  * The engine, its catalog and the card are set up as the game sets them up:
  * the tower file goes through the engine's own `.vctower` loader, the catalog

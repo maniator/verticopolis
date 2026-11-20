@@ -31,7 +31,7 @@ Already incremental: gameplay events (one drain per reply), the log (`logSince` 
 
 ## 3. Candidate designs
 
-All three must keep the existing parity bar: the step, coalesced and worker hosts reach the same exact engine save, read model, crowd, cars, counters, log, events, money and clock (`wasmWorkerHost.integration.test.ts`), and the conformance digest across ts and wasm is unchanged (`conformanceWasm.integration.test.ts`).
+All three must keep the existing parity bar: the step, coalesced and worker hosts reach the same exact engine save, read model, crowd, cars, counters, log, events, money and clock (`wasmWorkerHost.integration.test.ts`), and the conformance digests are unchanged (the engine's `conformanceWasm` glue suite in Verticopolis/engine).
 
 ### A. "Changed since last sent", computed in the engine (recommended)
 

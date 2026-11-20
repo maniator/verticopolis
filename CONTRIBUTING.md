@@ -127,13 +127,12 @@ Verticopolis has **two test tiers**:
     and `@verticopolis/engine/conformance` (the conformance scenarios, their
     pinned hashes, the catalog digests and the fixtures). `npm install` copies
     the player build into `src/public/engine/` (`scripts/engine-install.ts`),
-    which is build output and is not checked in. The conformance suite runs
-    in this tier: `conformanceWasm.integration.test.ts` replays every
-    scenario of the installed conformance package on the installed engine and
-    must reproduce its hashes, so the engine the game pins is the one the
-    lock describes. The lock, the engine's goldens, its fuzzers and its Rust
-    tests live in Verticopolis/engine, which owns every simulation rule (see
-    its CONTRIBUTING.md); the rendering, audio, binding and host modules come
+    which is build output and is not checked in. The conformance suite does
+    not run here: Verticopolis/engine replays it natively, under WASI and
+    through the JavaScript binding the game loads (its glue suites) on every
+    pull request and push to its main branch. The lock, the engine's goldens,
+    its fuzzers and its Rust tests live there too, since it owns every
+    simulation rule (see its CONTRIBUTING.md); the rendering, audio, binding and host modules come
     from `@verticopolis/components`. To move the game to a new engine, raise
     the `@verticopolis/engine` pin in `package.json` and run `npm install`;
     the suites check the rest.

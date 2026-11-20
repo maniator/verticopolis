@@ -6,7 +6,7 @@ import type { FacilityKind } from "@verticopolis/engine/model/types";
  * pin. The exemption dates from when the lock also pinned the TypeScript
  * engine, which keeps a one story wedding hall where the Rust engine builds the
  * 28 wide, five story cathedral. The lock is now written from the Rust catalog
- * alone, and `conformanceWasm.integration.test.ts` pins the hall's footprint
+ * alone, and the engine's `conformanceWasm` glue suite pins the hall's footprint
  * directly. `LOCK_FOOTPRINT_EXEMPT` in `src/catalog.rs` is the same
  * list, and dropping it moves the lock (an engine crate change).
  */
