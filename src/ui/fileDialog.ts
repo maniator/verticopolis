@@ -1,4 +1,4 @@
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import type { UI } from "./UI";
 import { cleanFileName, freeName, type TowerFileEntry } from "../storage/fileSpace";
 import type { FilePlace } from "./templates/fileDialogPlaces";
@@ -118,7 +118,7 @@ export interface FileDialogResume {
 const carriesFiles = (e: DragEvent): boolean => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
 
 export function showFileDialog(
-  ui: Pick<UI, "openModal" | "closeModal">,
+  ui: Pick<UI, "openModal" | "renderModal" | "closeModal">,
   ctx: FileDialogCtx,
   resume?: FileDialogResume,
 ): void {
@@ -143,14 +143,10 @@ export function showFileDialog(
   const placeFiles = (): readonly TowerFileEntry[] => (inLinked() ? linked!.files() : ctx.files());
   const allowed = (): boolean => !inLinked() || linked!.state()?.access === "granted";
   const placeName = (): string => (inLinked() ? `"${linked!.state()!.name}"` : "My Towers");
-  const box = ui.openModal(
-    { title: opening ? "Open" : "Save As", body: html`<div class="fd-host"></div>` },
-    {
-      displaceable: opening,
-    },
-  );
-  const host = box.querySelector<HTMLElement>(".fd-host")!;
-  box.classList.add("fd-window");
+  const title = opening ? "Open" : "Save As";
+  // The window's body is the `.fd` itself, straight under the modal's box,
+  // where the components' stylesheet sizes the window.
+  const box = ui.openModal({ title, body: html`` }, { displaceable: opening });
   let rows: FileRow[] = [];
 
   const rowOf = (id: string | null) => rows.find((r) => r.id === id) ?? null;
@@ -185,7 +181,7 @@ export function showFileDialog(
       where: whereWords(),
       lookOpen: state.look,
     };
-    render(fileDialogTemplate(view, handlers), host);
+    ui.renderModal({ title, body: fileDialogTemplate(view, handlers) });
   }
   const offFiles = ctx.onChange(draw);
   const offLinked = linked?.onChange(draw);
@@ -266,7 +262,7 @@ export function showFileDialog(
    *  can't be taken back. */
   function ask(question: FileAsk): void {
     set({ ask: question, menu: null });
-    host.querySelector<HTMLElement>(question.alt ? '[data-fd-ask="alt"]' : '[data-fd-ask="no"]')?.focus();
+    box.querySelector<HTMLElement>(question.alt ? '[data-fd-ask="alt"]' : '[data-fd-ask="no"]')?.focus();
     ctx.asked?.(question.kind);
   }
 
@@ -290,7 +286,7 @@ export function showFileDialog(
     // The game never renames a file on the player's computer.
     if (!target || state.busy || inLinked()) return;
     set({ renaming: target.id, menu: null, line: null });
-    const input = host.querySelector<HTMLInputElement>(".fd-rename");
+    const input = box.querySelector<HTMLInputElement>(".fd-rename");
     input?.focus();
     input?.select();
   }
@@ -340,18 +336,18 @@ export function showFileDialog(
     const target = fileOf(state.selected);
     if (target?.type !== "tower" || inLinked() || !ctx.versions) return;
     const { selected, name, filter, sort, place } = state;
-    const scroll = host.querySelector(".fd-rows")?.scrollTop ?? 0;
+    const scroll = box.querySelector(".fd-rows")?.scrollTop ?? 0;
     ctx.versions(target.id, () => showFileDialog(ui, ctx, { selected, name, filter, sort, place, scroll }));
   }
 
   function focusList(): void {
-    host.querySelector<HTMLElement>(".fd-rows")?.focus();
+    box.querySelector<HTMLElement>(".fd-rows")?.focus();
   }
 
   /** Back where the question came from once it is dropped: the File name box
    *  after Save As asked about a name, else the list. */
   function focusAfterAsk(asked: FileAsk | null): void {
-    if (asked?.kind === "replace") host.querySelector<HTMLElement>("#fd-name")?.focus();
+    if (asked?.kind === "replace") box.querySelector<HTMLElement>("#fd-name")?.focus();
     else focusList();
   }
 
@@ -394,9 +390,9 @@ export function showFileDialog(
    *  a press near the right or bottom edge (a phone's long-press) opens it
    *  to the left of or above the finger instead of off the edge. */
   function openMenu(id: string, x: number, y: number): void {
-    const frame = (host.querySelector(".fd") ?? box).getBoundingClientRect();
+    const frame = (box.querySelector(".fd") ?? box).getBoundingClientRect();
     set({ selected: id, name: rowOf(id)?.name ?? state.name, menu: { id, x: x - frame.left, y: y - frame.top } });
-    const menu = host.querySelector<HTMLElement>(".fd-menu");
+    const menu = box.querySelector<HTMLElement>(".fd-menu");
     if (menu) {
       const inside = (at: number, size: number, room: number) => Math.max(0, Math.min(at, room - size));
       const kept = {
@@ -406,7 +402,7 @@ export function showFileDialog(
       };
       if (kept.x !== state.menu?.x || kept.y !== state.menu?.y) set({ menu: kept });
     }
-    host.querySelector<HTMLElement>(".fd-menu .mb-item")?.focus();
+    box.querySelector<HTMLElement>(".fd-menu .mb-item")?.focus();
   }
 
   const handlers = {
@@ -456,7 +452,7 @@ export function showFileDialog(
       set,
       linked,
       run,
-      host,
+      host: box,
       focusList,
       remember: rememberPlace,
     }),
@@ -467,7 +463,7 @@ export function showFileDialog(
   box.addEventListener("keydown", (e) => {
     if (e.key === "Tab" && state.ask) {
       e.preventDefault();
-      const buttons = [...host.querySelectorAll<HTMLElement>(".fd-ask .btn")];
+      const buttons = [...box.querySelectorAll<HTMLElement>(".fd-ask .btn")];
       const at = buttons.indexOf(document.activeElement as HTMLElement);
       buttons[(at + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
       return;
@@ -478,7 +474,7 @@ export function showFileDialog(
     const asked = state.ask;
     const looking = state.look && !asked;
     set({ menu: null, ask: null, look: false });
-    if (looking) host.querySelector<HTMLElement>(".fd-look")?.focus();
+    if (looking) box.querySelector<HTMLElement>(".fd-look")?.focus();
     else focusAfterAsk(asked);
   });
   box.addEventListener("dragenter", (e) => {
@@ -510,12 +506,12 @@ export function showFileDialog(
   if (inLinked()) void linked!.refresh().catch(() => {});
   if (resume) {
     // Back from a child window: the list where it was, the row in focus.
-    const list = host.querySelector<HTMLElement>(".fd-rows");
+    const list = box.querySelector<HTMLElement>(".fd-rows");
     if (list) list.scrollTop = resume.scroll;
     focusList();
   } else if (opening) focusList();
   else {
-    const input = host.querySelector<HTMLInputElement>("#fd-name");
+    const input = box.querySelector<HTMLInputElement>("#fd-name");
     input?.focus();
     input?.select();
   }

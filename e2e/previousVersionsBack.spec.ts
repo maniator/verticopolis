@@ -35,14 +35,14 @@ const row = (page: Page, name: string) => page.locator("#modal .fd-row", { hasTe
 
 async function versionsFromMenu(page: Page): Promise<void> {
   await page.locator("#modal .fd-menu").getByRole("menuitem", { name: "Previous versions…" }).click();
-  await expect(page.locator("#modal .pv-window")).toBeVisible();
+  await expect(page.locator("#modal .modal-box > .pv")).toBeVisible();
   await expect(page.locator("#modal .fd")).toHaveCount(0);
 }
 
 /** The Open or Save As window is back, titled `title`, with `name` picked. */
 async function expectBack(page: Page, title: string, name: string): Promise<void> {
   await expect(page.locator("#modal")).toHaveJSProperty("open", true);
-  await expect(page.locator("#modal .pv-window")).toHaveCount(0);
+  await expect(page.locator("#modal .modal-box > .pv")).toHaveCount(0);
   await expect(page.locator("#modal .win-title")).toContainText(title);
   await expect(row(page, name)).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#modal #fd-name")).toHaveValue(name);

@@ -1189,7 +1189,7 @@ function buildInsights(ids) {
     {
       name: "The desk: windows, taskbar and Control Panel",
       description:
-        "app_action for the 1994 desk on a computer: desk_shown and desk_title_shown (once per page life the desk comes up over a tower, or around the title screen), desk_window (<window>_<verb>, such as map_min, tower_max or tower_close), desk_task (a taskbar button: <window>_front, _min or _restore), desk_start_open (the Verticopolis menu opened, title or tower) and desk_start (its item), desk_tray (display or sound), desk_win_menu_open (taskbar or title_bar) and desk_win_menu (<window>_<command>), and desk_control (the Control Panel icon), production.",
+        "app_action for the 1994 desk on a computer and the pocket desk on a phone or tablet: desk_shown (once per page life the desk comes up over a tower; detail desk or pocket) and desk_title_shown (around the title screen), desk_window (<window>_<verb>, such as map_min, tower_max or tower_close), desk_task (a taskbar button: <window>_front, _min or _restore), desk_start_open (the Verticopolis menu opened, title or tower) and desk_start (its item), desk_tray (display or sound), desk_win_menu_open (taskbar or title_bar) and desk_win_menu (<window>_<command>), and desk_control (the Control Panel icon), production.",
       query: trends([series("app_action", "Actions")], {
         breakdown: ["action", "detail"],
         display: "ActionsTable",

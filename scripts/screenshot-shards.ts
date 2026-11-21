@@ -178,6 +178,9 @@ export const SHARDS: Record<string, string[]> = {
   // README's day and night pair on a second one, the title window, and the
   // startup screen on a computer and a phone.
   desk: ["desk", "desk-hero", "desk-title", "startup-sunrise", "startup-sunrise-phone"],
+  // The pocket desk on a phone held each way (owner, 2026-11-20), with the Map
+  // open and closed; its own shard, as new features get.
+  "pocket-desk": ["desk-pocket-phone", "desk-pocket-landscape"],
   // The appearance schemes (owner, 2026-11-17): the dialog, the canon tower's
   // desk in Skyline and High Contrast, a phone in Skyline and the phone title
   // screen in both; its own shard,

@@ -33,6 +33,7 @@ const ui = {
     boxes.push(box);
     return box;
   }),
+  renderModal: vi.fn((tpl: ModalView) => render(viewTemplate(tpl), boxes[boxes.length - 1])),
   closeModal: vi.fn(() => boxes.forEach((b) => b.remove())),
 };
 

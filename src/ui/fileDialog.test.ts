@@ -25,7 +25,11 @@ let listeners: (() => void)[];
 let ctx: FileDialogCtx & {
   [K in "open" | "save" | "rename" | "duplicate" | "remove" | "add" | "fromComputer"]: ReturnType<typeof vi.fn>;
 };
-let ui: { openModal: ReturnType<typeof vi.fn>; closeModal: ReturnType<typeof vi.fn> };
+let ui: {
+  openModal: ReturnType<typeof vi.fn>;
+  renderModal: ReturnType<typeof vi.fn>;
+  closeModal: ReturnType<typeof vi.fn>;
+};
 let box: HTMLElement | null;
 
 function makeCtx(mode: "open" | "saveAs", over: Partial<FileDialogCtx> = {}) {
@@ -76,6 +80,7 @@ beforeEach(() => {
       document.body.append(box);
       return box;
     }),
+    renderModal: vi.fn((tpl: ModalView) => render(viewTemplate(tpl), box!)),
     closeModal: vi.fn(() => box?.remove()),
   };
   clearFileClipboardForTests();

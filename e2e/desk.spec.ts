@@ -5,7 +5,8 @@ import { expectEngineHosted } from "./helpers";
  * The 1994 desk in a real browser: a computer gets the tower, Info, Tools,
  * the Map and the Bulletin as windows on a teal desk with a taskbar. Windows
  * minimize to the taskbar and come back from it, the tower maximizes and
- * resizes, the Control Panel opens from the tray, a phone or a touch screen
+ * resizes, the Control Panel opens from the tray, a sideways tablet gets it
+ * with touch chrome, a touch phone gets the pocket desk, a phone without touch
  * never gets it, and `?desk=on` brings it to a smaller screen (there is no
  * player switch; `?desk=off` is for testing).
  * The other specs turn the desk off through the config's storageState; this
@@ -203,15 +204,40 @@ test.describe("the desk on a computer", () => {
 test.describe("the desk on a computer-sized touch screen", () => {
   test.use({ viewport: DESKTOP, hasTouch: true });
 
-  test("a big screen whose main input is touch keeps its own layout", async ({ page }) => {
+  test("a sideways tablet gets the full desk with touch chrome", async ({ page }) => {
     await load(page);
-    await expect(body(page)).toHaveClass(/\bsplash-up\b/);
+    await expect(body(page)).toHaveClass(/\bdesk-title\b/);
+    await enterTower(page);
+    await expect(body(page)).toHaveClass(/\bdesk\b/);
+    await expect(body(page)).toHaveClass(/\bdesk-touch\b/);
+    await expect(body(page)).not.toHaveClass(/\bdesk-pocket\b/);
+  });
+});
+
+test.describe("the desk on a touch phone", () => {
+  test.use({ viewport: PHONE, hasTouch: true });
+
+  test("a phone gets the pocket desk: the tower window holds Info, Tools and the tower, the Map floats in the tower's view", async ({
+    page,
+  }) => {
+    await load(page);
     await expect(body(page)).not.toHaveClass(/\bdesk-title\b/);
+    await enterTower(page);
+    await expect(body(page)).toHaveClass(/\bdesk-pocket\b/);
+    await expect(body(page)).toHaveClass(/\bdesk-touch\b/);
+    const grid = page.locator("#desk-win-tower .desk-pocket-body");
+    await expect(grid.locator("> #topbar")).toHaveCount(1);
+    await expect(grid.locator("> #palette")).toHaveCount(1);
+    await expect(grid.locator("> #stage")).toHaveCount(1);
+    await expect(page.locator("#stage > #overview-map")).toBeVisible();
+    const map = await box(page.locator("#overview-map .overview-map-body"));
+    expect(Math.round(map.width)).toBe(150);
+    expect(Math.round(map.height)).toBe(216);
   });
 });
 
 test.describe("the desk on other screens", () => {
-  test("a phone never gets the desk", async ({ page }) => {
+  test("a phone-sized window with a mouse never gets the desk", async ({ page }) => {
     await page.setViewportSize(PHONE);
     await load(page);
     await expect(body(page)).not.toHaveClass(/\bdesk-title\b/);

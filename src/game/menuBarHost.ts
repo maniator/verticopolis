@@ -65,6 +65,16 @@ export function drawMenuBar(doc: Document = document): MenuBar | null {
   return drawn.bar;
 }
 
+/** Run the actions registered for item `id` on `doc`'s bar, as a pick would,
+ *  without a click on the item: a click while a menu is open would report a
+ *  pick the player never made. */
+export function runMenuItem(id: string, doc: Document = document): void {
+  const actions = drawnBar(doc)?.actions.get(id);
+  if (!actions) return;
+  const View = doc.defaultView?.MouseEvent ?? MouseEvent;
+  for (const run of [...actions]) run(new View("click"));
+}
+
 /** Run `run` when the item `id` is picked, on the bar drawn on `doc`'s page.
  *  A page without the bar runs nothing. */
 export function onMenuItem(id: string, run: MenuAction, doc: Document = document): void {

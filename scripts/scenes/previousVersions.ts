@@ -71,14 +71,14 @@ async function rowMenu(page: Page, name: string, item: FileItem = "mb-import"): 
 async function versionsOf(page: Page, name: string, item: FileItem = "mb-import"): Promise<void> {
   await rowMenu(page, name, item);
   await page.locator("#modal .fd-menu [role=menuitem]", { hasText: "Previous versions" }).click();
-  await page.waitForSelector("#modal .pv-window .pv", { timeout: 4000 });
+  await page.waitForSelector("#modal .modal-box > .pv", { timeout: 4000 });
 }
 
 /** Previous versions… of `name`, then Cancel: back in the window it came from. */
 async function backFrom(page: Page, name: string, item: FileItem): Promise<void> {
   await versionsOf(page, name, item);
   await page.locator("#modal .pv-buttons .btn", { hasText: "Cancel" }).click();
-  await page.waitForSelector("#modal .fd-window .fd-row.selected", { timeout: 4000 });
+  await page.waitForSelector("#modal .modal-box > .fd .fd-row.selected", { timeout: 4000 });
 }
 
 const still = (shot: Shot, crop = true): Shot => ({

@@ -1,4 +1,4 @@
-import { html, nothing, render, type TemplateResult } from "lit-html";
+import { html, nothing, type TemplateResult } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import type { TowerVersion } from "../storage/fileVersions";
 import type { UI } from "./UI";
@@ -40,11 +40,13 @@ export function versionWhen(at: number, now = Date.now()): string {
   return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
 }
 
-export function showVersionsDialog(ui: Pick<UI, "openModal" | "closeModal">, ctx: VersionsCtx): void {
+const TITLE = "Previous Versions";
+
+export function showVersionsDialog(ui: Pick<UI, "openModal" | "renderModal" | "closeModal">, ctx: VersionsCtx): void {
   const state = { selected: ctx.versions[0]?.key ?? null, busy: false, line: null as FileNote | null };
-  const box = ui.openModal({ title: "Previous Versions", body: html`<div class="pv-host"></div>` });
-  box.classList.add("pv-window");
-  const host = box.querySelector<HTMLElement>(".pv-host")!;
+  // The `.pv` is the modal's body, straight under its box, where the
+  // components' stylesheet sizes the window.
+  const box = ui.openModal({ title: TITLE, body: html`` });
   const picked = () => ctx.versions.find((v) => v.key === state.selected) ?? null;
   // Every way out but Open goes back to the window this one came from. Not
   // while a version is opening: that closes this window on its own.
@@ -81,18 +83,18 @@ export function showVersionsDialog(ui: Pick<UI, "openModal" | "closeModal">, ctx
 
   function draw(): void {
     if (!box.isConnected) return;
-    render(
-      versionsTemplate(ctx, state, {
+    ui.renderModal({
+      title: TITLE,
+      body: versionsTemplate(ctx, state, {
         select: (key) => ((state.selected = key), draw()),
         open,
         cancel: dismiss,
         picked,
       }),
-      host,
-    );
+    });
   }
   draw();
-  host.querySelector<HTMLElement>(".pv-row.selected")?.focus();
+  box.querySelector<HTMLElement>(".pv-row.selected")?.focus();
 }
 
 interface VersionsHandlers {

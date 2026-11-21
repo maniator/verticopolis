@@ -3,13 +3,14 @@
  * screen, written into docs/screenshots/features/ for the Help site and the
  * PR review, plus the README's day and night pair (`desk-hero`), written into
  * docs/screenshots/. Every other scene turns the desk off; these keep it on
- * (`desk`).
+ * (`desk`). The pocket desk scenes show a phone held each way, with the Map
+ * floating over the tower and then closed to its pill.
  * The shots in a scene share one page, so each setup starts from the last
  * one's state and leaves the next a known one. Part of the SCENES manifest
  * (screenshot-scenes.ts). Keep ERASABLE.
  */
 import { type Page } from "playwright";
-import { PHONE, type Scene, type Shot } from "../screenshot-env.ts";
+import { PHONE, PHONE_LANDSCAPE, type Scene, type Shot } from "../screenshot-env.ts";
 import { buildCanonTower } from "../screenshot-tower-builders.ts";
 
 /** Close any open menu, so a shot starts from the plain desk. */
@@ -92,6 +93,18 @@ const startupShots = (suffix: string): Shot[] =>
     wait: 200,
     setup: (page: Page) => page.evaluate(startupAt, at),
   }));
+
+/** The pocket desk's two shots on one phone: the Map open, then closed. */
+function pocketShots(suffix: string): Shot[] {
+  return [
+    { name: `desk-pocket${suffix}`, clock: 11, wait: 1200 },
+    {
+      name: `desk-pocket${suffix}-map-closed`,
+      clock: 11,
+      setup: (page) => page.locator("#overview-map .overview-map-close").click(),
+    },
+  ];
+}
 
 export const DESK_SCENES: Scene[] = [
   {
@@ -217,5 +230,27 @@ export const DESK_SCENES: Scene[] = [
     viewport: PHONE,
     keepSplash: true,
     shots: startupShots("-phone"),
+  },
+  {
+    // The pocket desk (owner, 2026-11-20) on a phone held upright: the tower
+    // window fills the screen with Info, Tools and the tower, and the Map
+    // floats over the tower at its phone size.
+    id: "desk-pocket-phone",
+    outDir: "features",
+    viewport: PHONE,
+    desk: true,
+    build: buildCanonTower,
+    assertUnits: 200,
+    shots: pocketShots("-phone"),
+  },
+  {
+    // The same on a phone held sideways, with Tools as a column on the left.
+    id: "desk-pocket-landscape",
+    outDir: "features",
+    viewport: PHONE_LANDSCAPE,
+    desk: true,
+    build: buildCanonTower,
+    assertUnits: 200,
+    shots: pocketShots("-landscape"),
   },
 ];
