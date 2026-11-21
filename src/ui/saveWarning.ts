@@ -1,52 +1,45 @@
+import { html, type TemplateResult } from "lit-html";
+import { renderDetached, type Detached } from "@verticopolis/components/windows/detached";
 import { SAVE_WARNING_TITLE } from "../storage/saveFailureCopy";
 
 /** The id of the notice, so a second failure rewords it instead of stacking. */
 export const SAVE_WARNING_ID = "save-warning";
 
+/** The notice up on each rail, kept to reword it. */
+const shown = new WeakMap<HTMLElement, Detached>();
+
+function noticeTemplate(text: string, onExport: () => void, onDismiss: () => void): TemplateResult {
+  return html`<div id=${SAVE_WARNING_ID} class="toast bad toast--sticky save-warning" role="alert"
+    ><strong class="save-warning-title">${SAVE_WARNING_TITLE}</strong><p class="save-warning-text">${text}</p
+    ><div class="save-warning-actions"
+      ><button type="button" class="btn" data-act="export" @click=${onExport}>Save As…</button
+      ><button type="button" class="btn" data-act="dismiss" @click=${onDismiss}>Dismiss</button></div
+    ></div
+  >`;
+}
+
 /**
  * Put up (or reword) the notice that stays on the toast rail while saving is
  * not working. It looks like a failure toast but does not fade: it holds the
- * likely causes, an Export button and Dismiss. The toast cap never prunes it
- * (see `toast` in ./uiStatus). Built from text nodes, so nothing in `text`
- * is read as markup.
+ * likely causes, a Save As… button and Dismiss. The toast cap never prunes it
+ * (see `toast` in ./uiStatus). lit keeps `text` as text, so nothing in it is
+ * read as markup.
  */
 export function showSaveWarning(rail: HTMLElement, text: string, onExport: () => void): void {
-  let box = rail.querySelector<HTMLElement>(`#${SAVE_WARNING_ID}`);
-  if (!box) {
-    box = document.createElement("div");
-    box.id = SAVE_WARNING_ID;
-    box.className = "toast bad toast--sticky save-warning";
-    box.setAttribute("role", "alert");
-    const title = document.createElement("strong");
-    title.className = "save-warning-title";
-    title.textContent = SAVE_WARNING_TITLE;
-    const body = document.createElement("p");
-    body.className = "save-warning-text";
-    const actions = document.createElement("div");
-    actions.className = "save-warning-actions";
-    actions.append(
-      button("Save As…", "export", onExport),
-      button("Dismiss", "dismiss", () => clearSaveWarning(rail)),
-    );
-    box.append(title, body, actions);
-    // First on the rail, so the toasts that come and go stack under it.
-    rail.prepend(box);
+  const template = noticeTemplate(text, onExport, () => clearSaveWarning(rail));
+  const up = shown.get(rail);
+  if (up && up.elements[0].parentNode === rail) {
+    up.update(template);
+    return;
   }
-  const body = box.querySelector<HTMLElement>(".save-warning-text");
-  if (body) body.textContent = text;
+  const drawn = renderDetached(rail.ownerDocument, template);
+  shown.set(rail, drawn);
+  // First on the rail, so the toasts that come and go stack under it.
+  rail.prepend(...drawn.elements);
 }
 
 /** Take the notice down, if it is up. */
 export function clearSaveWarning(rail: HTMLElement): void {
-  rail.querySelector(`#${SAVE_WARNING_ID}`)?.remove();
-}
-
-function button(label: string, act: string, onClick: () => void): HTMLButtonElement {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = "btn";
-  b.dataset.act = act;
-  b.textContent = label;
-  b.addEventListener("click", onClick);
-  return b;
+  shown.get(rail)?.elements[0].remove();
+  shown.delete(rail);
 }
