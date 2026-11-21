@@ -36,6 +36,7 @@ import {
   type DeskWindowSpec,
 } from "@verticopolis/components/windows/desk/deskWindow";
 import { onMenuItem, runMenuItem, setMenuState, type MenuEntryState } from "../../game/menuBarHost";
+import { setDeskMenus } from "./deskMenus";
 
 /**
  * The 1994 desk (option C, picked by the owner on 2026-11-15): on a computer,
@@ -263,8 +264,7 @@ export class DeskController {
     const windowMenu = doc.getElementById("mb-window-menu");
     if (windowMenu)
       for (const id of ["mb-win-statusbar", "mb-fullscreen"]) this.move(doc.getElementById(id), windowMenu);
-    // Info and Tools are always in the pocket tower window, so its Window menu leaves them out.
-    for (const id of ["mb-dw-info", "mb-dw-tools"]) doc.getElementById(id)?.toggleAttribute("hidden", pocket);
+    setDeskMenus(doc, pocket);
 
     // Tools and the small windows the game already draws.
     const bulletin = doc.getElementById("bulletin-win");
@@ -411,7 +411,7 @@ export class DeskController {
     this.infoFrame = null;
     this.setTowerTitle = null;
     this.active = null;
-    for (const id of ["mb-dw-info", "mb-dw-tools"]) this.doc.getElementById(id)?.removeAttribute("hidden");
+    setDeskMenus(this.doc, null);
     this.doc.body.classList.remove(DESK_CLASS, DESK_POCKET_CLASS, DESK_TOUCH_CLASS);
     this.doc.dispatchEvent(new CustomEvent(DESK_CHANGE_EVENT));
   }

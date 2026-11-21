@@ -211,6 +211,18 @@ describe("DeskController", () => {
     expect(parents()).toEqual(["mb-options-menu", "mb-options-menu"]);
   });
 
+  it("leaves Tower Info, Map and Bulletin to the Window menu while it is up, and gives them back to Tower after", () => {
+    const desk = new DeskController(doc);
+    desk.start();
+    const ids = ["mb-win-tower", "mb-win-map", "mb-win-bulletin", "mb-tower-win-sep"];
+    const hidden = () => ids.map((id) => doc.getElementById(id)!.hidden);
+    expect(hidden()).toEqual([true, true, true, true]);
+    expect(doc.getElementById("btn-stats")!.hidden).toBe(false);
+    screen();
+    fireMediaChange();
+    expect(hidden()).toEqual([false, false, false, false]);
+  });
+
   it("stacks the tower like any window, but keeps a maximized tower under the small windows", () => {
     new DeskController(doc).start();
     const tower = doc.getElementById("desk-win-tower")!;

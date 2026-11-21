@@ -126,7 +126,7 @@ function gameMenus({ sponsorUrl, onSponsor }: Omit<GameMenuOptions, "pick">): Me
           { id: "mb-win-tower", label: "Tower Info", checked: false },
           { id: "mb-win-map", label: "Map", checked: false },
           { id: "mb-win-bulletin", label: "Bulletin", checked: false },
-          sep(),
+          sep("mb-tower-win-sep"),
           { id: "btn-stats", label: "Statistics…" },
           { id: "mb-rename", label: "Rename Tower…" },
           sep(),

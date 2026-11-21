@@ -468,7 +468,10 @@ never the name).
 The 1994 desk (owner, 2026-11-15) has a Window menu of its own, with
 `window_*` codes so its picks never mix with the Tower and Options items of
 the same windows; on the desk, Status Bar and Full Screen move into it and keep
-their codes, with `menu` reading `window`.
+their codes, with `menu` reading `window`. From the release after 4.14.2 the
+Tower menu leaves Tower Info, Map and Bulletin out while the desk is up (owner,
+2026-11-21), so on the desk those windows arrive only as `window_*` picks and
+Tower's `tower_info`, `map` and `bulletin` come from the ordinary layout alone.
 
 File > Open Recent is a submenu: opening it sends nothing, and a pick from it
 counts in the File menu (`menu: file`) as `recent_1` to `recent_5`, its line's
