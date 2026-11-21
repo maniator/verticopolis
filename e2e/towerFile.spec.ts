@@ -97,7 +97,7 @@ async function previousVersions(page: Page, name: string): Promise<void> {
   await expect.poll(() => rowNames(page), { timeout: 15_000 }).toContain(name);
   await row(page, name).click({ button: "right" });
   await page.locator(".fd-menu").getByRole("menuitem", { name: "Previous versions…" }).click();
-  await expect(page.locator(".pv-window")).toBeVisible();
+  await expect(page.locator("#modal .modal-box > .pv")).toBeVisible();
 }
 
 test("the autosave writes the tower's own file, and after a reload it opens to the identical game", async ({

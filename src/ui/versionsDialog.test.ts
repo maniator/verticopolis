@@ -1,5 +1,8 @@
+import { render } from "lit-html";
+import type { ModalView } from "@verticopolis/components/windows/uiModal";
 import { describe, expect, it, vi } from "vitest";
 import type { TowerVersion } from "../storage/fileVersions";
+import { viewTemplate } from "./testing/litTestUtils";
 import { showVersionsDialog, versionWhen } from "./versionsDialog";
 
 const NOW = new Date(2026, 10, 17, 18, 0).getTime();
@@ -11,12 +14,13 @@ function makeUi() {
   const box = document.createElement("div");
   const dialog = document.createElement("dialog");
   const ui = {
-    openModal: vi.fn(() => {
+    openModal: vi.fn((view: ModalView) => {
       document.body.replaceChildren(dialog);
       dialog.replaceChildren(box);
-      box.innerHTML = '<h2>Previous Versions</h2><div class="pv-host"></div>';
+      render(viewTemplate(view), box);
       return box;
     }),
+    renderModal: vi.fn((view: ModalView) => render(viewTemplate(view), box)),
     closeModal: vi.fn(() => box.remove()),
   };
   return { ui, box, dialog };

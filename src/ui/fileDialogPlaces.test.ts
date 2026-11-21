@@ -16,7 +16,11 @@ const entry = (id: string, name: string, kind: TowerFileEntry["kind"] = "tower")
 });
 
 let box: HTMLElement | null;
-let ui: { openModal: ReturnType<typeof vi.fn>; closeModal: ReturnType<typeof vi.fn> };
+let ui: {
+  openModal: ReturnType<typeof vi.fn>;
+  renderModal: ReturnType<typeof vi.fn>;
+  closeModal: ReturnType<typeof vi.fn>;
+};
 let folder: LinkedFolderState | null;
 let linked: {
   [K in keyof LinkedPlaceCtx]: LinkedPlaceCtx[K] extends (...a: never[]) => unknown
@@ -115,6 +119,7 @@ beforeEach(() => {
       document.body.append(box);
       return box;
     }),
+    renderModal: vi.fn((tpl: ModalView) => render(viewTemplate(tpl), box!)),
     closeModal: vi.fn(() => box?.remove()),
   };
 });
