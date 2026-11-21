@@ -10,6 +10,8 @@
  * press (the map, or nothing), so a mouse or touch user keeps the game's keys
  * and a focused map keeps its arrow keys.
  */
+import { html } from "lit-html";
+import { renderDetached } from "@verticopolis/components/windows/detached";
 import {
   DEFAULT_MAP_VIEW,
   MAP_VIEWS,
@@ -37,35 +39,28 @@ export class MapViewPicker {
     private readonly onSelect: (view: MapViewId) => void,
     private readonly views: ReadonlyArray<MapViewEntry> = MAP_VIEWS,
   ) {
-    const root = doc.createElement("label");
-    root.id = MAP_PICKER_DOM.root;
-    root.className = "overview-map-views";
-    const name = doc.createElement("span");
-    name.className = "overview-map-views-label";
-    name.textContent = "View";
-    const select = doc.createElement("select");
-    select.id = MAP_PICKER_DOM.select;
-    select.className = "field overview-map-picker";
-    for (const view of views) {
-      const option = doc.createElement("option");
-      option.value = view.id;
-      option.textContent = view.label;
-      select.append(option);
-    }
-    select.value = this.selectedView;
-    select.addEventListener("pointerdown", () => {
-      if (this.focusBefore === undefined) this.focusBefore = doc.activeElement === select ? null : doc.activeElement;
-    });
-    select.addEventListener("change", () => this.changed());
-    // A press that chose nothing (the open list dismissed, or the chosen
-    // view picked again) leaves focus on the select; once focus leaves it,
-    // or a key is pressed on it, the press is forgotten, so the next choice
-    // from the keyboard keeps focus here.
-    select.addEventListener("blur", () => (this.focusBefore = undefined));
-    select.addEventListener("keydown", () => (this.focusBefore = undefined));
-    root.append(name, select);
+    // A press that chose nothing (the open list dismissed, or the chosen view
+    // picked again) leaves focus on the select; once focus leaves it, or a
+    // key is pressed on it, the press is forgotten, so the next choice from
+    // the keyboard keeps focus here. `selected` on the options, since a
+    // select's `value` set before its options are drawn would not hold.
+    const forget = () => (this.focusBefore = undefined);
+    const [root] = renderDetached(
+      doc,
+      html`<label id=${MAP_PICKER_DOM.root} class="overview-map-views"
+        ><span class="overview-map-views-label">View</span
+        ><select id=${MAP_PICKER_DOM.select} class="field overview-map-picker"
+          @pointerdown=${() => {
+            if (this.focusBefore === undefined)
+              this.focusBefore = doc.activeElement === this.select ? null : doc.activeElement;
+          }}
+          @change=${() => this.changed()} @blur=${forget} @keydown=${forget}
+          >${views.map((view) => html`<option value=${view.id} ?selected=${view.id === this.selectedView}>${view.label}</option>`)}</select
+        ></label
+      >`,
+    ).elements as [HTMLElement];
     this.root = root;
-    this.select = select;
+    this.select = root.querySelector("select")!;
   }
 
   /** The selected view. */

@@ -1,10 +1,13 @@
-import { iconNode } from "./iconNodes";
+import { html, nothing, type TemplateResult } from "lit-html";
+import { iconTemplate } from "@verticopolis/components/windows/icons";
+import { renderDetached } from "@verticopolis/components/windows/detached";
 
 /**
  * The overview MAP window's elements (#343): the window with its title bar,
  * the two stacked canvases and the text summary, plus the Map button that
  * opens it, plus `ContextWatch`, which tracks whether the canvases' 2D
- * contexts are lost. `OverviewMapWindow` wires them.
+ * contexts are lost. `OverviewMapWindow` hears their events through
+ * `MapDomEvents`.
  */
 
 /** The ids of the window's parts, which the CSS and the tests name. */
@@ -27,54 +30,74 @@ export interface MapDom {
   readonly toggle: HTMLButtonElement;
 }
 
-/** Build the window (hidden) and its button. The caller puts them in the page. */
-export function buildMapDom(doc: Document): MapDom {
-  const root = doc.createElement("div");
-  root.id = MAP_DOM_ID.window;
-  root.className = "win win-closable overview-map";
-  root.hidden = true;
-  root.setAttribute("role", "region");
-  root.setAttribute("aria-labelledby", MAP_DOM_ID.title);
-  const title = doc.createElement("div");
-  title.className = "win-title";
-  const name = doc.createElement("span");
-  name.id = MAP_DOM_ID.title;
-  name.textContent = "Map";
-  const close = doc.createElement("button");
-  close.type = "button";
-  close.className = "btn xs overview-map-close";
-  close.setAttribute("aria-label", "Close the map");
-  close.textContent = "✕";
-  title.append(name, close);
-  const body = doc.createElement("div");
-  body.className = "overview-map-body";
-  const towerCanvas = doc.createElement("canvas");
-  towerCanvas.className = "overview-map-tower";
-  towerCanvas.setAttribute("aria-hidden", "true");
-  const viewCanvas = doc.createElement("canvas");
-  viewCanvas.className = "overview-map-view";
-  viewCanvas.tabIndex = 0;
-  viewCanvas.setAttribute("role", "application");
-  viewCanvas.setAttribute("aria-label", "Tower map. Arrow keys move the view, Home and End go to the top and bottom.");
-  viewCanvas.setAttribute("aria-describedby", MAP_DOM_ID.summary);
-  const summary = doc.createElement("p");
-  summary.id = MAP_DOM_ID.summary;
-  summary.className = "visually-hidden";
-  // Heard only while the map has focus (the window turns it on and off), and
-  // written only when the words change: moving the view with the map's keys
-  // is announced, and panning the world with the map open stays quiet.
-  summary.setAttribute("aria-live", "off");
-  body.append(towerCanvas, viewCanvas);
-  root.append(title, body, summary);
-  const toggle = doc.createElement("button");
-  toggle.type = "button";
-  toggle.id = MAP_DOM_ID.toggle;
-  toggle.className = "btn overview-map-toggle";
-  // The glyph shows on desktop only (the phone pill keeps its word alone).
-  toggle.append(iconNode("map", {}, doc), "Map");
-  toggle.title = "Show the tower map";
-  toggle.setAttribute("aria-controls", MAP_DOM_ID.window);
-  return { root, title, close, body, towerCanvas, viewCanvas, summary, toggle };
+/** What the window hears from its elements. */
+export interface MapDomEvents {
+  readonly toggle: (e: MouseEvent) => void;
+  readonly close: (e: MouseEvent) => void;
+  readonly key: (e: KeyboardEvent) => void;
+  readonly mouseDown: (e: MouseEvent) => void;
+  readonly wheel: (e: WheelEvent) => void;
+  readonly mapFocus: () => void;
+  readonly mapBlur: () => void;
+  readonly pointerDown: (e: PointerEvent) => void;
+  readonly pointerMove: (e: PointerEvent) => void;
+  readonly pointerUp: (e: PointerEvent) => void;
+  /** A pointercancel or lostpointercapture: the press ends unreleased. */
+  readonly pointerEnd: (e: PointerEvent) => void;
+  readonly contextLost: (e: Event) => void;
+  readonly contextRestored: (e: Event) => void;
+}
+
+/** What the views put in the window: the View dropdown, drawn right after
+ *  the title bar, and the legends, drawn in the body over the canvases. */
+export interface MapDomParts {
+  readonly picker?: Node;
+  readonly legends?: ReadonlyArray<Node>;
+}
+
+const preventDefault = (e: Event): void => e.preventDefault();
+
+/** The window (hidden) and its button, side by side. */
+export function mapTemplate(on: MapDomEvents, parts: MapDomParts = {}): TemplateResult {
+  // A pinch or Ctrl+wheel over the window never zooms the page, which takes a
+  // listener that is not passive.
+  const wheel = { handleEvent: on.wheel, passive: false };
+  // The summary is heard only while the map has focus (the window turns it on
+  // and off), and written only when the words change: moving the view with
+  // the map's keys is announced, and panning the world with the map open
+  // stays quiet. The toggle's glyph shows on desktop only (the phone pill
+  // keeps its word alone).
+  return html`<div id=${MAP_DOM_ID.window} class="win win-closable overview-map" hidden role="region" aria-labelledby=${MAP_DOM_ID.title}
+      @keydown=${on.key} @contextmenu=${preventDefault} @mousedown=${on.mouseDown} @wheel=${wheel}
+    ><div class="win-title"><span id=${MAP_DOM_ID.title}>Map</span><button type="button" class="btn xs overview-map-close" aria-label="Close the map" @click=${on.close}>✕</button></div>${parts.picker ?? nothing}<div class="overview-map-body"
+      ><canvas class="overview-map-tower" aria-hidden="true" @contextlost=${on.contextLost} @contextrestored=${on.contextRestored}></canvas><canvas
+        class="overview-map-view" tabindex="0" role="application"
+        aria-label="Tower map. Arrow keys move the view, Home and End go to the top and bottom." aria-describedby=${MAP_DOM_ID.summary}
+        @contextlost=${on.contextLost} @contextrestored=${on.contextRestored}
+        @focus=${on.mapFocus} @blur=${on.mapBlur}
+        @pointerdown=${on.pointerDown} @pointermove=${on.pointerMove} @pointerup=${on.pointerUp}
+        @pointercancel=${on.pointerEnd} @lostpointercapture=${on.pointerEnd}
+      ></canvas>${parts.legends ?? nothing}</div
+    ><p id=${MAP_DOM_ID.summary} class="visually-hidden" aria-live="off"></p></div
+  ><button type="button" id=${MAP_DOM_ID.toggle} class="btn overview-map-toggle" title="Show the tower map" aria-controls=${MAP_DOM_ID.window} @click=${on.toggle}
+    >${iconTemplate("map", {})}Map</button
+  >`;
+}
+
+/** Draw the window (hidden) and its button. The caller puts them in the page. */
+export function buildMapDom(doc: Document, on: MapDomEvents, parts: MapDomParts = {}): MapDom {
+  const [root, toggle] = renderDetached(doc, mapTemplate(on, parts)).elements as [HTMLElement, HTMLButtonElement];
+  const part = <T extends Element>(selector: string): T => root.querySelector<T>(selector)!;
+  return {
+    root,
+    title: part(".win-title"),
+    close: part(".overview-map-close"),
+    body: part(".overview-map-body"),
+    towerCanvas: part(".overview-map-tower"),
+    viewCanvas: part(".overview-map-view"),
+    summary: part(`#${MAP_DOM_ID.summary}`),
+    toggle,
+  };
 }
 
 /** What a frame finds of the canvases' 2D contexts (see `ContextWatch.poll`). */
@@ -101,19 +124,22 @@ export class ContextWatch {
   constructor(
     private readonly canvases: ReadonlyArray<HTMLCanvasElement>,
     private readonly contexts: ReadonlyArray<CanvasRenderingContext2D | null>,
-    changed: () => void,
-  ) {
-    for (const canvas of canvases) {
-      canvas.addEventListener("contextlost", () => {
-        this.lostByEvent.add(canvas);
-        changed();
-      });
-      canvas.addEventListener("contextrestored", () => {
-        this.lostByEvent.delete(canvas);
-        this.restoredByEvent = true;
-        changed();
-      });
-    }
+    private readonly changed: () => void,
+  ) {}
+
+  /** A canvas's `contextlost` event. */
+  lostEvent(canvas: EventTarget | null): void {
+    if (!this.canvases.includes(canvas as HTMLCanvasElement)) return;
+    this.lostByEvent.add(canvas as HTMLCanvasElement);
+    this.changed();
+  }
+
+  /** A canvas's `contextrestored` event. */
+  restoredEvent(canvas: EventTarget | null): void {
+    if (!this.canvases.includes(canvas as HTMLCanvasElement)) return;
+    this.lostByEvent.delete(canvas as HTMLCanvasElement);
+    this.restoredByEvent = true;
+    this.changed();
   }
 
   /** Read once per open frame: "lost" while any context is lost, "restored"

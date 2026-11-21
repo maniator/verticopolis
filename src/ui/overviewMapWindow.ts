@@ -109,7 +109,43 @@ export class OverviewMapWindow {
 
   constructor(private readonly deps: OverviewMapDeps) {
     const doc = deps.stage.ownerDocument;
-    const dom = buildMapDom(doc);
+    const dom = buildMapDom(
+      doc,
+      {
+        toggle: (e) => {
+          this.setOpen(true, true);
+          // The button hides while the map is open. A keyboard press moves
+          // focus onto the map; a mouse user keeps the game's keys for the world.
+          if (isKeyboardClick(e)) this.focusMap();
+        },
+        close: (e) => this.closeFromWindow(isKeyboardClick(e)),
+        key: (e) => this.onKey(e),
+        // A mouse press never focuses the map, so a click on it leaves the
+        // game's keys with the world. Buttons keep their default (a mouse
+        // close blurs the close button), so their pressed look still shows in
+        // every browser, and the View dropdown keeps it so it opens (it hands
+        // focus back itself).
+        mouseDown: (e) =>
+          e.target instanceof HTMLButtonElement || e.target instanceof HTMLSelectElement || e.preventDefault(),
+        wheel: (e) => e.ctrlKey && e.preventDefault(),
+        mapFocus: () => {
+          // A pointer press never focuses the map (a browser that focuses on
+          // a canceled pointerdown, or on the tap's click, included), so the
+          // game keeps its keys. Any other focus (Tab, the Map button from the
+          // keyboard or assistive tech, a dialog giving focus back) stays.
+          if (this.pointerFocus.claimsNow()) this.viewCanvas.blur();
+          else this.summary.setAttribute("aria-live", "polite");
+        },
+        mapBlur: () => this.summary.setAttribute("aria-live", "off"),
+        pointerDown: (e) => this.onPointerDown(e),
+        pointerMove: (e) => this.onPointerMove(e),
+        pointerUp: (e) => this.endPress(e, true),
+        pointerEnd: (e) => this.endPress(e, false),
+        contextLost: (e) => this.contexts.lostEvent(e.currentTarget),
+        contextRestored: (e) => this.contexts.restoredEvent(e.currentTarget),
+      },
+      deps.views?.parts(doc),
+    );
     this.root = dom.root;
     this.body = dom.body;
     this.closeButton = dom.close;
@@ -117,7 +153,6 @@ export class OverviewMapWindow {
     this.viewCanvas = dom.viewCanvas;
     this.summary = dom.summary;
     this.toggle = dom.toggle;
-    deps.views?.mount(dom);
     this.worldPress = new WorldPress([this.root, this.toggle]);
     this.input = {
       view: { structure: [], rooms: [], tower: { lowestFloor: 1, highestFloor: 1, transports: [] } },
@@ -137,40 +172,6 @@ export class OverviewMapWindow {
     this.towerCtx = this.towerCanvas.getContext("2d");
     this.viewCtx = this.viewCanvas.getContext("2d");
 
-    this.toggle.addEventListener("click", (e) => {
-      this.setOpen(true, true);
-      // The button hides while the map is open. A keyboard press moves focus
-      // onto the map; a mouse user keeps the game's keys for the world.
-      if (isKeyboardClick(e)) this.focusMap();
-    });
-    dom.close.addEventListener("click", (e) => this.closeFromWindow(isKeyboardClick(e)));
-    this.root.addEventListener("keydown", (e) => this.onKey(e));
-    this.root.addEventListener("contextmenu", (e) => e.preventDefault());
-    // A mouse press never focuses the map, so a click on it leaves the game's
-    // keys with the world. Buttons keep their default (a mouse close blurs the
-    // close button), so their pressed look still shows in every browser, and
-    // the View dropdown keeps it so it opens (it hands focus back itself).
-    this.root.addEventListener(
-      "mousedown",
-      (e) => e.target instanceof HTMLButtonElement || e.target instanceof HTMLSelectElement || e.preventDefault(),
-    );
-    // A pinch or Ctrl+wheel over the window never zooms the page.
-    this.root.addEventListener("wheel", (e) => e.ctrlKey && e.preventDefault(), { passive: false });
-    this.viewCanvas.addEventListener("focus", () => {
-      // A pointer press never focuses the map (a browser that focuses on a
-      // canceled pointerdown, or on the tap's click, included), so the game
-      // keeps its keys. Any other focus (Tab, the Map button from the
-      // keyboard or assistive tech, a dialog giving focus back) stays.
-      if (this.pointerFocus.claimsNow()) this.viewCanvas.blur();
-      else this.summary.setAttribute("aria-live", "polite");
-    });
-    this.viewCanvas.addEventListener("blur", () => this.summary.setAttribute("aria-live", "off"));
-    this.viewCanvas.addEventListener("pointerdown", (e) => this.onPointerDown(e));
-    this.viewCanvas.addEventListener("pointermove", (e) => this.onPointerMove(e));
-    this.viewCanvas.addEventListener("pointerup", (e) => this.endPress(e, true));
-    for (const end of ["pointercancel", "lostpointercapture"] as const) {
-      this.viewCanvas.addEventListener(end, (e) => this.endPress(e, false));
-    }
     doc.addEventListener("pointerdown", this.onDocPointerDown, true);
     doc.addEventListener("pointerup", this.onDocPointerUp, true);
     doc.addEventListener("pointercancel", this.onDocPointerUp, true);

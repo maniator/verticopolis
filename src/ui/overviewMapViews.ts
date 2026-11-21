@@ -70,7 +70,7 @@ import {
   type HeatViewId,
 } from "@verticopolis/components/render/overviewMap/heatView";
 import type { HeatmapMode } from "@verticopolis/engine/model/engineTypes";
-import type { MapDom } from "./overviewMapDom";
+import type { MapDomParts } from "./overviewMapDom";
 import { MapLegend } from "./overviewMapLegend";
 import { MapViewPicker } from "./overviewMapPicker";
 
@@ -158,9 +158,9 @@ export class OverviewMapViews {
 
   constructor(private readonly deps: MapViewsDeps) {}
 
-  /** Put the View dropdown under the title bar, and the legends in the body. */
-  mount(dom: Pick<MapDom, "root" | "title" | "body">): void {
-    const doc = dom.root.ownerDocument;
+  /** Draw the View dropdown and the legends, for the window to put under
+   *  its title bar and in its body. */
+  parts(doc: Document): MapDomParts {
     this.picker = new MapViewPicker(doc, () => this.viewChosen());
     this.legends = {
       eval: new MapLegend(doc, "eval", EVAL_LEGEND),
@@ -169,8 +169,7 @@ export class OverviewMapViews {
       traffic: new MapLegend(doc, "traffic", TRAFFIC_LEGEND),
       occupancy: new MapLegend(doc, "occupancy", OCCUPANCY_LEGEND),
     };
-    dom.title.after(this.picker.root);
-    for (const legend of Object.values(this.legends)) dom.body.append(legend.root);
+    return { picker: this.picker.root, legends: Object.values(this.legends).map((legend) => legend.root) };
   }
 
   /** The selected view. */
