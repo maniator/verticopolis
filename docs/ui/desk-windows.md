@@ -16,6 +16,7 @@ ordinary layout. The code is `src/ui/desk/` here and `windows/desk/*` from
 | Bulletin | Title bar | No | Yes | No | ✕, Window > Bulletin | Bottom of the right column (on a desk too short for it under the Map, over the tower's sky at the left, clear of the menu bar, the toasts and the ground line) |
 | Tower Info | Title bar | No | Yes | No | ✕, Window > Tower Info | Under Info, left of the column |
 | Control Panel | Title bar | No | Yes | No | ✕; opens from the Verticopolis menu and the tray | The middle of the desk |
+| Help (the Player's Manual) | Title bar | Grip, at least 480 by 360 | Yes | Yes, button or double-click the title | ✕; opens from Help > Player's Manual, F1 and every Help link in the game, with the tower paused until it closes | The middle of the desk, 760 by 560 (shrunk to fit a smaller desk) |
 
 - Windows stack in the order they were pressed, the tower like any other, and
   only the last one pressed has a lit title bar (owner, 2026-11-15). A
@@ -57,11 +58,12 @@ ordinary layout. The code is `src/ui/desk/` here and `windows/desk/*` from
   a tower and `desk_title_shown` around the title screen (each once per page
   life); `desk_window` is a window changing, detail `<window>_<verb>` with
   windows `tower`, `info`, `tools`, `map`, `bulletin`, `tower_info`,
-  `control_panel` and verbs `min`, `restore`, `max`, `unmax`, `resize`,
-  `move` (the first move in a page life) and `close` (the tower's and the
-  Control Panel's ✕; the Map, Bulletin and Tower Info ✕ keep their own
+  `control_panel`, `help` and verbs `min`, `restore`, `max`, `unmax`, `resize`,
+  `move` (the first move in a page life) and `close` (the tower's, the
+  Control Panel's and Help's ✕; the Map, Bulletin and Tower Info ✕ keep their own
   `window_close`, which a window-menu Close does not send), from whichever button, double-click, taskbar press or window menu
-  did it; `desk_task` is a taskbar window button, detail `<window>_front`,
+  did it; `desk_help_menu` is a pick on the Help window's menu bar, detail the item's
+  code (`src/ui/desk/deskHelpMenu.ts`); `desk_task` is a taskbar window button, detail `<window>_front`,
   `_min` or `_restore` (`title` on the title screen); `desk_start_open` is the
   Verticopolis button opening its menu (`title` or `tower`) and `desk_start` a
   pick on it, detail the game menu item it ran (`btn-new`, `mb-import`,

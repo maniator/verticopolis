@@ -4,6 +4,7 @@
 // (site.mjs pageJsonLd): the breadcrumb trail, and a WebSite or Article.
 import Default from "@astrojs/starlight/components/Head.astro";
 import { cardAlt, cardUrl, pageJsonLd } from "../../site.mjs";
+import { EMBEDDED_CLASS, IDLE_LIMIT_MS, boundIdle } from "../../../src/manual/manualEmbed";
 
 const { entry, id } = Astro.locals.starlightRoute;
 const jsonLd = JSON.stringify(
@@ -11,8 +12,14 @@ const jsonLd = JSON.stringify(
 ).replace(/</g, "\\u003c");
 const card = cardUrl(id);
 const alt = cardAlt(entry.data.title);
+// Inside a frame the page is in the game's Help window (only the game may
+// frame the manual), so it wears the embedded class before it paints, and its
+// idle callbacks get a deadline, since the game's frame loop leaves it no idle
+// moment (src/manual/manualEmbed.ts).
+const embedBoot = `try{if(window.top!==window.self){document.documentElement.classList.add(${JSON.stringify(EMBEDDED_CLASS)});(${boundIdle.toString()})(window,${IDLE_LIMIT_MS})}}catch(e){}`;
 ---
 
+<script is:inline set:html={embedBoot} />
 <Default />
 <meta property="og:image" content={card} />
 <meta property="og:image:alt" content={alt} />

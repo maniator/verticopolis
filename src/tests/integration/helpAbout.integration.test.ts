@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
 import { PAUSED_FOR_HELP } from "../../ui/helpPause";
 import { trackAppAction } from "../../analytics";
+import { ManualWindow, setDeskManual } from "../../ui/desk/deskHelpWindow";
 
 /**
  * In-game Help (src/ui/uiHelp.ts) on the real UI, with the game's
@@ -224,6 +225,29 @@ describe("About… (About this game)", () => {
     expect(speed.now()).toBe(0);
     leaveAndReturn();
     expect(speed.now()).toBe(3);
+  });
+
+  it("on the desk, opens the manual in its window, opens no tab, and holds the pause until the window closes", () => {
+    const speed = speedAt(3);
+    makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
+    const manual = new ManualWindow(document, { closed: () => {}, shown: () => {}, menuPicked: () => {} });
+    document.body.append(manual.frame.root);
+    setDeskManual(manual);
+    try {
+      const open = vi.spyOn(window, "open");
+      (document.getElementById("btn-help") as HTMLButtonElement).click();
+      expect(open).not.toHaveBeenCalled();
+      expect(manual.isOpen()).toBe(true);
+      expect(manual.frame.page.getAttribute("src")).toBe("/help/?from=game&via=game_menu");
+      expect(speed.now()).toBe(0);
+      leaveAndReturn();
+      expect(speed.now()).toBe(0);
+      manual.close();
+      expect(speed.now()).toBe(3);
+    } finally {
+      setDeskManual(null);
+      manual.dispose();
+    }
   });
 
   it("opens the manual from the title screen in a new tab, holding the pause until the player is back", () => {

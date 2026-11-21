@@ -19,6 +19,7 @@ import { manualHost, manualSavedFor } from "../manual/manualOffline";
 import { HELP_TOPIC_PATH, isHelpTopic } from "./helpTopics";
 import type { HelpTopicSurface } from "./templates/helpTopicLink";
 import { hostHelpBar } from "./helpBarHost";
+import { deskManual } from "./desk/deskHelpWindow";
 
 /**
  * The in-game Help: About this game (the game panel's "About…") and the
@@ -193,14 +194,27 @@ export function showHelp(ui: UI, source: GameHelpSource): void {
 }
 
 /**
- * Open a Help site page in a new tab and hold the tower's pause until the
- * player is back on the game tab. A Ctrl or Cmd click (`e`) opens it in the
- * background and the tower keeps running. `blocked` runs when the browser
+ * Open a Help site page and hold the tower's pause: on the desk in the
+ * Player's Manual window until it closes, elsewhere in a new tab until the
+ * player is back on the game tab. A Ctrl or Cmd click (`e`) opens a tab in
+ * the background and the tower keeps running. `blocked` runs when the browser
  * refuses the new tab (a pop-up blocker), so the player is never left with
  * nothing. Returns whether the tab opened.
  */
 function openPageInTab(ui: UI, href: string, source: GameHelpSource, blocked: () => void, e?: MouseEvent): boolean {
   const background = !!e && (e.ctrlKey || e.metaKey);
+  // On the desk the page opens in the Player's Manual window, and the pause
+  // holds until that window closes (src/ui/desk/deskHelpWindow.ts).
+  const manual = background ? null : deskManual();
+  if (manual) {
+    if (!manual.isOpen()) {
+      const pause = helpPause(ui);
+      pause.begin();
+      manual.whenClosed(() => pause.end());
+    }
+    manual.show(href, source);
+    return true;
+  }
   const tab = window.open(fromGameHref(helpUrl(href), source), "_blank");
   if (!tab) {
     blocked();
