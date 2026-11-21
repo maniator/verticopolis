@@ -296,6 +296,7 @@ export class DeskController {
     const manual = new ManualWindow(doc, {
       closed: () => trackDeskClose("help"),
       shown: () => this.bringUp("help"),
+      menuPicked: (item) => trackAppAction("desk_help_menu", item),
     });
     desk.appendChild(manual.frame.root);
     add(

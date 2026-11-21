@@ -230,7 +230,7 @@ describe("About… (About this game)", () => {
   it("on the desk, opens the manual in its window, opens no tab, and holds the pause until the window closes", () => {
     const speed = speedAt(3);
     makeUI({ getSpeed: speed.getSpeed, onSpeed: speed.onSpeed });
-    const manual = new ManualWindow(document, { closed: () => {}, shown: () => {} });
+    const manual = new ManualWindow(document, { closed: () => {}, shown: () => {}, menuPicked: () => {} });
     document.body.append(manual.frame.root);
     setDeskManual(manual);
     try {

@@ -33,7 +33,15 @@ import { siteHref } from "../../site.mjs";
   import { getCommonProps, setCommonProps, trackAppAction } from "../../../src/analytics";
   import { gameLinkDetail, helpPageDetail, landingAction, sponsorTapListener } from "../../site.mjs";
   import { saveManualOffline } from "../../../src/manual/manualOffline";
-  import { EMBEDDED_CLASS, gameOriginFor, pageMessage, embeddedClick } from "../../../src/manual/manualEmbed";
+  import {
+    EMBEDDED_CLASS,
+    embeddedClick,
+    gameOriginFor,
+    pageMessage,
+    readManualCommand,
+    type ManualLook,
+  } from "../../../src/manual/manualEmbed";
+  import { openStarlightSearch } from "../../../src/ui/starlightSearch";
 
   // The site's base as Astro built it: "" at the root of the manual's own
   // host, "/help" on the game's.
@@ -74,9 +82,28 @@ import { siteHref } from "../../site.mjs";
   // the manual is already open, and the browser's own help would cover it.
   if (document.documentElement.classList.contains(EMBEDDED_CLASS)) {
     const game = gameOriginFor(location.host, location.origin);
-    const tell = () => window.parent.postMessage(pageMessage(location, base, document.title), game);
+    const looks = () => document.querySelector<HTMLSelectElement>("starlight-theme-select select");
+    const look = (): ManualLook => {
+      const value = looks()?.value;
+      return value === "light" || value === "dark" ? value : "auto";
+    };
+    const tell = () => window.parent.postMessage(pageMessage(location, base, document.title, look()), game);
     tell();
     window.addEventListener("hashchange", tell);
+    // The window's menus: Print Topic, Find and the Options looks.
+    window.addEventListener("message", (e) => {
+      if (e.source !== window.parent || e.origin !== game) return;
+      const command = readManualCommand(e.data);
+      if (command?.command === "print") window.print();
+      else if (command?.command === "find") openStarlightSearch();
+      else if (command?.command === "look") {
+        const select = looks();
+        if (!select) return;
+        select.value = command.look;
+        select.dispatchEvent(new Event("change"));
+        tell();
+      }
+    });
     document.addEventListener("click", (e) => {
       const link = e.target instanceof Element ? e.target.closest("a") : null;
       const to = embeddedClick(e, link, location.href, base);

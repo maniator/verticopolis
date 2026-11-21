@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MANUAL_PAGE_TYPE } from "../../manual/manualEmbed";
+import { MANUAL_COMMAND_TYPE, MANUAL_PAGE_TYPE } from "../../manual/manualEmbed";
 import { MANUAL_TITLE, ManualWindow, deskManual, setDeskManual } from "./deskHelpWindow";
 
 /** A manual window on the page, its frame's window stood in for by a spy. */
 function placed() {
-  const hooks = { closed: vi.fn(), shown: vi.fn() };
+  const hooks = { closed: vi.fn(), shown: vi.fn(), menuPicked: vi.fn() };
   const win = new ManualWindow(document, hooks);
   document.body.append(win.frame.root);
-  const frameWin = { location: { replace: vi.fn() } };
+  const frameWin = { location: { replace: vi.fn() }, postMessage: vi.fn() };
   Object.defineProperty(win.frame.page, "contentWindow", { value: frameWin, configurable: true });
   return { win, hooks, frameWin };
 }
@@ -19,9 +19,13 @@ function message(source: unknown, data: unknown, origin = location.origin): void
   window.dispatchEvent(event);
 }
 
-const page = (path: string, title = "Page") => ({ type: MANUAL_PAGE_TYPE, path, title });
+const page = (path: string, title = "Page", look = "auto") => ({ type: MANUAL_PAGE_TYPE, path, title, look });
 const button = (root: HTMLElement, label: string) =>
   [...root.querySelectorAll<HTMLButtonElement>(".desk-help-bar button")].find((b) => b.textContent === label)!;
+
+/** The window menu's item reporting `code`. */
+const menuItem = (root: HTMLElement, code: string) =>
+  root.querySelector<HTMLElement>(`.desk-help-menu [data-help-item="${code}"]`)!;
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -142,6 +146,62 @@ describe("ManualWindow", () => {
     win.dispose();
     expect(waiting).toHaveBeenCalledTimes(1);
     expect(hooks.closed).not.toHaveBeenCalled();
+  });
+});
+
+describe("ManualWindow's menu bar", () => {
+  it("prints and searches the page in the frame, telling only the manual's origin", () => {
+    const { win, hooks, frameWin } = placed();
+    const focus = vi.spyOn(win.frame.page, "focus");
+    win.show("/help/", "game_menu");
+    menuItem(win.frame.root, "print").click();
+    expect(frameWin.postMessage).toHaveBeenLastCalledWith(
+      { type: MANUAL_COMMAND_TYPE, command: "print" },
+      location.origin,
+    );
+    menuItem(win.frame.root, "find").click();
+    expect(focus).toHaveBeenCalled();
+    expect(frameWin.postMessage).toHaveBeenLastCalledWith(
+      { type: MANUAL_COMMAND_TYPE, command: "find" },
+      location.origin,
+    );
+    expect(hooks.menuPicked.mock.calls).toEqual([["print"], ["find"]]);
+  });
+
+  it("checks the look the page wears, and asks the page for the look picked", () => {
+    const { win, frameWin } = placed();
+    const checked = (code: string) => menuItem(win.frame.root, code).getAttribute("aria-checked");
+    win.show("/help/", "game_menu");
+    expect(checked("theme_auto")).toBe("true");
+    message(frameWin, page("/", "Page", "dark"));
+    expect([checked("theme_dark"), checked("theme_auto")]).toEqual(["true", "false"]);
+    menuItem(win.frame.root, "theme_light").click();
+    expect(frameWin.postMessage).toHaveBeenLastCalledWith(
+      { type: MANUAL_COMMAND_TYPE, command: "look", look: "light" },
+      location.origin,
+    );
+    expect(checked("theme_light")).toBe("true");
+  });
+
+  it("closes the window from File > Exit, as the player's close", () => {
+    const { win, hooks } = placed();
+    win.show("/help/", "game_menu");
+    menuItem(win.frame.root, "exit").click();
+    expect(win.isOpen()).toBe(false);
+    expect(hooks.closed).toHaveBeenCalledTimes(1);
+    expect(hooks.menuPicked).toHaveBeenCalledWith("exit");
+  });
+
+  it("copies the manual's own address for the page showing, and opens What's New in the window", async () => {
+    const { win, frameWin } = placed();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    win.show("/help/", "game_menu");
+    message(frameWin, page("/rooms/hotels/"));
+    menuItem(win.frame.root, "copy_link").click();
+    expect(writeText).toHaveBeenCalledWith(`${location.origin}/help/rooms/hotels/`);
+    menuItem(win.frame.root, "whats_new").click();
+    expect(frameWin.location.replace).toHaveBeenLastCalledWith("/help/changelog/");
   });
 });
 

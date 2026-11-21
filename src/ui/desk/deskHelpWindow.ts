@@ -1,7 +1,9 @@
 import { buildHelpWindow, type HelpWindow } from "@verticopolis/components/windows/desk/deskHelp";
 import { helpUrl } from "../../helpAddress";
-import { readPageMessage } from "../../manual/manualEmbed";
+import { MANUAL_COMMAND_TYPE, readPageMessage, type ManualCommand, type ManualLook } from "../../manual/manualEmbed";
 import { fromGameHref, type GameHelpSource } from "../fromGame";
+import { SPONSOR_URL, sponsorOffered } from "../splashTemplate";
+import { deskHelpMenuModel, type DeskHelpMenuDeps } from "./deskHelpMenu";
 
 /**
  * The Player's Manual in its own window on the desk (owner, 2026-11-20): the
@@ -9,9 +11,11 @@ import { fromGameHref, type GameHelpSource } from "../fromGame";
  * a frame. The manual's pages say which page they show
  * (src/manual/manualEmbed.ts); the window keeps its own Back and Forward from
  * those, and moves the frame with `location.replace`, so the game's own
- * browser history never fills with manual pages.
+ * browser history never fills with manual pages. Its menu bar
+ * (deskHelpMenu.ts) acts on the page through commands it posts to the frame.
  *
- * Cost: nothing runs per frame; one message per manual page shown.
+ * Cost: nothing runs per frame; one message per manual page shown, and the
+ * menu bar redraws when the page's look changes.
  */
 
 /** The window's title, and the page title it falls back to. */
@@ -23,6 +27,8 @@ export interface ManualWindowHooks {
   readonly closed: () => void;
   /** Heard when Help shows a page in it, so the desk brings it up. */
   readonly shown: () => void;
+  /** Heard on a pick from the window's menu bar, with the item's code. */
+  readonly menuPicked: (item: string) => void;
 }
 
 /** The manual's own address for `path`, a page under the manual's base
@@ -37,6 +43,9 @@ export class ManualWindow {
   private readonly manualOrigin: string;
   /** Run once when the window next closes, by the player or the desk. */
   private closing: (() => void)[] = [];
+  /** The look the page shown last said it wears, which Options checks. */
+  private look: ManualLook = "auto";
+  private readonly menuDeps: DeskHelpMenuDeps;
 
   constructor(
     private readonly doc: Document,
@@ -44,13 +53,40 @@ export class ManualWindow {
   ) {
     const view = doc.defaultView;
     this.manualOrigin = new URL(manualHref("/"), (view ?? globalThis).location.href).origin;
-    this.frame = buildHelpWindow(doc, MANUAL_TITLE, {
-      contents: () => this.go("/"),
-      back: () => this.step(-1),
-      forward: () => this.step(1),
+    this.menuDeps = {
       openInBrowser: () => this.openInBrowser(),
-      close: { label: "Close the Player's Manual", onClick: () => this.close() },
-    });
+      print: () => this.send({ type: MANUAL_COMMAND_TYPE, command: "print" }),
+      exit: () => this.close(),
+      find: () => {
+        // The page's search box can take the focus only once its frame has it.
+        this.frame.page.focus();
+        this.send({ type: MANUAL_COMMAND_TYPE, command: "find" });
+      },
+      copyLink: () => {
+        if (!view) return;
+        const href = new URL(this.currentHref(), view.location.href).href;
+        void view.navigator.clipboard?.writeText(href).catch(() => {});
+      },
+      setLook: (look) => {
+        this.setLook(look);
+        this.send({ type: MANUAL_COMMAND_TYPE, command: "look", look });
+      },
+      whatsNew: () => this.go("/changelog/"),
+      sponsor: sponsorOffered() ? SPONSOR_URL : null,
+      track: hooks.menuPicked,
+    };
+    this.frame = buildHelpWindow(
+      doc,
+      MANUAL_TITLE,
+      {
+        contents: () => this.go("/"),
+        back: () => this.step(-1),
+        forward: () => this.step(1),
+        openInBrowser: () => this.openInBrowser(),
+        close: { label: "Close the Player's Manual", onClick: () => this.close() },
+      },
+      { model: deskHelpMenuModel(this.menuDeps, this.look) },
+    );
     this.frame.root.hidden = true;
     view?.addEventListener("message", this.onMessage);
   }
@@ -117,6 +153,7 @@ export class ManualWindow {
     if (!this.isOpen() || e.origin !== this.manualOrigin || e.source !== this.frame.page.contentWindow) return;
     const page = readPageMessage(e.data);
     if (!page) return;
+    this.setLook(page.look);
     this.frame.setTitle(page.title === MANUAL_TITLE ? MANUAL_TITLE : `${page.title} - ${MANUAL_TITLE}`);
     if (this.pages[this.at] !== page.path) {
       this.pages = [...this.pages.slice(0, this.at + 1), page.path];
@@ -137,8 +174,26 @@ export class ManualWindow {
     this.go(this.pages[to]);
   }
 
+  /** The manual's own address for the page showing now. */
+  private currentHref(): string {
+    return manualHref(this.current() ?? "/");
+  }
+
   private openInBrowser(): void {
-    this.doc.defaultView?.open(manualHref(this.current() ?? "/"), "_blank", "noopener");
+    this.doc.defaultView?.open(this.currentHref(), "_blank", "noopener");
+  }
+
+  /** Ask the page in the frame to do `command`; only the manual's origin
+   *  hears it. */
+  private send(command: ManualCommand): void {
+    this.frame.page.contentWindow?.postMessage(command, this.manualOrigin);
+  }
+
+  /** Check `look` in Options, redrawing the bar only when it changes. */
+  private setLook(look: ManualLook): void {
+    if (look === this.look) return;
+    this.look = look;
+    this.frame.menus.render(deskHelpMenuModel(this.menuDeps, look));
   }
 
   private syncNav(): void {

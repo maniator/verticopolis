@@ -532,6 +532,7 @@ The windows and cards that came with the menu bar report through `app_action`:
 | `desk_win_menu_open` | `taskbar` or `title_bar` | A window menu opened, from a taskbar button (right-click, Shift+F10 or the context menu key) or a window's title bar (right-click) |
 | `desk_win_menu` | `<window>_<command>`, commands `restore`, `minimize`, `maximize`, `close` | A window menu pick. Restore, Minimize and Maximize also send their `desk_window` row |
 | `desk_control` | `display`, `appearance`, `sounds` or `settings` | A Control Panel icon (the Screen Saver dialog, the Appearance dialog, sound on or off, or Settings) |
+| `desk_help_menu` | `open_browser`, `print`, `exit`, `find`, `copy_link`, `theme_light`, `theme_dark`, `theme_auto`, `whats_new`, `report` or `sponsor` | A pick on the Help window's own menu bar (File, Edit, Options, Help; from the release after this change). The manual page in the window sends no `help_menu_pick` for it |
 
 ## `engine_status`
 

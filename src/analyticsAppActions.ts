@@ -201,6 +201,7 @@ export type AppActionName =
   | "desk_win_menu"
   | "desk_win_menu_open"
   | "desk_control"
+  | "desk_help_menu"
   // A press on a title-screen button (src/game/titlePicks.ts): `detail`
   // `continue`, `open`, `new`, `help`, `mute`, `install` or `sponsor`.
   | "title_pick"
