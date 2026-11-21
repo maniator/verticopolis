@@ -29,7 +29,9 @@ the ordinary layout. The code is `src/ui/desk/` here and `windows/desk/*` from
   player plays with can be lost. The tower's menu bar has a Window menu on
   the desk (Tools, Info, Map, Bulletin, Tower Info, then Status Bar and Full
   Screen moved in from Options): each item brings its window up, closed or
-  minimized, and is checked while it is open. Options drops Tools there.
+  minimized, and is checked while it is open. Options drops Tools there,
+  and Tower drops Tower Info, Map and Bulletin with the separator under them
+  (owner, 2026-11-21; `deskMenus.ts`), so each window has one menu item.
 - A right-click on a window's title bar or taskbar button (or Shift+F10 or the
   context menu key on a taskbar button) opens its window menu: Restore,
   Minimize, Maximize (the tower), Close, each grayed when it does not apply.
@@ -121,8 +123,7 @@ flowchart TD
   Panel across its top at the height of what they hold (a long list
   scrolls); the tower stays laid out under them. A Bulletin the game opens by
   itself (news, the welcome note) waits minimized on the taskbar; one the
-  player asks for from the Window menu, Tower > Bulletin or the taskbar
-  comes up.
+  player asks for from the Window menu or the taskbar comes up.
 - The pocket desk saves no places and runs no resize pass: its stylesheet
   places every window. Turning a tablet between pocket and full desk takes
   the old desk down and puts the new one up.
