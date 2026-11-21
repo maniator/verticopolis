@@ -9,8 +9,10 @@ import type { PortCodes } from "@verticopolis/engine/port/portCodes";
 import { clockOf } from "../engineHost/headerClock";
 import type { SimView } from "@verticopolis/engine/port/view";
 import type { UI } from "./UI";
-import { render } from "lit-html";
-import { appendMessage } from "./iconNodes";
+import { html, render } from "lit-html";
+import { ifDefined } from "lit-html/directives/if-defined.js";
+import { renderDetached } from "@verticopolis/components/windows/detached";
+import { messageWithIcons } from "@verticopolis/components/windows/icons";
 import { groupDigits } from "@verticopolis/components/windows/format";
 import { paletteWindow, relabelPalette, syncPaletteTabs } from "./uiPalette";
 import { refitPalette } from "./paletteFit";
@@ -342,16 +344,18 @@ function readLog(src: HudSource, seq: number): (Pick<LogEntry, "text" | "kind"> 
   return lines;
 }
 
-/** One bulletin line. Still never interpolates engine text into innerHTML:
- *  `appendMessage` keeps every character of `e.text` as a TEXT NODE and
- *  only swaps a known leading emoji for a trusted, code-built icon element (#721).
- *  The icon is `currentColor`, so it inherits this line's severity color (the
- *  `${e.kind}` class), matching the text. */
+/** A line of text in a `<div>` of class `cls`, its known leading emoji
+ *  swapped for a pixel icon. lit keeps every character of `text` as text, so
+ *  engine text never becomes markup (#721). The icon is `currentColor`, so it
+ *  takes the line's severity color. */
+function messageLine(cls: string, text: string, role?: string): HTMLDivElement {
+  return renderDetached(document, html`<div class=${cls} role=${ifDefined(role)}>${messageWithIcons(text)}</div>`)
+    .elements[0] as HTMLDivElement;
+}
+
+/** One bulletin line. */
 function logLine(e: Pick<LogEntry, "text" | "kind">): HTMLDivElement {
-  const d = document.createElement("div");
-  d.className = `log-line ${e.kind}`;
-  appendMessage(d, e.text);
-  return d;
+  return messageLine(`log-line ${e.kind}`, e.text);
 }
 
 /** Adopt a freshly-swapped tower's log baseline (load / import / new / undo /
@@ -385,14 +389,11 @@ export function showTower(ui: Pick<UI, "resetLog" | "update">, src: HudSource, g
 
 /** A transient toast on the toast rail; self-removing, capped at TOAST_MAX. */
 export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): void {
-  const t = document.createElement("div");
-  t.className = `toast ${kind}`;
-  appendMessage(t, text);
   // The rail is polite (role="status") so routine good/info toasts never
   // interrupt a screen reader mid-sentence, and a catch-up flush of several at
   // once queues instead of barging. A genuine error is the exception: mark it
   // role="alert" (an assertive live region of its own) so it still cuts in.
-  if (kind === "bad") t.setAttribute("role", "alert");
+  const t = messageLine(`toast ${kind}`, text, kind === "bad" ? "alert" : undefined);
   ui.el.toast.appendChild(t);
   // Self-removing: hold, then a short fade. Track the pending timer under the
   // node so an early prune (below) can cancel it; the fade step re-registers the

@@ -1,3 +1,5 @@
+import { html } from "lit-html";
+import { renderDetached } from "@verticopolis/components/windows/detached";
 import { MAX_STEP_S, SAVER_PIXEL, type SaverScene } from "./saverScene";
 
 /**
@@ -91,19 +93,13 @@ export function showScreenSaver(opts: ScreenSaverOpts, doc: Document = document)
   const startedAt = now();
   const returnFocus = doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
 
-  const root = doc.createElement("div");
-  root.id = "screensaver";
-  root.setAttribute("role", "dialog");
-  root.setAttribute("aria-modal", "true");
-  root.setAttribute("aria-label", "Screen saver");
-  root.tabIndex = -1;
-  const canvas = doc.createElement("canvas");
-  canvas.setAttribute("aria-hidden", "true");
-  const hint = doc.createElement("p");
-  hint.className = "screensaver-hint";
-  hint.setAttribute("role", "status");
-  hint.textContent = SAVER_HINT;
-  root.append(canvas, hint);
+  const [root] = renderDetached(
+    doc,
+    html`<div id="screensaver" role="dialog" aria-modal="true" aria-label="Screen saver" tabindex="-1"
+      ><canvas aria-hidden="true"></canvas><p class="screensaver-hint" role="status">${SAVER_HINT}</p></div
+    >`,
+  ).elements as [HTMLElement];
+  const canvas = root.querySelector("canvas")!;
   doc.body.appendChild(root);
   root.focus({ preventScroll: true });
 
