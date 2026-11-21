@@ -106,8 +106,9 @@ flowchart TD
   `#topbar` (Info), `#palette` (Tools) and `#stage`: Info across the top,
   Tools along the bottom of an upright phone (one row of tabs, one row of
   tools with their prices, about 76 px), and at the left of a sideways
-  phone or an upright tablet. Inspect and Bulldoze, pinned at the start of
-  the strip, show their icons alone. There are no Info or Tools windows, so
+  phone or an upright tablet. Inspect and Bulldoze sit pinned at the start
+  of the strip, and on a phone held upright they show their icons alone.
+  There are no Info or Tools windows, so
   the Window menu leaves them out; the status bar is hidden, and the taskbar
   names the tower alone. The tower has no Minimize or Maximize, and its
   taskbar button only brings it to the front.
