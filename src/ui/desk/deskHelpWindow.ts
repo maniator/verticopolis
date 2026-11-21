@@ -124,11 +124,13 @@ export class ManualWindow {
     this.hooks.closed();
   }
 
-  /** Stop hearing the manual's pages; the desk is coming down. An open
-   *  window closes without counting as the player's close. */
+  /** Stop hearing the manual's pages and take the menu bar's listeners off
+   *  the page; the desk is coming down, and the next desk builds its own
+   *  window. An open window closes without counting as the player's close. */
   dispose(): void {
     if (this.isOpen()) this.shut();
     this.doc.defaultView?.removeEventListener("message", this.onMessage);
+    this.frame.dispose();
   }
 
   private shut(): void {

@@ -205,6 +205,21 @@ describe("ManualWindow's menu bar", () => {
   });
 });
 
+describe("ManualWindow.dispose", () => {
+  it("takes the menu bar's page listeners off, so a desk built again leaves no bar behind", () => {
+    const { win } = placed();
+    const under = vi.fn();
+    document.body.addEventListener("pointerdown", under);
+    win.show("/help/", "game_menu");
+    win.frame.root.querySelector<HTMLButtonElement>(".desk-help-menu .mb-title")!.click();
+    win.dispose();
+    // The old bar's menu stayed open, but it no longer swallows a press outside it.
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+    expect(under).toHaveBeenCalledTimes(1);
+    document.body.removeEventListener("pointerdown", under);
+  });
+});
+
 describe("deskManual", () => {
   it("is the desk's window while the desk is up", () => {
     expect(deskManual()).toBeNull();
