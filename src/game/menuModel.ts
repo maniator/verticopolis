@@ -102,7 +102,7 @@ function gameMenus({ sponsorUrl, onSponsor }: Omit<GameMenuOptions, "pick">): Me
           { id: "mb-export", label: "Save As…", shortcut: "Ctrl+Shift+S" },
           // The passive home of the install offer: present only when the app
           // can be installed and is not already (the controller shows it).
-          sep(undefined, "mb-install-sep", true),
+          sep("mb-install-sep", "mb-install-sep", true),
           { id: "btn-install-menu", label: "Install app", hidden: true },
           // Close comes last, below its own line, as a program's Exit does.
           sep("mb-close-sep"),

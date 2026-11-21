@@ -89,14 +89,14 @@ beforeEach(() => {
 
 describe("File > Open Recent", () => {
   it("shows the grayed line with no recent towers", () => {
-    fillRecentMenu(root);
+    fillRecentMenu();
     expect(shown()).toEqual(["No recent towers"]);
   });
 
   it("numbers the towers newest first, with the number underlined as its key", () => {
     keep(towers(2), folder("Sky Mall.vctower"), towers(1, "tdt"));
     fake.files.set("id1", entry(1, "Old Tower", "tdt"));
-    fillRecentMenu(root);
+    fillRecentMenu();
     expect(shown()).toEqual(["1Tower 2", "2Sky Mall.vctower", "3Old Tower (1994)"]);
     expect(item(2).querySelector("u")?.textContent).toBe("2");
     expect(item(1).title).toBe("In My Towers");
@@ -111,7 +111,7 @@ describe("File > Open Recent", () => {
 
   it("takes a file deleted from My Towers, and one from a folder no longer linked, off the list", () => {
     keep(towers(9), towers(1), folder("Gone.vctower", "L0"), folder("Here.vctower"));
-    fillRecentMenu(root);
+    fillRecentMenu();
     expect(shown()).toEqual(["1Tower 1", "2Here.vctower"]);
     expect(stored()).toEqual([towers(1), folder("Here.vctower")]);
   });
@@ -121,7 +121,7 @@ describe("File > Open Recent", () => {
     // put one of its files on top of the shared list.
     fake.keptLinkId = "L2";
     keep(folder("Theirs.vctower", "L2"), folder("Mine.vctower"), folder("Old.vctower", "L0"));
-    fillRecentMenu(root);
+    fillRecentMenu();
     expect(shown()).toEqual(["1Mine.vctower"]);
     expect(stored()).toEqual([folder("Theirs.vctower", "L2"), folder("Mine.vctower")]);
   });
@@ -129,7 +129,7 @@ describe("File > Open Recent", () => {
   it("keeps every line while My Towers is still opening, under the stored names", () => {
     fake.open = false;
     keep(towers(9));
-    fillRecentMenu(root);
+    fillRecentMenu();
     expect(shown()).toEqual(["1Tower 9"]);
     expect(stored()).toEqual([towers(9)]);
   });
@@ -137,14 +137,14 @@ describe("File > Open Recent", () => {
   it("hides a linked file in a browser that can't link a folder, and keeps it", () => {
     fake.canLink = false;
     keep(folder("Sky.vctower"), towers(1));
-    fillRecentMenu(root);
+    fillRecentMenu();
     expect(shown()).toEqual(["1Tower 1"]);
     expect(stored()).toHaveLength(2);
   });
 
   it("opens a My Towers line through the Open window's path, and counts where it came from", async () => {
     keep(towers(2), towers(1));
-    fillRecentMenu(root);
+    fillRecentMenu();
     item(2).click();
     await vi.waitFor(() => expect(fake.openTowersFile).toHaveBeenCalledWith(app, "id1"));
     expect(fake.track).toHaveBeenCalledWith("files_open", "recent");

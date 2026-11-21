@@ -1,4 +1,5 @@
 import { isInstalledStandalone } from "../ui/standalone";
+import type { MenuEntryState } from "./menuBarHost";
 
 /**
  * Whether Options > Full Screen is offered (owner, 2026-11-15).
@@ -33,14 +34,11 @@ export const FULL_SCREEN_ITEM = "mb-fullscreen";
 export const DISPLAY_SEPARATOR = "mb-display-sep";
 
 /**
- * Show or hide Full Screen, read as the Options menu opens. On a phone the
+ * Whether Full Screen shows, read as the Options menu opens. On a phone the
  * line above it goes with it: Tools and Status Bar are a computer's items, so
  * Full Screen is the only thing under that line there.
  */
-export function fitFullScreenItem(phone: boolean, doc: Document = document): void {
+export function fullScreenStates(phone: boolean, doc: Document = document): Record<string, MenuEntryState> {
   const offered = fullScreenOffered({ phone, installed: isInstalledStandalone(), filling: !!doc.fullscreenElement });
-  const item = doc.getElementById(FULL_SCREEN_ITEM);
-  if (item) item.hidden = !offered;
-  const sep = doc.getElementById(DISPLAY_SEPARATOR);
-  if (sep) sep.hidden = phone && !offered;
+  return { [FULL_SCREEN_ITEM]: { hidden: !offered }, [DISPLAY_SEPARATOR]: { hidden: phone && !offered } };
 }

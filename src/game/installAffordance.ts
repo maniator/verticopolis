@@ -10,7 +10,7 @@ import {
 import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { showInstallHelp } from "../ui/uiDialogs";
 import { isSplashUp } from "./interactionState";
-import { onMenuItem } from "./menuBarHost";
+import { onMenuItem, setMenuState } from "./menuBarHost";
 
 /**
  * The install-affordance controller (SPEC-pwa-install). Ties the browser install
@@ -80,8 +80,7 @@ function hasReallyPlayed(app: GameApp): boolean {
 /** Toggle the permanent passive menu entry to match live offerability. Cheap;
  *  called on init and on every install-seam change. */
 function refreshMenu(): void {
-  const menu = document.getElementById("btn-install-menu") as HTMLButtonElement | null;
-  if (menu) menu.hidden = installAvailability() === "none";
+  setMenuState({ "btn-install-menu": { hidden: installAvailability() === "none" } });
 }
 
 function hideChip(): void {

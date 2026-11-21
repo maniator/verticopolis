@@ -35,7 +35,7 @@ import {
   type DeskChange,
   type DeskWindowSpec,
 } from "@verticopolis/components/windows/desk/deskWindow";
-import { onMenuItem, runMenuItem } from "../../game/menuBarHost";
+import { onMenuItem, runMenuItem, setMenuState, type MenuEntryState } from "../../game/menuBarHost";
 
 /**
  * The 1994 desk (option C, picked by the owner on 2026-11-15): on a computer,
@@ -483,11 +483,12 @@ export class DeskController {
     }
     this.taskbar?.render(entries);
     const pocketMap = this.pocket ? this.doc.getElementById("overview-map") : null;
+    const checks: Record<string, MenuEntryState> = {};
     for (const item of this.doc.querySelectorAll<HTMLElement>("[data-desk-win]")) {
       const id = item.dataset.deskWin as DeskWindowId;
-      const open = String(pocketMap && id === "map" ? !pocketMap.hidden : !!this.wins.get(id)?.spec.isOpen());
-      if (item.getAttribute("aria-checked") !== open) item.setAttribute("aria-checked", open);
+      checks[item.id] = { checked: pocketMap && id === "map" ? !pocketMap.hidden : !!this.wins.get(id)?.spec.isOpen() };
     }
+    setMenuState(checks, this.doc);
     this.taskbar?.syncSound();
     this.syncControl?.();
   }
