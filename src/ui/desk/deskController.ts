@@ -182,7 +182,7 @@ export class DeskController {
     for (const item of this.doc.querySelectorAll<HTMLElement>("[data-desk-win]")) {
       onMenuItem(item.id, () => this.show(item.dataset.deskWin as DeskWindowId), this.doc);
     }
-    // Tower > Bulletin is the player asking too, so the pocket desk brings it up.
+    // The Window menu opens the Bulletin by running Tower's hidden item: the player asking.
     onMenuItem("mb-win-bulletin", () => this.ask("bulletin"), this.doc);
   }
 
