@@ -186,7 +186,7 @@ describe("DeskController", () => {
     expect(doc.querySelector("#palette .desk-btn-close")).toBeNull();
     const map = doc.getElementById("overview-map")!;
     // The game's Map item opens the Map the game's way.
-    doc.getElementById("mb-win-map")!.addEventListener("click", () => (map.hidden = false));
+    onMenuItem("mb-win-map", () => (map.hidden = false), doc);
     map.hidden = true;
     await Promise.resolve();
     expect(doc.getElementById("mb-dw-map")!.getAttribute("aria-checked")).toBe("false");

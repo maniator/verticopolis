@@ -116,8 +116,9 @@ flowchart TD
   the top-left on a phone, 200 by 288 at the bottom-right on a tablet), with
   its own ✕ and Map pill, and has no taskbar button. It opens with the
   pocket desk, and Window > Map opens it again after its ✕.
-- The Bulletin, Tower Info and the Control Panel open over the whole desk
-  and the tower stays laid out under them. A Bulletin the game opens by
+- The Bulletin opens over the whole desk, and Tower Info and the Control
+  Panel across its top at the height of what they hold (a long list
+  scrolls); the tower stays laid out under them. A Bulletin the game opens by
   itself (news, the welcome note) waits minimized on the taskbar; one the
   player asks for from the Window menu, Tower > Bulletin or the taskbar
   comes up.

@@ -56,7 +56,7 @@ import {
   toggleFullScreen,
   wireMenus,
 } from "./menuWiring";
-import { drawMenuBar } from "./menuBarHost";
+import { drawMenuBar, onMenuItem, runMenuItem } from "./menuBarHost";
 
 /** The menu bar's items as index.html has them, plus the windows and the
  *  toolbar twins the wiring reaches. */
@@ -384,6 +384,16 @@ describe("wireMenus analytics", () => {
     });
     expect(bar.current()).toBeNull();
     expect(menus.dismiss).not.toHaveBeenCalled();
+  });
+
+  it("an item that runs another item's actions still reports one menu_pick", () => {
+    wireMenus(fakeApp().app);
+    // The desk's Window > Map opens the Map the way Tower > Map does.
+    onMenuItem("mb-quick-save", () => runMenuItem("mb-win-map"));
+    pointerClick($("mb-file"));
+    pointerClick($("mb-quick-save"));
+    expect(map.set).toHaveBeenCalled();
+    expect(menus.pick).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ menu: "file", item: "quick_save" }));
   });
 
   it("a keyboard pick says keys, and a checkmark item reports the state it flips to", () => {

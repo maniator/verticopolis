@@ -35,7 +35,7 @@ import {
   type DeskChange,
   type DeskWindowSpec,
 } from "@verticopolis/components/windows/desk/deskWindow";
-import { onMenuItem } from "../../game/menuBarHost";
+import { onMenuItem, runMenuItem } from "../../game/menuBarHost";
 
 /**
  * The 1994 desk (option C, picked by the owner on 2026-11-15): on a computer,
@@ -198,7 +198,7 @@ export class DeskController {
   private show(id: DeskWindowId): void {
     // The pocket desk's Map is the game's own card in the tower's view.
     if (this.pocket && id === "map" && this.doc.getElementById("overview-map")?.hidden)
-      this.doc.getElementById("mb-win-map")?.click();
+      runMenuItem("mb-win-map", this.doc);
     const w = this.wins.get(id);
     if (!w) return;
     this.ask(id);
@@ -272,7 +272,7 @@ export class DeskController {
     for (const el of pocket ? [towerInfo, bulletin] : [palette, map, towerInfo, bulletin]) this.move(el, desk);
     // Tools never folds on the desk: a window folded off the desk opens.
     if (palette?.classList.contains(PALETTE_COLLAPSED_CLASS)) doc.getElementById(PALETTE_COLLAPSE_BUTTON_ID)?.click();
-    const item = (id: string) => () => doc.getElementById(id)?.click();
+    const item = (id: string) => () => runMenuItem(id, doc);
 
     const spec = (
       id: DeskWindowId,
